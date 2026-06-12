@@ -1,0 +1,287 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── AUTH / RBAC ──────────────────────────
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  role          Role     @default(viewer)
+  name          String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  createdSuppliers  Supplier[]        @relation("SupplierCreatedBy")
+  createdBatches    Batch[]           @relation("BatchCreatedBy")
+  createdCycles     ProductionCycle[] @relation("CycleCreatedBy")
+
+  @@map("users")
+}
+
+enum Role {
+  owner
+  manager
+  viewer
+}
+
+// ── SUPPLIERS ────────────────────────────
+model Supplier {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String    @unique @db.VarChar(100)
+  description   String?   @db.Text
+  chickenType   String?   @map("chicken_type") @db.VarChar(50)
+  isActive      Boolean   @default(true) @map("is_active")
+  isDefault     Boolean   @default(false) @map("is_default")
+  createdBy     String?   @map("created_by") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  feedStages    FeedStage[]
+  batches       Batch[]
+  projections   Projection[]
+  creator       User?     @relation("SupplierCreatedBy", fields: [createdBy], references: [id])
+
+  @@map("suppliers")
+}
+
+// ── FEED STAGES ──────────────────────────
+model FeedStage {
+  id                String      @id @default(uuid()) @db.Uuid
+  supplierId        String      @map("supplier_id") @db.Uuid
+  stageName         String      @map("stage_name") @db.VarChar(50)
+  stageType         StageType   @default(feed) @map("stage_type")
+  dayRangeStart     Int?        @map("day_range_start")
+  dayRangeEnd       Int?        @map("day_range_end")
+  unitSizeKg        Decimal     @map("unit_size_kg") @db.Decimal(10, 3)
+  unitPriceZmw      Decimal     @map("unit_price_zmw") @db.Decimal(12, 2)
+  intakePerBirdKg   Decimal     @map("intake_per_bird_kg") @db.Decimal(8, 4)
+  sortOrder         Int         @default(0) @map("sort_order")
+  isActive          Boolean     @default(true) @map("is_active")
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  supplier          Supplier    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  batchExpenses     BatchExpense[]
+
+  @@unique([supplierId, stageName])
+  @@index([supplierId, sortOrder])
+  @@map("feed_stages")
+}
+
+enum StageType {
+  feed
+  chick
+  medication
+  other
+}
+
+// ── PRODUCTION CYCLES ────────────────────
+model ProductionCycle {
+  id           String        @id @default(uuid()) @db.Uuid
+  cycleNumber  Int           @unique @map("cycle_number")
+  label        String?       @db.VarChar(50)
+  notes        String?       @db.Text
+  status       CycleStatus   @default(planned)
+  createdBy    String?       @map("created_by") @db.Uuid
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  batches      Batch[]
+  creator      User?         @relation("CycleCreatedBy", fields: [createdBy], references: [id])
+
+  @@map("production_cycles")
+}
+
+enum CycleStatus {
+  planned
+  active
+  completed
+}
+
+// ── BATCHES (SHOOTS) ─────────────────────
+model Batch {
+  id                   String       @id @default(uuid()) @db.Uuid
+  cycleId              String       @map("cycle_id") @db.Uuid
+  supplierId           String       @map("supplier_id") @db.Uuid
+  shootLabel           String       @map("shoot_label") @db.VarChar(20)
+  targetExecutionDt    DateTime     @map("target_execution_dt") @db.Date
+  salesDate            DateTime     @map("sales_date") @db.Date
+  growthQtyAdded       Int          @default(0) @map("growth_qty_added")
+  totalQtyAtHand       Int          @map("total_qty_at_hand")
+  revenueTargetZmw     Decimal?     @map("revenue_target_zmw") @db.Decimal(14, 2)
+  salesPricePerBird    Decimal?     @map("sales_price_per_bird") @db.Decimal(10, 2)
+  actualBirdsSold      Int?         @map("actual_birds_sold")
+  actualSalePrice      Decimal?     @map("actual_sale_price") @db.Decimal(10, 2)
+  mortalityPctAssumed  Decimal      @default(0.0500) @map("mortality_pct_assumed") @db.Decimal(5, 4)
+  status               BatchStatus  @default(planned)
+  createdBy            String?      @map("created_by") @db.Uuid
+  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  cycle                ProductionCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  supplier             Supplier        @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  expenses             BatchExpense[]
+  overheadCosts        OverheadCost[]
+  mortalityRecords     MortalityRecord[]
+  projections          Projection[]
+  creator              User?           @relation("BatchCreatedBy", fields: [createdBy], references: [id])
+
+  @@index([cycleId, shootLabel])
+  @@map("batches")
+}
+
+enum BatchStatus {
+  planned
+  active
+  harvested
+  closed
+}
+
+// ── BATCH EXPENSES ───────────────────────
+model BatchExpense {
+  id                 String          @id @default(uuid()) @db.Uuid
+  batchId            String          @map("batch_id") @db.Uuid
+  feedStageId        String?         @map("feed_stage_id") @db.Uuid
+  expenseCategory    ExpenseCategory @default(feed) @map("expense_category")
+  description        String?         @db.VarChar(200)
+  quantityItems      Decimal?        @map("quantity_items") @db.Decimal(12, 4)
+  quantityRoundedUp  Int?            @map("quantity_rounded_up")
+  unitPriceZmw       Decimal         @map("unit_price_zmw") @db.Decimal(12, 2)
+  subtotalZmw        Decimal         @map("subtotal_zmw") @db.Decimal(14, 2)
+  isProjected        Boolean         @default(true) @map("is_projected")
+  recordedAt         DateTime        @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  batch              Batch           @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  feedStage          FeedStage?      @relation(fields: [feedStageId], references: [id])
+
+  @@index([batchId])
+  @@map("batch_expenses")
+}
+
+enum ExpenseCategory {
+  feed
+  chick
+  medication
+  labor
+  utilities
+  transport
+  other
+}
+
+// ── OVERHEAD COSTS ───────────────────────
+model OverheadCost {
+  id           String            @id @default(uuid()) @db.Uuid
+  batchId      String            @map("batch_id") @db.Uuid
+  category     OverheadCategory
+  description  String?           @db.VarChar(200)
+  amountZmw    Decimal           @map("amount_zmw") @db.Decimal(14, 2)
+  isProjected  Boolean           @default(true) @map("is_projected")
+  notes        String?           @db.Text
+  recordedAt   DateTime          @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  batch        Batch             @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@map("overhead_costs")
+}
+
+enum OverheadCategory {
+  medication
+  vaccination
+  labour
+  electricity
+  water
+  litter
+  transport_to_market
+  other
+}
+
+// ── MORTALITY RECORDS ────────────────────
+model MortalityRecord {
+  id          String   @id @default(uuid()) @db.Uuid
+  batchId     String   @map("batch_id") @db.Uuid
+  recordedAt  DateTime @map("recorded_at") @db.Timestamptz(6)
+  dayOfCycle  Int?     @map("day_of_cycle")
+  birdsLost   Int      @default(0) @map("birds_lost")
+  cause       String?  @db.VarChar(100)
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  batch       Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId, recordedAt])
+  @@map("mortality_records")
+}
+
+// ── PROJECTIONS ──────────────────────────
+model Projection {
+  id                 String   @id @default(uuid()) @db.Uuid
+  batchId            String   @map("batch_id") @db.Uuid
+  supplierId         String   @map("supplier_id") @db.Uuid
+  birdCount          Int      @map("bird_count")
+  salesPricePerBird  Decimal  @map("sales_price_per_bird") @db.Decimal(10, 2)
+  mortalityPct       Decimal  @default(0.0500) @map("mortality_pct") @db.Decimal(5, 4)
+  effectiveBirdCount Decimal  @map("effective_bird_count") @db.Decimal(12, 2)
+  totalFeedCost      Decimal  @map("total_feed_cost") @db.Decimal(14, 2)
+  totalChickCost     Decimal  @map("total_chick_cost") @db.Decimal(14, 2)
+  totalOverheadCost  Decimal? @map("total_overhead_cost") @db.Decimal(14, 2)
+  totalExpenses      Decimal  @map("total_expenses") @db.Decimal(14, 2)
+  projectedRevenue   Decimal  @map("projected_revenue") @db.Decimal(14, 2)
+  grossProfit        Decimal  @map("gross_profit") @db.Decimal(14, 2)
+  netProfit          Decimal  @map("net_profit") @db.Decimal(14, 2)
+  calculatedAt       DateTime @default(now()) @map("calculated_at") @db.Timestamptz(6)
+
+  batch              Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  supplier           Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@index([batchId])
+  @@map("projections")
+}
+
+// ── EXCHANGE RATES ───────────────────────
+model ExchangeRate {
+  id             String   @id @default(uuid()) @db.Uuid
+  currencyFrom   String   @default("USD") @map("currency_from") @db.Char(3)
+  currencyTo     String   @default("ZMW") @map("currency_to") @db.Char(3)
+  rate           Decimal  @db.Decimal(12, 6)
+  effectiveDate  DateTime @map("effective_date") @db.Date
+  source         String?  @db.VarChar(50)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([currencyFrom, currencyTo, effectiveDate])
+  @@map("exchange_rates")
+}
+
+// ── EQUIPMENT ITEMS ──────────────────────
+model EquipmentItem {
+  id              String              @id @default(uuid()) @db.Uuid
+  category        EquipmentCategory
+  name            String              @db.VarChar(200)
+  unitCostUsd     Decimal?            @map("unit_cost_usd") @db.Decimal(14, 2)
+  quantity        Int                 @default(1)
+  isCompulsory    Boolean             @default(false) @map("is_compulsory")
+  usefulLifeYears Int?                @map("useful_life_years")
+  notes           String?             @db.Text
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("equipment_items")
+}
+
+enum EquipmentCategory {
+  raising_equipment
+  abattoir
+  cold_storage
+  building
+  other
+}

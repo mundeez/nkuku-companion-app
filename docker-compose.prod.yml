@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  nginx:
+    volumes:
+      - ./infra/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - certbot_certs:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      certbot:
+        condition: service_completed_successfully
+
+  api:
+    build:
+      target: production
+    environment:
+      NODE_ENV: production
+    volumes: []
+    command: ["node", "dist/main.js"]
+
+  web:
+    build:
+      target: production
+    volumes: []
+    command: ["node", "server.js"]
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: >
+      sh -c "certbot certonly --standalone
+      --non-interactive
+      --agree-tos
+      --email admin@$$NGINX_HOST
+      -d $$NGINX_HOST
+      || true"
+    environment:
+      NGINX_HOST: ${NGINX_HOST:-nkuku.local}
+    networks:
+      - nkuku_public
+
+volumes:
+  certbot_certs:
+  certbot_www:

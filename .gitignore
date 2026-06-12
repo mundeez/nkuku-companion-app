@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+apps/web/.next/
+apps/web/out/
+apps/api/dist/
+apps/mobile/build/
+apps/mobile/.dart_tool/
+
+# Logs
+*.log
+logs/
+
+# Testing
+coverage/
+*.lcov
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+
+# Docker
+docker-compose.override.yml
+
+# Misc
+*.pem
+*.key
+certs/

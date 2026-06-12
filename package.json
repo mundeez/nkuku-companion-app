@@ -1,0 +1,30 @@
+{
+  "name": "nkuku-companion-app",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "description": "Nkuku Companion App — broiler chicken business management platform",
+  "scripts": {
+    "dev": "docker compose up",
+    "dev:build": "docker compose up --build",
+    "dev:down": "docker compose down -v",
+    "dev:prod": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "test:integration": "pnpm -r test:integration",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "db:seed": "pnpm --filter api db:seed",
+    "db:studio": "pnpm --filter api db:studio",
+    "db:generate": "pnpm --filter api db:generate",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
