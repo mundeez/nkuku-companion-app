@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 
 # ── Development stage ────────────────────
-FROM node:20-alpine AS development
+FROM node:20-slim AS development
 
 WORKDIR /app
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+RUN apt-get update -y && apt-get install -y openssl && corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 COPY apps/api/package.json ./
 COPY apps/api/prisma ./prisma/
@@ -19,11 +19,11 @@ EXPOSE 3001
 CMD ["pnpm", "run", "dev"]
 
 # ── Production stage ─────────────────────
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
+RUN apt-get update -y && apt-get install -y openssl && corepack enable && corepack prepare pnpm@8.15.0 --activate
 
 COPY apps/api/package.json ./
 COPY apps/api/prisma ./prisma/

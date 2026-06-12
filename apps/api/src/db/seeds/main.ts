@@ -136,11 +136,10 @@ async function main() {
   ];
 
   for (const eq of equipmentData) {
-    await prisma.equipmentItem.upsert({
-      where: { id: `seeded-${eq.name}` },
-      update: {},
-      create: { ...eq, id: `seeded-${eq.name}` },
-    });
+    const existing = await prisma.equipmentItem.findFirst({ where: { name: eq.name } });
+    if (!existing) {
+      await prisma.equipmentItem.create({ data: eq });
+    }
   }
   console.log('[SEED] Equipment items:', equipmentData.length);
 
@@ -177,23 +176,25 @@ async function main() {
     // Pick NUTRI FEED as default supplier for seeded batches
     const defaultSupplier = await prisma.supplier.findFirst({ where: { isDefault: true } });
 
-    await prisma.batch.upsert({
-      where: { id: `seeded-${cycle.id}-${row.shootLabel}` },
-      update: {},
-      create: {
-        id: `seeded-${cycle.id}-${row.shootLabel}`,
-        cycleId: cycle.id,
-        supplierId: defaultSupplier!.id,
-        shootLabel: row.shootLabel,
-        targetExecutionDt: new Date(row.targetExecutionDt),
-        salesDate: new Date(row.salesDate),
-        growthQtyAdded: row.growthQtyAdded,
-        totalQtyAtHand: row.totalQtyAtHand,
-        revenueTargetZmw: row.revenueTargetZmw,
-        status: 'planned',
-        createdBy: owner.id,
-      },
+    const existingBatch = await prisma.batch.findFirst({
+      where: { cycleId: cycle.id, shootLabel: row.shootLabel }
     });
+    if (!existingBatch) {
+      await prisma.batch.create({
+        data: {
+          cycleId: cycle.id,
+          supplierId: defaultSupplier!.id,
+          shootLabel: row.shootLabel,
+          targetExecutionDt: new Date(row.targetExecutionDt),
+          salesDate: new Date(row.salesDate),
+          growthQtyAdded: row.growthQtyAdded,
+          totalQtyAtHand: row.totalQtyAtHand,
+          revenueTargetZmw: row.revenueTargetZmw,
+          status: 'planned',
+          createdBy: owner.id,
+        },
+      });
+    }
   }
   console.log('[SEED] Production cycles + batches:', expansionRows.length);
 

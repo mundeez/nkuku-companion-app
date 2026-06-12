@@ -45,5 +45,6 @@
   },
   "prisma": {
     "seed": "tsx src/db/seeds/main.ts"
-  }
+  },
+  "type": "module"
 }

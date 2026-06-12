@@ -59,7 +59,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "3001:3001"
+      - "30001:3001"
     networks:
       - nkuku_internal
       - nkuku_public
@@ -79,7 +79,7 @@ services:
     depends_on:
       - api
     ports:
-      - "3000:3000"
+      - "30000:3000"
     networks:
       - nkuku_public
     restart: unless-stopped
@@ -89,7 +89,7 @@ services:
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "80:80"
+      - "30080:80"
     depends_on:
       - api
       - web
@@ -97,13 +97,6 @@ services:
       - nkuku_public
     restart: unless-stopped
 
-  adminer:
-    image: adminer:latest
-    ports:
-      - "8080:8080"
-    networks:
-      - nkuku_internal
-    restart: unless-stopped
 
 volumes:
   postgres_data:
