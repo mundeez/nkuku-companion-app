@@ -21,7 +21,12 @@ const app = Fastify({
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
 
-await app.register(cors, { origin: true, credentials: true });
+// CORS: allow configured origins (comma-separated) or default to all in dev
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+  : true;
+
+await app.register(cors, { origin: corsOrigins, credentials: true });
 
 await app.register(swagger, {
   swagger: {
@@ -66,4 +71,3 @@ try {
   app.log.error(err);
   process.exit(1);
 }
-

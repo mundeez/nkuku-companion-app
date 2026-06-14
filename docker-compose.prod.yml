@@ -1,49 +1,95 @@
-version: "3.9"
+# Nkuku Companion — Production Docker Compose
+# Deploy: docker compose -f docker-compose.prod.yml up --build -d
+#
+# Requirements:
+#   - .env file present in project root (see .env.example)
+#   - ISPConfig nginx (or any reverse proxy) handles SSL on port 80/443
+#   - Docker containers bind to localhost only for security
 
 services:
-  nginx:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: nkuku_db
+      POSTGRES_USER: nkuku_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - ./infra/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
-      - certbot_certs:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      certbot:
-        condition: service_completed_successfully
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nkuku_user -d nkuku_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nkuku_internal
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nkuku_internal
+    restart: unless-stopped
 
   api:
     build:
+      context: .
+      dockerfile: apps/api/Dockerfile
       target: production
     environment:
       NODE_ENV: production
-    volumes: []
-    command: ["node", "dist/main.js"]
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      PORT: 3001
+      HOST: 0.0.0.0
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
+      OWNER_EMAIL: ${OWNER_EMAIL}
+      OWNER_PASSWORD: ${OWNER_PASSWORD}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    # Bind to localhost only — ISPConfig nginx proxies in from the outside
+    ports:
+      - "127.0.0.1:30001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nkuku_internal
+      - nkuku_public
+    restart: unless-stopped
+    command: ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/main.js"]
 
   web:
     build:
+      context: .
+      dockerfile: apps/web/Dockerfile
       target: production
-    volumes: []
-    command: ["node", "server.js"]
-
-  certbot:
-    image: certbot/certbot:latest
-    volumes:
-      - certbot_certs:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-    entrypoint: >
-      sh -c "certbot certonly --standalone
-      --non-interactive
-      --agree-tos
-      --email admin@$$NGINX_HOST
-      -d $$NGINX_HOST
-      || true"
     environment:
-      NGINX_HOST: ${NGINX_HOST:-nkuku.local}
+      NODE_ENV: production
+      # Empty = same-origin API calls (nginx routes /api to backend)
+      NEXT_PUBLIC_API_URL: ""
+    # Bind to localhost only — ISPConfig nginx proxies in from the outside
+    ports:
+      - "127.0.0.1:30000:3000"
+    depends_on:
+      - api
     networks:
       - nkuku_public
+    restart: unless-stopped
 
 volumes:
-  certbot_certs:
-  certbot_www:
+  postgres_data:
+  redis_data:
+
+networks:
+  nkuku_internal:
+  nkuku_public:

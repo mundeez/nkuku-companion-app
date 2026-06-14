@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export type ApiError = { error: string; message?: string };
 
@@ -20,7 +20,8 @@ export async function apiFetch<T>(
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const url = API_URL ? `${API_URL}${path}` : path;
+  const res = await fetch(url, {
     ...options,
     headers,
   });
@@ -63,4 +64,3 @@ export function getUser() {
   }
   return null;
 }
-
