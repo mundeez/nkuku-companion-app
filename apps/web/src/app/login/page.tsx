@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import { login } from "@/lib/api/client";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { refreshUser } = useAuth();
   const [email, setEmail] = useState("owner@nkuku.local");
   const [password, setPassword] = useState("change_me");
   const [error, setError] = useState("");
@@ -21,6 +23,7 @@ export default function LoginPage() {
     setError("");
     try {
       await login(email, password);
+      refreshUser();
       router.push("/");
     } catch (err: any) {
       setError(err.message || "Login failed");
@@ -72,4 +75,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
