@@ -9,6 +9,18 @@ function getToken(): string | null {
   return null;
 }
 
+function handleAuthError(errorCode: string) {
+  if (
+    typeof window !== "undefined" &&
+    (errorCode === "INVALID_TOKEN" || errorCode === "MISSING_TOKEN")
+  ) {
+    localStorage.removeItem("nkuku_access_token");
+    localStorage.removeItem("nkuku_refresh_token");
+    localStorage.removeItem("nkuku_user");
+    window.location.href = "/login";
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
@@ -28,7 +40,9 @@ export async function apiFetch<T>(
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(data?.error || `HTTP ${res.status}`);
+    const errorCode = data?.error || `HTTP ${res.status}`;
+    handleAuthError(errorCode);
+    throw new Error(errorCode);
   }
   return data as T;
 }
