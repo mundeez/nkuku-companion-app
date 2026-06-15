@@ -6,7 +6,7 @@ import 'auth_service.dart';
 /// Development (Android emulator):  http://10.0.2.2:30001
 /// Development (iOS simulator):     http://localhost:30001
 /// Production:                      https://nkuku.deeztechnology.solutions/api
-const String _baseUrl = 'http://10.0.2.2:30001';
+const String _baseUrl = 'https://nkuku.deeztechnology.solutions/api';
 
 class ApiService {
   static final Dio dio = Dio(BaseOptions(
