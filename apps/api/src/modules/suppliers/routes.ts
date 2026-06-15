@@ -6,6 +6,7 @@ const SupplierCreateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().optional(),
   chickenType: z.string().optional(),
+  contact: z.string().optional(),
   isActive: z.boolean().optional(),
   isDefault: z.boolean().optional(),
 });
@@ -14,6 +15,7 @@ const SupplierUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().optional(),
   chickenType: z.string().optional(),
+  contact: z.string().optional(),
   isActive: z.boolean().optional(),
   isDefault: z.boolean().optional(),
 });

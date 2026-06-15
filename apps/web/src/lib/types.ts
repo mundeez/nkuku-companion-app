@@ -1,8 +1,19 @@
+export interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  role: "owner" | "manager" | "viewer";
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Supplier {
   id: string;
   name: string;
   description?: string;
   chickenType?: string;
+  contact?: string;
   isActive: boolean;
   isDefault: boolean;
   feedStages: FeedStage[];

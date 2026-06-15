@@ -12,6 +12,7 @@ import { buildBatchModule } from './modules/batches/routes.js';
 import { buildProjectionModule } from './modules/projections/routes.js';
 import { buildExpansionPlanModule } from './modules/expansion-plan/routes.js';
 import { buildOverheadModule } from './modules/overhead/routes.js';
+import { buildUserModule } from './modules/users/routes.js';
 
 const prisma = new PrismaClient();
 const app = Fastify({
@@ -56,6 +57,7 @@ await app.register(buildBatchModule, { prefix: '/api/v1/batches' });
 await app.register(buildProjectionModule, { prefix: '/api/v1/projections' });
 await app.register(buildExpansionPlanModule, { prefix: '/api/v1/expansion-plan' });
 await app.register(buildOverheadModule, { prefix: '/api/v1/overhead' });
+await app.register(buildUserModule, { prefix: '/api/v1/users' });
 
 // ── Health check ─────────────────────────
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

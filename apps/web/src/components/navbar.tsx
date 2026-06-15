@@ -6,16 +6,17 @@ import { Button } from "./ui/button";
 import { LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
 
-const navLinks = [
-  { href: "/", label: "Dashboard" },
-  { href: "/suppliers", label: "Suppliers" },
-  { href: "/projections", label: "Projections" },
-  { href: "/expansion-plan", label: "Expansion Plan" },
-];
-
 export function Navbar() {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const navLinks = [
+    { href: "/", label: "Dashboard" },
+    { href: "/suppliers", label: "Suppliers" },
+    { href: "/projections", label: "Projections" },
+    { href: "/expansion-plan", label: "Expansion Plan" },
+    ...(user?.role === "owner" ? [{ href: "/users", label: "Users" }] : []),
+  ];
 
   if (!user) return null;
 
