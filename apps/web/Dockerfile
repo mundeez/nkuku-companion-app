@@ -27,6 +27,8 @@ COPY apps/web/src ./src
 COPY apps/web/public ./public
 RUN pnpm run build
 
-# Standalone output is in .next/standalone
+# Copy static files into standalone output so the server can serve them
+RUN cp -R .next/static .next/standalone/.next/static
+
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]
