@@ -13,6 +13,16 @@ import { buildProjectionModule } from './modules/projections/routes.js';
 import { buildExpansionPlanModule } from './modules/expansion-plan/routes.js';
 import { buildOverheadModule } from './modules/overhead/routes.js';
 import { buildUserModule } from './modules/users/routes.js';
+import { buildBreedModule } from './modules/breeds/routes.js';
+import { buildBroilerFlockModule } from './modules/broiler-flocks/routes.js';
+import { buildGrowthRecordModule } from './modules/growth-records/routes.js';
+import { buildFeedRecordModule } from './modules/feed-records/routes.js';
+import { buildWaterRecordModule } from './modules/water-records/routes.js';
+import { buildMortalityEventModule } from './modules/mortality-events/routes.js';
+import { buildVaccinationEventModule } from './modules/vaccination-events/routes.js';
+import { buildFinancialRecordModule } from './modules/financial-records/routes.js';
+import { buildAlertModule } from './modules/alerts/routes.js';
+import { buildDiseaseModule } from './modules/diseases/routes.js';
 
 const prisma = new PrismaClient();
 const app = Fastify({
@@ -58,6 +68,16 @@ await app.register(buildProjectionModule, { prefix: '/api/v1/projections' });
 await app.register(buildExpansionPlanModule, { prefix: '/api/v1/expansion-plan' });
 await app.register(buildOverheadModule, { prefix: '/api/v1/overhead' });
 await app.register(buildUserModule, { prefix: '/api/v1/users' });
+await app.register(buildBreedModule, { prefix: '/api/v1/breeds' });
+await app.register(buildBroilerFlockModule, { prefix: '/api/v1/broiler-flocks' });
+await app.register(buildGrowthRecordModule, { prefix: '/api/v1/growth-records' });
+await app.register(buildFeedRecordModule, { prefix: '/api/v1/feed-records' });
+await app.register(buildWaterRecordModule, { prefix: '/api/v1/water-records' });
+await app.register(buildMortalityEventModule, { prefix: '/api/v1/mortality-events' });
+await app.register(buildVaccinationEventModule, { prefix: '/api/v1/vaccination-events' });
+await app.register(buildFinancialRecordModule, { prefix: '/api/v1/financial-records' });
+await app.register(buildAlertModule, { prefix: '/api/v1/alerts' });
+await app.register(buildDiseaseModule, { prefix: '/api/v1/diseases' });
 
 // ── Health check ─────────────────────────
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
