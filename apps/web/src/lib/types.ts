@@ -76,3 +76,149 @@ export interface ProductionCycle {
   batches: Batch[];
 }
 
+
+// ── Broiler Management Types ────────────────────
+
+export interface Breed {
+  id: string;
+  name: string;
+  supplier: string;
+  isPrimary: boolean;
+  performanceTargets: PerformanceTarget[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PerformanceTarget {
+  id: string;
+  breedId: string;
+  ageDays: number;
+  targetWeight: number;
+  targetFeed: number;
+  targetFcr: number;
+}
+
+export interface BroilerFlock {
+  id: string;
+  name: string;
+  breedId: string;
+  breed: Breed;
+  startDate: string;
+  initialCount: number;
+  currentCount: number;
+  targetWeight?: number;
+  targetAge?: number;
+  feedTransitionDay?: number;
+  status: "active" | "completed" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GrowthRecord {
+  id: string;
+  flockId: string;
+  recordDate: string;
+  sampleSize: number;
+  avgWeight: number;
+  notes?: string;
+}
+
+export interface FeedRecord {
+  id: string;
+  flockId: string;
+  recordDate: string;
+  feedType: "starter" | "grower" | "finisher";
+  feedBrand?: string;
+  quantityKg: number;
+  costZmw?: number;
+  notes?: string;
+}
+
+export interface WaterRecord {
+  id: string;
+  flockId: string;
+  recordDate: string;
+  quantityLiters: number;
+  ph?: number;
+  temperature?: number;
+  notes?: string;
+}
+
+export interface MortalityEvent {
+  id: string;
+  flockId: string;
+  eventDate: string;
+  count: number;
+  cause?: string;
+  ageDays?: number;
+  notes?: string;
+}
+
+export interface VaccinationEvent {
+  id: string;
+  flockId: string;
+  vaccineName: string;
+  vaccineType: string;
+  adminDate: string;
+  adminMethod: string;
+  ageDays: number;
+  nextDueDate?: string;
+  notes?: string;
+}
+
+export interface FinancialRecord {
+  id: string;
+  flockId: string;
+  recordDate: string;
+  category: FinancialCategory;
+  description: string;
+  amountZmw: number;
+  isIncome: boolean;
+  notes?: string;
+}
+
+export type FinancialCategory =
+  | "chick_purchase"
+  | "feed"
+  | "vaccines"
+  | "medication"
+  | "labor"
+  | "utilities"
+  | "equipment"
+  | "sales"
+  | "other";
+
+export interface Alert {
+  id: string;
+  flockId: string;
+  flock?: { name: string };
+  alertType: AlertType;
+  title: string;
+  message: string;
+  severity: "info" | "warning" | "critical";
+  dueDate: string;
+  isRead: boolean;
+  isResolved: boolean;
+  createdAt: string;
+}
+
+export type AlertType =
+  | "temperature_adjustment"
+  | "vaccination_due"
+  | "feed_transition"
+  | "weight_check"
+  | "mortality_threshold"
+  | "environmental"
+  | "financial";
+
+export interface Disease {
+  id: string;
+  name: string;
+  category: string;
+  incubation?: string;
+  mortalityRate?: string;
+  symptoms?: string;
+  prevention?: string;
+  treatment?: string;
+  organicTreatments?: string;
+}

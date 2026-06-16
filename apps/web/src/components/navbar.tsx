@@ -12,6 +12,8 @@ export function Navbar() {
 
   const navLinks = [
     { href: "/", label: "Dashboard" },
+    { href: "/broiler-flocks", label: "Broiler Flocks" },
+    { href: "/diseases", label: "Diseases" },
     { href: "/suppliers", label: "Suppliers" },
     { href: "/projections", label: "Projections" },
     { href: "/expansion-plan", label: "Expansion Plan" },
@@ -74,4 +76,3 @@ export function Navbar() {
     </nav>
   );
 }
-
