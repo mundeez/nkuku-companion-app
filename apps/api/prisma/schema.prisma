@@ -24,6 +24,7 @@ model User {
   createdSuppliers  Supplier[]        @relation("SupplierCreatedBy")
   createdBatches    Batch[]           @relation("BatchCreatedBy")
   createdCycles     ProductionCycle[] @relation("CycleCreatedBy")
+  createdFlocks     BroilerFlock[]    @relation("FlockCreatedBy")
 
   @@map("users")
 }
@@ -285,4 +286,279 @@ enum EquipmentCategory {
   cold_storage
   building
   other
+}
+
+// ── BROILER MANAGEMENT MODULE ────────────────────
+
+model Breed {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  supplier    String   @db.VarChar(100)
+  isPrimary   Boolean  @default(false) @map("is_primary")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  performanceTargets PerformanceTarget[]
+  flocks             BroilerFlock[]
+
+  @@map("breeds")
+}
+
+model PerformanceTarget {
+  id           String   @id @default(uuid()) @db.Uuid
+  breedId      String   @map("breed_id") @db.Uuid
+  ageDays      Int      @map("age_days")
+  targetWeight Decimal  @map("target_weight") @db.Decimal(10, 3)
+  targetFeed   Decimal  @map("target_feed") @db.Decimal(10, 3)
+  targetFcr    Decimal  @map("target_fcr") @db.Decimal(5, 3)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  breed        Breed    @relation(fields: [breedId], references: [id], onDelete: Cascade)
+
+  @@unique([breedId, ageDays])
+  @@index([breedId, ageDays])
+  @@map("performance_targets")
+}
+
+model BroilerFlock {
+  id           String      @id @default(uuid()) @db.Uuid
+  name         String      @db.VarChar(100)
+  breedId      String      @map("breed_id") @db.Uuid
+  startDate    DateTime    @map("start_date") @db.Date
+  initialCount Int         @map("initial_count")
+  currentCount Int         @map("current_count")
+  targetWeight Decimal?    @map("target_weight") @db.Decimal(10, 3)
+  targetAge    Int?        @map("target_age")
+  feedTransitionDay Int?   @map("feed_transition_day")
+  status       FlockStatus @default(active)
+  createdBy    String?     @map("created_by") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  breed              Breed                @relation(fields: [breedId], references: [id])
+  creator            User?                @relation("FlockCreatedBy", fields: [createdBy], references: [id])
+  growthRecords      GrowthRecord[]
+  feedRecords        FeedRecord[]
+  waterRecords       WaterRecord[]
+  mortalityEvents    MortalityEvent[]
+  vaccinationEvents  VaccinationEvent[]
+  financialRecords   FinancialRecord[]
+  alerts             Alert[]
+
+  @@index([breedId, status])
+  @@map("broiler_flocks")
+}
+
+enum FlockStatus {
+  active
+  completed
+  cancelled
+}
+
+enum FeedType {
+  starter
+  grower
+  finisher
+}
+
+model GrowthRecord {
+  id         String   @id @default(uuid()) @db.Uuid
+  flockId    String   @map("flock_id") @db.Uuid
+  recordDate DateTime @map("record_date") @db.Date
+  sampleSize Int      @map("sample_size")
+  avgWeight  Decimal  @map("avg_weight") @db.Decimal(10, 3)
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock      BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, recordDate])
+  @@map("growth_records")
+}
+
+model FeedRecord {
+  id         String   @id @default(uuid()) @db.Uuid
+  flockId    String   @map("flock_id") @db.Uuid
+  recordDate DateTime @map("record_date") @db.Date
+  feedType   FeedType
+  feedBrand  String?  @map("feed_brand") @db.VarChar(100)
+  quantityKg Decimal  @map("quantity_kg") @db.Decimal(10, 3)
+  costZmw    Decimal? @map("cost_zmw") @db.Decimal(14, 2)
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock      BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, recordDate])
+  @@map("feed_records")
+}
+
+model WaterRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  flockId        String   @map("flock_id") @db.Uuid
+  recordDate     DateTime @map("record_date") @db.Date
+  quantityLiters Decimal  @map("quantity_liters") @db.Decimal(10, 2)
+  ph             Decimal? @db.Decimal(4, 2)
+  temperature    Decimal? @map("temperature_c") @db.Decimal(5, 2)
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock          BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, recordDate])
+  @@map("water_records")
+}
+
+model MortalityEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  flockId   String   @map("flock_id") @db.Uuid
+  eventDate DateTime @map("event_date") @db.Date
+  count     Int
+  cause     String?  @db.VarChar(200)
+  ageDays   Int?     @map("age_days")
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock     BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, eventDate])
+  @@map("mortality_events")
+}
+
+model VaccinationEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  flockId     String   @map("flock_id") @db.Uuid
+  vaccineName String   @map("vaccine_name") @db.VarChar(100)
+  vaccineType String   @map("vaccine_type") @db.VarChar(100)
+  adminDate   DateTime @map("admin_date") @db.Date
+  adminMethod String   @map("admin_method") @db.VarChar(50)
+  ageDays     Int      @map("age_days")
+  nextDueDate DateTime? @map("next_due_date") @db.Date
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock       BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, adminDate])
+  @@map("vaccination_events")
+}
+
+model FinancialRecord {
+  id          String              @id @default(uuid()) @db.Uuid
+  flockId     String              @map("flock_id") @db.Uuid
+  recordDate  DateTime            @map("record_date") @db.Date
+  category    FinancialCategory
+  description String              @db.VarChar(200)
+  amountZmw   Decimal             @map("amount_zmw") @db.Decimal(14, 2)
+  isIncome    Boolean             @default(false) @map("is_income")
+  notes       String?             @db.Text
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock       BroilerFlock        @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, recordDate])
+  @@map("financial_records")
+}
+
+enum FinancialCategory {
+  chick_purchase
+  feed
+  vaccines
+  medication
+  labor
+  utilities
+  equipment
+  sales
+  other
+}
+
+model Alert {
+  id         String        @id @default(uuid()) @db.Uuid
+  flockId    String        @map("flock_id") @db.Uuid
+  alertType  AlertType     @map("alert_type")
+  title      String        @db.VarChar(200)
+  message    String        @db.Text
+  severity   AlertSeverity @default(info)
+  dueDate    DateTime      @map("due_date") @db.Date
+  isRead     Boolean       @default(false) @map("is_read")
+  isResolved Boolean       @default(false) @map("is_resolved")
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock      BroilerFlock  @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, isResolved, dueDate])
+  @@map("alerts")
+}
+
+enum AlertType {
+  temperature_adjustment
+  vaccination_due
+  feed_transition
+  weight_check
+  mortality_threshold
+  environmental
+  financial
+}
+
+enum AlertSeverity {
+  info
+  warning
+  critical
+}
+
+model Disease {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String   @unique @db.VarChar(100)
+  category          String   @db.VarChar(50)
+  incubation        String?  @db.VarChar(100)
+  mortalityRate     String?  @map("mortality_rate") @db.VarChar(50)
+  symptoms          String?  @db.Text
+  prevention        String?  @db.Text
+  treatment         String?  @db.Text
+  organicTreatments String?  @map("organic_treatments") @db.Text
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("diseases")
+}
+
+model VaccinationSchedule {
+  id          String   @id @default(uuid()) @db.Uuid
+  breedId     String?  @map("breed_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  isDefault   Boolean  @default(false) @map("is_default")
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  items       VaccinationScheduleItem[]
+
+  @@unique([name])
+  @@map("vaccination_schedules")
+}
+
+model VaccinationScheduleItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  scheduleId  String   @map("schedule_id") @db.Uuid
+  vaccineName String   @map("vaccine_name") @db.VarChar(100)
+  vaccineType String   @map("vaccine_type") @db.VarChar(100)
+  ageDays     Int      @map("age_days")
+  adminMethod String   @map("admin_method") @db.VarChar(50)
+  sortOrder   Int      @map("sort_order")
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  schedule    VaccinationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([scheduleId, sortOrder])
+  @@map("vaccination_schedule_items")
 }

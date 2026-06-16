@@ -1,4 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import { seedBroilerBreeds } from './broiler-breeds';
+import { seedRoss308Performance } from './ross308-performance';
+import { seedCobb500Performance } from './cobb500-performance';
+import { seedDiseases } from './diseases';
+import { seedVaccinationSchedules } from './vaccination-schedules';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -197,6 +202,13 @@ async function main() {
     }
   }
   console.log('[SEED] Production cycles + batches:', expansionRows.length);
+
+  // ── Broiler Management Seeds ──
+  await seedBroilerBreeds(prisma);
+  await seedRoss308Performance(prisma);
+  await seedCobb500Performance(prisma);
+  await seedDiseases(prisma);
+  await seedVaccinationSchedules(prisma);
 
   console.log('[SEED] Complete!');
 }
