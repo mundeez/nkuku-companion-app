@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
+import { useToast } from "@/components/toast-provider";
+import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
 import { BroilerFlock, Breed } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +46,8 @@ const emptyForm: FlockFormData = {
 export default function BroilerFlocksPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { addToast } = useToast();
+  const { addToast } = useToast();
   const [flocks, setFlocks] = useState<BroilerFlock[]>([]);
   const [breeds, setBreeds] = useState<Breed[]>([]);
   const [error, setError] = useState("");
@@ -129,12 +133,12 @@ export default function BroilerFlocksPage() {
         method: "POST",
         body: JSON.stringify(form),
       });
-      setSuccess("Flock created successfully.");
+      addToast("Flock created successfully.", "success");
       setCreateOpen(false);
       setForm(emptyForm);
       loadData();
     } catch (err: any) {
-      setError(err.message || "Failed to create flock.");
+      addToast(err.message || "Failed to create flock.", "error");
     } finally {
       setFormLoading(false);
     }
@@ -148,12 +152,12 @@ export default function BroilerFlocksPage() {
         method: "PATCH",
         body: JSON.stringify(form),
       });
-      setSuccess("Flock updated successfully.");
+      addToast("Flock updated successfully.", "success");
       setEditOpen(false);
       setEditingFlock(null);
       loadData();
     } catch (err: any) {
-      setError(err.message || "Failed to update flock.");
+      addToast(err.message || "Failed to update flock.", "error");
     } finally {
       setFormLoading(false);
     }
@@ -166,12 +170,12 @@ export default function BroilerFlocksPage() {
       await apiFetch<{ deleted: boolean }>(`/api/v1/broiler-flocks/${deletingFlock.id}`, {
         method: "DELETE",
       });
-      setSuccess("Flock deleted successfully.");
+      addToast("Flock deleted successfully.", "success");
       setDeleteOpen(false);
       setDeletingFlock(null);
       loadData();
     } catch (err: any) {
-      setError(err.message || "Failed to delete flock.");
+      addToast(err.message || "Failed to delete flock.", "error");
     } finally {
       setFormLoading(false);
     }

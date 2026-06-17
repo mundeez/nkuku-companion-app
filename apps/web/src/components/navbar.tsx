@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
-import { LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, X, Bell } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
@@ -14,6 +14,7 @@ export function Navbar() {
     { href: "/", label: "Dashboard" },
     { href: "/broiler-flocks", label: "Broiler Flocks" },
     { href: "/diseases", label: "Diseases" },
+    { href: "/alerts", label: "Alerts" },
     { href: "/suppliers", label: "Suppliers" },
     { href: "/projections", label: "Projections" },
     { href: "/expansion-plan", label: "Expansion Plan" },
@@ -43,6 +44,9 @@ export function Navbar() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/alerts" className="hidden sm:block relative">
+              <Bell className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+            </Link>
             <span className="hidden sm:inline text-sm text-muted-foreground">
               {user.name || user.email} ({user.role})
             </span>
