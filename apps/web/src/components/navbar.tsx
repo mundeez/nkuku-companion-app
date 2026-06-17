@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useAuth } from "./auth-provider";
+import { useTheme } from "./theme-provider";
 import { Button } from "./ui/button";
-import { LogOut, Menu, X, Bell } from "lucide-react";
+import { LogOut, Menu, X, Bell, Sun, Moon, Settings } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [
@@ -43,12 +45,28 @@ export function Navbar() {
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/alerts" className="hidden sm:block relative">
-              <Bell className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden sm:flex h-9 w-9"
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              title="Toggle theme"
+            >
+              {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Link href="/alerts" className="hidden sm:block">
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Bell className="h-4 w-4" />
+              </Button>
             </Link>
-            <span className="hidden sm:inline text-sm text-muted-foreground">
-              {user.name || user.email} ({user.role})
+            <Link href="/settings" className="hidden sm:block">
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </Link>
+            <span className="hidden md:inline text-sm text-muted-foreground">
+              {user.name || user.email}
             </span>
             <Button variant="ghost" size="sm" onClick={logout}>
               <LogOut className="h-4 w-4 mr-2" />
@@ -75,6 +93,9 @@ export function Navbar() {
               {link.label}
             </Link>
           ))}
+          <Link href="/settings" className="block py-2 text-sm font-medium text-muted-foreground hover:text-foreground" onClick={() => setMobileOpen(false)}>
+            Settings
+          </Link>
         </div>
       )}
     </nav>
