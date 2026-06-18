@@ -49,6 +49,7 @@ model Supplier {
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   feedStages    FeedStage[]
+  feedRecords   FeedRecord[]
   batches       Batch[]
   projections   Projection[]
   creator       User?     @relation("SupplierCreatedBy", fields: [createdBy], references: [id])
@@ -381,6 +382,7 @@ model GrowthRecord {
 model FeedRecord {
   id         String   @id @default(uuid()) @db.Uuid
   flockId    String   @map("flock_id") @db.Uuid
+  supplierId String?  @map("supplier_id") @db.Uuid   // NEW
   recordDate DateTime @map("record_date") @db.Date
   feedType   FeedType
   feedBrand  String?  @map("feed_brand") @db.VarChar(100)
@@ -391,6 +393,7 @@ model FeedRecord {
   updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   flock      BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  supplier   Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)  // NEW
 
   @@index([flockId, recordDate])
   @@map("feed_records")

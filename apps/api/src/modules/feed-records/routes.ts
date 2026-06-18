@@ -4,6 +4,7 @@ import { authenticate, requireRole } from '../auth/routes.js';
 
 const FeedRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
+  supplierId: z.string().uuid().optional(),
   recordDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   feedType: z.enum(['starter', 'grower', 'finisher']),
   feedBrand: z.string().optional(),
@@ -29,6 +30,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
     return prisma.feedRecord.findMany({
       where: { flockId },
       orderBy: { recordDate: 'asc' },
+      include: { supplier: { select: { name: true } } },
     });
   });
 
@@ -50,6 +52,12 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
       _count: true,
     });
 
+    const supplierBreakdown = await prisma.feedRecord.groupBy({
+      by: ['feedBrand'],
+      where: { flockId },
+      _sum: { quantityKg: true, costZmw: true },
+    });
+
     const totalFeed = await prisma.feedRecord.aggregate({
       where: { flockId },
       _sum: { quantityKg: true, costZmw: true },
@@ -61,6 +69,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
 
     return {
       summary,
+      supplierBreakdown,
       totalFeedKg: totalFeed._sum.quantityKg ?? 0,
       totalCostZmw: totalFeed._sum.costZmw ?? 0,
       costPerBird,
@@ -77,9 +86,17 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
+    // Auto-derive feedBrand from supplier name if not provided
+    let feedBrand = data.feedBrand;
+    if (data.supplierId && !feedBrand) {
+      const supplier = await prisma.supplier.findUnique({ where: { id: data.supplierId } });
+      feedBrand = supplier?.name ?? null;
+    }
+
     return prisma.feedRecord.create({
       data: {
         ...data,
+        feedBrand,
         recordDate: new Date(data.recordDate),
         flockId,
       },

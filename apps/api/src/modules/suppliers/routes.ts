@@ -64,6 +64,42 @@ export async function buildSupplierModule(app: FastifyInstance) {
     return supplier;
   });
 
+
+
+  // GET /api/v1/suppliers/:id/feed-price
+  app.get('/:id/feed-price', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const { feedType } = z.object({
+      feedType: z.enum(['starter', 'grower', 'finisher']),
+    }).parse(request.query);
+
+    const supplier = await prisma.supplier.findFirst({
+      where: { id },
+      include: { feedStages: true },
+    });
+    if (!supplier) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    const stage = supplier.feedStages.find(
+      (s) => s.stageType === 'feed' && s.stageName.toLowerCase() === feedType
+    );
+
+    if (!stage) {
+      return reply.status(404).send({
+        error: 'NO_PRICE_FOUND',
+        message: `No ${feedType} price configured for ${supplier.name}`,
+      });
+    }
+
+    const pricePerKg = Number(stage.unitPriceZmw) / Number(stage.unitSizeKg);
+
+    return {
+      supplierName: supplier.name,
+      stageName: stage.stageName,
+      unitSizeKg: Number(stage.unitSizeKg),
+      unitPriceZmw: Number(stage.unitPriceZmw),
+      pricePerKg: Number(pricePerKg.toFixed(2)),
+    };
+  });
   // DELETE /api/v1/suppliers/:id
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
