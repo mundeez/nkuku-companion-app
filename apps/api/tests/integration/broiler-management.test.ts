@@ -103,10 +103,10 @@ describe('Broiler Management API', () => {
 
   describe('Growth Records', () => {
     it('creates a growth record', async () => {
-      const res = await fetch(`${API_URL}/api/v1/growth-records?flockId=${flockId}`, {
+      const res = await fetch(`${API_URL}/api/v1/growth-records`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordDate: '2026-06-10', sampleSize: 50, avgWeight: 850 }),
+        body: JSON.stringify({ flockId, recordDate: '2026-06-10', sampleSize: 50, avgWeight: 850 }),
       });
       expect(res.status).toBe(200);
       const data = await res.json();
@@ -125,10 +125,10 @@ describe('Broiler Management API', () => {
 
   describe('Feed Records', () => {
     it('creates a feed record', async () => {
-      const res = await fetch(`${API_URL}/api/v1/feed-records?flockId=${flockId}`, {
+      const res = await fetch(`${API_URL}/api/v1/feed-records`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordDate: '2026-06-10', feedType: 'starter', quantityKg: 25, costZmw: 375 }),
+        body: JSON.stringify({ flockId, recordDate: '2026-06-10', feedType: 'starter', quantityKg: 25, costZmw: 375 }),
       });
       expect(res.status).toBe(200);
       const data = await res.json();
@@ -155,10 +155,10 @@ describe('Broiler Management API', () => {
       const beforeData = await before.json();
       const beforeCount = beforeData.currentCount;
 
-      const res = await fetch(`${API_URL}/api/v1/mortality-events?flockId=${flockId}`, {
+      const res = await fetch(`${API_URL}/api/v1/mortality-events`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventDate: '2026-06-12', count: 5, cause: 'Heat stress', ageDays: 12 }),
+        body: JSON.stringify({ flockId, eventDate: '2026-06-12', count: 5, cause: 'Heat stress', ageDays: 12 }),
       });
       expect(res.status).toBe(200);
       const data = await res.json();
@@ -184,17 +184,17 @@ describe('Broiler Management API', () => {
 
   describe('Financial Records', () => {
     it('creates expense and income records', async () => {
-      const expense = await fetch(`${API_URL}/api/v1/financial-records?flockId=${flockId}`, {
+      const expense = await fetch(`${API_URL}/api/v1/financial-records`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordDate: '2026-06-01', category: 'chick_purchase', description: 'Day old chicks', amountZmw: 5000 }),
+        body: JSON.stringify({ flockId, recordDate: '2026-06-01', category: 'chick_purchase', description: 'Day old chicks', amountZmw: 5000 }),
       });
       expect(expense.status).toBe(200);
 
-      const income = await fetch(`${API_URL}/api/v1/financial-records?flockId=${flockId}`, {
+      const income = await fetch(`${API_URL}/api/v1/financial-records`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordDate: '2026-06-15', category: 'sales', description: 'Partial sale', amountZmw: 8000, isIncome: true }),
+        body: JSON.stringify({ flockId, recordDate: '2026-06-15', category: 'sales', description: 'Partial sale', amountZmw: 8000, isIncome: true }),
       });
       expect(income.status).toBe(200);
     });

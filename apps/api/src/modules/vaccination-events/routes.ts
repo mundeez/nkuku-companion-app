@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 
 const VaccinationEventCreateSchema = z.object({
+  flockId: z.string().uuid(),
   vaccineName: z.string().min(1).max(100),
-  vaccineType: z.string().min(1).max(100),
+  vaccineType: z.string().max(100).optional(),
   adminDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   adminMethod: z.string().min(1).max(50),
   ageDays: z.number().int().min(0),
@@ -68,8 +69,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
   });
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const data = VaccinationEventCreateSchema.parse(request.body);
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId, ...data } = VaccinationEventCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -79,6 +79,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
     return prisma.vaccinationEvent.create({
       data: {
+        vaccineType: data.vaccineType || data.vaccineName,
         ...data,
         adminDate: new Date(data.adminDate),
         nextDueDate: data.nextDueDate ? new Date(data.nextDueDate) : null,
@@ -103,6 +104,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     return prisma.vaccinationEvent.update({
       where: { id },
       data: {
+        vaccineType: data.vaccineType || data.vaccineName,
         ...data,
         adminDate: data.adminDate ? new Date(data.adminDate) : undefined,
         nextDueDate: data.nextDueDate ? new Date(data.nextDueDate) : undefined,

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 
 const WaterRecordCreateSchema = z.object({
+  flockId: z.string().uuid(),
   recordDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   quantityLiters: z.number().positive(),
   ph: z.number().min(0).max(14).optional(),
@@ -59,8 +60,7 @@ export async function buildWaterRecordModule(app: FastifyInstance) {
   });
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const data = WaterRecordCreateSchema.parse(request.body);
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId, ...data } = WaterRecordCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -73,6 +73,30 @@ export async function buildWaterRecordModule(app: FastifyInstance) {
         ...data,
         recordDate: new Date(data.recordDate),
         flockId,
+      },
+    });
+  });
+
+
+
+  app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const data = WaterRecordCreateSchema.partial().parse(request.body);
+    const authUser = (request as any).authUser;
+
+    const record = await prisma.waterRecord.findFirst({
+      where: { id },
+      include: { flock: true },
+    });
+    if (!record || record.flock.createdBy !== authUser.userId) {
+      return reply.status(404).send({ error: 'NOT_FOUND' });
+    }
+
+    return prisma.waterRecord.update({
+      where: { id },
+      data: {
+        ...data,
+        recordDate: data.recordDate ? new Date(data.recordDate) : undefined,
       },
     });
   });

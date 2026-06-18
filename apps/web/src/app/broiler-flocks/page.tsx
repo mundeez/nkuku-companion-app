@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast-provider";
-import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
 import { BroilerFlock, Breed } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +45,6 @@ const emptyForm: FlockFormData = {
 export default function BroilerFlocksPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { addToast } = useToast();
   const { addToast } = useToast();
   const [flocks, setFlocks] = useState<BroilerFlock[]>([]);
   const [breeds, setBreeds] = useState<Breed[]>([]);

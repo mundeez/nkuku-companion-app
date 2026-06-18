@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 
 const MortalityEventCreateSchema = z.object({
+  flockId: z.string().uuid(),
   eventDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   count: z.number().int().min(1),
   cause: z.string().optional(),
@@ -62,8 +63,7 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
   });
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const data = MortalityEventCreateSchema.parse(request.body);
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId, ...data } = MortalityEventCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -82,6 +82,39 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
         ...data,
         eventDate: new Date(data.eventDate),
         flockId,
+      },
+    });
+  });
+
+
+
+  app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const data = MortalityEventCreateSchema.partial().parse(request.body);
+    const authUser = (request as any).authUser;
+
+    const record = await prisma.mortalityEvent.findFirst({
+      where: { id },
+      include: { flock: true },
+    });
+    if (!record || record.flock.createdBy !== authUser.userId) {
+      return reply.status(404).send({ error: 'NOT_FOUND' });
+    }
+
+    // Adjust flock count if count changed
+    if (data.count !== undefined && record.flock) {
+      const delta = record.count - data.count;
+      await prisma.broilerFlock.update({
+        where: { id: record.flockId },
+        data: { currentCount: { increment: delta } },
+      });
+    }
+
+    return prisma.mortalityEvent.update({
+      where: { id },
+      data: {
+        ...data,
+        eventDate: data.eventDate ? new Date(data.eventDate) : undefined,
       },
     });
   });

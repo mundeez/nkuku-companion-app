@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 
 const FeedRecordCreateSchema = z.object({
+  flockId: z.string().uuid(),
   recordDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   feedType: z.enum(['starter', 'grower', 'finisher']),
   feedBrand: z.string().optional(),
@@ -68,8 +69,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
   });
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const data = FeedRecordCreateSchema.parse(request.body);
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId, ...data } = FeedRecordCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -82,6 +82,30 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
         ...data,
         recordDate: new Date(data.recordDate),
         flockId,
+      },
+    });
+  });
+
+
+
+  app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const data = FeedRecordCreateSchema.partial().parse(request.body);
+    const authUser = (request as any).authUser;
+
+    const record = await prisma.feedRecord.findFirst({
+      where: { id },
+      include: { flock: true },
+    });
+    if (!record || record.flock.createdBy !== authUser.userId) {
+      return reply.status(404).send({ error: 'NOT_FOUND' });
+    }
+
+    return prisma.feedRecord.update({
+      where: { id },
+      data: {
+        ...data,
+        recordDate: data.recordDate ? new Date(data.recordDate) : undefined,
       },
     });
   });

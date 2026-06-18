@@ -4,12 +4,20 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
-import { BroilerFlock, GrowthRecord, FeedRecord, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Alert } from "@/lib/types";
+import { BroilerFlock, GrowthRecord, FeedRecord, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Bell, Activity, Scale } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2 } from "lucide-react";
 
 export default function FlockDetailPage() {
   const params = useParams();
@@ -144,21 +152,24 @@ export default function FlockDetailPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={loadAll} canEdit={canCreateEdit} /></TabsContent>
-        <TabsContent value="feed"><SimpleRecordTab flockId={flockId} records={feedRecords} type="feed" onRefresh={loadAll} canEdit={canCreateEdit} /></TabsContent>
-        <TabsContent value="water"><SimpleRecordTab flockId={flockId} records={waterRecords} type="water" onRefresh={loadAll} canEdit={canCreateEdit} /></TabsContent>
-        <TabsContent value="mortality"><SimpleRecordTab flockId={flockId} records={mortalityEvents} type="mortality" onRefresh={loadAll} canEdit={canCreateEdit} /></TabsContent>
-        <TabsContent value="vaccination"><SimpleRecordTab flockId={flockId} records={vaccinationEvents} type="vaccination" onRefresh={loadAll} canEdit={canCreateEdit} /></TabsContent>
-        <TabsContent value="financial"><SimpleRecordTab flockId={flockId} records={financialRecords} type="financial" onRefresh={loadAll} canEdit={canCreateEdit} /></TabsContent>
+        <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="feed"><SimpleRecordTab flockId={flockId} records={feedRecords} type="feed" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="water"><SimpleRecordTab flockId={flockId} records={waterRecords} type="water" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="mortality"><SimpleRecordTab flockId={flockId} records={mortalityEvents} type="mortality" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="vaccination"><SimpleRecordTab flockId={flockId} records={vaccinationEvents} type="vaccination" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="financial"><SimpleRecordTab flockId={flockId} records={financialRecords} type="financial" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit }: any) {
+function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole }: any) {
   const [formOpen, setFormOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>({});
+  const [editingRecord, setEditingRecord] = useState<any | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState<any | null>(null);
 
   const titles: any = {
     growth: { title: "Growth Records", icon: TrendingUp, endpoint: "/api/v1/growth-records", fields: [
@@ -202,24 +213,86 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit }: any) {
 
   const config = titles[type];
   const Icon = config.icon;
+  const isEditing = !!editingRecord;
 
   async function handleSave() {
     setSaving(true);
     try {
-      await apiFetch(config.endpoint, { method: "POST", body: JSON.stringify({ ...form, flockId }) });
-      setFormOpen(false); onRefresh();
-    } catch (e: any) { alert(e.message); } finally { setSaving(false); }
+      if (isEditing) {
+        await apiFetch(`${config.endpoint}/${editingRecord.id}`, { method: "PATCH", body: JSON.stringify({ ...form, flockId }) });
+      } else {
+        await apiFetch(config.endpoint, { method: "POST", body: JSON.stringify({ ...form, flockId }) });
+      }
+      setFormOpen(false);
+      setEditingRecord(null);
+      setForm({});
+      onRefresh();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deletingRecord) return;
+    setSaving(true);
+    try {
+      await apiFetch(`${config.endpoint}/${deletingRecord.id}`, { method: "DELETE" });
+      setDeleteOpen(false);
+      setDeletingRecord(null);
+      onRefresh();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openAdd() {
+    setEditingRecord(null);
+    setForm({});
+    setFormOpen(true);
+  }
+
+  function openEdit(record: any) {
+    setEditingRecord(record);
+    // Pre-populate form fields based on record type
+    const prefill: any = {};
+    config.fields.forEach((f: any) => {
+      const val = record[f.key];
+      if (val !== undefined && val !== null) {
+        if (f.type === "date") {
+          prefill[f.key] = new Date(val).toISOString().split("T")[0];
+        } else if (f.type === "number") {
+          prefill[f.key] = Number(val);
+        } else if (f.type === "checkbox") {
+          prefill[f.key] = !!val;
+        } else {
+          prefill[f.key] = String(val);
+        }
+      }
+    });
+    setForm(prefill);
+    setFormOpen(true);
+  }
+
+  function openDelete(record: any) {
+    setDeletingRecord(record);
+    setDeleteOpen(true);
   }
 
   function renderField(f: any) {
-    const val = form[f.key] || "";
+    const val = form[f.key] || (f.type === "checkbox" ? false : "");
     if (f.type === "select") return (
-      <select key={f.key} className="w-full border rounded-md p-2" value={val} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}>
+      <select key={f.key} className="w-full border rounded-md p-2 bg-background" value={val} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}>
         <option value="">Select...</option>
         {f.options.map((o: string) => <option key={o} value={o}>{o}</option>)}
       </select>
     );
-    if (f.type === "checkbox") return <input key={f.key} type="checkbox" checked={!!val} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />;
+    if (f.type === "checkbox") return (
+      <input key={f.key} type="checkbox" checked={!!val} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />
+    );
     return <input key={f.key} type={f.type} step={f.type === "number" ? "0.1" : undefined} className="w-full border rounded-md p-2" value={val} onChange={(e) => setForm({ ...form, [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value })} />;
   }
 
@@ -237,31 +310,56 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit }: any) {
     <div>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium">{config.title}</h3>
-        {canEdit && <Button size="sm" onClick={() => { setForm({}); setFormOpen(true); }}><Icon className="h-4 w-4 mr-1" />Add</Button>}
+        {canEdit && <Button size="sm" onClick={openAdd}><Icon className="h-4 w-4 mr-1" />Add</Button>}
       </div>
       {records.length === 0 ? <p className="text-muted-foreground">No records yet.</p> : (
         <div className="space-y-2">{records.map((r: any) => (
           <Card key={r.id}><CardContent className="py-3 flex justify-between items-center">
             <div><p className="font-medium">{renderRecord(r)}</p><p className="text-sm text-muted-foreground">{new Date(r.recordDate || r.eventDate || r.adminDate).toLocaleDateString()}</p></div>
+            {canEdit && (
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                {userRole === "owner" && (
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => openDelete(r)}><Trash2 className="h-4 w-4" /></Button>
+                )}
+              </div>
+            )}
           </CardContent></Card>
         ))}</div>
       )}
-      {formOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader><CardTitle>Add {config.title}</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              {config.fields.map((f: any) => (
-                <div key={f.key}><label className="text-sm font-medium">{f.label}</label>{renderField(f)}</div>
-              ))}
-            </CardContent>
-            <div className="p-6 pt-0 flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
-            </div>
-          </Card>
-        </div>
-      )}
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!open) { setFormOpen(false); setEditingRecord(null); setForm({}); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{isEditing ? "Edit" : "Add"} {config.title}</DialogTitle>
+            <DialogDescription>{isEditing ? "Update the record details below." : "Enter the new record details."}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {config.fields.map((f: any) => (
+              <div key={f.key}><label className="text-sm font-medium">{f.label}</label>{renderField(f)}</div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setFormOpen(false); setEditingRecord(null); setForm({}); }}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update" : "Save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={(open) => { if (!open) { setDeleteOpen(false); setDeletingRecord(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Record</DialogTitle>
+            <DialogDescription>This action cannot be undone. Are you sure?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteOpen(false); setDeletingRecord(null); }}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={saving}>{saving ? "Deleting..." : "Delete"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

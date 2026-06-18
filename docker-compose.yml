@@ -72,7 +72,7 @@ services:
       dockerfile: apps/web/Dockerfile
       target: development
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     volumes:
       - ./apps/web/src:/app/src:ro
       - ./apps/web/tsconfig.json:/app/tsconfig.json:ro
