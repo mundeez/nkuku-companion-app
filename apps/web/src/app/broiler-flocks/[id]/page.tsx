@@ -85,7 +85,7 @@ export default function FlockDetailPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">{flock.name}</h1>
-          <p className="text-muted-foreground">{flock.breed?.name} | Day {ageDays} | {getStatusBadge(flock.status)}</p>
+          <div className="text-muted-foreground">{flock.breed?.name} | Day {ageDays} | {getStatusBadge(flock.status)}</div>
         </div>
       </div>
 
