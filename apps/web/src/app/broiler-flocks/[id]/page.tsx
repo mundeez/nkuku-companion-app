@@ -17,7 +17,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout } from "lucide-react";
 
 export default function FlockDetailPage() {
   const params = useParams();
@@ -261,7 +261,13 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
 
   function openAdd() {
     setEditingRecord(null);
-    setForm({});
+    // Default date to today for all record types
+    const today = new Date().toISOString().split("T")[0];
+    const defaults: any = {};
+    config.fields.forEach((f: any) => {
+      if (f.type === "date") defaults[f.key] = today;
+    });
+    setForm(defaults);
     setCostOverride(false);
     setFormOpen(true);
   }
@@ -420,13 +426,41 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
 
   function renderRecord(r: any) {
     if (type === "growth") return <span>Weight: {r.avgWeight}g (n={r.sampleSize})</span>;
-    if (type === "feed") return (
-      <span className="capitalize">
-        {r.feedBrand ? `${r.feedBrand} | ` : ""}
-        {r.feedType}: {r.quantityKg}kg
-        {r.costZmw && ` | ZMW ${r.costZmw}`}
-      </span>
-    );
+    if (type === "feed") {
+      const feedTypeColors: any = { starter: "bg-blue-100 text-blue-800", grower: "bg-amber-100 text-amber-800", finisher: "bg-green-100 text-green-800" };
+      const feedTypeIcons: any = { starter: <Sprout className="h-3 w-3 mr-1" />, grower: <Wheat className="h-3 w-3 mr-1" />, finisher: <Package className="h-3 w-3 mr-1" /> };
+      // Look up bag size from supplier if available
+      let bagInfo = "";
+      if (r.supplierId && suppliers) {
+        const supplier = suppliers.find((s: any) => s.id === r.supplierId);
+        if (supplier) {
+          const stage = supplier.feedStages.find(
+            (s: any) => s.stageType === "feed" && s.stageName.toLowerCase() === r.feedType
+          );
+          if (stage && stage.unitSizeKg > 0) {
+            const bags = Math.round(Number(r.quantityKg) / Number(stage.unitSizeKg));
+            bagInfo = `${bags}×${stage.unitSizeKg}kg bags`;
+          }
+        }
+      }
+      return (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            {r.feedType && (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${feedTypeColors[r.feedType] || "bg-gray-100 text-gray-800"}`}>
+                {feedTypeIcons[r.feedType]}
+                {r.feedType}
+              </span>
+            )}
+            <span className="font-medium">{r.quantityKg}kg</span>
+            {bagInfo && <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{bagInfo}</span>}
+            {r.costZmw && <span className="text-muted-foreground text-sm">@ ZMW {r.costZmw}</span>}
+            {r.feedBrand && <span className="text-muted-foreground text-sm">| {r.feedBrand}</span>}
+          </div>
+          {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
+        </div>
+      );
+    }
     if (type === "water") return <span>{r.quantityLiters} liters {r.ph && `| pH ${r.ph}`}</span>;
     if (type === "mortality") return <span className="text-red-700">{r.count} deaths - {r.cause || "Unknown"}</span>;
     if (type === "vaccination") return <span className="text-green-700">{r.vaccineName} | {r.adminMethod}</span>;
@@ -446,7 +480,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       {records.length === 0 ? <p className="text-muted-foreground">No records yet.</p> : (
         <div className="space-y-2">{records.map((r: any) => (
           <Card key={r.id}><CardContent className="py-3 flex justify-between items-center">
-            <div><p className="font-medium">{renderRecord(r)}</p><p className="text-sm text-muted-foreground">{new Date(r.recordDate || r.eventDate || r.adminDate).toLocaleDateString()}</p></div>
+            <div><div className="font-medium">{renderRecord(r)}</div><p className="text-sm text-muted-foreground">{new Date(r.recordDate || r.eventDate || r.adminDate).toLocaleDateString()}</p></div>
             {canEdit && (
               <div className="flex gap-1">
                 <Button variant="ghost" size="sm" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
@@ -509,6 +543,19 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
               </div>
             )}
 
+            {/* Notes field for feed records */}
+            {type === "feed" && (
+              <div>
+                <label className="text-sm font-medium">Notes</label>
+                <textarea
+                  className="w-full border rounded-md p-2 min-h-[60px] resize-y"
+                  value={form.notes || ""}
+                  placeholder="Optional notes about this feed purchase"
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </div>
+            )}
+
             {/* Quantity and Cost (shown for all feed records) */}
             {type === "feed" && (
               <>
@@ -526,14 +573,18 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium">Total Cost (ZMW)</label>
                     {hasSupplier && (
-                      <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
+                      <div className="flex items-center gap-1.5">
                         <input
+                          id="cost-override"
                           type="checkbox"
                           checked={costOverride}
                           onChange={(e) => setCostOverride(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-gray-300"
                         />
-                        Override
-                      </label>
+                        <label htmlFor="cost-override" className="text-xs text-muted-foreground cursor-pointer select-none">
+                          Override
+                        </label>
+                      </div>
                     )}
                   </div>
                   <input
@@ -547,7 +598,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
                   />
                   {hasSupplier && !costOverride && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Auto-calculated from supplier pricing. Check "Override" to edit manually.
+                      Auto-calculated from supplier pricing. Check Override to edit.
                     </p>
                   )}
                 </div>
