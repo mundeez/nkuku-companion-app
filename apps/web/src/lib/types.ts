@@ -126,12 +126,14 @@ export interface GrowthRecord {
 export interface FeedRecord {
   id: string;
   flockId: string;
+  supplierId?: string;
   recordDate: string;
   feedType: "starter" | "grower" | "finisher";
   feedBrand?: string;
   quantityKg: number;
   costZmw?: number;
   notes?: string;
+  supplier?: { name: string };
 }
 
 export interface WaterRecord {

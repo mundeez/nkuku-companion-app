@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
-import { BroilerFlock, GrowthRecord, FeedRecord, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord } from "@/lib/types";
+import { BroilerFlock, GrowthRecord, FeedRecord, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ export default function FlockDetailPage() {
   const [mortalityEvents, setMortalityEvents] = useState<MortalityEvent[]>([]);
   const [vaccinationEvents, setVaccinationEvents] = useState<VaccinationEvent[]>([]);
   const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -48,6 +49,7 @@ export default function FlockDetailPage() {
     apiFetch<MortalityEvent[]>(`/api/v1/mortality-events?flockId=${flockId}`).then(setMortalityEvents).catch(() => {});
     apiFetch<VaccinationEvent[]>(`/api/v1/vaccination-events?flockId=${flockId}`).then(setVaccinationEvents).catch(() => {});
     apiFetch<FinancialRecord[]>(`/api/v1/financial-records?flockId=${flockId}`).then(setFinancialRecords).catch(() => {});
+    apiFetch<Supplier[]>("/api/v1/suppliers").then(setSuppliers).catch(() => {});
   }
 
   useEffect(() => {
@@ -153,7 +155,7 @@ export default function FlockDetailPage() {
         </TabsContent>
 
         <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
-        <TabsContent value="feed"><SimpleRecordTab flockId={flockId} records={feedRecords} type="feed" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="feed"><SimpleRecordTab flockId={flockId} records={feedRecords} type="feed" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} suppliers={suppliers} /></TabsContent>
         <TabsContent value="water"><SimpleRecordTab flockId={flockId} records={waterRecords} type="water" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
         <TabsContent value="mortality"><SimpleRecordTab flockId={flockId} records={mortalityEvents} type="mortality" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
         <TabsContent value="vaccination"><SimpleRecordTab flockId={flockId} records={vaccinationEvents} type="vaccination" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
@@ -163,13 +165,14 @@ export default function FlockDetailPage() {
   );
 }
 
-function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole }: any) {
+function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole, suppliers }: any) {
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>({});
   const [editingRecord, setEditingRecord] = useState<any | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<any | null>(null);
+  const [costOverride, setCostOverride] = useState(false);
 
   const titles: any = {
     growth: { title: "Growth Records", icon: TrendingUp, endpoint: "/api/v1/growth-records", fields: [
@@ -180,9 +183,8 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole 
     ]},
     feed: { title: "Feed Records", icon: TrendingUp, endpoint: "/api/v1/feed-records", fields: [
       { key: "recordDate", label: "Date", type: "date" },
-      { key: "feedType", label: "Type", type: "select", options: ["starter", "grower", "finisher"] },
-      { key: "quantityKg", label: "Quantity (kg)", type: "number" },
-      { key: "costZmw", label: "Cost (ZMW)", type: "number" },
+      { key: "supplierId", label: "Supplier", type: "supplier-select" },
+      { key: "feedType", label: "Feed Type", type: "select", options: ["starter", "grower", "finisher"] },
     ]},
     water: { title: "Water Records", icon: Droplets, endpoint: "/api/v1/water-records", fields: [
       { key: "recordDate", label: "Date", type: "date" },
@@ -218,14 +220,22 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole 
   async function handleSave() {
     setSaving(true);
     try {
+      const body = { ...form, flockId };
+      // Remove UI-only fields before sending
+      delete body._bagSizeKg;
+      delete body._bagPriceZmw;
+      delete body.bagCount;
+      if (body.supplierId === "custom") delete body.supplierId;
+
       if (isEditing) {
-        await apiFetch(`${config.endpoint}/${editingRecord.id}`, { method: "PATCH", body: JSON.stringify({ ...form, flockId }) });
+        await apiFetch(`${config.endpoint}/${editingRecord.id}`, { method: "PATCH", body: JSON.stringify(body) });
       } else {
-        await apiFetch(config.endpoint, { method: "POST", body: JSON.stringify({ ...form, flockId }) });
+        await apiFetch(config.endpoint, { method: "POST", body: JSON.stringify(body) });
       }
       setFormOpen(false);
       setEditingRecord(null);
       setForm({});
+      setCostOverride(false);
       onRefresh();
     } catch (e: any) {
       alert(e.message);
@@ -252,12 +262,12 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole 
   function openAdd() {
     setEditingRecord(null);
     setForm({});
+    setCostOverride(false);
     setFormOpen(true);
   }
 
   function openEdit(record: any) {
     setEditingRecord(record);
-    // Pre-populate form fields based on record type
     const prefill: any = {};
     config.fields.forEach((f: any) => {
       const val = record[f.key];
@@ -273,7 +283,39 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole 
         }
       }
     });
+
+    // For feed records with supplier, calculate bag count
+    if (type === "feed" && record.supplierId && suppliers) {
+      const supplier = suppliers.find((s: any) => s.id === record.supplierId);
+      if (supplier) {
+        const stage = supplier.feedStages.find(
+          (s: any) => s.stageType === "feed" && s.stageName.toLowerCase() === record.feedType
+        );
+        if (stage) {
+          prefill._bagSizeKg = Number(stage.unitSizeKg);
+          prefill._bagPriceZmw = Number(stage.unitPriceZmw);
+          prefill.bagCount = Math.round(Number(record.quantityKg) / Number(stage.unitSizeKg));
+        }
+        prefill.supplierId = record.supplierId;
+      }
+    }
+    // Always prefill quantity and cost for feed records
+    if (type === "feed") {
+      if (record.quantityKg !== undefined && record.quantityKg !== null) {
+        prefill.quantityKg = Number(record.quantityKg);
+      }
+      if (record.costZmw !== undefined && record.costZmw !== null) {
+        prefill.costZmw = Number(record.costZmw);
+      }
+    }
+    // If no supplier but has feedBrand, treat as custom
+    if (type === "feed" && !record.supplierId && record.feedBrand) {
+      prefill.supplierId = "custom";
+      prefill.feedBrand = record.feedBrand;
+    }
+
     setForm(prefill);
+    setCostOverride(false);
     setFormOpen(true);
   }
 
@@ -282,29 +324,118 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole 
     setDeleteOpen(true);
   }
 
+  async function fetchSupplierPrice(supplierId: string, feedType: string) {
+    try {
+      return await apiFetch<any>(`/api/v1/suppliers/${supplierId}/feed-price?feedType=${feedType}`);
+    } catch {
+      return null;
+    }
+  }
+
+  function recalcFromBags(newForm: any, bags: number) {
+    const bagSize = newForm._bagSizeKg || 0;
+    const bagPrice = newForm._bagPriceZmw || 0;
+    if (bagSize > 0 && bagPrice > 0) {
+      newForm.quantityKg = Number((bags * bagSize).toFixed(2));
+      if (!costOverride) {
+        newForm.costZmw = Number((bags * bagPrice).toFixed(2));
+      }
+    }
+    return newForm;
+  }
+
   function renderField(f: any) {
     const val = form[f.key] || (f.type === "checkbox" ? false : "");
-    if (f.type === "select") return (
-      <select key={f.key} className="w-full border rounded-md p-2 bg-background" value={val} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}>
-        <option value="">Select...</option>
-        {f.options.map((o: string) => <option key={o} value={o}>{o}</option>)}
-      </select>
-    );
-    if (f.type === "checkbox") return (
-      <input key={f.key} type="checkbox" checked={!!val} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />
-    );
+
+    if (f.type === "supplier-select") {
+      return (
+        <select
+          key={f.key}
+          className="w-full border rounded-md p-2 bg-background"
+          value={val || ""}
+          onChange={async (e) => {
+            const supplierId = e.target.value;
+            const newForm = { ...form, [f.key]: supplierId };
+
+            if (supplierId && supplierId !== "custom") {
+              const priceData = await fetchSupplierPrice(supplierId, form.feedType || "starter");
+              if (priceData) {
+                newForm._bagSizeKg = priceData.unitSizeKg;
+                newForm._bagPriceZmw = priceData.unitPriceZmw;
+                newForm.feedBrand = priceData.supplierName;
+                const bags = Number(newForm.bagCount) || 0;
+                if (bags > 0) {
+                  recalcFromBags(newForm, bags);
+                }
+              } else {
+                newForm._bagSizeKg = null;
+                newForm._bagPriceZmw = null;
+              }
+            } else {
+              newForm._bagSizeKg = null;
+              newForm._bagPriceZmw = null;
+            }
+            setForm(newForm);
+          }}
+        >
+          <option value="">Select supplier...</option>
+          {suppliers && suppliers.map((s: any) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+          <option value="custom">Custom (Other)</option>
+        </select>
+      );
+    }
+
+    if (f.type === "select") {
+      return (
+        <select key={f.key} className="w-full border rounded-md p-2 bg-background" value={val} onChange={async (e) => {
+          const newForm = { ...form, [f.key]: e.target.value };
+          // If feed type changes and supplier is selected, re-fetch price
+          if (type === "feed" && f.key === "feedType" && form.supplierId && form.supplierId !== "custom") {
+            const priceData = await fetchSupplierPrice(form.supplierId, e.target.value);
+            if (priceData) {
+              newForm._bagSizeKg = priceData.unitSizeKg;
+              newForm._bagPriceZmw = priceData.unitPriceZmw;
+              const bags = Number(newForm.bagCount) || 0;
+              if (bags > 0) {
+                recalcFromBags(newForm, bags);
+              }
+            }
+          }
+          setForm(newForm);
+        }}>
+          <option value="">Select...</option>
+          {f.options.map((o: string) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      );
+    }
+
+    if (f.type === "checkbox") {
+      return <input key={f.key} type="checkbox" checked={!!val} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />;
+    }
+
     return <input key={f.key} type={f.type} step={f.type === "number" ? "0.1" : undefined} className="w-full border rounded-md p-2" value={val} onChange={(e) => setForm({ ...form, [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value })} />;
   }
 
   function renderRecord(r: any) {
     if (type === "growth") return <span>Weight: {r.avgWeight}g (n={r.sampleSize})</span>;
-    if (type === "feed") return <span className="capitalize">{r.feedType}: {r.quantityKg}kg {r.costZmw && `| ZMW ${r.costZmw}`}</span>;
+    if (type === "feed") return (
+      <span className="capitalize">
+        {r.feedBrand ? `${r.feedBrand} | ` : ""}
+        {r.feedType}: {r.quantityKg}kg
+        {r.costZmw && ` | ZMW ${r.costZmw}`}
+      </span>
+    );
     if (type === "water") return <span>{r.quantityLiters} liters {r.ph && `| pH ${r.ph}`}</span>;
     if (type === "mortality") return <span className="text-red-700">{r.count} deaths - {r.cause || "Unknown"}</span>;
     if (type === "vaccination") return <span className="text-green-700">{r.vaccineName} | {r.adminMethod}</span>;
     if (type === "financial") return <span className={r.isIncome ? "text-green-700" : ""}>{r.category}: {r.description} | ZMW {r.amountZmw} {r.isIncome && "(Income)"}</span>;
     return null;
   }
+
+  const hasSupplier = form.supplierId && form.supplierId !== "custom" && form._bagSizeKg;
+  const isCustom = form.supplierId === "custom";
 
   return (
     <div>
@@ -329,19 +460,102 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole 
       )}
 
       {/* Add/Edit Dialog */}
-      <Dialog open={formOpen} onOpenChange={(open) => { if (!open) { setFormOpen(false); setEditingRecord(null); setForm({}); } }}>
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!open) { setFormOpen(false); setEditingRecord(null); setForm({}); setCostOverride(false); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{isEditing ? "Edit" : "Add"} {config.title}</DialogTitle>
             <DialogDescription>{isEditing ? "Update the record details below." : "Enter the new record details."}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Standard fields */}
             {config.fields.map((f: any) => (
               <div key={f.key}><label className="text-sm font-medium">{f.label}</label>{renderField(f)}</div>
             ))}
+
+            {/* Bag count field (only for feed with supplier) */}
+            {type === "feed" && hasSupplier && (
+              <div>
+                <label className="text-sm font-medium">Number of Bags ({form._bagSizeKg}kg each @ ZMW {form._bagPriceZmw}/bag)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="w-full border rounded-md p-2"
+                  value={form.bagCount || ""}
+                  placeholder={`Enter number of ${form._bagSizeKg}kg bags`}
+                  onChange={(e) => {
+                    const bags = Number(e.target.value) || 0;
+                    const newForm = { ...form, bagCount: bags };
+                    recalcFromBags(newForm, bags);
+                    setForm(newForm);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Auto: {form.quantityKg || 0}kg @ ZMW {form.costZmw || 0}
+                </p>
+              </div>
+            )}
+
+            {/* Custom supplier name input */}
+            {type === "feed" && isCustom && (
+              <div>
+                <label className="text-sm font-medium">Custom Supplier Name</label>
+                <input
+                  className="w-full border rounded-md p-2"
+                  value={form.feedBrand || ""}
+                  placeholder="e.g., Local Market"
+                  onChange={(e) => setForm({ ...form, feedBrand: e.target.value })}
+                />
+              </div>
+            )}
+
+            {/* Quantity and Cost (shown for all feed records) */}
+            {type === "feed" && (
+              <>
+                <div>
+                  <label className="text-sm font-medium">Total Quantity (kg)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="w-full border rounded-md p-2"
+                    value={form.quantityKg || ""}
+                    onChange={(e) => setForm({ ...form, quantityKg: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Total Cost (ZMW)</label>
+                    {hasSupplier && (
+                      <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={costOverride}
+                          onChange={(e) => setCostOverride(e.target.checked)}
+                        />
+                        Override
+                      </label>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full border rounded-md p-2"
+                    value={form.costZmw || ""}
+                    readOnly={hasSupplier && !costOverride}
+                    style={{ backgroundColor: hasSupplier && !costOverride ? "#f3f4f6" : "white" }}
+                    onChange={(e) => setForm({ ...form, costZmw: Number(e.target.value) })}
+                  />
+                  {hasSupplier && !costOverride && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Auto-calculated from supplier pricing. Check "Override" to edit manually.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setFormOpen(false); setEditingRecord(null); setForm({}); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setFormOpen(false); setEditingRecord(null); setForm({}); setCostOverride(false); }}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update" : "Save")}</Button>
           </DialogFooter>
         </DialogContent>
