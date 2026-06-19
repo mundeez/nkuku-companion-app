@@ -495,12 +495,12 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
 
       {/* Add/Edit Dialog */}
       <Dialog open={formOpen} onOpenChange={(open) => { if (!open) { setFormOpen(false); setEditingRecord(null); setForm({}); setCostOverride(false); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-0">
             <DialogTitle>{isEditing ? "Edit" : "Add"} {config.title}</DialogTitle>
             <DialogDescription>{isEditing ? "Update the record details below." : "Enter the new record details."}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-4 px-6 overflow-y-auto">
             {/* Standard fields */}
             {config.fields.map((f: any) => (
               <div key={f.key}><label className="text-sm font-medium">{f.label}</label>{renderField(f)}</div>
@@ -605,7 +605,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
               </>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="p-6 pt-0">
             <Button variant="outline" onClick={() => { setFormOpen(false); setEditingRecord(null); setForm({}); setCostOverride(false); }}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : (isEditing ? "Update" : "Save")}</Button>
           </DialogFooter>
