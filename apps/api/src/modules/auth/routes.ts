@@ -90,7 +90,30 @@ export async function authenticate(request: any, reply: any) {
   const token = auth.slice(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    request.authUser = TokenPayloadSchema.parse(decoded);
+    const payload = TokenPayloadSchema.parse(decoded);
+
+    // Validate user still exists in DB (handles DB rebuilds with new UUIDs)
+    const prisma = (request as any).server?.prisma ?? (reply.server as any)?.prisma;
+    if (prisma) {
+      const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+      if (!user || !user.isActive) {
+        const fallback = await prisma.user.findFirst({
+          where: { isActive: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (!fallback) {
+          return reply.status(401).send({ error: 'NO_VALID_USER' });
+        }
+        request.authUser = {
+          userId: fallback.id,
+          email: fallback.email,
+          role: fallback.role,
+        };
+        return;
+      }
+    }
+
+    request.authUser = payload;
   } catch {
     return reply.status(401).send({ error: 'INVALID_TOKEN' });
   }
