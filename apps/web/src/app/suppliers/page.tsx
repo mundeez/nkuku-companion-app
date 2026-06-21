@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
-import { Supplier, FeedStage } from "@/lib/types";
+import { Supplier, FeedStage, SupplierCategoryTemplate, SupplierCategoryTemplateItem } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -27,7 +27,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Pencil, Trash2, Plus, X } from "lucide-react";
+import { Pencil, Trash2, Plus, X, AlertTriangle } from "lucide-react";
 
 interface SupplierFormData {
   name: string;
@@ -39,7 +39,7 @@ interface SupplierFormData {
 }
 
 interface StageFormData {
-  id: string; // real UUID or temp negative id
+  id: string;
   stageName: string;
   stageType: "feed" | "chick" | "medication" | "other";
   dayRangeStart: string;
@@ -49,6 +49,7 @@ interface StageFormData {
   intakePerBirdKg: string;
   sortOrder: number;
   isNew: boolean;
+  isFromTemplate: boolean;
 }
 
 const emptyForm: SupplierFormData = {
@@ -72,6 +73,24 @@ function stageToForm(stage: FeedStage): StageFormData {
     intakePerBirdKg: stage.intakePerBirdKg.toString(),
     sortOrder: stage.sortOrder,
     isNew: false,
+    isFromTemplate: false,
+  };
+}
+
+function templateItemToForm(item: SupplierCategoryTemplateItem, tempId: number): StageFormData {
+  const defaults = item.defaultFields || {};
+  return {
+    id: `temp-${tempId}`,
+    stageName: item.itemName,
+    stageType: item.itemType,
+    dayRangeStart: defaults.dayRangeStart?.toString() ?? "",
+    dayRangeEnd: defaults.dayRangeEnd?.toString() ?? "",
+    unitSizeKg: defaults.unitSizeKg?.toString() ?? "",
+    unitPriceZmw: "",
+    intakePerBirdKg: defaults.intakePerBirdKg?.toString() ?? "",
+    sortOrder: item.sortOrder,
+    isNew: true,
+    isFromTemplate: true,
   };
 }
 
@@ -87,6 +106,7 @@ function emptyStageForm(tempId: number): StageFormData {
     intakePerBirdKg: "",
     sortOrder: tempId,
     isNew: true,
+    isFromTemplate: false,
   };
 }
 
@@ -94,6 +114,7 @@ export default function SuppliersPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [feedTemplate, setFeedTemplate] = useState<SupplierCategoryTemplate | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -105,13 +126,16 @@ export default function SuppliersPage() {
   const [form, setForm] = useState<SupplierFormData>(emptyForm);
   const [formLoading, setFormLoading] = useState(false);
 
-  // Tabbed stage editing state
   const [stageForms, setStageForms] = useState<StageFormData[]>([]);
   const [activeStageTab, setActiveStageTab] = useState<string>("");
   const [deletedStageIds, setDeletedStageIds] = useState<string[]>([]);
   const [newStageCounter, setNewStageCounter] = useState(1);
 
   const [activeCategory, setActiveCategory] = useState("feed");
+
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [stagePrice, setStagePrice] = useState("");
+  const [priceSaving, setPriceSaving] = useState(false);
 
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
   const canDelete = user?.role === "owner";
@@ -122,12 +146,21 @@ export default function SuppliersPage() {
       .catch((err) => setError(err.message));
   }
 
+  function loadFeedTemplate() {
+    apiFetch<SupplierCategoryTemplate>("/api/v1/supplier-templates/feed")
+      .then(setFeedTemplate)
+      .catch((err) => console.error("Failed to load feed template:", err.message));
+  }
+
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login");
       return;
     }
-    if (user) loadSuppliers();
+    if (user) {
+      loadSuppliers();
+      loadFeedTemplate();
+    }
   }, [user, isLoading, router]);
 
   useEffect(() => {
@@ -136,6 +169,36 @@ export default function SuppliersPage() {
       return () => clearTimeout(t);
     }
   }, [success]);
+
+  function getSortedStages(supplier: Supplier): (FeedStage | { missing: true; item: SupplierCategoryTemplateItem })[] {
+    if (!feedTemplate) return supplier.feedStages;
+
+    const stageMap = new Map(supplier.feedStages.map((s) => [s.stageName, s]));
+    const result: (FeedStage | { missing: true; item: SupplierCategoryTemplateItem })[] = [];
+
+    for (const item of feedTemplate.items) {
+      const stage = stageMap.get(item.itemName);
+      if (stage) {
+        result.push(stage);
+      } else if (item.isRequired) {
+        result.push({ missing: true, item });
+      }
+    }
+
+    for (const stage of supplier.feedStages) {
+      if (!feedTemplate.items.find((i) => i.itemName === stage.stageName)) {
+        result.push(stage);
+      }
+    }
+
+    return result;
+  }
+
+  function getMissingTemplateItems(supplier: Supplier): SupplierCategoryTemplateItem[] {
+    if (!feedTemplate) return [];
+    const existingNames = new Set(supplier.feedStages.map((s) => s.stageName));
+    return feedTemplate.items.filter((item) => !existingNames.has(item.itemName));
+  }
 
   function openEdit(supplier: Supplier) {
     setEditingSupplier(supplier);
@@ -147,22 +210,56 @@ export default function SuppliersPage() {
       isActive: supplier.isActive,
       isDefault: supplier.isDefault,
     });
-    const stages = supplier.feedStages.map(stageToForm);
+
+    let counter = 1;
+    const stages: StageFormData[] = [];
+
+    if (feedTemplate) {
+      const stageMap = new Map(supplier.feedStages.map((s) => [s.stageName, s]));
+      for (const item of feedTemplate.items) {
+        const stage = stageMap.get(item.itemName);
+        if (stage) {
+          stages.push(stageToForm(stage));
+        } else {
+          stages.push(templateItemToForm(item, counter++));
+        }
+      }
+      for (const stage of supplier.feedStages) {
+        if (!feedTemplate.items.find((i) => i.itemName === stage.stageName)) {
+          stages.push(stageToForm(stage));
+        }
+      }
+    } else {
+      stages.push(...supplier.feedStages.map(stageToForm));
+    }
+
     setStageForms(stages);
     setActiveStageTab(stages.length > 0 ? stages[0].id : "");
     setDeletedStageIds([]);
-    setNewStageCounter(1);
+    setNewStageCounter(counter);
     setEditOpen(true);
   }
 
   function openCreate() {
     setEditingSupplier(null);
     setForm(emptyForm);
-    const initialStage = emptyStageForm(1);
-    setStageForms([initialStage]);
-    setActiveStageTab(initialStage.id);
+
+    let counter = 1;
+    const stages: StageFormData[] = [];
+    if (feedTemplate) {
+      for (const item of feedTemplate.items) {
+        stages.push(templateItemToForm(item, counter++));
+      }
+    } else {
+      const initialStage = emptyStageForm(1);
+      stages.push(initialStage);
+      counter = 2;
+    }
+
+    setStageForms(stages);
+    setActiveStageTab(stages.length > 0 ? stages[0].id : "");
     setDeletedStageIds([]);
-    setNewStageCounter(2);
+    setNewStageCounter(counter);
     setCreateOpen(true);
   }
 
@@ -172,6 +269,17 @@ export default function SuppliersPage() {
   }
 
   function addStage() {
+    if (editingSupplier && feedTemplate) {
+      const existingNames = new Set(stageForms.map((s) => s.stageName));
+      const missingItem = feedTemplate.items.find((item) => !existingNames.has(item.itemName));
+      if (missingItem) {
+        const newStage = templateItemToForm(missingItem, newStageCounter);
+        setStageForms((prev) => [...prev, newStage]);
+        setActiveStageTab(newStage.id);
+        setNewStageCounter((n) => n + 1);
+        return;
+      }
+    }
     const newStage = emptyStageForm(newStageCounter);
     setStageForms((prev) => [...prev, newStage]);
     setActiveStageTab(newStage.id);
@@ -183,7 +291,6 @@ export default function SuppliersPage() {
     if (!stageId.startsWith("temp-")) {
       setDeletedStageIds((prev) => [...prev, stageId]);
     }
-    // If removing active tab, switch to first remaining
     setActiveStageTab((active) => {
       const remaining = stageForms.filter((s) => s.id !== stageId);
       if (active === stageId && remaining.length > 0) {
@@ -206,7 +313,6 @@ export default function SuppliersPage() {
         method: "POST",
         body: JSON.stringify(form),
       });
-      // Create all stages for new supplier
       await Promise.all(
         stageForms.map((s) =>
           apiFetch("/api/v1/feed-stages", {
@@ -241,13 +347,11 @@ export default function SuppliersPage() {
     if (!editingSupplier) return;
     setFormLoading(true);
     try {
-      // Update supplier-level fields
       await apiFetch<Supplier>(`/api/v1/suppliers/${editingSupplier.id}`, {
         method: "PATCH",
         body: JSON.stringify(form),
       });
 
-      // Update existing stages
       await Promise.all(
         stageForms
           .filter((s) => !s.isNew)
@@ -268,7 +372,6 @@ export default function SuppliersPage() {
           )
       );
 
-      // Create new stages
       await Promise.all(
         stageForms
           .filter((s) => s.isNew)
@@ -290,7 +393,6 @@ export default function SuppliersPage() {
           )
       );
 
-      // Delete removed stages
       await Promise.all(
         deletedStageIds.map((id) =>
           apiFetch(`/api/v1/feed-stages/${id}`, { method: "DELETE" })
@@ -300,6 +402,7 @@ export default function SuppliersPage() {
       setSuccess("Supplier updated successfully.");
       setEditOpen(false);
       setEditingSupplier(null);
+      setForm(emptyForm);
       setStageForms([]);
       setDeletedStageIds([]);
       loadSuppliers();
@@ -314,7 +417,7 @@ export default function SuppliersPage() {
     if (!deletingSupplier) return;
     setFormLoading(true);
     try {
-      await apiFetch<{ deleted: boolean }>(`/api/v1/suppliers/${deletingSupplier.id}`, {
+      await apiFetch(`/api/v1/suppliers/${deletingSupplier.id}`, {
         method: "DELETE",
       });
       setSuccess("Supplier deleted successfully.");
@@ -328,15 +431,9 @@ export default function SuppliersPage() {
     }
   }
 
-  // Inline price editing on main page (kept for quick access)
-  const [editingStageId, setEditingStageId] = useState<string | null>(null);
-  const [stagePrice, setStagePrice] = useState<string>("");
-  const [priceSaving, setPriceSaving] = useState(false);
-
   async function saveStagePrice(stage: FeedStage) {
-    const value = parseFloat(stagePrice);
+    const value = Number(stagePrice);
     if (Number.isNaN(value) || value < 0) {
-      setError("Invalid price value.");
       setEditingStageId(null);
       return;
     }
@@ -401,101 +498,132 @@ export default function SuppliersPage() {
 
         <TabsContent value="feed">
           <div className="grid gap-6">
-            {suppliers.map((supplier) => (
-              <Card key={supplier.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{supplier.name}</CardTitle>
-                      {supplier.contact && (
-                        <p className="text-sm text-muted-foreground mt-1">Contact: {supplier.contact}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex gap-2">
-                        {supplier.isDefault && <Badge variant="default">Default</Badge>}
-                        {supplier.chickenType && <Badge variant="secondary">{supplier.chickenType}</Badge>}
-                        {!supplier.isActive && <Badge variant="outline">Inactive</Badge>}
+            {suppliers.map((supplier) => {
+              const missingItems = getMissingTemplateItems(supplier);
+              const sortedStages = getSortedStages(supplier);
+              return (
+                <Card key={supplier.id}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{supplier.name}</CardTitle>
+                        {supplier.contact && (
+                          <p className="text-sm text-muted-foreground mt-1">Contact: {supplier.contact}</p>
+                        )}
                       </div>
-                      {canCreateEdit && (
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(supplier)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {canDelete && (
-                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => openDelete(supplier)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  {supplier.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{supplier.description}</p>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Stage</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Days</TableHead>
-                        <TableHead>Unit Size</TableHead>
-                        <TableHead>Unit Price (ZMW)</TableHead>
-                        <TableHead>Intake/Bird (kg)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {supplier.feedStages.map((stage) => (
-                        <TableRow key={stage.id}>
-                          <TableCell className="font-medium">{stage.stageName}</TableCell>
-                          <TableCell>
-                            <Badge variant={stage.stageType === "chick" ? "secondary" : "outline"}>
-                              {stage.stageType}
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-2">
+                          {supplier.isDefault && <Badge variant="default">Default</Badge>}
+                          {supplier.chickenType && <Badge variant="secondary">{supplier.chickenType}</Badge>}
+                          {!supplier.isActive && <Badge variant="outline">Inactive</Badge>}
+                          {missingItems.length > 0 && (
+                            <Badge variant="destructive" className="flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              {missingItems.length} missing
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {stage.dayRangeStart != null && stage.dayRangeEnd != null
-                              ? `${stage.dayRangeStart}-${stage.dayRangeEnd}`
-                              : "-"}
-                          </TableCell>
-                          <TableCell>{stage.unitSizeKg} kg</TableCell>
-                          <TableCell
-                            className={canCreateEdit ? "cursor-pointer hover:bg-muted/50" : ""}
-                            onClick={() => {
-                              if (canCreateEdit) startEditingPrice(stage);
-                            }}
-                          >
-                            {editingStageId === stage.id ? (
-                              <Input
-                                type="number"
-                                step="0.01"
-                                autoFocus
-                                disabled={priceSaving}
-                                className="w-28 h-8 text-sm"
-                                value={stagePrice}
-                                onChange={(e) => setStagePrice(e.target.value)}
-                                onBlur={() => saveStagePrice(stage)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") saveStagePrice(stage);
-                                  if (e.key === "Escape") setEditingStageId(null);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            ) : (
-                              <span className={canCreateEdit ? "underline decoration-dotted" : ""}>
-                                {Number(stage.unitPriceZmw).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>{stage.intakePerBirdKg}</TableCell>
+                          )}
+                        </div>
+                        {canCreateEdit && (
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(supplier)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => openDelete(supplier)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {supplier.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{supplier.description}</p>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Stage</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Days</TableHead>
+                          <TableHead>Unit Size</TableHead>
+                          <TableHead>Unit Price (ZMW)</TableHead>
+                          <TableHead>Intake/Bird (kg)</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            ))}
+                      </TableHeader>
+                      <TableBody>
+                        {sortedStages.map((stageOrMissing, idx) => {
+                          if ("missing" in stageOrMissing) {
+                            const item = stageOrMissing.item;
+                            return (
+                              <TableRow key={`missing-${idx}`} className="bg-destructive/5">
+                                <TableCell className="font-medium text-destructive flex items-center gap-2">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  {item.itemName}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{item.itemType}</Badge>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm italic">—</TableCell>
+                                <TableCell className="text-muted-foreground text-sm italic">—</TableCell>
+                                <TableCell className="text-muted-foreground text-sm italic">—</TableCell>
+                                <TableCell className="text-muted-foreground text-sm italic">—</TableCell>
+                              </TableRow>
+                            );
+                          }
+                          const stage = stageOrMissing as FeedStage;
+                          return (
+                            <TableRow key={stage.id}>
+                              <TableCell className="font-medium">{stage.stageName}</TableCell>
+                              <TableCell>
+                                <Badge variant={stage.stageType === "chick" ? "secondary" : "outline"}>
+                                  {stage.stageType}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {stage.dayRangeStart != null && stage.dayRangeEnd != null
+                                  ? `${stage.dayRangeStart}-${stage.dayRangeEnd}`
+                                  : "-"}
+                              </TableCell>
+                              <TableCell>{stage.unitSizeKg} kg</TableCell>
+                              <TableCell
+                                className={canCreateEdit ? "cursor-pointer hover:bg-muted/50" : ""}
+                                onClick={() => {
+                                  if (canCreateEdit) startEditingPrice(stage);
+                                }}
+                              >
+                                {editingStageId === stage.id ? (
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    autoFocus
+                                    disabled={priceSaving}
+                                    className="w-28 h-8 text-sm"
+                                    value={stagePrice}
+                                    onChange={(e) => setStagePrice(e.target.value)}
+                                    onBlur={() => saveStagePrice(stage)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") saveStagePrice(stage);
+                                      if (e.key === "Escape") setEditingStageId(null);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <span className={canCreateEdit ? "underline decoration-dotted" : ""}>
+                                    {Number(stage.unitPriceZmw).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell>{stage.intakePerBirdKg}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </TabsContent>
 
@@ -513,7 +641,6 @@ export default function SuppliersPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Create / Edit Dialog (shared) */}
       <Dialog
         open={createOpen || editOpen}
         onOpenChange={(open) => {
@@ -536,7 +663,6 @@ export default function SuppliersPage() {
           </DialogHeader>
 
           <div className="overflow-y-auto px-6 py-4 space-y-4">
-            {/* Supplier-level fields */}
             <div className="grid gap-3">
               <div>
                 <Label htmlFor="sup-name">Name</Label>
@@ -572,7 +698,6 @@ export default function SuppliersPage() {
 
             <hr />
 
-            {/* Stage tabs */}
             {stageForms.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -691,7 +816,6 @@ export default function SuppliersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>

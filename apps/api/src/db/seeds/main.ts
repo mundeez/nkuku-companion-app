@@ -4,6 +4,7 @@ import { seedRoss308Performance } from './ross308-performance';
 import { seedCobb500Performance } from './cobb500-performance';
 import { seedDiseases } from './diseases';
 import { seedVaccinationSchedules } from './vaccination-schedules';
+import { seedSupplierCategoryTemplates } from './supplier-templates';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -28,7 +29,10 @@ async function main() {
   });
   console.log('[SEED] Owner user:', owner.email);
 
-  // ── 2. Seed Suppliers + Feed Stages ─────
+  // ── 2. Seed Supplier Category Templates ──
+  await seedSupplierCategoryTemplates(prisma);
+
+  // ── 3. Seed Suppliers + Feed Stages ─────
   const suppliersData = [
     {
       name: 'NUTRI FEED',
@@ -111,7 +115,7 @@ async function main() {
     console.log('[SEED] Supplier + stages:', supplier.name);
   }
 
-  // ── 3. Seed Exchange Rate ───────────────
+  // ── 4. Seed Exchange Rate ───────────────
   await prisma.exchangeRate.upsert({
     where: {
       currencyFrom_currencyTo_effectiveDate: {
@@ -131,7 +135,7 @@ async function main() {
   });
   console.log('[SEED] Exchange rate: USD/ZMW = 17.71');
 
-  // ── 4. Seed Equipment Items ────────────
+  // ── 5. Seed Equipment Items ────────────
   const equipmentData = [
     { category: 'raising_equipment', name: 'Abbatoir Set (12,000 BPH)', unitCostUsd: 60000, isCompulsory: true, quantity: 1 },
     { category: 'cold_storage', name: 'Cold Room', unitCostUsd: 0, isCompulsory: true, quantity: 1, notes: 'Pricing TBD' },
@@ -148,7 +152,7 @@ async function main() {
   }
   console.log('[SEED] Equipment items:', equipmentData.length);
 
-  // ── 5. Seed Production Cycles & Batches ──
+  // ── 6. Seed Production Cycles & Batches ──
   const expansionRows = [
     { cycleNumber: 1, targetExecutionDt: '2024-12-05', growthQtyAdded: 0, totalQtyAtHand: 200, shootLabel: 'Shoot 1', revenueTargetZmw: 5000, salesDate: '2025-01-16' },
     { cycleNumber: 1, targetExecutionDt: '2024-12-26', growthQtyAdded: 0, totalQtyAtHand: 200, shootLabel: 'Shoot 2', revenueTargetZmw: 5000, salesDate: '2025-02-06' },

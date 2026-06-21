@@ -31,6 +31,27 @@ export interface FeedStage {
   sortOrder: number;
 }
 
+export interface SupplierCategoryTemplate {
+  id: string;
+  category: string;
+  name: string;
+  description?: string;
+  sortOrder: number;
+  isActive: boolean;
+  items: SupplierCategoryTemplateItem[];
+}
+
+export interface SupplierCategoryTemplateItem {
+  id: string;
+  templateId: string;
+  itemName: string;
+  itemType: "feed" | "chick" | "medication" | "other";
+  sortOrder: number;
+  defaultFields?: Record<string, any>;
+  isRequired: boolean;
+  isActive: boolean;
+}
+
 export interface Batch {
   id: string;
   cycleId: string;
