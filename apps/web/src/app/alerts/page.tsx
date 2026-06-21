@@ -63,7 +63,7 @@ export default function AlertsPage() {
   async function handleGenerate() {
     setGenerating(true);
     try {
-      await apiFetch("/api/v1/alerts/generate", { method: "POST" });
+      await apiFetch("/api/v1/alerts/generate", { method: "POST", body: JSON.stringify({}) });
       loadAlerts();
     } catch (err: any) {
       setError(err.message);
