@@ -27,7 +27,23 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Pencil, Trash2, Plus, X, AlertTriangle } from "lucide-react";
+import { Pencil, Trash2, Plus, X, AlertTriangle, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface SupplierFormData {
   name: string;
@@ -110,6 +126,62 @@ function emptyStageForm(tempId: number): StageFormData {
   };
 }
 
+function SortableStageTab({
+  stage,
+  isActive,
+  onRemove,
+}: {
+  stage: StageFormData;
+  isActive: boolean;
+  onRemove: (id: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: stage.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    position: "relative" as const,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <TabsTrigger
+        value={stage.id}
+        className="relative pr-6 select-none"
+        data-state={isActive ? "active" : "inactive"}
+      >
+        <span
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing mr-1 text-muted-foreground hover:text-foreground"
+          title="Drag to reorder"
+        >
+          <GripVertical className="h-3 w-3" />
+        </span>
+        {stage.stageName || "New Stage"}
+        <button
+          type="button"
+          className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(stage.id);
+          }}
+          title="Remove stage"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </TabsTrigger>
+    </div>
+  );
+}
+
 export default function SuppliersPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -136,6 +208,13 @@ export default function SuppliersPage() {
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [stagePrice, setStagePrice] = useState("");
   const [priceSaving, setPriceSaving] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: () => null as any,
+    })
+  );
 
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
   const canDelete = user?.role === "owner";
@@ -304,6 +383,19 @@ export default function SuppliersPage() {
     setStageForms((prev) =>
       prev.map((s) => (s.id === stageId ? { ...s, ...updates } : s))
     );
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setStageForms((prev) => {
+      const oldIndex = prev.findIndex((s) => s.id === active.id);
+      const newIndex = prev.findIndex((s) => s.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      const moved = arrayMove(prev, oldIndex, newIndex);
+      return moved.map((s, idx) => ({ ...s, sortOrder: idx }));
+    });
   }
 
   async function handleCreate() {
@@ -707,24 +799,20 @@ export default function SuppliersPage() {
                   </Button>
                 </div>
                 <Tabs value={activeStageTab} onValueChange={setActiveStageTab}>
-                  <TabsList className="flex-wrap h-auto">
-                    {stageForms.map((stage) => (
-                      <TabsTrigger key={stage.id} value={stage.id} className="relative pr-6">
-                        {stage.stageName || "New Stage"}
-                        <button
-                          type="button"
-                          className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeStage(stage.id);
-                          }}
-                          title="Remove stage"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={stageForms.map((s) => s.id)} strategy={horizontalListSortingStrategy}>
+                      <TabsList className="flex-wrap h-auto">
+                        {stageForms.map((stage) => (
+                          <SortableStageTab
+                            key={stage.id}
+                            stage={stage}
+                            isActive={activeStageTab === stage.id}
+                            onRemove={removeStage}
+                          />
+                        ))}
+                      </TabsList>
+                    </SortableContext>
+                  </DndContext>
                   {stageForms.map((stage) => (
                     <TabsContent key={stage.id} value={stage.id} className="space-y-3 mt-3">
                       <div>

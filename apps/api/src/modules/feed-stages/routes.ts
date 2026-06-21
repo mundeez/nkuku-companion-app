@@ -9,7 +9,7 @@ const FeedStageCreateSchema = z.object({
   dayRangeStart: z.number().int().optional(),
   dayRangeEnd: z.number().int().optional(),
   unitSizeKg: z.coerce.number().positive(),
-  unitPriceZmw: z.coerce.number().positive(),
+  unitPriceZmw: z.coerce.number().nonnegative(),
   intakePerBirdKg: z.coerce.number().nonnegative(),
   sortOrder: z.number().int().default(0),
   isActive: z.boolean().optional(),
