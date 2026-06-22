@@ -581,7 +581,7 @@ export default function SuppliersPage() {
 
       <Tabs value={activeCategory} onValueChange={setActiveCategory} className="mb-6">
         <TabsList>
-          <TabsTrigger value="feed">Feed</TabsTrigger>
+          <TabsTrigger value="feed">Feed & Chicks</TabsTrigger>
           <TabsTrigger value="vaccine">Vaccine</TabsTrigger>
           <TabsTrigger value="labour">Labour</TabsTrigger>
           <TabsTrigger value="equipment">Equipment</TabsTrigger>

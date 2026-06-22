@@ -50,6 +50,7 @@ model Supplier {
 
   feedStages    FeedStage[]
   feedRecords   FeedRecord[]
+  flocks        BroilerFlock[]
   batches       Batch[]
   projections   Projection[]
   creator       User?     @relation("SupplierCreatedBy", fields: [createdBy], references: [id])
@@ -363,18 +364,21 @@ model BroilerFlock {
   id           String      @id @default(uuid()) @db.Uuid
   name         String      @db.VarChar(100)
   breedId      String      @map("breed_id") @db.Uuid
+  supplierId   String?     @map("supplier_id") @db.Uuid
   startDate    DateTime    @map("start_date") @db.Date
   initialCount Int         @map("initial_count")
   currentCount Int         @map("current_count")
   targetWeight Decimal?    @map("target_weight") @db.Decimal(10, 3)
   targetAge    Int?        @map("target_age")
   feedTransitionDay Int?   @map("feed_transition_day")
+  chickPriceZmw Decimal?  @map("chick_price_zmw") @db.Decimal(14, 2)
   status       FlockStatus @default(active)
   createdBy    String?     @map("created_by") @db.Uuid
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   breed              Breed                @relation(fields: [breedId], references: [id])
+  supplier           Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   creator            User?                @relation("FlockCreatedBy", fields: [createdBy], references: [id])
   growthRecords      GrowthRecord[]
   feedRecords        FeedRecord[]
@@ -385,6 +389,7 @@ model BroilerFlock {
   alerts             Alert[]
 
   @@index([breedId, status])
+  @@index([supplierId])
   @@map("broiler_flocks")
 }
 

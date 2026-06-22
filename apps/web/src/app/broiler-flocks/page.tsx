@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
-import { BroilerFlock, Breed } from "@/lib/types";
+import { BroilerFlock, Breed, Supplier } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,11 +25,13 @@ import { Plus, Pencil, Trash2, Eye, TrendingUp, AlertTriangle } from "lucide-rea
 interface FlockFormData {
   name: string;
   breedId: string;
+  supplierId?: string;
   startDate: string;
   initialCount: number;
   targetWeight?: number;
   targetAge?: number;
   feedTransitionDay?: number;
+  chickPriceZmw?: number;
 }
 
 const emptyForm: FlockFormData = {
@@ -48,6 +50,7 @@ export default function BroilerFlocksPage() {
   const { addToast } = useToast();
   const [flocks, setFlocks] = useState<BroilerFlock[]>([]);
   const [breeds, setBreeds] = useState<Breed[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -68,6 +71,9 @@ export default function BroilerFlocksPage() {
       .catch((err) => setError(err.message));
     apiFetch<Breed[]>("/api/v1/breeds")
       .then(setBreeds)
+      .catch((err) => setError(err.message));
+    apiFetch<Supplier[]>("/api/v1/suppliers")
+      .then(setSuppliers)
       .catch((err) => setError(err.message));
   }
 
@@ -91,11 +97,13 @@ export default function BroilerFlocksPage() {
     setForm({
       name: flock.name,
       breedId: flock.breedId,
+      supplierId: flock.supplierId,
       startDate: new Date(flock.startDate).toISOString().split("T")[0],
       initialCount: flock.initialCount,
       targetWeight: flock.targetWeight || undefined,
       targetAge: flock.targetAge || undefined,
       feedTransitionDay: flock.feedTransitionDay || 11,
+      chickPriceZmw: flock.chickPriceZmw || undefined,
     });
     setEditOpen(true);
   }
@@ -103,6 +111,15 @@ export default function BroilerFlocksPage() {
   function openDelete(flock: BroilerFlock) {
     setDeletingFlock(flock);
     setDeleteOpen(true);
+  }
+
+  async function fetchSupplierChickPrice(supplierId: string) {
+    try {
+      const data = await apiFetch<any>(`/api/v1/suppliers/${supplierId}/feed-price?feedType=Day-old%20Chicks`);
+      return data;
+    } catch {
+      return null;
+    }
   }
 
   function getAgeDays(startDate: string): number {
@@ -124,12 +141,20 @@ export default function BroilerFlocksPage() {
     }
   }
 
+  function prepareFlockBody(formData: FlockFormData) {
+    const body: any = { ...formData };
+    if (body.supplierId === "custom" || body.supplierId === "") {
+      body.supplierId = null;
+    }
+    return body;
+  }
+
   async function handleCreate() {
     setFormLoading(true);
     try {
       await apiFetch<BroilerFlock>("/api/v1/broiler-flocks", {
         method: "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify(prepareFlockBody(form)),
       });
       addToast("Flock created successfully.", "success");
       setCreateOpen(false);
@@ -148,7 +173,7 @@ export default function BroilerFlocksPage() {
     try {
       await apiFetch<BroilerFlock>(`/api/v1/broiler-flocks/${editingFlock.id}`, {
         method: "PATCH",
-        body: JSON.stringify(form),
+        body: JSON.stringify(prepareFlockBody(form)),
       });
       addToast("Flock updated successfully.", "success");
       setEditOpen(false);
@@ -254,6 +279,18 @@ export default function BroilerFlocksPage() {
                       <span className="font-medium">Day {flock.feedTransitionDay}</span>
                     </div>
                   )}
+                  {flock.supplier && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Supplier</span>
+                      <span className="font-medium">{flock.supplier.name}</span>
+                    </div>
+                  )}
+                  {flock.chickPriceZmw && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Chick Price</span>
+                      <span className="font-medium">ZMW {flock.chickPriceZmw}</span>
+                    </div>
+                  )}
                   <div className="pt-3 flex gap-2">
                     <Button
                       variant="outline"
@@ -341,6 +378,46 @@ export default function BroilerFlocksPage() {
               <Label>Feed Transition Day (Starter to Grower)</Label>
               <Input type="number" value={form.feedTransitionDay || ""} onChange={(e) => setForm({ ...form, feedTransitionDay: Number(e.target.value) })} />
             </div>
+            <div>
+              <Label>Supplier</Label>
+              <select
+                className="w-full border rounded-md p-2 bg-background"
+                value={form.supplierId || ""}
+                onChange={async (e) => {
+                  const supplierId = e.target.value;
+                  const newForm = { ...form, supplierId };
+                  if (supplierId && supplierId !== "custom") {
+                    const priceData = await fetchSupplierChickPrice(supplierId);
+                    if (priceData) {
+                      newForm.chickPriceZmw = priceData.unitPriceZmw;
+                    } else {
+                      newForm.chickPriceZmw = undefined;
+                    }
+                  } else if (supplierId === "custom") {
+                    newForm.chickPriceZmw = undefined;
+                  } else {
+                    newForm.chickPriceZmw = undefined;
+                  }
+                  setForm(newForm);
+                }}
+              >
+                <option value="">Select supplier...</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+                <option value="custom">Custom (Other)</option>
+              </select>
+            </div>
+            <div>
+              <Label>Price per Chick (ZMW)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.chickPriceZmw || ""}
+                placeholder="e.g., 19.00"
+                onChange={(e) => setForm({ ...form, chickPriceZmw: Number(e.target.value) })}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -375,6 +452,46 @@ export default function BroilerFlocksPage() {
             <div>
               <Label>Feed Transition Day</Label>
               <Input type="number" value={form.feedTransitionDay || ""} onChange={(e) => setForm({ ...form, feedTransitionDay: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label>Supplier</Label>
+              <select
+                className="w-full border rounded-md p-2 bg-background"
+                value={form.supplierId || ""}
+                onChange={async (e) => {
+                  const supplierId = e.target.value;
+                  const newForm = { ...form, supplierId };
+                  if (supplierId && supplierId !== "custom") {
+                    const priceData = await fetchSupplierChickPrice(supplierId);
+                    if (priceData) {
+                      newForm.chickPriceZmw = priceData.unitPriceZmw;
+                    } else {
+                      newForm.chickPriceZmw = undefined;
+                    }
+                  } else if (supplierId === "custom") {
+                    newForm.chickPriceZmw = undefined;
+                  } else {
+                    newForm.chickPriceZmw = undefined;
+                  }
+                  setForm(newForm);
+                }}
+              >
+                <option value="">Select supplier...</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+                <option value="custom">Custom (Other)</option>
+              </select>
+            </div>
+            <div>
+              <Label>Price per Chick (ZMW)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.chickPriceZmw || ""}
+                placeholder="e.g., 19.00"
+                onChange={(e) => setForm({ ...form, chickPriceZmw: Number(e.target.value) })}
+              />
             </div>
             <div>
               <Label>Status</Label>

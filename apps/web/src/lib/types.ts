@@ -124,12 +124,15 @@ export interface BroilerFlock {
   name: string;
   breedId: string;
   breed: Breed;
+  supplierId?: string;
+  supplier?: Supplier;
   startDate: string;
   initialCount: number;
   currentCount: number;
   targetWeight?: number;
   targetAge?: number;
   feedTransitionDay?: number;
+  chickPriceZmw?: number;
   status: "active" | "completed" | "cancelled";
   createdAt: string;
   updatedAt: string;

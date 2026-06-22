@@ -5,19 +5,23 @@ import { authenticate, requireRole } from '../auth/routes.js';
 const FlockCreateSchema = z.object({
   name: z.string().min(1).max(100),
   breedId: z.string().uuid(),
+  supplierId: z.string().uuid().optional(),
   startDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   initialCount: z.number().int().min(1),
   targetWeight: z.number().positive().optional(),
   targetAge: z.number().int().positive().optional(),
   feedTransitionDay: z.number().int().min(1).max(21).optional(),
+  chickPriceZmw: z.number().nonnegative().optional(),
 });
 
 const FlockUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   breedId: z.string().uuid().optional(),
+  supplierId: z.string().uuid().optional().nullable(),
   targetWeight: z.number().positive().optional(),
   targetAge: z.number().int().positive().optional(),
   feedTransitionDay: z.number().int().min(1).max(21).optional(),
+  chickPriceZmw: z.number().nonnegative().optional().nullable(),
   status: z.enum(['active', 'completed', 'cancelled']).optional(),
   currentCount: z.number().int().min(0).optional(),
 });
@@ -38,7 +42,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
     return prisma.broilerFlock.findMany({
       where,
-      include: { breed: true },
+      include: { breed: true, supplier: { select: { id: true, name: true, feedStages: true } } },
       orderBy: { startDate: 'desc' },
     });
   });
@@ -50,6 +54,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       where: { id, createdBy: authUser.userId },
       include: {
         breed: { include: { performanceTargets: { orderBy: { ageDays: 'asc' } } } },
+        supplier: { select: { id: true, name: true, feedStages: true } },
         growthRecords: { orderBy: { recordDate: 'desc' }, take: 1 },
         _count: {
           select: {
@@ -91,7 +96,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       data,
     });
     if (flock.count === 0) return reply.status(404).send({ error: 'NOT_FOUND' });
-    return prisma.broilerFlock.findUnique({ where: { id }, include: { breed: true } });
+    return prisma.broilerFlock.findUnique({ where: { id }, include: { breed: true, supplier: { select: { id: true, name: true, feedStages: true } } } });
   });
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
