@@ -394,12 +394,6 @@ enum FlockStatus {
   cancelled
 }
 
-enum FeedType {
-  starter
-  grower
-  finisher
-}
-
 model GrowthRecord {
   id         String   @id @default(uuid()) @db.Uuid
   flockId    String   @map("flock_id") @db.Uuid
@@ -421,7 +415,7 @@ model FeedRecord {
   flockId    String   @map("flock_id") @db.Uuid
   supplierId String?  @map("supplier_id") @db.Uuid   // NEW
   recordDate DateTime @map("record_date") @db.Date
-  feedType   FeedType
+  feedType   String   @db.VarChar(50)
   feedBrand  String?  @map("feed_brand") @db.VarChar(100)
   quantityKg Decimal  @map("quantity_kg") @db.Decimal(10, 3)
   costZmw    Decimal? @map("cost_zmw") @db.Decimal(14, 2)

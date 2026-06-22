@@ -15,8 +15,9 @@ export default function FeedCalculatorPage() {
   const flockId = params.id as string;
   const [summary, setSummary] = useState<any>(null);
   const [flock, setFlock] = useState<any>(null);
+  const [supplier, setSupplier] = useState<any>(null);
   const [error, setError] = useState("");
-  const [calc, setCalc] = useState({ birds: 1000, days: 42, feedType: "starter" });
+  const [calc, setCalc] = useState({ birds: 1000, days: 42, feedType: "" });
   const [result, setResult] = useState<any>(null);
 
   useEffect(() => {
@@ -26,20 +27,32 @@ export default function FeedCalculatorPage() {
         .then(setSummary)
         .catch((err) => setError(err.message));
       apiFetch(`/api/v1/broiler-flocks/${flockId}`)
-        .then(setFlock)
+        .then((f: any) => {
+          setFlock(f);
+          if (f?.supplierId) {
+            apiFetch(`/api/v1/suppliers/${f.supplierId}`)
+              .then(setSupplier)
+              .catch(() => {});
+          }
+        })
         .catch(() => {});
     }
   }, [user, isLoading, flockId, router]);
 
+  const feedStages = supplier?.feedStages
+    ?.filter((s: any) => s.stageType === "feed" || s.stageType === "chick")
+    ?.sort((a: any, b: any) => a.sortOrder - b.sortOrder) || [];
+
   function runCalculator() {
     const { birds, days, feedType } = calc;
+    const lower = feedType.toLowerCase();
     // Ross 308 approximate feed consumption per bird
-    const dailyFeed: any = {
-      starter: days <= 10 ? 0.035 : 0,
-      grower: days > 10 && days <= 24 ? 0.065 : 0,
-      finisher: days > 24 ? 0.095 : 0,
-    };
-    const daily = dailyFeed[feedType] || 0.05;
+    let daily = 0.05;
+    if (lower.includes("starter")) daily = days <= 10 ? 0.035 : 0.045;
+    else if (lower.includes("grower")) daily = days > 10 && days <= 24 ? 0.065 : 0.055;
+    else if (lower.includes("finish")) daily = days > 24 ? 0.095 : 0.085;
+    else if (lower.includes("pre")) daily = 0.025;
+    else if (lower.includes("withdraw")) daily = 0.04;
     const totalFeed = birds * daily * days;
     const bags50kg = Math.ceil(totalFeed / 50);
     const costPerKg = 15; // Approximate ZMW per kg
@@ -86,9 +99,10 @@ export default function FeedCalculatorPage() {
             <div>
               <label className="text-sm font-medium">Feed Type</label>
               <select className="w-full border rounded-md p-2 mt-1" value={calc.feedType} onChange={(e) => setCalc({ ...calc, feedType: e.target.value })}>
-                <option value="starter">Starter (Day 0-10)</option>
-                <option value="grower">Grower (Day 11-24)</option>
-                <option value="finisher">Finisher (Day 25+)</option>
+                <option value="">{feedStages.length > 0 ? "Select feed type..." : "Loading..."}</option>
+                {feedStages.map((s: any) => (
+                  <option key={s.id} value={s.stageName}>{s.stageName}</option>
+                ))}
               </select>
             </div>
             <Button onClick={runCalculator} className="w-full">Calculate</Button>

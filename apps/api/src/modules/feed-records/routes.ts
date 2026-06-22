@@ -6,7 +6,7 @@ const FeedRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
   supplierId: z.string().uuid().optional(),
   recordDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
-  feedType: z.enum(['starter', 'grower', 'finisher']),
+  feedType: z.string().min(1).max(50),
   feedBrand: z.string().optional(),
   quantityKg: z.number().positive(),
   costZmw: z.number().nonnegative().optional(),

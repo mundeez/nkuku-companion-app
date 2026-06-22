@@ -184,7 +184,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
     feed: { title: "Feed Records", icon: TrendingUp, endpoint: "/api/v1/feed-records", fields: [
       { key: "recordDate", label: "Date", type: "date" },
       { key: "supplierId", label: "Supplier", type: "supplier-select" },
-      { key: "feedType", label: "Feed Type", type: "select", options: ["starter", "grower", "finisher"] },
+      { key: "feedType", label: "Feed Type", type: "feed-type-select" },
     ]},
     water: { title: "Water Records", icon: Droplets, endpoint: "/api/v1/water-records", fields: [
       { key: "recordDate", label: "Date", type: "date" },
@@ -295,7 +295,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       const supplier = suppliers.find((s: any) => s.id === record.supplierId);
       if (supplier) {
         const stage = supplier.feedStages.find(
-          (s: any) => s.stageType === "feed" && s.stageName.toLowerCase() === record.feedType
+          (s: any) => (s.stageType === "feed" || s.stageType === "chick") && s.stageName.toLowerCase() === record.feedType.toLowerCase()
         );
         if (stage) {
           prefill._bagSizeKg = Number(stage.unitSizeKg);
@@ -364,7 +364,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
             const newForm = { ...form, [f.key]: supplierId };
 
             if (supplierId && supplierId !== "custom") {
-              const priceData = await fetchSupplierPrice(supplierId, form.feedType || "starter");
+              const priceData = form.feedType ? await fetchSupplierPrice(supplierId, form.feedType) : null;
               if (priceData) {
                 newForm._bagSizeKg = priceData.unitSizeKg;
                 newForm._bagPriceZmw = priceData.unitPriceZmw;
@@ -393,22 +393,42 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       );
     }
 
-    if (f.type === "select") {
+    if (f.type === "feed-type-select") {
+      const supplier = suppliers?.find((s: any) => s.id === form.supplierId);
+      const stages = supplier
+        ? supplier.feedStages
+            .filter((s: any) => s.stageType === "feed" || s.stageType === "chick")
+            .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
+        : [];
       return (
         <select key={f.key} className="w-full border rounded-md p-2 bg-background" value={val} onChange={async (e) => {
           const newForm = { ...form, [f.key]: e.target.value };
-          // If feed type changes and supplier is selected, re-fetch price
-          if (type === "feed" && f.key === "feedType" && form.supplierId && form.supplierId !== "custom") {
+          if (type === "feed" && form.supplierId && form.supplierId !== "custom") {
             const priceData = await fetchSupplierPrice(form.supplierId, e.target.value);
             if (priceData) {
               newForm._bagSizeKg = priceData.unitSizeKg;
               newForm._bagPriceZmw = priceData.unitPriceZmw;
+              newForm.feedBrand = priceData.supplierName;
               const bags = Number(newForm.bagCount) || 0;
               if (bags > 0) {
                 recalcFromBags(newForm, bags);
               }
             }
           }
+          setForm(newForm);
+        }}>
+          <option value="">{supplier ? "Select feed type..." : "Select supplier first..."}</option>
+          {stages.map((s: any) => (
+            <option key={s.id} value={s.stageName}>{s.stageName}</option>
+          ))}
+        </select>
+      );
+    }
+
+    if (f.type === "select") {
+      return (
+        <select key={f.key} className="w-full border rounded-md p-2 bg-background" value={val} onChange={async (e) => {
+          const newForm = { ...form, [f.key]: e.target.value };
           setForm(newForm);
         }}>
           <option value="">Select...</option>
@@ -424,18 +444,35 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
     return <input key={f.key} type={f.type} step={f.type === "number" ? "0.1" : undefined} className="w-full border rounded-md p-2" value={val} onChange={(e) => setForm({ ...form, [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value })} />;
   }
 
+  function getFeedTypeColor(name: string) {
+    const lower = name.toLowerCase();
+    if (lower.includes("starter")) return "bg-blue-100 text-blue-800";
+    if (lower.includes("grower")) return "bg-amber-100 text-amber-800";
+    if (lower.includes("finish")) return "bg-green-100 text-green-800";
+    if (lower.includes("pre")) return "bg-cyan-100 text-cyan-800";
+    if (lower.includes("withdraw")) return "bg-orange-100 text-orange-800";
+    if (lower.includes("chick")) return "bg-pink-100 text-pink-800";
+    return "bg-gray-100 text-gray-800";
+  }
+  function getFeedTypeIcon(name: string) {
+    const lower = name.toLowerCase();
+    if (lower.includes("starter")) return <Sprout className="h-3 w-3 mr-1" />;
+    if (lower.includes("grower")) return <Wheat className="h-3 w-3 mr-1" />;
+    if (lower.includes("finish")) return <Package className="h-3 w-3 mr-1" />;
+    if (lower.includes("chick")) return <span className="text-xs mr-1">🐣</span>;
+    return null;
+  }
+
   function renderRecord(r: any) {
     if (type === "growth") return <span>Weight: {r.avgWeight}g (n={r.sampleSize})</span>;
     if (type === "feed") {
-      const feedTypeColors: any = { starter: "bg-blue-100 text-blue-800", grower: "bg-amber-100 text-amber-800", finisher: "bg-green-100 text-green-800" };
-      const feedTypeIcons: any = { starter: <Sprout className="h-3 w-3 mr-1" />, grower: <Wheat className="h-3 w-3 mr-1" />, finisher: <Package className="h-3 w-3 mr-1" /> };
       // Look up bag size from supplier if available
       let bagInfo = "";
       if (r.supplierId && suppliers) {
         const supplier = suppliers.find((s: any) => s.id === r.supplierId);
         if (supplier) {
           const stage = supplier.feedStages.find(
-            (s: any) => s.stageType === "feed" && s.stageName.toLowerCase() === r.feedType
+            (s: any) => (s.stageType === "feed" || s.stageType === "chick") && s.stageName.toLowerCase() === r.feedType.toLowerCase()
           );
           if (stage && stage.unitSizeKg > 0) {
             const bags = Math.round(Number(r.quantityKg) / Number(stage.unitSizeKg));
@@ -447,8 +484,8 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
             {r.feedType && (
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${feedTypeColors[r.feedType] || "bg-gray-100 text-gray-800"}`}>
-                {feedTypeIcons[r.feedType]}
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getFeedTypeColor(r.feedType)}`}>
+                {getFeedTypeIcon(r.feedType)}
                 {r.feedType}
               </span>
             )}

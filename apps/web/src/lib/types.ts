@@ -149,7 +149,7 @@ export interface FeedRecord {
   flockId: string;
   supplierId?: string;
   recordDate: string;
-  feedType: "starter" | "grower" | "finisher";
+  feedType: string;
   feedBrand?: string;
   quantityKg: number;
   costZmw?: number;

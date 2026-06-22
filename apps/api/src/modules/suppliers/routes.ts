@@ -70,7 +70,7 @@ export async function buildSupplierModule(app: FastifyInstance) {
   app.get('/:id/feed-price', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const { feedType } = z.object({
-      feedType: z.enum(['starter', 'grower', 'finisher']),
+      feedType: z.string().min(1).max(50),
     }).parse(request.query);
 
     const supplier = await prisma.supplier.findFirst({
@@ -80,7 +80,7 @@ export async function buildSupplierModule(app: FastifyInstance) {
     if (!supplier) return reply.status(404).send({ error: 'NOT_FOUND' });
 
     const stage = supplier.feedStages.find(
-      (s) => s.stageType === 'feed' && s.stageName.toLowerCase() === feedType
+      (s) => s.stageType === 'feed' && s.stageName.toLowerCase() === feedType.toLowerCase()
     );
 
     if (!stage) {
