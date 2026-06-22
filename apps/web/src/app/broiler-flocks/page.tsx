@@ -100,10 +100,10 @@ export default function BroilerFlocksPage() {
       supplierId: flock.supplierId,
       startDate: new Date(flock.startDate).toISOString().split("T")[0],
       initialCount: flock.initialCount,
-      targetWeight: flock.targetWeight || undefined,
-      targetAge: flock.targetAge || undefined,
-      feedTransitionDay: flock.feedTransitionDay || 11,
-      chickPriceZmw: flock.chickPriceZmw || undefined,
+      targetWeight: flock.targetWeight ? Number(flock.targetWeight) : undefined,
+      targetAge: flock.targetAge ? Number(flock.targetAge) : undefined,
+      feedTransitionDay: flock.feedTransitionDay ? Number(flock.feedTransitionDay) : 11,
+      chickPriceZmw: flock.chickPriceZmw ? Number(flock.chickPriceZmw) : undefined,
     });
     setEditOpen(true);
   }
@@ -335,12 +335,12 @@ export default function BroilerFlocksPage() {
 
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-0">
             <DialogTitle>Create New Flock</DialogTitle>
             <DialogDescription>Enter flock details. Start date = Day 0.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="overflow-y-auto px-6 py-4 space-y-4">
             <div>
               <Label>Flock Name</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g., Flock A - June 2026" />
@@ -417,9 +417,14 @@ export default function BroilerFlocksPage() {
                 placeholder="e.g., 19.00"
                 onChange={(e) => setForm({ ...form, chickPriceZmw: Number(e.target.value) })}
               />
+              {form.chickPriceZmw && form.initialCount > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Unit: ZMW {form.chickPriceZmw} | Total: ZMW {(form.chickPriceZmw * form.initialCount).toFixed(2)} ({form.initialCount} birds)
+                </p>
+              )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="p-6 pt-0">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={formLoading || !form.name || !form.breedId}>
               {formLoading ? "Creating..." : "Create Flock"}
@@ -430,14 +435,18 @@ export default function BroilerFlocksPage() {
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-0">
             <DialogTitle>Edit Flock</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="overflow-y-auto px-6 py-4 space-y-4">
             <div>
               <Label>Flock Name</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div>
+              <Label>Initial Bird Count</Label>
+              <Input type="number" value={form.initialCount} onChange={(e) => setForm({ ...form, initialCount: Number(e.target.value) })} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -492,6 +501,11 @@ export default function BroilerFlocksPage() {
                 placeholder="e.g., 19.00"
                 onChange={(e) => setForm({ ...form, chickPriceZmw: Number(e.target.value) })}
               />
+              {form.chickPriceZmw && form.initialCount > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Unit: ZMW {form.chickPriceZmw} | Total: ZMW {(form.chickPriceZmw * form.initialCount).toFixed(2)} ({form.initialCount} birds)
+                </p>
+              )}
             </div>
             <div>
               <Label>Status</Label>
@@ -505,7 +519,7 @@ export default function BroilerFlocksPage() {
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="p-6 pt-0">
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button onClick={handleUpdate} disabled={formLoading}>
               {formLoading ? "Saving..." : "Save Changes"}

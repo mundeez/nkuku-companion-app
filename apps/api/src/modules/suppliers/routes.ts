@@ -80,7 +80,7 @@ export async function buildSupplierModule(app: FastifyInstance) {
     if (!supplier) return reply.status(404).send({ error: 'NOT_FOUND' });
 
     const stage = supplier.feedStages.find(
-      (s) => s.stageType === 'feed' && s.stageName.toLowerCase() === feedType.toLowerCase()
+      (s) => s.stageName.toLowerCase() === feedType.toLowerCase()
     );
 
     if (!stage) {
