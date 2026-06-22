@@ -2,16 +2,20 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 
+const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
+
 const FlockCreateSchema = z.object({
   name: z.string().min(1).max(100),
   breedId: z.string().uuid(),
   supplierId: z.string().uuid().optional(),
-  startDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  startDate: dateOrIso,
   initialCount: z.number().int().min(1),
   targetWeight: z.number().positive().optional(),
   targetAge: z.number().int().positive().optional(),
   feedTransitionDay: z.number().int().min(1).max(21).optional(),
   chickPriceZmw: z.number().nonnegative().optional(),
+  chicksCollected: z.boolean().optional(),
+  collectionDate: dateOrIso.nullable().optional(),
 });
 
 const FlockUpdateSchema = z.object({
@@ -22,6 +26,8 @@ const FlockUpdateSchema = z.object({
   targetAge: z.number().int().positive().optional(),
   feedTransitionDay: z.number().int().min(1).max(21).optional(),
   chickPriceZmw: z.number().nonnegative().optional().nullable(),
+  chicksCollected: z.boolean().optional(),
+  collectionDate: dateOrIso.nullable().optional(),
   status: z.enum(['active', 'completed', 'cancelled']).optional(),
   currentCount: z.number().int().min(0).optional(),
 });
@@ -75,25 +81,61 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const data = FlockCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
     const startDate = new Date(data.startDate);
-    return prisma.broilerFlock.create({
+    const collectionDate = data.collectionDate ? new Date(data.collectionDate) : null;
+
+    const flock = await prisma.broilerFlock.create({
       data: {
-        ...data,
+        name: data.name,
+        breedId: data.breedId,
+        supplierId: data.supplierId,
         startDate,
+        initialCount: data.initialCount,
         currentCount: data.initialCount,
+        targetWeight: data.targetWeight,
+        targetAge: data.targetAge,
         feedTransitionDay: data.feedTransitionDay ?? 11,
+        chickPriceZmw: data.chickPriceZmw,
+        chicksCollected: data.chicksCollected ?? false,
+        collectionDate,
         createdBy: authUser.userId,
       },
-      include: { breed: true },
+      include: { breed: true, supplier: { select: { name: true } } },
     });
+
+    // Auto-create a financial record for chick purchase
+    if (data.supplierId && data.chickPriceZmw && data.chickPriceZmw > 0) {
+      const supplier = await prisma.supplier.findUnique({
+        where: { id: data.supplierId },
+        select: { name: true },
+      });
+      await prisma.financialRecord.create({
+        data: {
+          flockId: flock.id,
+          recordDate: startDate,
+          category: 'chick_purchase',
+          description: `Day-old chicks - ${supplier?.name || 'Unknown'} (${data.initialCount} birds)`,
+          amountZmw: data.chickPriceZmw * data.initialCount,
+          isIncome: false,
+          notes: 'Auto-generated from flock creation',
+        },
+      });
+    }
+
+    return flock;
   });
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const data = FlockUpdateSchema.parse(request.body);
+    const raw = FlockUpdateSchema.parse(request.body);
     const authUser = (request as any).authUser;
+
+    const updateData: any = { ...raw };
+    if (raw.collectionDate) updateData.collectionDate = new Date(raw.collectionDate);
+    if (raw.collectionDate === null) updateData.collectionDate = null;
+
     const flock = await prisma.broilerFlock.updateMany({
       where: { id, createdBy: authUser.userId },
-      data,
+      data: updateData,
     });
     if (flock.count === 0) return reply.status(404).send({ error: 'NOT_FOUND' });
     return prisma.broilerFlock.findUnique({ where: { id }, include: { breed: true, supplier: { select: { id: true, name: true, feedStages: true } } } });

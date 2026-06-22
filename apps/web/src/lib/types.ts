@@ -133,6 +133,8 @@ export interface BroilerFlock {
   targetAge?: number;
   feedTransitionDay?: number;
   chickPriceZmw?: number;
+  chicksCollected: boolean;
+  collectionDate?: string;
   status: "active" | "completed" | "cancelled";
   createdAt: string;
   updatedAt: string;

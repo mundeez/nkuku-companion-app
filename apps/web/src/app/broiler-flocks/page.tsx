@@ -32,6 +32,8 @@ interface FlockFormData {
   targetAge?: number;
   feedTransitionDay?: number;
   chickPriceZmw?: number;
+  chicksCollected?: boolean;
+  collectionDate?: string;
 }
 
 const emptyForm: FlockFormData = {
@@ -42,6 +44,7 @@ const emptyForm: FlockFormData = {
   targetWeight: 2.5,
   targetAge: 42,
   feedTransitionDay: 11,
+  chicksCollected: false,
 };
 
 export default function BroilerFlocksPage() {
@@ -104,6 +107,8 @@ export default function BroilerFlocksPage() {
       targetAge: flock.targetAge ? Number(flock.targetAge) : undefined,
       feedTransitionDay: flock.feedTransitionDay ? Number(flock.feedTransitionDay) : 11,
       chickPriceZmw: flock.chickPriceZmw ? Number(flock.chickPriceZmw) : undefined,
+      chicksCollected: flock.chicksCollected,
+      collectionDate: flock.collectionDate ? new Date(flock.collectionDate).toISOString().split("T")[0] : undefined,
     });
     setEditOpen(true);
   }
@@ -286,9 +291,25 @@ export default function BroilerFlocksPage() {
                     </div>
                   )}
                   {flock.chickPriceZmw && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Chick Price</span>
-                      <span className="font-medium">ZMW {flock.chickPriceZmw}</span>
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Chick Price</span>
+                        <span className="font-medium">ZMW {flock.chickPriceZmw}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Chicks</span>
+                        <span className="font-medium">ZMW {(flock.chickPriceZmw * flock.initialCount).toFixed(2)} ({flock.initialCount} birds)</span>
+                      </div>
+                    </>
+                  )}
+                  {flock.supplier && !flock.chicksCollected && (
+                    <div className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded w-fit">
+                      <span>Chicks Pending Collection</span>
+                    </div>
+                  )}
+                  {flock.chicksCollected && flock.collectionDate && (
+                    <div className="text-xs text-muted-foreground">
+                      Collected: {new Date(flock.collectionDate).toLocaleDateString()}
                     </div>
                   )}
                   <div className="pt-3 flex gap-2">
@@ -423,6 +444,26 @@ export default function BroilerFlocksPage() {
                 </p>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="create-chicks-collected"
+                checked={form.chicksCollected || false}
+                onChange={(e) => setForm({ ...form, chicksCollected: e.target.checked, collectionDate: e.target.checked ? (form.collectionDate || new Date().toISOString().split("T")[0]) : undefined })}
+              />
+              <label htmlFor="create-chicks-collected" className="text-sm">Chicks already collected from hatchery</label>
+            </div>
+            {form.chicksCollected && (
+              <div>
+                <Label>Collection Date</Label>
+                <Input type="date" value={form.collectionDate || new Date().toISOString().split("T")[0]} onChange={(e) => setForm({ ...form, collectionDate: e.target.value })} />
+              </div>
+            )}
+            {!form.chicksCollected && form.supplierId && form.supplierId !== "custom" && (
+              <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
+                Chicks are booked and paid for. Mark as collected when picked up from hatchery.
+              </p>
+            )}
           </div>
           <DialogFooter className="p-6 pt-0">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -507,6 +548,26 @@ export default function BroilerFlocksPage() {
                 </p>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="edit-chicks-collected"
+                checked={form.chicksCollected || false}
+                onChange={(e) => setForm({ ...form, chicksCollected: e.target.checked, collectionDate: e.target.checked ? (form.collectionDate || new Date().toISOString().split("T")[0]) : undefined })}
+              />
+              <label htmlFor="edit-chicks-collected" className="text-sm">Chicks already collected from hatchery</label>
+            </div>
+            {form.chicksCollected && (
+              <div>
+                <Label>Collection Date</Label>
+                <Input type="date" value={form.collectionDate || new Date().toISOString().split("T")[0]} onChange={(e) => setForm({ ...form, collectionDate: e.target.value })} />
+              </div>
+            )}
+            {!form.chicksCollected && form.supplierId && form.supplierId !== "custom" && (
+              <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
+                Chicks are booked and paid for. Mark as collected when picked up from hatchery.
+              </p>
+            )}
             <div>
               <Label>Status</Label>
               <Select value={editingFlock?.status || "active"} onValueChange={(v: any) => { if (editingFlock) setEditingFlock({ ...editingFlock, status: v }); }}>

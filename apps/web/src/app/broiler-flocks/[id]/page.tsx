@@ -145,10 +145,21 @@ export default function FlockDetailPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span>Total Feed</span><span className="font-medium">{totalFeed.toFixed(1)} kg</span></div>
                 <div className="flex justify-between"><span>Total Water</span><span className="font-medium">{totalWater.toFixed(1)} liters</span></div>
+                {flock.chickPriceZmw && (
+                  <div className="flex justify-between"><span>Chick Purchase</span><span className="font-medium">ZMW {(flock.chickPriceZmw * flock.initialCount).toFixed(2)} ({flock.initialCount} birds @ ZMW {flock.chickPriceZmw})</span></div>
+                )}
                 <div className="flex justify-between"><span>Total Cost</span><span className="font-medium">ZMW {totalCost.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Total Revenue</span><span className="font-medium">ZMW {totalRevenue.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Feed Transition Day</span><span className="font-medium">Day {flock.feedTransitionDay || 11}</span></div>
                 <div className="flex justify-between"><span>Target Weight</span><span className="font-medium">{flock.targetWeight || "-"} kg @ Day {flock.targetAge || "-"}</span></div>
+                {flock.supplier && (
+                  <div className="flex justify-between"><span>Supplier</span><span className="font-medium">{flock.supplier.name}</span></div>
+                )}
+                <div className="flex justify-between"><span>Collection</span><span className="font-medium">
+                  {flock.chicksCollected
+                    ? (flock.collectionDate ? `Collected on ${new Date(flock.collectionDate).toLocaleDateString()}` : "Collected")
+                    : <span className="text-amber-700">Pending Collection</span>}
+                </span></div>
               </div>
             </CardContent></Card>
           </div>
