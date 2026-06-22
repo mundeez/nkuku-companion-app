@@ -19,12 +19,16 @@ docker compose exec api pnpm run test:unit
 docker compose exec api pnpm run test:integration
 docker compose exec api pnpm run test
 
-# Database
+# Database (manual — only when needed)
 docker compose exec api npx prisma db push
-docker compose exec api npx prisma db seed
+docker compose exec api npx prisma db seed   # only on fresh DB or after schema changes
 
-# Stop and clean
-docker compose down -v
+# Rebuild with PRESERVED DATA (use this for code changes)
+docker compose down && docker compose up --build -d
+
+# FULL RESET — destroys ALL data (use with caution)
+docker compose down -v && docker compose up --build -d
+docker compose exec api npx prisma db seed   # re-seed after full reset
 ```
 
 ## Architecture

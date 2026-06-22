@@ -64,7 +64,7 @@ services:
       - nkuku_internal
       - nkuku_public
     restart: unless-stopped
-    command: ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && pnpm run dev"]
+    command: ["sh", "-c", "npx prisma migrate deploy && pnpm run dev"]
 
   web:
     build:
