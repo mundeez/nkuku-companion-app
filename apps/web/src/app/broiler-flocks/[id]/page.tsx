@@ -37,6 +37,12 @@ export default function FlockDetailPage() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
 
+  const [editCollectionOpen, setEditCollectionOpen] = useState(false);
+  const [collectionForm, setCollectionForm] = useState({ chicksCollected: false, collectionDate: "" });
+  const [editNotesOpen, setEditNotesOpen] = useState(false);
+  const [notesForm, setNotesForm] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
 
   function loadAll() {
@@ -52,12 +58,50 @@ export default function FlockDetailPage() {
     apiFetch<Supplier[]>("/api/v1/suppliers").then(setSuppliers).catch(() => {});
   }
 
+  async function saveCollectionStatus() {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/v1/broiler-flocks/${flockId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          chicksCollected: collectionForm.chicksCollected,
+          collectionDate: collectionForm.chicksCollected ? collectionForm.collectionDate : null,
+        }),
+      });
+      setEditCollectionOpen(false);
+      loadAll();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveQualityNotes() {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/v1/broiler-flocks/${flockId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ chickQualityNotes: notesForm || null }),
+      });
+      setEditNotesOpen(false);
+      loadAll();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
     if (user && flockId) loadAll();
   }, [user, isLoading, flockId, router]);
 
-  function getStatusBadge(status: string) {
+  function getStatusBadge(status: string, chicksCollected?: boolean) {
+    if (status === "active" && !chicksCollected) {
+      return <Badge className="bg-amber-100 text-amber-800">Pending</Badge>;
+    }
     switch (status) {
       case "active": return <Badge className="bg-green-100 text-green-800">Active</Badge>;
       case "completed": return <Badge variant="secondary">Completed</Badge>;
@@ -85,7 +129,7 @@ export default function FlockDetailPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">{flock.name}</h1>
-          <div className="text-muted-foreground">{flock.breed?.name} | Day {ageDays} | {getStatusBadge(flock.status)}</div>
+          <div className="text-muted-foreground">{flock.breed?.name} | Day {ageDays} | {getStatusBadge(flock.status, flock.chicksCollected)}</div>
         </div>
       </div>
 
@@ -114,6 +158,7 @@ export default function FlockDetailPage() {
         <TabsList className="mb-4 flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="growth">Growth ({growthRecords.length})</TabsTrigger>
+          <TabsTrigger value="chicks">Chicks</TabsTrigger>
           <TabsTrigger value="feed">Feed ({feedRecords.length})</TabsTrigger>
           <TabsTrigger value="water">Water ({waterRecords.length})</TabsTrigger>
           <TabsTrigger value="mortality">Mortality ({mortalityEvents.length})</TabsTrigger>
@@ -145,24 +190,187 @@ export default function FlockDetailPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span>Total Feed</span><span className="font-medium">{totalFeed.toFixed(1)} kg</span></div>
                 <div className="flex justify-between"><span>Total Water</span><span className="font-medium">{totalWater.toFixed(1)} liters</span></div>
-                {flock.chickPriceZmw && (
-                  <div className="flex justify-between"><span>Chick Purchase</span><span className="font-medium">ZMW {(flock.chickPriceZmw * flock.initialCount).toFixed(2)} ({flock.initialCount} birds @ ZMW {flock.chickPriceZmw})</span></div>
-                )}
                 <div className="flex justify-between"><span>Total Cost</span><span className="font-medium">ZMW {totalCost.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Total Revenue</span><span className="font-medium">ZMW {totalRevenue.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Feed Transition Day</span><span className="font-medium">Day {flock.feedTransitionDay || 11}</span></div>
                 <div className="flex justify-between"><span>Target Weight</span><span className="font-medium">{flock.targetWeight || "-"} kg @ Day {flock.targetAge || "-"}</span></div>
-                {flock.supplier && (
-                  <div className="flex justify-between"><span>Supplier</span><span className="font-medium">{flock.supplier.name}</span></div>
-                )}
-                <div className="flex justify-between"><span>Collection</span><span className="font-medium">
-                  {flock.chicksCollected
-                    ? (flock.collectionDate ? `Collected on ${new Date(flock.collectionDate).toLocaleDateString()}` : "Collected")
-                    : <span className="text-amber-700">Pending Collection</span>}
-                </span></div>
               </div>
             </CardContent></Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="chicks">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-4 w-4" /> Chick Purchase
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  {flock.chickPriceZmw ? (
+                    <>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Unit Price</span><span className="font-medium">ZMW {flock.chickPriceZmw}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span className="font-medium">{flock.initialCount} birds</span></div>
+                      <div className="flex justify-between border-t pt-2 mt-2"><span className="font-medium">Total Cost</span><span className="font-bold">ZMW {(flock.chickPriceZmw * flock.initialCount).toFixed(2)}</span></div>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">No chick purchase data recorded.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sprout className="h-4 w-4" /> Supplier
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  {flock.supplier ? (
+                    <>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span className="font-medium">{flock.supplier.name}</span></div>
+                      {flock.supplier.contact && (
+                        <div className="flex justify-between"><span className="text-muted-foreground">Contact</span><span className="font-medium">{flock.supplier.contact}</span></div>
+                      )}
+                      {flock.supplier.chickenType && (
+                        <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="font-medium">{flock.supplier.chickenType}</span></div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">No supplier assigned.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" /> Collection Status
+                </CardTitle>
+                {canCreateEdit && (
+                  <Button variant="outline" size="sm" onClick={() => {
+                    setCollectionForm({
+                      chicksCollected: flock.chicksCollected,
+                      collectionDate: flock.collectionDate ? new Date(flock.collectionDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+                    });
+                    setEditCollectionOpen(true);
+                  }}>
+                    <Pencil className="h-3 w-3 mr-1" /> Edit
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  {flock.chicksCollected ? (
+                    <div className="inline-flex items-center gap-1 text-green-700 bg-green-100 px-2 py-1 rounded">
+                      <span className="font-medium">Collected</span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1 text-amber-700 bg-amber-100 px-2 py-1 rounded">
+                      <span className="font-medium">Pending Collection</span>
+                    </div>
+                  )}
+                  {flock.collectionDate && (
+                    <div className="flex justify-between"><span className="text-muted-foreground">Collection Date</span><span className="font-medium">{new Date(flock.collectionDate).toLocaleDateString()}</span></div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base">Chick Quality Notes</CardTitle>
+                {canCreateEdit && (
+                  <Button variant="outline" size="sm" onClick={() => { setNotesForm(flock.chickQualityNotes || ""); setEditNotesOpen(true); }}>
+                    <Pencil className="h-3 w-3 mr-1" /> Edit
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {flock.chickQualityNotes ? (
+                  <p className="text-sm whitespace-pre-wrap">{flock.chickQualityNotes}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No quality notes recorded.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Edit Collection Dialog */}
+          <Dialog open={editCollectionOpen} onOpenChange={setEditCollectionOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Collection Status</DialogTitle>
+                <DialogDescription>Update whether chicks have been collected from the hatchery.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="collection-status"
+                    id="status-not-collected"
+                    checked={!collectionForm.chicksCollected}
+                    onChange={() => setCollectionForm({ ...collectionForm, chicksCollected: false, collectionDate: "" })}
+                  />
+                  <label htmlFor="status-not-collected" className="text-sm font-medium">NOT Collected</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="collection-status"
+                    id="status-collected"
+                    checked={collectionForm.chicksCollected}
+                    onChange={() => setCollectionForm({ ...collectionForm, chicksCollected: true, collectionDate: collectionForm.collectionDate || new Date().toISOString().split("T")[0] })}
+                  />
+                  <label htmlFor="status-collected" className="text-sm font-medium">Collected on</label>
+                </div>
+                {collectionForm.chicksCollected && (
+                  <div>
+                    <label className="text-sm text-muted-foreground">Collection Date</label>
+                    <input
+                      type="date"
+                      className="w-full border rounded-md p-2 mt-1"
+                      value={collectionForm.collectionDate}
+                      onChange={(e) => setCollectionForm({ ...collectionForm, collectionDate: e.target.value })}
+                    />
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditCollectionOpen(false)}>Cancel</Button>
+                <Button onClick={saveCollectionStatus} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Notes Dialog */}
+          <Dialog open={editNotesOpen} onOpenChange={setEditNotesOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Chick Quality Notes</DialogTitle>
+                <DialogDescription>Record observations about chick quality on arrival.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <textarea
+                  className="w-full border rounded-md p-2 min-h-[120px]"
+                  placeholder="e.g. Uniform size, active, good feathering..."
+                  value={notesForm}
+                  onChange={(e) => setNotesForm(e.target.value)}
+                  maxLength={500}
+                />
+                <p className="text-xs text-muted-foreground mt-1">{notesForm.length}/500 characters</p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditNotesOpen(false)}>Cancel</Button>
+                <Button onClick={saveQualityNotes} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>

@@ -133,7 +133,10 @@ export default function BroilerFlocksPage() {
     return Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   }
 
-  function getStatusBadge(status: string) {
+  function getStatusBadge(status: string, chicksCollected?: boolean) {
+    if (status === "active" && !chicksCollected) {
+      return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Pending</Badge>;
+    }
     switch (status) {
       case "active":
         return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>;
@@ -220,7 +223,7 @@ export default function BroilerFlocksPage() {
         <div>
           <h1 className="text-3xl font-bold mb-2">Broiler Flocks</h1>
           <p className="text-muted-foreground">
-            Manage your broiler flocks ({flocks.filter((f) => f.status === "active").length} active)
+            Manage your broiler flocks ({flocks.filter((f) => f.status === "active" && f.chicksCollected).length} active, {flocks.filter((f) => f.status === "active" && !f.chicksCollected).length} pending)
           </p>
         </div>
         {canCreateEdit && (
@@ -254,7 +257,7 @@ export default function BroilerFlocksPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">{flock.name}</CardTitle>
-                  {getStatusBadge(flock.status)}
+                  {getStatusBadge(flock.status, flock.chicksCollected)}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {flock.breed?.name} | Day {ageDays}
@@ -444,26 +447,40 @@ export default function BroilerFlocksPage() {
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="create-chicks-collected"
-                checked={form.chicksCollected || false}
-                onChange={(e) => setForm({ ...form, chicksCollected: e.target.checked, collectionDate: e.target.checked ? (form.collectionDate || new Date().toISOString().split("T")[0]) : undefined })}
-              />
-              <label htmlFor="create-chicks-collected" className="text-sm">Chicks already collected from hatchery</label>
-            </div>
-            {form.chicksCollected && (
-              <div>
-                <Label>Collection Date</Label>
-                <Input type="date" value={form.collectionDate || new Date().toISOString().split("T")[0]} onChange={(e) => setForm({ ...form, collectionDate: e.target.value })} />
+            <div className="space-y-2">
+              <Label>Collection Status</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="create-collection-status"
+                  id="create-not-collected"
+                  checked={!form.chicksCollected}
+                  onChange={() => setForm({ ...form, chicksCollected: false, collectionDate: undefined })}
+                />
+                <label htmlFor="create-not-collected" className="text-sm">NOT Collected</label>
               </div>
-            )}
-            {!form.chicksCollected && form.supplierId && form.supplierId !== "custom" && (
-              <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
-                Chicks are booked and paid for. Mark as collected when picked up from hatchery.
-              </p>
-            )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="create-collection-status"
+                  id="create-collected"
+                  checked={form.chicksCollected || false}
+                  onChange={() => setForm({ ...form, chicksCollected: true, collectionDate: form.collectionDate || new Date().toISOString().split("T")[0] })}
+                />
+                <label htmlFor="create-collected" className="text-sm">Collected on</label>
+              </div>
+              {form.chicksCollected && (
+                <div>
+                  <Label>Collection Date</Label>
+                  <Input type="date" value={form.collectionDate || new Date().toISOString().split("T")[0]} onChange={(e) => setForm({ ...form, collectionDate: e.target.value })} />
+                </div>
+              )}
+              {!form.chicksCollected && form.supplierId && form.supplierId !== "custom" && (
+                <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
+                  Chicks are booked and paid for. Mark as collected when picked up from hatchery.
+                </p>
+              )}
+            </div>
           </div>
           <DialogFooter className="p-6 pt-0">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -548,26 +565,40 @@ export default function BroilerFlocksPage() {
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="edit-chicks-collected"
-                checked={form.chicksCollected || false}
-                onChange={(e) => setForm({ ...form, chicksCollected: e.target.checked, collectionDate: e.target.checked ? (form.collectionDate || new Date().toISOString().split("T")[0]) : undefined })}
-              />
-              <label htmlFor="edit-chicks-collected" className="text-sm">Chicks already collected from hatchery</label>
-            </div>
-            {form.chicksCollected && (
-              <div>
-                <Label>Collection Date</Label>
-                <Input type="date" value={form.collectionDate || new Date().toISOString().split("T")[0]} onChange={(e) => setForm({ ...form, collectionDate: e.target.value })} />
+            <div className="space-y-2">
+              <Label>Collection Status</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="edit-collection-status"
+                  id="edit-not-collected"
+                  checked={!form.chicksCollected}
+                  onChange={() => setForm({ ...form, chicksCollected: false, collectionDate: undefined })}
+                />
+                <label htmlFor="edit-not-collected" className="text-sm">NOT Collected</label>
               </div>
-            )}
-            {!form.chicksCollected && form.supplierId && form.supplierId !== "custom" && (
-              <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
-                Chicks are booked and paid for. Mark as collected when picked up from hatchery.
-              </p>
-            )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="edit-collection-status"
+                  id="edit-collected"
+                  checked={form.chicksCollected || false}
+                  onChange={() => setForm({ ...form, chicksCollected: true, collectionDate: form.collectionDate || new Date().toISOString().split("T")[0] })}
+                />
+                <label htmlFor="edit-collected" className="text-sm">Collected on</label>
+              </div>
+              {form.chicksCollected && (
+                <div>
+                  <Label>Collection Date</Label>
+                  <Input type="date" value={form.collectionDate || new Date().toISOString().split("T")[0]} onChange={(e) => setForm({ ...form, collectionDate: e.target.value })} />
+                </div>
+              )}
+              {!form.chicksCollected && form.supplierId && form.supplierId !== "custom" && (
+                <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
+                  Chicks are booked and paid for. Mark as collected when picked up from hatchery.
+                </p>
+              )}
+            </div>
             <div>
               <Label>Status</Label>
               <Select value={editingFlock?.status || "active"} onValueChange={(v: any) => { if (editingFlock) setEditingFlock({ ...editingFlock, status: v }); }}>

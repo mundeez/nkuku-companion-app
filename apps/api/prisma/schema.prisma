@@ -374,6 +374,7 @@ model BroilerFlock {
   chickPriceZmw Decimal?  @map("chick_price_zmw") @db.Decimal(14, 2)
   chicksCollected Boolean  @default(false) @map("chicks_collected")
   collectionDate  DateTime? @map("collection_date") @db.Date
+  chickQualityNotes String?  @map("chick_quality_notes") @db.VarChar(500)
   status       FlockStatus @default(active)
   createdBy    String?     @map("created_by") @db.Uuid
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)

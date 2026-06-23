@@ -135,6 +135,7 @@ export interface BroilerFlock {
   chickPriceZmw?: number;
   chicksCollected: boolean;
   collectionDate?: string;
+  chickQualityNotes?: string;
   status: "active" | "completed" | "cancelled";
   createdAt: string;
   updatedAt: string;

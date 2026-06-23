@@ -16,6 +16,7 @@ const FlockCreateSchema = z.object({
   chickPriceZmw: z.number().nonnegative().optional(),
   chicksCollected: z.boolean().optional(),
   collectionDate: dateOrIso.nullable().optional(),
+  chickQualityNotes: z.string().max(500).optional().nullable(),
 });
 
 const FlockUpdateSchema = z.object({
@@ -28,6 +29,7 @@ const FlockUpdateSchema = z.object({
   chickPriceZmw: z.number().nonnegative().optional().nullable(),
   chicksCollected: z.boolean().optional(),
   collectionDate: dateOrIso.nullable().optional(),
+  chickQualityNotes: z.string().max(500).optional().nullable(),
   status: z.enum(['active', 'completed', 'cancelled']).optional(),
   currentCount: z.number().int().min(0).optional(),
 });
@@ -97,6 +99,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         chickPriceZmw: data.chickPriceZmw,
         chicksCollected: data.chicksCollected ?? false,
         collectionDate,
+        chickQualityNotes: data.chickQualityNotes,
         createdBy: authUser.userId,
       },
       include: { breed: true, supplier: { select: { name: true } } },
@@ -132,6 +135,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const updateData: any = { ...raw };
     if (raw.collectionDate) updateData.collectionDate = new Date(raw.collectionDate);
     if (raw.collectionDate === null) updateData.collectionDate = null;
+    if (raw.chickQualityNotes === '') updateData.chickQualityNotes = null;
 
     const flock = await prisma.broilerFlock.updateMany({
       where: { id, createdBy: authUser.userId },

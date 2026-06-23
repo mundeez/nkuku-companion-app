@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api/client";
@@ -135,26 +136,26 @@ export default function DashboardPage() {
           <CardDescription>Frequently used tools</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <a href="/broiler-flocks" className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+          <Link href="/broiler-flocks" className="block p-4 rounded-lg border hover:bg-accent transition-colors">
             <Scale className="h-5 w-5 mb-2 text-primary" />
             <div className="font-medium">Manage Flocks</div>
             <div className="text-sm text-muted-foreground">Track growth & health</div>
-          </a>
-          <a href="/diseases" className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+          </Link>
+          <Link href="/diseases" className="block p-4 rounded-lg border hover:bg-accent transition-colors">
             <HeartPulse className="h-5 w-5 mb-2 text-primary" />
             <div className="font-medium">Disease Database</div>
             <div className="text-sm text-muted-foreground">Symptoms & treatments</div>
-          </a>
-          <a href="/projections" className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+          </Link>
+          <Link href="/projections" className="block p-4 rounded-lg border hover:bg-accent transition-colors">
             <DollarSign className="h-5 w-5 mb-2 text-primary" />
             <div className="font-medium">Run Projection</div>
             <div className="text-sm text-muted-foreground">Calculate costs & profits</div>
-          </a>
-          <a href="/suppliers" className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+          </Link>
+          <Link href="/suppliers" className="block p-4 rounded-lg border hover:bg-accent transition-colors">
             <Users className="h-5 w-5 mb-2 text-primary" />
             <div className="font-medium">Manage Suppliers</div>
             <div className="text-sm text-muted-foreground">Update feed prices</div>
-          </a>
+          </Link>
         </CardContent>
       </Card>
     </div>
