@@ -19,6 +19,16 @@ import {
 } from "@/components/ui/dialog";
 import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout } from "lucide-react";
 
+function fmtCollectionDate(date: string | Date | undefined): string {
+  if (!date) return "";
+  const d = new Date(date);
+  const weekday = d.toLocaleDateString("en-GB", { weekday: "short" });
+  const day = d.toLocaleDateString("en-GB", { day: "2-digit" });
+  const month = d.toLocaleDateString("en-GB", { month: "short" });
+  const year = d.toLocaleDateString("en-GB", { year: "numeric" });
+  return `${weekday}-${day}-${month}-${year}`;
+}
+
 export default function FlockDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -118,7 +128,10 @@ export default function FlockDetailPage() {
   const totalFeed = feedRecords.reduce((sum, r) => sum + Number(r.quantityKg), 0);
   const totalWater = waterRecords.reduce((sum, r) => sum + Number(r.quantityLiters), 0);
   const totalMortality = mortalityEvents.reduce((sum, e) => sum + e.count, 0);
-  const totalCost = financialRecords.filter((r) => !r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
+  const financialCost = financialRecords.filter((r) => !r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
+  const hasChickFinancialRecord = financialRecords.some((r) => r.category === "chick_purchase" && !r.isIncome);
+  const chickPurchaseCost = !hasChickFinancialRecord && flock.chickPriceZmw ? Number(flock.chickPriceZmw) * flock.initialCount : 0;
+  const totalCost = financialCost + chickPurchaseCost;
   const totalRevenue = financialRecords.filter((r) => r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
 
   return (
@@ -276,7 +289,7 @@ export default function FlockDetailPage() {
                     </div>
                   )}
                   {flock.collectionDate && (
-                    <div className="flex justify-between"><span className="text-muted-foreground">Collection Date</span><span className="font-medium">{new Date(flock.collectionDate).toLocaleDateString()}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Collection Date</span><span className="font-medium">{fmtCollectionDate(flock.collectionDate)}</span></div>
                   )}
                 </div>
               </CardContent>

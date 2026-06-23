@@ -12,7 +12,7 @@ import { TrendingUp, Users, Calendar, DollarSign, HeartPulse, Scale, AlertTriang
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const [stats, setStats] = useState({ suppliers: 0, batches: 0, cycles: 0, activeFlocks: 0, totalBirds: 0, mortalityRate: 0 });
+  const [stats, setStats] = useState({ suppliers: 0, batches: 0, cycles: 0, activeFlocks: 0, pendingFlocks: 0, totalBirds: 0, mortalityRate: 0 });
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -26,7 +26,8 @@ export default function DashboardPage() {
         apiFetch<BroilerFlock[]>("/api/v1/broiler-flocks"),
       ]).then(([suppliers, cycles, flocks]) => {
         const batchCount = cycles.reduce((sum, c) => sum + c.batches.length, 0);
-        const activeFlocks = flocks.filter((f) => f.status === "active");
+        const activeFlocks = flocks.filter((f) => f.status === "active" && f.chicksCollected);
+        const pendingFlocks = flocks.filter((f) => f.status === "active" && !f.chicksCollected);
         const totalBirds = activeFlocks.reduce((sum, f) => sum + f.currentCount, 0);
         const totalInitial = activeFlocks.reduce((sum, f) => sum + f.initialCount, 0);
         const mortalityRate = totalInitial > 0 ? ((totalInitial - totalBirds) / totalInitial * 100).toFixed(1) : "0";
@@ -35,6 +36,7 @@ export default function DashboardPage() {
           batches: batchCount,
           cycles: cycles.length,
           activeFlocks: activeFlocks.length,
+          pendingFlocks: pendingFlocks.length,
           totalBirds,
           mortalityRate: Number(mortalityRate),
         });
@@ -65,6 +67,16 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Flocks</CardTitle>
+            <Scale className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.pendingFlocks}</div>
+            <p className="text-xs text-muted-foreground">Awaiting chick collection</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Birds</CardTitle>
             <Scale className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -81,16 +93,6 @@ export default function DashboardPage() {
           <CardContent>
             <div className={`text-2xl font-bold ${stats.mortalityRate > 10 ? "text-red-600" : ""}`}>{stats.mortalityRate}%</div>
             <p className="text-xs text-muted-foreground">Active flocks average</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Diseases</CardTitle>
-            <HeartPulse className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">10</div>
-            <p className="text-xs text-muted-foreground">In database</p>
           </CardContent>
         </Card>
       </div>

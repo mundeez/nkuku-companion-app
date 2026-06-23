@@ -294,16 +294,10 @@ export default function BroilerFlocksPage() {
                     </div>
                   )}
                   {flock.chickPriceZmw && (
-                    <>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Chick Price</span>
-                        <span className="font-medium">ZMW {flock.chickPriceZmw}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total Chicks</span>
-                        <span className="font-medium">ZMW {(flock.chickPriceZmw * flock.initialCount).toFixed(2)} ({flock.initialCount} birds)</span>
-                      </div>
-                    </>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Chick Purchase</span>
+                      <span className="font-medium">ZMW {(Number(flock.chickPriceZmw) * flock.initialCount).toFixed(2)} ({flock.initialCount} birds @ ZMW {Number(flock.chickPriceZmw)})</span>
+                    </div>
                   )}
                   {flock.supplier && !flock.chicksCollected && (
                     <div className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded w-fit">
@@ -312,7 +306,14 @@ export default function BroilerFlocksPage() {
                   )}
                   {flock.chicksCollected && flock.collectionDate && (
                     <div className="text-xs text-muted-foreground">
-                      Collected: {new Date(flock.collectionDate).toLocaleDateString()}
+                      Collected: {(() => {
+                        const d = new Date(flock.collectionDate);
+                        const weekday = d.toLocaleDateString("en-GB", { weekday: "short" });
+                        const day = d.toLocaleDateString("en-GB", { day: "2-digit" });
+                        const month = d.toLocaleDateString("en-GB", { month: "short" });
+                        const year = d.toLocaleDateString("en-GB", { year: "numeric" });
+                        return `${weekday}-${day}-${month}-${year}`;
+                      })()}
                     </div>
                   )}
                   <div className="pt-3 flex gap-2">

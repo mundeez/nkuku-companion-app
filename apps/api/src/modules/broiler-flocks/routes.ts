@@ -50,7 +50,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
     return prisma.broilerFlock.findMany({
       where,
-      include: { breed: true, supplier: { select: { id: true, name: true, feedStages: true } } },
+      include: { breed: true, supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } } },
       orderBy: { startDate: 'desc' },
     });
   });
@@ -62,7 +62,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       where: { id, createdBy: authUser.userId },
       include: {
         breed: { include: { performanceTargets: { orderBy: { ageDays: 'asc' } } } },
-        supplier: { select: { id: true, name: true, feedStages: true } },
+        supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } },
         growthRecords: { orderBy: { recordDate: 'desc' }, take: 1 },
         _count: {
           select: {
@@ -142,7 +142,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       data: updateData,
     });
     if (flock.count === 0) return reply.status(404).send({ error: 'NOT_FOUND' });
-    return prisma.broilerFlock.findUnique({ where: { id }, include: { breed: true, supplier: { select: { id: true, name: true, feedStages: true } } } });
+    return prisma.broilerFlock.findUnique({ where: { id }, include: { breed: true, supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } } } });
   });
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
