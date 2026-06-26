@@ -35,7 +35,10 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen px-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
+        <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-2">
+            <img src="/logo.png" alt="Nkuku Companion" className="h-20 w-auto" />
+          </div>
           <CardTitle className="text-2xl">Nkuku Companion</CardTitle>
           <CardDescription>
             Sign in to manage your broiler production
