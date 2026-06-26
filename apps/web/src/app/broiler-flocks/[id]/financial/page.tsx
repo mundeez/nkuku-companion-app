@@ -6,7 +6,8 @@ import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, DollarSign, TrendingUp, Target } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Target, FileText, BarChart3, Wallet } from "lucide-react";
+import Link from "next/link";
 
 export default function FinancialProjectionPage() {
   const params = useParams();
@@ -89,6 +90,42 @@ export default function FinancialProjectionPage() {
               <p className="text-sm text-muted-foreground">Profit per Bird</p>
               <p className={`text-2xl font-bold ${summary.profitPerBird >= 0 ? "text-green-600" : "text-red-600"}`}>ZMW {Number(summary.profitPerBird).toFixed(2)}</p>
             </CardContent></Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3 mb-6">
+            <Link href={`/financials/income-statement?flockIds=${flockId}`}>
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardContent className="pt-6 flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium">Income Statement</p>
+                    <p className="text-sm text-muted-foreground">P&L for this flock</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href={`/financials/balance-sheet?flockIds=${flockId}`}>
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardContent className="pt-6 flex items-center gap-3">
+                  <BarChart3 className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="font-medium">Balance Sheet</p>
+                    <p className="text-sm text-muted-foreground">Assets & liabilities</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href={`/financials/cash-flow?flockIds=${flockId}`}>
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardContent className="pt-6 flex items-center gap-3">
+                  <Wallet className="h-5 w-5 text-amber-600" />
+                  <div>
+                    <p className="font-medium">Cash Flow</p>
+                    <p className="text-sm text-muted-foreground">Operating & investing</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 mb-6">
