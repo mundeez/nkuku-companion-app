@@ -7,6 +7,7 @@ import 'login_screen.dart';
 import 'suppliers_screen.dart';
 import 'projections_screen.dart';
 import 'expansion_plan_screen.dart';
+import 'financials/financial_dashboard_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -113,6 +114,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     subtitle: 'View production cycles',
                     onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const ExpansionPlanScreen())),
+                  ),
+                  _ActionTile(
+                    icon: Icons.account_balance_wallet,
+                    title: 'Financials',
+                    subtitle: 'Statements, reports & exports',
+                    onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const FinancialDashboardScreen())),
                   ),
                 ],
               ),

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { AuditService } from '../../core/financial-engine/audit.service.js';
 
 const FinancialRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -14,6 +15,7 @@ const FinancialRecordCreateSchema = z.object({
 
 export async function buildFinancialRecordModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
+  const audit = new AuditService(prisma);
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
@@ -79,16 +81,25 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
-    return prisma.financialRecord.create({
+    const created = await prisma.financialRecord.create({
       data: {
         ...data,
         recordDate: new Date(data.recordDate),
         flockId,
       },
     });
+
+    await audit.log({
+      userId: authUser.userId,
+      entityType: 'FinancialRecord',
+      entityId: created.id,
+      action: 'create',
+      newState: created,
+      ipAddress: request.ip,
+    });
+
+    return created;
   });
-
-
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
@@ -103,13 +114,25 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    return prisma.financialRecord.update({
+    const updated = await prisma.financialRecord.update({
       where: { id },
       data: {
         ...data,
         recordDate: data.recordDate ? new Date(data.recordDate) : undefined,
       },
     });
+
+    await audit.log({
+      userId: authUser.userId,
+      entityType: 'FinancialRecord',
+      entityId: id,
+      action: 'update',
+      previousState: record,
+      newState: updated,
+      ipAddress: request.ip,
+    });
+
+    return updated;
   });
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
@@ -125,6 +148,16 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     }
 
     await prisma.financialRecord.delete({ where: { id } });
+
+    await audit.log({
+      userId: authUser.userId,
+      entityType: 'FinancialRecord',
+      entityId: id,
+      action: 'delete',
+      previousState: record,
+      ipAddress: request.ip,
+    });
+
     return { deleted: true };
   });
 }

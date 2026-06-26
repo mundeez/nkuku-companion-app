@@ -87,8 +87,8 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       startDate: dateOrIso.optional(),
       endDate: dateOrIso.optional(),
       entityType: z.string().optional(),
-      page: z.string().optional().transform(Number),
-      limit: z.string().optional().transform(Number),
+      page: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
+      limit: z.string().optional().transform((v) => (v ? Number(v) : undefined)),
     }).parse(request.query);
 
     return audit.query({
