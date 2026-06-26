@@ -9,6 +9,7 @@ const VaccinationEventCreateSchema = z.object({
   adminDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   adminMethod: z.string().min(1).max(50),
   ageDays: z.number().int().min(0),
+  costZmw: z.number().nonnegative().optional(),
   nextDueDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
   notes: z.string().optional(),
 });
@@ -77,7 +78,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
-    return prisma.vaccinationEvent.create({
+    const record = await prisma.vaccinationEvent.create({
       data: {
         vaccineType: data.vaccineType || data.vaccineName,
         ...data,
@@ -86,6 +87,24 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
         flockId,
       },
     });
+
+    // Auto-create financial record for vaccine cost
+    if (data.costZmw && data.costZmw > 0) {
+      await prisma.financialRecord.create({
+        data: {
+          flockId,
+          sourceRecordId: record.id,
+          recordDate: new Date(data.adminDate),
+          category: 'vaccines',
+          description: `Vaccine - ${data.vaccineName} (${data.adminMethod})`,
+          amountZmw: data.costZmw,
+          isIncome: false,
+          notes: 'Auto-generated from vaccination record',
+        },
+      });
+    }
+
+    return record;
   });
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
@@ -101,7 +120,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    return prisma.vaccinationEvent.update({
+    const updated = await prisma.vaccinationEvent.update({
       where: { id },
       data: {
         vaccineType: data.vaccineType || data.vaccineName,
@@ -110,6 +129,41 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
         nextDueDate: data.nextDueDate ? new Date(data.nextDueDate) : undefined,
       },
     });
+
+    // Sync financial record
+    const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });
+    if (data.costZmw !== undefined) {
+      if (data.costZmw > 0) {
+        const desc = `Vaccine - ${data.vaccineName || event.vaccineName} (${data.adminMethod || event.adminMethod})`;
+        if (finRecord) {
+          await prisma.financialRecord.update({
+            where: { id: finRecord.id },
+            data: {
+              amountZmw: data.costZmw,
+              description: desc,
+              recordDate: data.adminDate ? new Date(data.adminDate) : finRecord.recordDate,
+            },
+          });
+        } else {
+          await prisma.financialRecord.create({
+            data: {
+              flockId: event.flockId,
+              sourceRecordId: id,
+              recordDate: new Date(data.adminDate || event.adminDate),
+              category: 'vaccines',
+              description: desc,
+              amountZmw: data.costZmw,
+              isIncome: false,
+              notes: 'Auto-generated from vaccination record',
+            },
+          });
+        }
+      } else if (finRecord) {
+        await prisma.financialRecord.delete({ where: { id: finRecord.id } });
+      }
+    }
+
+    return updated;
   });
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
@@ -123,6 +177,10 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     if (!event || event.flock.createdBy !== authUser.userId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    // Delete linked financial record
+    const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });
+    if (finRecord) await prisma.financialRecord.delete({ where: { id: finRecord.id } });
 
     await prisma.vaccinationEvent.delete({ where: { id } });
     return { deleted: true };

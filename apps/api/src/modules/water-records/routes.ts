@@ -8,6 +8,7 @@ const WaterRecordCreateSchema = z.object({
   quantityLiters: z.number().positive(),
   ph: z.number().min(0).max(14).optional(),
   temperature: z.number().optional(),
+  costZmw: z.number().nonnegative().optional(),
   notes: z.string().optional(),
 });
 
@@ -68,13 +69,31 @@ export async function buildWaterRecordModule(app: FastifyInstance) {
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
-    return prisma.waterRecord.create({
+    const record = await prisma.waterRecord.create({
       data: {
         ...data,
         recordDate: new Date(data.recordDate),
         flockId,
       },
     });
+
+    // Auto-create financial record for water cost
+    if (data.costZmw && data.costZmw > 0) {
+      await prisma.financialRecord.create({
+        data: {
+          flockId,
+          sourceRecordId: record.id,
+          recordDate: new Date(data.recordDate),
+          category: 'utilities',
+          description: `Water - ${data.quantityLiters} liters`,
+          amountZmw: data.costZmw,
+          isIncome: false,
+          notes: 'Auto-generated from water record',
+        },
+      });
+    }
+
+    return record;
   });
 
 
@@ -92,13 +111,48 @@ export async function buildWaterRecordModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    return prisma.waterRecord.update({
+    const updated = await prisma.waterRecord.update({
       where: { id },
       data: {
         ...data,
         recordDate: data.recordDate ? new Date(data.recordDate) : undefined,
       },
     });
+
+    // Sync financial record
+    const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });
+    if (data.costZmw !== undefined) {
+      if (data.costZmw > 0) {
+        const desc = `Water - ${data.quantityLiters ?? record.quantityLiters} liters`;
+        if (finRecord) {
+          await prisma.financialRecord.update({
+            where: { id: finRecord.id },
+            data: {
+              amountZmw: data.costZmw,
+              description: desc,
+              recordDate: data.recordDate ? new Date(data.recordDate) : finRecord.recordDate,
+            },
+          });
+        } else {
+          await prisma.financialRecord.create({
+            data: {
+              flockId: record.flockId,
+              sourceRecordId: id,
+              recordDate: new Date(data.recordDate || record.recordDate),
+              category: 'utilities',
+              description: desc,
+              amountZmw: data.costZmw,
+              isIncome: false,
+              notes: 'Auto-generated from water record',
+            },
+          });
+        }
+      } else if (finRecord) {
+        await prisma.financialRecord.delete({ where: { id: finRecord.id } });
+      }
+    }
+
+    return updated;
   });
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
@@ -112,6 +166,10 @@ export async function buildWaterRecordModule(app: FastifyInstance) {
     if (!record || record.flock.createdBy !== authUser.userId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    // Delete linked financial record
+    const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });
+    if (finRecord) await prisma.financialRecord.delete({ where: { id: finRecord.id } });
 
     await prisma.waterRecord.delete({ where: { id } });
     return { deleted: true };

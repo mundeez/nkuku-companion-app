@@ -8,6 +8,7 @@ const MortalityEventCreateSchema = z.object({
   count: z.number().int().min(1),
   cause: z.string().optional(),
   ageDays: z.number().int().optional(),
+  costZmw: z.number().nonnegative().optional(),
   notes: z.string().optional(),
 });
 
@@ -77,13 +78,31 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
       data: { currentCount: Math.max(0, flock.currentCount - data.count) },
     });
 
-    return prisma.mortalityEvent.create({
+    const record = await prisma.mortalityEvent.create({
       data: {
         ...data,
         eventDate: new Date(data.eventDate),
         flockId,
       },
     });
+
+    // Auto-create financial record for mortality/disposal cost
+    if (data.costZmw && data.costZmw > 0) {
+      await prisma.financialRecord.create({
+        data: {
+          flockId,
+          sourceRecordId: record.id,
+          recordDate: new Date(data.eventDate),
+          category: 'other',
+          description: `Mortality/Disposal - ${data.count} birds (${data.cause || 'Unknown cause'})`,
+          amountZmw: data.costZmw,
+          isIncome: false,
+          notes: 'Auto-generated from mortality record',
+        },
+      });
+    }
+
+    return record;
   });
 
 
@@ -110,13 +129,48 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
       });
     }
 
-    return prisma.mortalityEvent.update({
+    const updated = await prisma.mortalityEvent.update({
       where: { id },
       data: {
         ...data,
         eventDate: data.eventDate ? new Date(data.eventDate) : undefined,
       },
     });
+
+    // Sync financial record
+    const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });
+    if (data.costZmw !== undefined) {
+      if (data.costZmw > 0) {
+        const desc = `Mortality/Disposal - ${data.count ?? record.count} birds (${data.cause ?? record.cause ?? 'Unknown cause'})`;
+        if (finRecord) {
+          await prisma.financialRecord.update({
+            where: { id: finRecord.id },
+            data: {
+              amountZmw: data.costZmw,
+              description: desc,
+              recordDate: data.eventDate ? new Date(data.eventDate) : finRecord.recordDate,
+            },
+          });
+        } else {
+          await prisma.financialRecord.create({
+            data: {
+              flockId: record.flockId,
+              sourceRecordId: id,
+              recordDate: new Date(data.eventDate || record.eventDate),
+              category: 'other',
+              description: desc,
+              amountZmw: data.costZmw,
+              isIncome: false,
+              notes: 'Auto-generated from mortality record',
+            },
+          });
+        }
+      } else if (finRecord) {
+        await prisma.financialRecord.delete({ where: { id: finRecord.id } });
+      }
+    }
+
+    return updated;
   });
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
@@ -136,6 +190,10 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
       where: { id: event.flockId },
       data: { currentCount: { increment: event.count } },
     });
+
+    // Delete linked financial record
+    const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });
+    if (finRecord) await prisma.financialRecord.delete({ where: { id: finRecord.id } });
 
     await prisma.mortalityEvent.delete({ where: { id } });
     return { deleted: true };

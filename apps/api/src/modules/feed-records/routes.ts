@@ -93,7 +93,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
       feedBrand = supplier?.name ?? null;
     }
 
-    return prisma.feedRecord.create({
+    const record = await prisma.feedRecord.create({
       data: {
         ...data,
         feedBrand,
@@ -101,6 +101,24 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
         flockId,
       },
     });
+
+    // Auto-create financial record for feed cost
+    if (data.costZmw && data.costZmw > 0) {
+      await prisma.financialRecord.create({
+        data: {
+          flockId,
+          sourceRecordId: record.id,
+          recordDate: new Date(data.recordDate),
+          category: 'feed',
+          description: `Feed - ${feedBrand || data.feedType} (${data.quantityKg}kg)`,
+          amountZmw: data.costZmw,
+          isIncome: false,
+          notes: 'Auto-generated from feed record',
+        },
+      });
+    }
+
+    return record;
   });
 
 
@@ -118,13 +136,48 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    return prisma.feedRecord.update({
+    const updated = await prisma.feedRecord.update({
       where: { id },
       data: {
         ...data,
         recordDate: data.recordDate ? new Date(data.recordDate) : undefined,
       },
     });
+
+    // Sync financial record
+    const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });
+    if (data.costZmw !== undefined) {
+      if (data.costZmw > 0) {
+        const desc = `Feed - ${data.feedBrand || record.feedBrand || updated.feedType} (${data.quantityKg ?? record.quantityKg}kg)`;
+        if (finRecord) {
+          await prisma.financialRecord.update({
+            where: { id: finRecord.id },
+            data: {
+              amountZmw: data.costZmw,
+              description: desc,
+              recordDate: data.recordDate ? new Date(data.recordDate) : finRecord.recordDate,
+            },
+          });
+        } else {
+          await prisma.financialRecord.create({
+            data: {
+              flockId: record.flockId,
+              sourceRecordId: id,
+              recordDate: new Date(data.recordDate || record.recordDate),
+              category: 'feed',
+              description: desc,
+              amountZmw: data.costZmw,
+              isIncome: false,
+              notes: 'Auto-generated from feed record',
+            },
+          });
+        }
+      } else if (finRecord) {
+        await prisma.financialRecord.delete({ where: { id: finRecord.id } });
+      }
+    }
+
+    return updated;
   });
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
@@ -138,6 +191,10 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
     if (!record || record.flock.createdBy !== authUser.userId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    // Delete linked financial record
+    const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });
+    if (finRecord) await prisma.financialRecord.delete({ where: { id: finRecord.id } });
 
     await prisma.feedRecord.delete({ where: { id } });
     return { deleted: true };

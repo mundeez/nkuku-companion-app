@@ -445,6 +445,7 @@ model WaterRecord {
   quantityLiters Decimal  @map("quantity_liters") @db.Decimal(10, 2)
   ph             Decimal? @db.Decimal(4, 2)
   temperature    Decimal? @map("temperature_c") @db.Decimal(5, 2)
+  costZmw        Decimal? @map("cost_zmw") @db.Decimal(14, 2)
   notes          String?  @db.Text
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -462,6 +463,7 @@ model MortalityEvent {
   count     Int
   cause     String?  @db.VarChar(200)
   ageDays   Int?     @map("age_days")
+  costZmw   Decimal? @map("cost_zmw") @db.Decimal(14, 2)
   notes     String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -480,6 +482,7 @@ model VaccinationEvent {
   adminDate   DateTime @map("admin_date") @db.Date
   adminMethod String   @map("admin_method") @db.VarChar(50)
   ageDays     Int      @map("age_days")
+  costZmw     Decimal? @map("cost_zmw") @db.Decimal(14, 2)
   nextDueDate DateTime? @map("next_due_date") @db.Date
   notes       String?  @db.Text
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -492,20 +495,22 @@ model VaccinationEvent {
 }
 
 model FinancialRecord {
-  id          String              @id @default(uuid()) @db.Uuid
-  flockId     String              @map("flock_id") @db.Uuid
-  recordDate  DateTime            @map("record_date") @db.Date
-  category    FinancialCategory
-  description String              @db.VarChar(200)
-  amountZmw   Decimal             @map("amount_zmw") @db.Decimal(14, 2)
-  isIncome    Boolean             @default(false) @map("is_income")
-  notes       String?             @db.Text
-  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String              @id @default(uuid()) @db.Uuid
+  flockId        String              @map("flock_id") @db.Uuid
+  sourceRecordId String?             @map("source_record_id") @db.Uuid
+  recordDate     DateTime            @map("record_date") @db.Date
+  category       FinancialCategory
+  description    String              @db.VarChar(200)
+  amountZmw      Decimal             @map("amount_zmw") @db.Decimal(14, 2)
+  isIncome       Boolean             @default(false) @map("is_income")
+  notes          String?             @db.Text
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  flock       BroilerFlock        @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  flock          BroilerFlock        @relation(fields: [flockId], references: [id], onDelete: Cascade)
 
   @@index([flockId, recordDate])
+  @@index([sourceRecordId])
   @@map("financial_records")
 }
 

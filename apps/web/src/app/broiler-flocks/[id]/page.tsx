@@ -423,18 +423,21 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       { key: "quantityLiters", label: "Quantity (liters)", type: "number" },
       { key: "ph", label: "pH", type: "number" },
       { key: "temperature", label: "Temperature (C)", type: "number" },
+      { key: "costZmw", label: "Cost (ZMW)", type: "number" },
     ]},
     mortality: { title: "Mortality Events", icon: Skull, endpoint: "/api/v1/mortality-events", fields: [
       { key: "eventDate", label: "Date", type: "date" },
       { key: "count", label: "Number of Birds", type: "number" },
       { key: "cause", label: "Cause", type: "text" },
       { key: "ageDays", label: "Age (days)", type: "number" },
+      { key: "costZmw", label: "Disposal Cost (ZMW)", type: "number" },
     ]},
     vaccination: { title: "Vaccination Records", icon: Syringe, endpoint: "/api/v1/vaccination-events", fields: [
       { key: "vaccineName", label: "Vaccine Name", type: "text" },
       { key: "adminDate", label: "Date", type: "date" },
       { key: "adminMethod", label: "Method", type: "select", options: ["Drinking Water", "Spray", "Eye Drop", "Injection", "Wing Web"] },
       { key: "ageDays", label: "Age (days)", type: "number" },
+      { key: "costZmw", label: "Cost (ZMW)", type: "number" },
     ]},
     financial: { title: "Financial Records", icon: DollarSign, endpoint: "/api/v1/financial-records", fields: [
       { key: "recordDate", label: "Date", type: "date" },
@@ -730,9 +733,9 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
         </div>
       );
     }
-    if (type === "water") return <span>{r.quantityLiters} liters {r.ph && `| pH ${r.ph}`}</span>;
-    if (type === "mortality") return <span className="text-red-700">{r.count} deaths - {r.cause || "Unknown"}</span>;
-    if (type === "vaccination") return <span className="text-green-700">{r.vaccineName} | {r.adminMethod}</span>;
+    if (type === "water") return <span>{r.quantityLiters} liters {r.ph && `| pH ${r.ph}`} {r.costZmw && `| ZMW ${r.costZmw}`}</span>;
+    if (type === "mortality") return <span className="text-red-700">{r.count} deaths - {r.cause || "Unknown"} {r.costZmw && `| ZMW ${r.costZmw}`}</span>;
+    if (type === "vaccination") return <span className="text-green-700">{r.vaccineName} | {r.adminMethod} {r.costZmw && `| ZMW ${r.costZmw}`}</span>;
     if (type === "financial") return <span className={r.isIncome ? "text-green-700" : ""}>{r.category}: {r.description} | ZMW {r.amountZmw} {r.isIncome && "(Income)"}</span>;
     return null;
   }
