@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="248" fill="#1B5E20"/>
+  
+  <!-- Phone frame -->
+  <rect x="96" y="56" width="320" height="400" rx="44" ry="44" fill="none" stroke="#FFFFFF" stroke-width="18"/>
+  
+  <!-- Phone notch/speaker bar -->
+  <rect x="176" y="72" width="160" height="12" rx="6" fill="#FFFFFF" opacity="0.6"/>
+  
+  <!-- Signal bars -->
+  <rect x="128" y="96" width="10" height="28" rx="3" fill="#FFFFFF" opacity="0.8"/>
+  <rect x="144" y="84" width="10" height="40" rx="3" fill="#FFFFFF" opacity="0.8"/>
+  <rect x="160" y="72" width="10" height="52" rx="3" fill="#FFFFFF" opacity="0.8"/>
+  
+  <!-- WiFi icon -->
+  <path d="M 344 84 Q 360 68 376 84" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+  <path d="M 336 76 Q 360 52 384 76" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+  <circle cx="360" cy="100" r="4" fill="#FFFFFF" opacity="0.8"/>
+  
+  <!-- Battery icon -->
+  <rect x="368" y="80" width="32" height="16" rx="3" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.8"/>
+  <rect x="370" y="82" width="22" height="12" rx="2" fill="#FFFFFF" opacity="0.8"/>
+  <rect x="402" y="84" width="4" height="8" rx="1" fill="#FFFFFF" opacity="0.8"/>
+  
+  <!-- Home bar -->
+  <rect x="196" y="432" width="120" height="8" rx="4" fill="#FFFFFF" opacity="0.6"/>
+  
+  <!-- Chart bars inside phone (left side) -->
+  <rect x="124" y="300" width="16" height="60" rx="4" fill="#FFFFFF" opacity="0.4"/>
+  <rect x="148" y="280" width="16" height="80" rx="4" fill="#FFFFFF" opacity="0.5"/>
+  <rect x="172" y="260" width="16" height="100" rx="4" fill="#FFFFFF" opacity="0.6"/>
+  
+  <!-- CHICKEN SILHOUETTE -->
+  <!-- Body -->
+  <ellipse cx="280" cy="270" rx="85" ry="70" fill="#FFFFFF"/>
+  
+  <!-- Neck and head -->
+  <path d="M 210 260 Q 190 200 220 170 Q 240 150 270 160" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2"/>
+  <circle cx="270" cy="155" r="35" fill="#FFFFFF"/>
+  
+  <!-- Beak -->
+  <path d="M 300 145 L 335 155 L 300 165 Z" fill="#FFFFFF"/>
+  
+  <!-- Eye -->
+  <circle cx="285" cy="148" r="7" fill="#1B5E20"/>
+  <circle cx="287" cy="146" r="2.5" fill="#FFFFFF"/>
+  
+  <!-- Comb (3 peaks) -->
+  <path d="M 245 130 Q 250 105 258 120 Q 265 100 275 118 Q 282 108 290 128" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+  
+  <!-- Wattle -->
+  <path d="M 295 168 Q 300 188 285 195" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Wing (3 layered feathers) -->
+  <path d="M 240 260 Q 180 210 170 170 Q 200 220 240 260" fill="#FFFFFF" opacity="0.9"/>
+  <path d="M 250 275 Q 190 245 180 200 Q 210 255 250 275" fill="#FFFFFF" opacity="0.8"/>
+  <path d="M 260 290 Q 210 275 200 235 Q 225 280 260 290" fill="#FFFFFF" opacity="0.7"/>
+  
+  <!-- Tail feathers -->
+  <path d="M 355 250 Q 410 200 405 150 Q 390 210 355 250" fill="#FFFFFF" opacity="0.85"/>
+  <path d="M 365 270 Q 430 240 425 180 Q 405 250 365 270" fill="#FFFFFF" opacity="0.75"/>
+  <path d="M 360 290 Q 420 290 415 220 Q 395 280 360 290" fill="#FFFFFF" opacity="0.65"/>
+  
+  <!-- Leg -->
+  <path d="M 270 340 L 270 385" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+  <!-- Foot -->
+  <path d="M 270 385 L 255 405 M 270 385 L 270 410 M 270 385 L 285 405" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Small chart line inside phone (right side) -->
+  <polyline points="340,360 360,340 380,350 400,320 420,330" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+</svg>

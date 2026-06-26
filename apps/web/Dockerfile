@@ -29,6 +29,7 @@ RUN pnpm run build
 
 # Copy static files into standalone output so the server can serve them
 RUN cp -R .next/static .next/standalone/.next/static
+RUN cp -R public .next/standalone/public
 
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]

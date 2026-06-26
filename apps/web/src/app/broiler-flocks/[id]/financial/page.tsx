@@ -23,13 +23,13 @@ export default function FinancialProjectionPage() {
     if (!isLoading && !user) { router.push("/login"); return; }
     if (user && flockId) {
       apiFetch(`/api/v1/financial-records/summary?flockId=${flockId}`)
-        .then(setSummary)
+        .then((data: any) => setSummary(data))
         .catch((err) => setError(err.message));
       apiFetch(`/api/v1/financial-records?flockId=${flockId}`)
-        .then(setRecords)
+        .then((data: any) => setRecords(data))
         .catch(() => {});
       apiFetch(`/api/v1/broiler-flocks/${flockId}`)
-        .then(setFlock)
+        .then((data: any) => setFlock(data))
         .catch(() => {});
     }
   }, [user, isLoading, flockId, router]);
