@@ -24,6 +24,7 @@ import { buildVaccinationEventModule } from './modules/vaccination-events/routes
 import { buildFinancialRecordModule } from './modules/financial-records/routes.js';
 import { buildAlertModule } from './modules/alerts/routes.js';
 import { buildDiseaseModule } from './modules/diseases/routes.js';
+import { buildFinancialEngineModule } from './modules/financial-engine/routes.js';
 
 const prisma = new PrismaClient();
 const app = Fastify({
@@ -80,6 +81,7 @@ await app.register(buildVaccinationEventModule, { prefix: '/api/v1/vaccination-e
 await app.register(buildFinancialRecordModule, { prefix: '/api/v1/financial-records' });
 await app.register(buildAlertModule, { prefix: '/api/v1/alerts' });
 await app.register(buildDiseaseModule, { prefix: '/api/v1/diseases' });
+await app.register(buildFinancialEngineModule, { prefix: '/api/v1/financial-engine' });
 
 // ── Health check ─────────────────────────
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

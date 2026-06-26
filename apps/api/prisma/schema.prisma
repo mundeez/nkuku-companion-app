@@ -609,3 +609,125 @@ model VaccinationScheduleItem {
   @@index([scheduleId, sortOrder])
   @@map("vaccination_schedule_items")
 }
+
+// ── FINANCIAL PERIODS ────────────────────
+model FinancialPeriod {
+  id         String     @id @default(uuid()) @db.Uuid
+  label      String     @db.VarChar(20)
+  periodType PeriodType @map("period_type")
+  startDate  DateTime   @map("start_date") @db.Date
+  endDate    DateTime   @map("end_date") @db.Date
+  isClosed   Boolean    @default(false) @map("is_closed")
+  closedAt   DateTime?  @map("closed_at") @db.Timestamptz(6)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  auditLogs AuditLog[]
+
+  @@unique([label, periodType])
+  @@index([startDate, endDate])
+  @@map("financial_periods")
+}
+
+enum PeriodType {
+  monthly
+  quarterly
+  annual
+}
+
+// ── AUDIT LOG ────────────────────────────
+model AuditLog {
+  id            String      @id @default(uuid()) @db.Uuid
+  userId        String?     @map("user_id") @db.Uuid
+  entityType    String      @map("entity_type") @db.VarChar(50)
+  entityId      String      @map("entity_id") @db.Uuid
+  action        AuditAction
+  previousState Json?       @map("previous_state")
+  newState      Json?       @map("new_state")
+  ipAddress     String?     @map("ip_address") @db.VarChar(45)
+  periodId      String?     @map("period_id") @db.Uuid
+  occurredAt    DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  period FinancialPeriod? @relation(fields: [periodId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId, occurredAt])
+  @@map("audit_logs")
+}
+
+enum AuditAction {
+  create
+  update
+  delete
+  period_close
+  report_generate
+}
+
+// ── SCHEDULED REPORTS ────────────────────
+model ScheduledReport {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @db.VarChar(100)
+  reportType  ReportType       @map("report_type")
+  frequency   ReportFrequency
+  scope       ReportScope
+  scopeId     String?          @map("scope_id") @db.Uuid
+  recipients  Json
+  format      ExportFormat
+  isActive    Boolean          @default(true) @map("is_active")
+  lastRunAt   DateTime?        @map("last_run_at") @db.Timestamptz(6)
+  nextRunAt   DateTime?        @map("next_run_at") @db.Timestamptz(6)
+  createdBy   String           @map("created_by") @db.Uuid
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  executions ReportExecution[]
+
+  @@map("scheduled_reports")
+}
+
+model ReportExecution {
+  id               String            @id @default(uuid()) @db.Uuid
+  scheduledReportId String           @map("scheduled_report_id") @db.Uuid
+  status           ExecutionStatus
+  fileUrl          String?           @db.VarChar(500)
+  errorMessage     String?           @map("error_message") @db.Text
+  executedAt       DateTime          @default(now()) @map("executed_at") @db.Timestamptz(6)
+
+  scheduledReport ScheduledReport @relation(fields: [scheduledReportId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledReportId, executedAt])
+  @@map("report_executions")
+}
+
+enum ReportType {
+  income_statement
+  balance_sheet
+  cash_flow
+  cost_breakdown
+  flock_profitability
+  cycle_summary
+}
+
+enum ReportFrequency {
+  weekly
+  monthly
+  quarterly
+}
+
+enum ReportScope {
+  global
+  flock
+  cycle
+}
+
+enum ExportFormat {
+  pdf
+  csv
+  excel
+}
+
+enum ExecutionStatus {
+  success
+  failed
+  running
+}

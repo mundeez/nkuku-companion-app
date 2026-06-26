@@ -20,6 +20,7 @@ export function Navbar() {
     { href: "/suppliers", label: "Suppliers" },
     { href: "/projections", label: "Projections" },
     { href: "/expansion-plan", label: "Expansion Plan" },
+    { href: "/financials", label: "Financials" },
     ...(user?.role === "owner" ? [{ href: "/users", label: "Users" }] : []),
   ];
 
