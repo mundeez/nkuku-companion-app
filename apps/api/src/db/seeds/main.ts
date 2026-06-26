@@ -214,6 +214,43 @@ async function main() {
   await seedDiseases(prisma);
   await seedVaccinationSchedules(prisma);
 
+  // ── Financial System Seeds ──
+  // Seed a closed monthly financial period
+  await prisma.financialPeriod.upsert({
+    where: { label_periodType: { label: '2025-01', periodType: 'monthly' } },
+    update: {},
+    create: {
+      label: '2025-01',
+      periodType: 'monthly',
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-01-31'),
+      isClosed: true,
+      closedAt: new Date('2025-02-01'),
+    },
+  });
+  console.log('[SEED] Financial period: 2025-01');
+
+  // Seed a demo scheduled report
+  const demoReport = await prisma.scheduledReport.findFirst({
+    where: { name: 'Monthly Income Statement', createdBy: owner.id },
+  });
+  if (!demoReport) {
+    await prisma.scheduledReport.create({
+      data: {
+        name: 'Monthly Income Statement',
+        reportType: 'income_statement',
+        frequency: 'monthly',
+        scope: 'global',
+        recipients: [owner.email],
+        format: 'csv',
+        isActive: true,
+        nextRunAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        createdBy: owner.id,
+      },
+    });
+    console.log('[SEED] Scheduled report: Monthly Income Statement');
+  }
+
   console.log('[SEED] Complete!');
 }
 

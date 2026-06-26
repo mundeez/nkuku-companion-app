@@ -25,6 +25,7 @@ import { buildFinancialRecordModule } from './modules/financial-records/routes.j
 import { buildAlertModule } from './modules/alerts/routes.js';
 import { buildDiseaseModule } from './modules/diseases/routes.js';
 import { buildFinancialEngineModule } from './modules/financial-engine/routes.js';
+import { SchedulerService } from './core/financial-engine/scheduler.service.js';
 
 const prisma = new PrismaClient();
 const app = Fastify({
@@ -85,6 +86,10 @@ await app.register(buildFinancialEngineModule, { prefix: '/api/v1/financial-engi
 
 // ── Health check ─────────────────────────
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// ── Start scheduled report cron ──────────
+const scheduler = new SchedulerService(prisma);
+scheduler.startCron();
 
 // ── Start server ─────────────────────────
 const port = parseInt(process.env.PORT || '3001', 10);
