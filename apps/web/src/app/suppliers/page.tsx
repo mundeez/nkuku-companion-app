@@ -826,7 +826,7 @@ export default function SuppliersPage() {
                       <div>
                         <Label>Stage Type</Label>
                         <select
-                          className="w-full border rounded-md p-2 bg-background"
+                          className="w-full border rounded-md p-2 bg-background text-foreground"
                           value={stage.stageType}
                           onChange={(e) => updateStage(stage.id, { stageType: e.target.value as any })}
                         >

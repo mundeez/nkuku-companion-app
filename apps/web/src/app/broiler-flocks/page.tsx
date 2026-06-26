@@ -406,7 +406,7 @@ export default function BroilerFlocksPage() {
             <div>
               <Label>Supplier</Label>
               <select
-                className="w-full border rounded-md p-2 bg-background"
+                className="w-full border rounded-md p-2 bg-background text-foreground"
                 value={form.supplierId || ""}
                 onChange={async (e) => {
                   const supplierId = e.target.value;
@@ -524,7 +524,7 @@ export default function BroilerFlocksPage() {
             <div>
               <Label>Supplier</Label>
               <select
-                className="w-full border rounded-md p-2 bg-background"
+                className="w-full border rounded-md p-2 bg-background text-foreground"
                 value={form.supplierId || ""}
                 onChange={async (e) => {
                   const supplierId = e.target.value;

@@ -347,7 +347,7 @@ export default function FlockDetailPage() {
                     <label className="text-sm text-muted-foreground">Collection Date</label>
                     <input
                       type="date"
-                      className="w-full border rounded-md p-2 mt-1"
+                      className="w-full border rounded-md p-2 mt-1 bg-background text-foreground"
                       value={collectionForm.collectionDate}
                       onChange={(e) => setCollectionForm({ ...collectionForm, collectionDate: e.target.value })}
                     />
@@ -370,7 +370,7 @@ export default function FlockDetailPage() {
               </DialogHeader>
               <div className="py-4">
                 <textarea
-                  className="w-full border rounded-md p-2 min-h-[120px]"
+                  className="w-full border rounded-md p-2 min-h-[120px] bg-background text-foreground"
                   placeholder="e.g. Uniform size, active, good feathering..."
                   value={notesForm}
                   onChange={(e) => setNotesForm(e.target.value)}
@@ -589,7 +589,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       return (
         <select
           key={f.key}
-          className="w-full border rounded-md p-2 bg-background"
+          className="w-full border rounded-md p-2 bg-background text-foreground"
           value={val || ""}
           onChange={async (e) => {
             const supplierId = e.target.value;
@@ -633,7 +633,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
             .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
         : [];
       return (
-        <select key={f.key} className="w-full border rounded-md p-2 bg-background" value={val} onChange={async (e) => {
+        <select key={f.key} className="w-full border rounded-md p-2 bg-background text-foreground" value={val} onChange={async (e) => {
           const newForm = { ...form, [f.key]: e.target.value };
           if (type === "feed" && form.supplierId && form.supplierId !== "custom") {
             const priceData = await fetchSupplierPrice(form.supplierId, e.target.value);
@@ -659,7 +659,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
 
     if (f.type === "select") {
       return (
-        <select key={f.key} className="w-full border rounded-md p-2 bg-background" value={val} onChange={async (e) => {
+        <select key={f.key} className="w-full border rounded-md p-2 bg-background text-foreground" value={val} onChange={async (e) => {
           const newForm = { ...form, [f.key]: e.target.value };
           setForm(newForm);
         }}>
@@ -673,7 +673,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       return <input key={f.key} type="checkbox" checked={!!val} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />;
     }
 
-    return <input key={f.key} type={f.type} step={f.type === "number" ? "0.1" : undefined} className="w-full border rounded-md p-2" value={val} onChange={(e) => setForm({ ...form, [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value })} />;
+    return <input key={f.key} type={f.type} step={f.type === "number" ? "0.1" : undefined} className="w-full border rounded-md p-2 bg-background text-foreground" value={val} onChange={(e) => setForm({ ...form, [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value })} />;
   }
 
   function getFeedTypeColor(name: string) {
@@ -783,7 +783,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
                   type="number"
                   min="0"
                   step="1"
-                  className="w-full border rounded-md p-2"
+                  className="w-full border rounded-md p-2 bg-background text-foreground"
                   value={form.bagCount || ""}
                   placeholder={`Enter number of ${form._bagSizeKg}kg bags`}
                   onChange={(e) => {
@@ -804,7 +804,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
               <div>
                 <label className="text-sm font-medium">Custom Supplier Name</label>
                 <input
-                  className="w-full border rounded-md p-2"
+                  className="w-full border rounded-md p-2 bg-background text-foreground"
                   value={form.feedBrand || ""}
                   placeholder="e.g., Local Market"
                   onChange={(e) => setForm({ ...form, feedBrand: e.target.value })}
@@ -817,7 +817,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
               <div>
                 <label className="text-sm font-medium">Notes</label>
                 <textarea
-                  className="w-full border rounded-md p-2 min-h-[60px] resize-y"
+                  className="w-full border rounded-md p-2 min-h-[60px] resize-y bg-background text-foreground"
                   value={form.notes || ""}
                   placeholder="Optional notes about this feed purchase"
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -833,7 +833,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full border rounded-md p-2"
+                    className="w-full border rounded-md p-2 bg-background text-foreground"
                     value={form.quantityKg || ""}
                     onChange={(e) => setForm({ ...form, quantityKg: Number(e.target.value) })}
                   />
@@ -859,10 +859,9 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
                   <input
                     type="number"
                     step="0.01"
-                    className="w-full border rounded-md p-2"
+                    className={`w-full border rounded-md p-2 bg-background text-foreground ${hasSupplier && !costOverride ? "opacity-70" : ""}`}
                     value={form.costZmw || ""}
                     readOnly={hasSupplier && !costOverride}
-                    style={{ backgroundColor: hasSupplier && !costOverride ? "#f3f4f6" : "white" }}
                     onChange={(e) => setForm({ ...form, costZmw: Number(e.target.value) })}
                   />
                   {hasSupplier && !costOverride && (

@@ -90,15 +90,15 @@ export default function FeedCalculatorPage() {
           <CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium">Number of Birds</label>
-              <input type="number" className="w-full border rounded-md p-2 mt-1" value={calc.birds} onChange={(e) => setCalc({ ...calc, birds: Number(e.target.value) })} />
+              <input type="number" className="w-full border rounded-md p-2 mt-1 bg-background text-foreground" value={calc.birds} onChange={(e) => setCalc({ ...calc, birds: Number(e.target.value) })} />
             </div>
             <div>
               <label className="text-sm font-medium">Age Range (days)</label>
-              <input type="number" className="w-full border rounded-md p-2 mt-1" value={calc.days} onChange={(e) => setCalc({ ...calc, days: Number(e.target.value) })} />
+              <input type="number" className="w-full border rounded-md p-2 mt-1 bg-background text-foreground" value={calc.days} onChange={(e) => setCalc({ ...calc, days: Number(e.target.value) })} />
             </div>
             <div>
               <label className="text-sm font-medium">Feed Type</label>
-              <select className="w-full border rounded-md p-2 mt-1" value={calc.feedType} onChange={(e) => setCalc({ ...calc, feedType: e.target.value })}>
+              <select className="w-full border rounded-md p-2 mt-1 bg-background text-foreground" value={calc.feedType} onChange={(e) => setCalc({ ...calc, feedType: e.target.value })}>
                 <option value="">{feedStages.length > 0 ? "Select feed type..." : "Loading..."}</option>
                 {feedStages.map((s: any) => (
                   <option key={s.id} value={s.stageName}>{s.stageName}</option>
