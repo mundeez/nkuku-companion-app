@@ -3,6 +3,7 @@ import '../../services/api_service.dart';
 import 'income_statement_screen.dart';
 import 'balance_sheet_screen.dart';
 import 'cash_flow_screen.dart';
+import 'overheads_screen.dart';
 
 class FinancialDashboardScreen extends StatefulWidget {
   const FinancialDashboardScreen({super.key});
@@ -14,7 +15,9 @@ class FinancialDashboardScreen extends StatefulWidget {
 class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
   Map<String, dynamic>? _summary;
   List<dynamic> _trend = [];
+  List<dynamic> _projections = [];
   bool _loading = true;
+  bool _showProjections = false;
 
   @override
   void initState() {
@@ -26,9 +29,11 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
     try {
       final summaryRes = await ApiService.dio.get('/api/v1/financial-engine/summary');
       final trendRes = await ApiService.dio.get('/api/v1/financial-engine/monthly-trend?year=${DateTime.now().year}');
+      final projRes = await ApiService.dio.get('/api/v1/financial-engine/projections');
       setState(() {
         _summary = summaryRes.data;
         _trend = trendRes.data as List;
+        _projections = projRes.data as List;
         _loading = false;
       });
     } catch (e) {
@@ -71,7 +76,46 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Text('Statements', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Statements', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Switch(
+                        value: _showProjections,
+                        onChanged: (v) => setState(() => _showProjections = v),
+                        activeColor: Colors.amber,
+                      ),
+                    ],
+                  ),
+                  if (_showProjections && _projections.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Card(
+                      color: Colors.amber.shade50,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: Colors.amber.shade200, borderRadius: BorderRadius.circular(4)),
+                                  child: const Text('ESTIMATED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ..._projections.map((p) => ListTile(
+                              dense: true,
+                              title: Text(p['flock']?['name'] ?? 'Flock'),
+                              trailing: Text('ZMW ${(p['amountZmw'] as num).toDouble().toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                            )),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   _StatementTile(
                     icon: Icons.insert_drive_file,
@@ -90,6 +134,12 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
                     title: 'Cash Flow',
                     subtitle: 'Operating, investing & financing',
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CashFlowScreen())),
+                  ),
+                  _StatementTile(
+                    icon: Icons.settings,
+                    title: 'Overheads',
+                    subtitle: 'Monthly labour, utilities & more',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OverheadsScreen())),
                   ),
                   const SizedBox(height: 16),
                   const Text('Monthly Trend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
