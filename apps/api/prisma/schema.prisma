@@ -21,10 +21,11 @@ model User {
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  createdSuppliers  Supplier[]        @relation("SupplierCreatedBy")
-  createdBatches    Batch[]           @relation("BatchCreatedBy")
-  createdCycles     ProductionCycle[] @relation("CycleCreatedBy")
-  createdFlocks     BroilerFlock[]    @relation("FlockCreatedBy")
+  createdSuppliers   Supplier[]        @relation("SupplierCreatedBy")
+  createdBatches     Batch[]           @relation("BatchCreatedBy")
+  createdCycles      ProductionCycle[] @relation("CycleCreatedBy")
+  createdFlocks      BroilerFlock[]    @relation("FlockCreatedBy")
+  monthlyOverheads   MonthlyOverhead[]
 
   @@map("users")
 }
@@ -375,6 +376,8 @@ model BroilerFlock {
   chicksCollected Boolean  @default(false) @map("chicks_collected")
   collectionDate  DateTime? @map("collection_date") @db.Date
   chickQualityNotes String?  @map("chick_quality_notes") @db.VarChar(500)
+  salePriceZmw    Decimal?    @map("sale_price_zmw") @db.Decimal(14, 2)
+  soldDate        DateTime?   @map("sold_date") @db.Date
   status       FlockStatus @default(active)
   createdBy    String?     @map("created_by") @db.Uuid
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -398,6 +401,7 @@ model BroilerFlock {
 
 enum FlockStatus {
   active
+  sold
   completed
   cancelled
 }
@@ -495,22 +499,26 @@ model VaccinationEvent {
 }
 
 model FinancialRecord {
-  id             String              @id @default(uuid()) @db.Uuid
-  flockId        String              @map("flock_id") @db.Uuid
-  sourceRecordId String?             @map("source_record_id") @db.Uuid
-  recordDate     DateTime            @map("record_date") @db.Date
-  category       FinancialCategory
-  description    String              @db.VarChar(200)
-  amountZmw      Decimal             @map("amount_zmw") @db.Decimal(14, 2)
-  isIncome       Boolean             @default(false) @map("is_income")
-  notes          String?             @db.Text
-  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String              @id @default(uuid()) @db.Uuid
+  flockId           String              @map("flock_id") @db.Uuid
+  sourceRecordId    String?             @map("source_record_id") @db.Uuid
+  sourceTable       String?             @map("source_table") @db.VarChar(50)
+  recordDate        DateTime            @map("record_date") @db.Date
+  category          FinancialCategory
+  description       String              @db.VarChar(200)
+  amountZmw         Decimal             @map("amount_zmw") @db.Decimal(14, 2)
+  isIncome          Boolean             @default(false) @map("is_income")
+  isSystemGenerated Boolean             @default(false) @map("is_system_generated")
+  isProjection      Boolean             @default(false) @map("is_projection")
+  notes             String?             @db.Text
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  flock          BroilerFlock        @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  flock             BroilerFlock        @relation(fields: [flockId], references: [id], onDelete: Cascade)
 
   @@index([flockId, recordDate])
   @@index([sourceRecordId])
+  @@index([isSystemGenerated])
   @@map("financial_records")
 }
 
@@ -730,4 +738,36 @@ enum ExecutionStatus {
   success
   failed
   running
+}
+
+// ── MONTHLY OVERHEADS ────────────────────
+model MonthlyOverhead {
+  id           String           @id @default(uuid()) @db.Uuid
+  yearMonth    String           @map("year_month") @db.VarChar(7)
+  category     OverheadCategory @map("category")
+  description  String?          @db.VarChar(200)
+  amountZmw    Decimal          @map("amount_zmw") @db.Decimal(14, 2)
+  contractType String           @map("contract_type") @db.VarChar(20)
+  recordedAt   DateTime         @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  createdBy    String           @map("created_by") @db.Uuid
+
+  user         User             @relation(fields: [createdBy], references: [id])
+
+  @@unique([yearMonth, category, description])
+  @@map("monthly_overheads")
+}
+
+// ── FLOCK OVERHEAD ALLOCATIONS ───────────
+model FlockOverheadAllocation {
+  id                   String   @id @default(uuid()) @db.Uuid
+  monthlyOverheadId    String   @map("monthly_overhead_id") @db.Uuid
+  flockId              String   @map("flock_id") @db.Uuid
+  allocationDate       DateTime @map("allocation_date") @db.Date
+  daysActiveInMonth    Int      @map("days_active_in_month")
+  totalActiveFlockDays Int      @map("total_active_flock_days")
+  allocatedAmount      Decimal  @map("allocated_amount") @db.Decimal(14, 2)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([flockId, allocationDate])
+  @@map("flock_overhead_allocations")
 }

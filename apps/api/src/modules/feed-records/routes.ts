@@ -108,11 +108,13 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
         data: {
           flockId,
           sourceRecordId: record.id,
+          sourceTable: 'feed_records',
           recordDate: new Date(data.recordDate),
           category: 'feed',
           description: `Feed - ${feedBrand || data.feedType} (${data.quantityKg}kg)`,
           amountZmw: data.costZmw,
           isIncome: false,
+          isSystemGenerated: true,
           notes: 'Auto-generated from feed record',
         },
       });
@@ -156,6 +158,8 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
               amountZmw: data.costZmw,
               description: desc,
               recordDate: data.recordDate ? new Date(data.recordDate) : finRecord.recordDate,
+              sourceTable: 'feed_records',
+              isSystemGenerated: true,
             },
           });
         } else {
@@ -163,11 +167,13 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
             data: {
               flockId: record.flockId,
               sourceRecordId: id,
+              sourceTable: 'feed_records',
               recordDate: new Date(data.recordDate || record.recordDate),
               category: 'feed',
               description: desc,
               amountZmw: data.costZmw,
               isIncome: false,
+              isSystemGenerated: true,
               notes: 'Auto-generated from feed record',
             },
           });

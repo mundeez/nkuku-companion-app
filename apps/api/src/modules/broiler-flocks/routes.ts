@@ -30,7 +30,9 @@ const FlockUpdateSchema = z.object({
   chicksCollected: z.boolean().optional(),
   collectionDate: dateOrIso.nullable().optional(),
   chickQualityNotes: z.string().max(500).optional().nullable(),
-  status: z.enum(['active', 'completed', 'cancelled']).optional(),
+  status: z.enum(['active', 'sold', 'completed', 'cancelled']).optional(),
+  salePriceZmw: z.number().nonnegative().optional().nullable(),
+  soldDate: dateOrIso.nullable().optional(),
   currentCount: z.number().int().min(0).optional(),
 });
 
@@ -114,11 +116,13 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       await prisma.financialRecord.create({
         data: {
           flockId: flock.id,
+          sourceTable: 'broiler_flocks',
           recordDate: startDate,
           category: 'chick_purchase',
           description: `Day-old chicks - ${supplier?.name || 'Unknown'} (${data.initialCount} birds)`,
           amountZmw: data.chickPriceZmw * data.initialCount,
           isIncome: false,
+          isSystemGenerated: true,
           notes: 'Auto-generated from flock creation',
         },
       });
@@ -137,11 +141,41 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     if (raw.collectionDate === null) updateData.collectionDate = null;
     if (raw.chickQualityNotes === '') updateData.chickQualityNotes = null;
 
-    const flock = await prisma.broilerFlock.updateMany({
+    const existing = await prisma.broilerFlock.findFirst({
       where: { id, createdBy: authUser.userId },
+    });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    if (raw.status === 'sold' && existing.status !== 'sold') {
+      updateData.soldDate = raw.soldDate ? new Date(raw.soldDate) : new Date();
+    }
+
+    const flock = await prisma.broilerFlock.update({
+      where: { id },
       data: updateData,
     });
-    if (flock.count === 0) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    // Auto-create sales financial record when flock is marked as sold
+    if (raw.status === 'sold' && existing.status !== 'sold') {
+      const salePrice = raw.salePriceZmw ?? existing.salePriceZmw ?? 0;
+      const soldCount = raw.currentCount ?? existing.currentCount ?? 0;
+      if (salePrice > 0 && soldCount > 0) {
+        await prisma.financialRecord.create({
+          data: {
+            flockId: id,
+            sourceTable: 'broiler_flocks',
+            recordDate: flock.soldDate ?? new Date(),
+            category: 'sales',
+            description: `Bird sales - ${flock.name} (${soldCount} birds)`,
+            amountZmw: salePrice * soldCount,
+            isIncome: true,
+            isSystemGenerated: true,
+            notes: 'Auto-generated from flock sale',
+          },
+        });
+      }
+    }
+
     return prisma.broilerFlock.findUnique({ where: { id }, include: { breed: true, supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } } } });
   });
 

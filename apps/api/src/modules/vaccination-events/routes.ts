@@ -94,11 +94,13 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
         data: {
           flockId,
           sourceRecordId: record.id,
+          sourceTable: 'vaccination_events',
           recordDate: new Date(data.adminDate),
           category: 'vaccines',
           description: `Vaccine - ${data.vaccineName} (${data.adminMethod})`,
           amountZmw: data.costZmw,
           isIncome: false,
+          isSystemGenerated: true,
           notes: 'Auto-generated from vaccination record',
         },
       });
@@ -142,6 +144,8 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
               amountZmw: data.costZmw,
               description: desc,
               recordDate: data.adminDate ? new Date(data.adminDate) : finRecord.recordDate,
+              sourceTable: 'vaccination_events',
+              isSystemGenerated: true,
             },
           });
         } else {
@@ -149,11 +153,13 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
             data: {
               flockId: event.flockId,
               sourceRecordId: id,
+              sourceTable: 'vaccination_events',
               recordDate: new Date(data.adminDate || event.adminDate),
               category: 'vaccines',
               description: desc,
               amountZmw: data.costZmw,
               isIncome: false,
+              isSystemGenerated: true,
               notes: 'Auto-generated from vaccination record',
             },
           });

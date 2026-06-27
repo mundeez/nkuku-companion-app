@@ -6,6 +6,8 @@ import { FinancialStatementService } from '../../core/financial-engine/statement
 import { AuditService } from '../../core/financial-engine/audit.service.js';
 import { ReportGenerationService } from '../../core/financial-engine/report-generation.service.js';
 import { SchedulerService } from '../../core/financial-engine/scheduler.service.js';
+import { OverheadAllocationService } from '../../core/financial-engine/overhead-allocation.service.js';
+import { HarvestProjectionService } from '../../core/financial-engine/harvest-projection.service.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -16,6 +18,8 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
   const audit = new AuditService(prisma);
   const reports = new ReportGenerationService();
   const scheduler = new SchedulerService(prisma);
+  const overheads = new OverheadAllocationService(prisma);
+  const projections = new HarvestProjectionService(prisma);
 
   // ── UNIFIED SUMMARY ──────────────────────
   app.get('/summary', { preHandler: [authenticate] }, async (request) => {
@@ -254,5 +258,54 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
   app.get('/scheduled-reports/:id/executions', { preHandler: [authenticate] }, async (request) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     return scheduler.getExecutions(id);
+  });
+
+  // ── MONTHLY OVERHEADS ──────────────────────
+  app.get('/overheads', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+    const authUser = (request as any).authUser;
+    return overheads.listMonthlyOverheads(authUser.userId);
+  });
+
+  app.post('/overheads', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+    const authUser = (request as any).authUser;
+    const body = z.object({
+      yearMonth: z.string().regex(/^\d{4}-\d{2}$/),
+      category: z.enum(['medication', 'vaccination', 'labour', 'electricity', 'water', 'litter', 'transport_to_market', 'other']),
+      description: z.string().optional(),
+      amountZmw: z.number().positive(),
+      contractType: z.enum(['monthly', 'weekly', 'daily', 'once_off']),
+    }).parse(request.body);
+
+    const created = await overheads.createMonthlyOverhead({ ...body, createdBy: authUser.userId });
+    await overheads.allocateOverheadForMonth(body.yearMonth, authUser.userId);
+    return created;
+  });
+
+  app.delete('/overheads/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const authUser = (request as any).authUser;
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const result = await overheads.deleteMonthlyOverhead(id, authUser.userId);
+    if (!result) return reply.status(404).send({ error: 'NOT_FOUND' });
+    reply.status(204).send();
+  });
+
+  app.post('/overheads/allocate/:yearMonth', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+    const authUser = (request as any).authUser;
+    const { yearMonth } = z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) }).parse(request.params);
+    return overheads.allocateOverheadForMonth(yearMonth, authUser.userId);
+  });
+
+  // ── HARVEST PROJECTIONS ────────────────────
+  app.get('/projections', { preHandler: [authenticate] }, async (request) => {
+    const authUser = (request as any).authUser;
+    return projections.getProjections(authUser.userId);
+  });
+
+  app.post('/projections/refresh', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+    const authUser = (request as any).authUser;
+    const body = z.object({ marketPricePerKg: z.number().positive().optional() }).parse(request.body);
+    const marketPrice = body.marketPricePerKg ?? 25;
+    await projections.refreshProjections({ marketPricePerKg: marketPrice, userId: authUser.userId });
+    return { refreshed: true };
   });
 }

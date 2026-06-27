@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
-import { DollarSign, TrendingUp, TrendingDown, PiggyBank, FileText, BarChart3, Calendar } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, PiggyBank, FileText, BarChart3, Calendar, Wrench, Eye } from "lucide-react";
 import Link from "next/link";
 
 const COLORS = ["#1B5E20", "#C6A017", "#1565C0", "#D32F2F", "#7B1FA2", "#E65100", "#00695C", "#5D4037"];
@@ -18,6 +18,9 @@ export default function FinancialsDashboard() {
   const [summary, setSummary] = useState<any>(null);
   const [trend, setTrend] = useState<any[]>([]);
   const [flockProfit, setFlockProfit] = useState<any[]>([]);
+  const [projections, setProjections] = useState<any[]>([]);
+  const [expansionTargets, setExpansionTargets] = useState<any>(null);
+  const [showProjections, setShowProjections] = useState(false);
   const [error, setError] = useState("");
   const [year] = useState(new Date().getFullYear());
 
@@ -32,6 +35,17 @@ export default function FinancialsDashboard() {
         .catch(() => {});
       apiFetch("/api/v1/financial-engine/flock-profitability")
         .then(setFlockProfit)
+        .catch(() => {});
+      apiFetch("/api/v1/financial-engine/projections")
+        .then(setProjections)
+        .catch(() => {});
+      apiFetch("/api/v1/expansion-plan")
+        .then((data: any) => {
+          const totalTarget = data.reduce((sum: number, cycle: any) => {
+            return sum + cycle.batches.reduce((bSum: number, batch: any) => bSum + (batch.revenueTargetZmw || 0), 0);
+          }, 0);
+          setExpansionTargets({ totalTarget, cycles: data.length });
+        })
         .catch(() => {});
     }
   }, [user, isLoading, router, year]);
@@ -49,11 +63,30 @@ export default function FinancialsDashboard() {
           <Link href="/financials/income-statement"><Button variant="outline"><FileText className="h-4 w-4 mr-2" />Income Statement</Button></Link>
           <Link href="/financials/balance-sheet"><Button variant="outline"><BarChart3 className="h-4 w-4 mr-2" />Balance Sheet</Button></Link>
           <Link href="/financials/cash-flow"><Button variant="outline"><TrendingUp className="h-4 w-4 mr-2" />Cash Flow</Button></Link>
-          {user.role !== "viewer" && <Link href="/financials/audit-log"><Button variant="outline"><Calendar className="h-4 w-4 mr-2" />Audit Log</Button></Link>}
+          {user.role !== "viewer" && (
+            <>
+              <Link href="/financials/overheads"><Button variant="outline"><Wrench className="h-4 w-4 mr-2" />Overheads</Button></Link>
+              <Link href="/financials/audit-log"><Button variant="outline"><Calendar className="h-4 w-4 mr-2" />Audit Log</Button></Link>
+            </>
+          )}
         </div>
       </div>
 
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
+
+      {/* Projections Toggle */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Button variant={showProjections ? "default" : "outline"} size="sm" onClick={() => setShowProjections(!showProjections)}>
+            <Eye className="h-4 w-4 mr-1" />{showProjections ? "Hide Projections" : "Show Projections"}
+          </Button>
+        </div>
+        {expansionTargets && (
+          <div className="text-sm text-muted-foreground">
+            Planning target: <span className="font-medium text-foreground">ZMW {Number(expansionTargets.totalTarget).toFixed(0)}</span> across {expansionTargets.cycles} cycles
+          </div>
+        )}
+      </div>
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-4 mb-6">
@@ -121,6 +154,31 @@ export default function FinancialsDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Projections Panel */}
+      {showProjections && projections.length > 0 && (
+        <Card className="mb-6 border-dashed border-2 border-amber-300">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800">ESTIMATED</span>
+              Harvest Projections
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              {projections.map((p: any) => (
+                <Card key={p.id} className="bg-amber-50/50">
+                  <CardContent className="pt-4">
+                    <p className="text-sm text-muted-foreground">{p.flock?.name || "Flock"}</p>
+                    <p className="text-lg font-bold text-amber-700">ZMW {Number(p.amountZmw).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">{p.flock?.currentCount} birds × {p.flock?.targetWeight}kg</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Profit Trend */}
       <Card className="mb-6">

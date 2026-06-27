@@ -26,6 +26,8 @@ import { buildAlertModule } from './modules/alerts/routes.js';
 import { buildDiseaseModule } from './modules/diseases/routes.js';
 import { buildFinancialEngineModule } from './modules/financial-engine/routes.js';
 import { SchedulerService } from './core/financial-engine/scheduler.service.js';
+import { DailyRecalculationService } from './core/financial-engine/daily-recalculation.service.js';
+import cron from 'node-cron';
 
 const prisma = new PrismaClient();
 const app = Fastify({
@@ -90,6 +92,19 @@ app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOStrin
 // ── Start scheduled report cron ──────────
 const scheduler = new SchedulerService(prisma);
 scheduler.startCron();
+
+// ── Start daily financial recalc cron ────
+const dailyRecalc = new DailyRecalculationService(prisma);
+const marketPrice = parseFloat(process.env.MARKET_PRICE_PER_KG || '25');
+cron.schedule('0 2 * * *', async () => {
+  app.log.info('[DailyRecalc] Starting daily recalculation...');
+  try {
+    await dailyRecalc.runDailyForAllUsers({ marketPricePerKg: marketPrice });
+    app.log.info('[DailyRecalc] Completed successfully');
+  } catch (err: any) {
+    app.log.error('[DailyRecalc] Failed:', err.message);
+  }
+});
 
 // ── Start server ─────────────────────────
 const port = parseInt(process.env.PORT || '3001', 10);
