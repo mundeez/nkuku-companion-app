@@ -74,6 +74,7 @@ export async function seedRoss308Performance(prisma: PrismaClient) {
   ];
 
   for (const target of targets) {
+    const targetWater = target.ageDays === 0 ? 0 : Number((target.targetFeed * 1.8).toFixed(3));
     await prisma.performanceTarget.upsert({
       where: {
         breedId_ageDays: {
@@ -81,10 +82,16 @@ export async function seedRoss308Performance(prisma: PrismaClient) {
           ageDays: target.ageDays,
         },
       },
-      update: {},
+      update: {
+        targetWeight: target.targetWeight,
+        targetFeed: target.targetFeed,
+        targetFcr: target.targetFcr,
+        targetWater,
+      },
       create: {
         breedId: breed.id,
         ...target,
+        targetWater,
       },
     });
   }

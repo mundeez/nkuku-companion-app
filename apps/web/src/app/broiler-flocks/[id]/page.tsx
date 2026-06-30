@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
 import { BroilerFlock, GrowthRecord, FeedRecord, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
@@ -17,7 +18,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout } from "lucide-react";
+import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout, ClipboardList, Thermometer, Pill, CalendarDays, Printer } from "lucide-react";
 
 function fmtCollectionDate(date: string | Date | undefined): string {
   if (!date) return "";
@@ -209,6 +210,37 @@ export default function FlockDetailPage() {
                 <div className="flex justify-between"><span>Target Weight</span><span className="font-medium">{flock.targetWeight || "-"} kg @ Day {flock.targetAge || "-"}</span></div>
               </div>
             </CardContent></Card>
+
+            <Card className="md:col-span-2">
+              <CardHeader><CardTitle className="text-base">Management Tools</CardTitle></CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <Link href={`/broiler-flocks/${flockId}/tasks`} className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+                  <ClipboardList className="h-5 w-5 mb-2 text-primary" />
+                  <div className="font-medium">Daily Checklist</div>
+                  <div className="text-sm text-muted-foreground">Tasks & vaccinations</div>
+                </Link>
+                <Link href={`/broiler-flocks/${flockId}/environment`} className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+                  <Thermometer className="h-5 w-5 mb-2 text-primary" />
+                  <div className="font-medium">Environment</div>
+                  <div className="text-sm text-muted-foreground">Temp, humidity, ammonia</div>
+                </Link>
+                <Link href={`/broiler-flocks/${flockId}/medication`} className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+                  <Pill className="h-5 w-5 mb-2 text-primary" />
+                  <div className="font-medium">Medication</div>
+                  <div className="text-sm text-muted-foreground">Treatments & withdrawal</div>
+                </Link>
+                <Link href={`/broiler-flocks/${flockId}/calendar`} className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+                  <CalendarDays className="h-5 w-5 mb-2 text-primary" />
+                  <div className="font-medium">Calendar</div>
+                  <div className="text-sm text-muted-foreground">Vaccines & feed phases</div>
+                </Link>
+                <Link href={`/broiler-flocks/${flockId}/calendar/print`} className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+                  <Printer className="h-5 w-5 mb-2 text-primary" />
+                  <div className="font-medium">Print Calendar</div>
+                  <div className="text-sm text-muted-foreground">Landscape printable</div>
+                </Link>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

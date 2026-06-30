@@ -24,6 +24,10 @@ import { buildVaccinationEventModule } from './modules/vaccination-events/routes
 import { buildFinancialRecordModule } from './modules/financial-records/routes.js';
 import { buildAlertModule } from './modules/alerts/routes.js';
 import { buildDiseaseModule } from './modules/diseases/routes.js';
+import { buildMedicationRecordModule } from './modules/medication-records/routes.js';
+import { buildVaccineInventoryModule } from './modules/vaccine-inventory/routes.js';
+import { buildEnvironmentalRecordModule } from './modules/environmental-records/routes.js';
+import { buildFlockTaskModule } from './modules/flock-tasks/routes.js';
 import { buildFinancialEngineModule } from './modules/financial-engine/routes.js';
 import { SchedulerService } from './core/financial-engine/scheduler.service.js';
 import { DailyRecalculationService } from './core/financial-engine/daily-recalculation.service.js';
@@ -84,6 +88,10 @@ await app.register(buildVaccinationEventModule, { prefix: '/api/v1/vaccination-e
 await app.register(buildFinancialRecordModule, { prefix: '/api/v1/financial-records' });
 await app.register(buildAlertModule, { prefix: '/api/v1/alerts' });
 await app.register(buildDiseaseModule, { prefix: '/api/v1/diseases' });
+await app.register(buildMedicationRecordModule, { prefix: '/api/v1/medication-records' });
+await app.register(buildVaccineInventoryModule, { prefix: '/api/v1/vaccine-inventory' });
+await app.register(buildEnvironmentalRecordModule, { prefix: '/api/v1/environmental-records' });
+await app.register(buildFlockTaskModule, { prefix: '/api/v1/flock-tasks' });
 await app.register(buildFinancialEngineModule, { prefix: '/api/v1/financial-engine' });
 
 // ── Health check ─────────────────────────
