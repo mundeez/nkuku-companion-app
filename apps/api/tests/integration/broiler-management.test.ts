@@ -232,6 +232,188 @@ describe('Broiler Management API', () => {
     });
   });
 
+  describe('Ross 308 Zambia Schedule', () => {
+    it('returns vaccination schedule with Zambia-specific ages', async () => {
+      const res = await fetch(`${API_URL}/api/v1/vaccination-events/schedule?flockId=${flockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ageDays).toBeGreaterThanOrEqual(0);
+      expect(data.upcoming).toBeDefined();
+      expect(data.overdue).toBeDefined();
+      const allItems = [...data.upcoming, ...data.overdue];
+      expect(allItems.some((i: any) => i.vaccineName.includes('Marek'))).toBe(true);
+      expect(allItems.some((i: any) => i.vaccineName.includes('Newcastle'))).toBe(true);
+      expect(allItems.some((i: any) => i.vaccineName.includes('Gumboro') || i.vaccineName.includes('IBD'))).toBe(true);
+    });
+  });
+
+  describe('Flock Timeline & Summary', () => {
+    it('returns hatch-to-market timeline', async () => {
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks/${flockId}/timeline`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.events).toBeDefined();
+      expect(data.events.length).toBeGreaterThan(0);
+      expect(data.events.some((e: any) => e.type === 'vaccination')).toBe(true);
+      expect(data.events.some((e: any) => e.title.includes('Feed transition'))).toBe(true);
+    });
+
+    it('returns printable calendar summary', async () => {
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks/${flockId}/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.days).toBeDefined();
+      expect(data.days.length).toBeGreaterThan(0);
+      expect(data.days[0].feedPhase).toBeDefined();
+      expect(data.days[0].managementTasks).toBeDefined();
+    });
+
+    it('returns performance targets for current age', async () => {
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks/${flockId}/performance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.currentTarget).toBeDefined();
+      expect(data.upcomingTargets).toBeDefined();
+    });
+  });
+
+  describe('Flock Tasks', () => {
+    it('generates daily checklist tasks', async () => {
+      const res = await fetch(`${API_URL}/api/v1/flock-tasks/generate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flockId }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.generated).toBeGreaterThan(0);
+
+      const list = await fetch(`${API_URL}/api/v1/flock-tasks?flockId=${flockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(list.status).toBe(200);
+      const tasks = await list.json();
+      expect(tasks.length).toBeGreaterThan(0);
+      expect(tasks.some((t: any) => t.category === 'vaccination')).toBe(true);
+    });
+  });
+
+  describe('Medication Records', () => {
+    it('creates a medication record with withdrawal date', async () => {
+      const res = await fetch(`${API_URL}/api/v1/medication-records`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flockId,
+          recordDate: '2026-06-10',
+          productName: 'Test Antibiotic',
+          category: 'antibiotic',
+          startDate: '2026-06-10',
+          withdrawalDays: 7,
+          costZmw: 250,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.productName).toBe('Test Antibiotic');
+      expect(data.withdrawalDate).toBeDefined();
+      expect(data.costZmw).toBe('250');
+    });
+
+    it('lists medication records', async () => {
+      const res = await fetch(`${API_URL}/api/v1/medication-records?flockId=${flockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Environmental Records', () => {
+    it('creates an environmental record', async () => {
+      const res = await fetch(`${API_URL}/api/v1/environmental-records`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flockId,
+          recordDate: '2026-06-10',
+          timeOfDay: 'Morning',
+          temperatureC: 30,
+          humidityPct: 60,
+          lightHours: 20,
+          litterScore: 3,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.temperatureC).toBe('30');
+      expect(data.humidityPct).toBe('60');
+    });
+
+    it('lists environmental records', async () => {
+      const res = await fetch(`${API_URL}/api/v1/environmental-records?flockId=${flockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Vaccine Inventory', () => {
+    it('creates a vaccine inventory item', async () => {
+      const res = await fetch(`${API_URL}/api/v1/vaccine-inventory`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Newcastle LaSota',
+          disease: 'Newcastle Disease',
+          batchNumber: 'TEST-001',
+          quantityDoses: 1000,
+          expiryDate: '2026-12-31',
+          costZmw: 450,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.name).toBe('Newcastle LaSota');
+      expect(data.batchNumber).toBe('TEST-001');
+    });
+
+    it('lists vaccine inventory', async () => {
+      const res = await fetch(`${API_URL}/api/v1/vaccine-inventory`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.length).toBeGreaterThan(0);
+      expect(data.some((i: any) => i.batchNumber === 'TEST-001')).toBe(true);
+    });
+  });
+
+  describe('Alert Generation', () => {
+    it('generates alerts including vaccination and task alerts', async () => {
+      const res = await fetch(`${API_URL}/api/v1/alerts/generate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.generated).toBeGreaterThan(0);
+      expect(data.alerts.some((a: any) => a.alertType === 'vaccination_due')).toBe(true);
+    });
+  });
+
   describe('Cleanup', () => {
     it('deletes the test flock', async () => {
       const res = await fetch(`${API_URL}/api/v1/broiler-flocks/${flockId}`, {

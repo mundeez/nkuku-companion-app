@@ -11,6 +11,9 @@ const VaccinationEventCreateSchema = z.object({
   ageDays: z.number().int().min(0),
   costZmw: z.number().nonnegative().optional(),
   nextDueDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  batchNumber: z.string().max(100).optional(),
+  expiryDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional().nullable(),
+  vaccineInventoryId: z.string().uuid().optional().nullable(),
   notes: z.string().optional(),
 });
 
@@ -53,8 +56,9 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     });
 
     // Get schedule items for breed
+    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Zambia Schedule' : 'Standard Broiler Schedule';
     const schedule = await prisma.vaccinationSchedule.findFirst({
-      where: { name: 'Ross 308 Comprehensive Schedule' },
+      where: { name: scheduleName },
       include: { items: { orderBy: { sortOrder: 'asc' } } },
     });
 
@@ -84,6 +88,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
         ...data,
         adminDate: new Date(data.adminDate),
         nextDueDate: data.nextDueDate ? new Date(data.nextDueDate) : null,
+        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         flockId,
       },
     });
@@ -129,6 +134,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
         ...data,
         adminDate: data.adminDate ? new Date(data.adminDate) : undefined,
         nextDueDate: data.nextDueDate ? new Date(data.nextDueDate) : undefined,
+        expiryDate: data.expiryDate !== undefined ? (data.expiryDate ? new Date(data.expiryDate) : null) : undefined,
       },
     });
 

@@ -192,6 +192,9 @@ export interface VaccinationEvent {
   adminMethod: string;
   ageDays: number;
   nextDueDate?: string;
+  batchNumber?: string;
+  expiryDate?: string;
+  vaccineInventoryId?: string;
   notes?: string;
 }
 
@@ -238,7 +241,12 @@ export type AlertType =
   | "weight_check"
   | "mortality_threshold"
   | "environmental"
-  | "financial";
+  | "financial"
+  | "medication_due"
+  | "withdrawal_due"
+  | "vaccine_expiry"
+  | "environmental_threshold"
+  | "task_due";
 
 export interface Disease {
   id: string;
@@ -250,4 +258,114 @@ export interface Disease {
   prevention?: string;
   treatment?: string;
   organicTreatments?: string;
+}
+
+export interface MedicationRecord {
+  id: string;
+  flockId: string;
+  recordDate: string;
+  productName: string;
+  category: MedicationCategory;
+  dose?: string;
+  route?: string;
+  startDate: string;
+  endDate?: string;
+  withdrawalDays?: number;
+  withdrawalDate?: string;
+  costZmw?: number;
+  veterinarian?: string;
+  notes?: string;
+}
+
+export type MedicationCategory =
+  | "antibiotic"
+  | "coccidiostat"
+  | "electrolyte"
+  | "vitamin"
+  | "probiotic"
+  | "acidifier"
+  | "phytogenic"
+  | "other";
+
+export interface VaccineInventory {
+  id: string;
+  name: string;
+  disease?: string;
+  supplier?: string;
+  batchNumber: string;
+  quantityDoses: number;
+  expiryDate: string;
+  status: VaccineInventoryStatus;
+  costZmw?: number;
+  notes?: string;
+}
+
+export type VaccineInventoryStatus = "available" | "in_use" | "expired" | "depleted";
+
+export interface EnvironmentalRecord {
+  id: string;
+  flockId: string;
+  recordDate: string;
+  timeOfDay?: string;
+  temperatureC?: number;
+  humidityPct?: number;
+  ammoniaPpm?: number;
+  lightHours?: number;
+  litterScore?: number;
+  ventilationNote?: string;
+  notes?: string;
+}
+
+export interface FlockTask {
+  id: string;
+  flockId: string;
+  taskDate: string;
+  ageDays: number;
+  category: FlockTaskCategory;
+  title: string;
+  description?: string;
+  isCompleted: boolean;
+  isSkipped: boolean;
+  completedAt?: string;
+  notes?: string;
+}
+
+export type FlockTaskCategory =
+  | "vaccination"
+  | "feed"
+  | "water"
+  | "environment"
+  | "health"
+  | "biosecurity"
+  | "management";
+
+export interface FlockTimelineEvent {
+  ageDays: number;
+  date: string;
+  type: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+}
+
+export interface FlockCalendarDay {
+  day: number;
+  age: string;
+  date: string;
+  vaccines: VaccinationScheduleItem[];
+  feedPhase: string;
+  managementTasks: string[];
+  healthSupport: string;
+}
+
+export interface VaccinationScheduleItem {
+  id: string;
+  scheduleId: string;
+  vaccineName: string;
+  vaccineType: string;
+  ageDays: number;
+  adminMethod: string;
+  sortOrder: number;
+  notes?: string;
+  completed?: boolean;
 }

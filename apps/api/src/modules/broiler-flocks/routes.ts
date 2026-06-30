@@ -239,8 +239,221 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       flock,
       ageDays,
       targetWeight: target?.targetWeight ?? null,
+      targetFeed: target?.targetFeed ?? null,
+      targetWater: target?.targetWater ?? null,
       targetFcr: target?.targetFcr ?? null,
       mortalityRate,
+    };
+  });
+
+  // GET /api/v1/broiler-flocks/:id/timeline - Hatch-to-market event timeline
+  app.get('/:id/timeline', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const authUser = (request as any).authUser;
+    const flock = await prisma.broilerFlock.findFirst({
+      where: { id, createdBy: authUser.userId },
+      include: { breed: true },
+    });
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    const startDate = new Date(flock.startDate);
+    const targetAge = flock.targetAge || 42;
+    const feedTransitionDay = flock.feedTransitionDay || 11;
+    const finisherDay = 25;
+    const today = new Date();
+    const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Zambia Schedule' : 'Standard Broiler Schedule';
+    const schedule = await prisma.vaccinationSchedule.findFirst({
+      where: { name: scheduleName },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+    });
+
+    const completedVaccines = await prisma.vaccinationEvent.findMany({
+      where: { flockId: id },
+      orderBy: { adminDate: 'asc' },
+    });
+
+    const events: any[] = [];
+
+    // Placement / brooding start
+    events.push({
+      ageDays: 0,
+      date: startDate.toISOString().split('T')[0],
+      type: 'management',
+      title: 'Chick placement / brooding starts',
+      description: 'Set brooder at 30°C, 60-70% RH, paper feed, 40g/chick.',
+      completed: ageDays >= 0,
+    });
+
+    // Hatchery vaccines (day 1)
+    for (const item of schedule?.items.filter(i => i.ageDays === 1) || []) {
+      const date = new Date(startDate.getTime() + 1 * 24 * 60 * 60 * 1000);
+      const completed = completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - 1) <= 1);
+      events.push({
+        ageDays: 1,
+        date: date.toISOString().split('T')[0],
+        type: 'vaccination',
+        title: `Vaccination: ${item.vaccineName}`,
+        description: `Administer via ${item.adminMethod}. ${item.notes || ''}`,
+        completed,
+      });
+    }
+
+    // Feed transitions
+    events.push({
+      ageDays: feedTransitionDay,
+      date: new Date(startDate.getTime() + feedTransitionDay * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      type: 'feed',
+      title: 'Feed transition: Starter to Grower',
+      description: 'Transition gradually over 3 days.',
+      completed: ageDays >= feedTransitionDay,
+    });
+    events.push({
+      ageDays: finisherDay,
+      date: new Date(startDate.getTime() + finisherDay * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      type: 'feed',
+      title: 'Feed transition: Grower to Finisher',
+      description: 'Adjust feed to market target.',
+      completed: ageDays >= finisherDay,
+    });
+
+    // On-farm vaccines (age > 1)
+    for (const item of schedule?.items.filter(i => i.ageDays > 1) || []) {
+      const date = new Date(startDate.getTime() + item.ageDays * 24 * 60 * 60 * 1000);
+      const completed = completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - item.ageDays) <= 1);
+      events.push({
+        ageDays: item.ageDays,
+        date: date.toISOString().split('T')[0],
+        type: 'vaccination',
+        title: `Vaccination: ${item.vaccineName}`,
+        description: `Administer via ${item.adminMethod}. ${item.notes || ''}`,
+        completed,
+      });
+    }
+
+    // Pre-slaughter withdrawal
+    events.push({
+      ageDays: targetAge - 7,
+      date: new Date(startDate.getTime() + (targetAge - 7) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      type: 'management',
+      title: 'Pre-slaughter withdrawal (coccidiostats)',
+      description: 'Check label withdrawal period.',
+      completed: ageDays >= targetAge - 7,
+    });
+
+    // Market / processing
+    events.push({
+      ageDays: targetAge,
+      date: new Date(startDate.getTime() + targetAge * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      type: 'management',
+      title: 'Market / processing date',
+      description: `Target live weight ${flock.targetWeight ? flock.targetWeight + ' kg' : '2.3-2.5 kg'}.`,
+      completed: ageDays >= targetAge,
+    });
+
+    events.sort((a, b) => a.ageDays - b.ageDays || a.type.localeCompare(b.type));
+
+    return { flock, ageDays, events };
+  });
+
+  // GET /api/v1/broiler-flocks/:id/summary - Printable calendar data
+  app.get('/:id/summary', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const authUser = (request as any).authUser;
+    const flock = await prisma.broilerFlock.findFirst({
+      where: { id, createdBy: authUser.userId },
+      include: { breed: true },
+    });
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    const startDate = new Date(flock.startDate);
+    const targetAge = flock.targetAge || 42;
+    const today = new Date();
+    const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Zambia Schedule' : 'Standard Broiler Schedule';
+    const schedule = await prisma.vaccinationSchedule.findFirst({
+      where: { name: scheduleName },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+    });
+
+    const completedVaccines = await prisma.vaccinationEvent.findMany({
+      where: { flockId: id },
+      orderBy: { adminDate: 'asc' },
+    });
+
+    const days = [];
+    for (let d = 0; d <= targetAge; d++) {
+      const date = new Date(startDate.getTime() + d * 24 * 60 * 60 * 1000);
+      const vaccines = (schedule?.items.filter(i => i.ageDays === d) || []).map(item => ({
+        ...item,
+        completed: completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - d) <= 1),
+      }));
+
+      const feedPhase = d < (flock.feedTransitionDay || 11) ? 'Starter' : d < 25 ? 'Grower' : 'Finisher';
+      const managementTasks = [
+        'Check temperature & humidity 2x daily',
+        'Record mortality and culls',
+        'Monitor feed and water consumption',
+        'Inspect litter quality',
+      ];
+      if (d > 0 && d % 7 === 0) managementTasks.push('Weekly weight sample');
+      if (d === (flock.feedTransitionDay || 11)) managementTasks.push('Feed transition: Starter to Grower');
+      if (d === 25) managementTasks.push('Feed transition: Grower to Finisher');
+
+      const healthSupport = d === 0
+        ? 'Electrolytes + vitamins in water for first 3-5 days; probiotics recommended'
+        : d === 1
+          ? 'Stress pack after transport and vaccination; monitor for dehydration'
+          : d === 10
+            ? 'Post-vaccination support: electrolytes/vitamins; watch respiratory signs'
+            : d === 14
+              ? 'Post-IBD vaccine support; monitor bursal reaction; maintain gut health'
+              : 'Monitor; vitamins/electrolytes if stress or heat';
+
+      days.push({
+        day: d,
+        age: `Day ${d}`,
+        date: date.toISOString().split('T')[0],
+        vaccines,
+        feedPhase,
+        managementTasks,
+        healthSupport,
+      });
+    }
+
+    return { flock, ageDays, targetAge, days };
+  });
+
+  // GET /api/v1/broiler-flocks/:id/performance - Expected performance for current age
+  app.get('/:id/performance', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const authUser = (request as any).authUser;
+    const flock = await prisma.broilerFlock.findFirst({
+      where: { id, createdBy: authUser.userId },
+      include: { breed: true },
+    });
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    const today = new Date();
+    const startDate = new Date(flock.startDate);
+    const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    const target = await prisma.performanceTarget.findUnique({
+      where: { breedId_ageDays: { breedId: flock.breedId, ageDays } },
+    });
+
+    const nextTargets = await prisma.performanceTarget.findMany({
+      where: { breedId: flock.breedId, ageDays: { gt: ageDays, lte: ageDays + 14 } },
+      orderBy: { ageDays: 'asc' },
+    });
+
+    return {
+      flock,
+      ageDays,
+      currentTarget: target,
+      upcomingTargets: nextTargets,
     };
   });
 }

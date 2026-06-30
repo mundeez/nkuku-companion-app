@@ -345,14 +345,15 @@ model Breed {
 }
 
 model PerformanceTarget {
-  id           String   @id @default(uuid()) @db.Uuid
-  breedId      String   @map("breed_id") @db.Uuid
-  ageDays      Int      @map("age_days")
-  targetWeight Decimal  @map("target_weight") @db.Decimal(10, 3)
-  targetFeed   Decimal  @map("target_feed") @db.Decimal(10, 3)
-  targetFcr    Decimal  @map("target_fcr") @db.Decimal(5, 3)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id            String   @id @default(uuid()) @db.Uuid
+  breedId       String   @map("breed_id") @db.Uuid
+  ageDays       Int      @map("age_days")
+  targetWeight  Decimal  @map("target_weight") @db.Decimal(10, 3)
+  targetFeed    Decimal  @map("target_feed") @db.Decimal(10, 3)
+  targetFcr     Decimal  @map("target_fcr") @db.Decimal(5, 3)
+  targetWater   Decimal? @map("target_water") @db.Decimal(10, 3)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   breed        Breed    @relation(fields: [breedId], references: [id], onDelete: Cascade)
 
@@ -391,6 +392,9 @@ model BroilerFlock {
   waterRecords       WaterRecord[]
   mortalityEvents    MortalityEvent[]
   vaccinationEvents  VaccinationEvent[]
+  medicationRecords  MedicationRecord[]
+  environmentalRecords EnvironmentalRecord[]
+  flockTasks         FlockTask[]
   financialRecords   FinancialRecord[]
   alerts             Alert[]
 
@@ -479,20 +483,24 @@ model MortalityEvent {
 }
 
 model VaccinationEvent {
-  id          String   @id @default(uuid()) @db.Uuid
-  flockId     String   @map("flock_id") @db.Uuid
-  vaccineName String   @map("vaccine_name") @db.VarChar(100)
-  vaccineType String   @map("vaccine_type") @db.VarChar(100)
-  adminDate   DateTime @map("admin_date") @db.Date
-  adminMethod String   @map("admin_method") @db.VarChar(50)
-  ageDays     Int      @map("age_days")
-  costZmw     Decimal? @map("cost_zmw") @db.Decimal(14, 2)
-  nextDueDate DateTime? @map("next_due_date") @db.Date
-  notes       String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String   @id @default(uuid()) @db.Uuid
+  flockId           String   @map("flock_id") @db.Uuid
+  vaccineName       String   @map("vaccine_name") @db.VarChar(100)
+  vaccineType       String   @map("vaccine_type") @db.VarChar(100)
+  adminDate         DateTime @map("admin_date") @db.Date
+  adminMethod       String   @map("admin_method") @db.VarChar(50)
+  ageDays           Int      @map("age_days")
+  costZmw           Decimal? @map("cost_zmw") @db.Decimal(14, 2)
+  nextDueDate       DateTime? @map("next_due_date") @db.Date
+  batchNumber       String?  @map("batch_number") @db.VarChar(100)
+  expiryDate        DateTime? @map("expiry_date") @db.Date
+  vaccineInventoryId String?  @map("vaccine_inventory_id") @db.Uuid
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  flock       BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  flock             BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  vaccineInventory  VaccineInventory? @relation(fields: [vaccineInventoryId], references: [id], onDelete: SetNull)
 
   @@index([flockId, adminDate])
   @@map("vaccination_events")
@@ -561,6 +569,11 @@ enum AlertType {
   mortality_threshold
   environmental
   financial
+  medication_due
+  withdrawal_due
+  vaccine_expiry
+  environmental_threshold
+  task_due
 }
 
 enum AlertSeverity {
@@ -616,6 +629,121 @@ model VaccinationScheduleItem {
 
   @@index([scheduleId, sortOrder])
   @@map("vaccination_schedule_items")
+}
+
+// ── MEDICATION & VACCINE MANAGEMENT ───────
+
+enum MedicationCategory {
+  antibiotic
+  coccidiostat
+  electrolyte
+  vitamin
+  probiotic
+  acidifier
+  phytogenic
+  other
+}
+
+model MedicationRecord {
+  id              String   @id @default(uuid()) @db.Uuid
+  flockId         String   @map("flock_id") @db.Uuid
+  recordDate      DateTime @map("record_date") @db.Date
+  productName     String   @map("product_name") @db.VarChar(100)
+  category        MedicationCategory
+  dose            String?  @db.VarChar(100)
+  route           String?  @db.VarChar(50)
+  startDate       DateTime @map("start_date") @db.Date
+  endDate         DateTime? @map("end_date") @db.Date
+  withdrawalDays  Int?     @map("withdrawal_days")
+  withdrawalDate  DateTime? @map("withdrawal_date") @db.Date
+  costZmw         Decimal? @map("cost_zmw") @db.Decimal(14, 2)
+  veterinarian    String?  @db.VarChar(100)
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock           BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, recordDate])
+  @@map("medication_records")
+}
+
+enum VaccineInventoryStatus {
+  available
+  in_use
+  expired
+  depleted
+}
+
+model VaccineInventory {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @db.VarChar(100)
+  disease       String?  @db.VarChar(100)
+  supplier      String?  @db.VarChar(100)
+  batchNumber   String   @map("batch_number") @db.VarChar(100)
+  quantityDoses Int      @map("quantity_doses")
+  expiryDate    DateTime @map("expiry_date") @db.Date
+  status        VaccineInventoryStatus @default(available)
+  costZmw       Decimal? @map("cost_zmw") @db.Decimal(14, 2)
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  vaccinationEvents VaccinationEvent[]
+
+  @@map("vaccine_inventory")
+}
+
+model EnvironmentalRecord {
+  id              String   @id @default(uuid()) @db.Uuid
+  flockId         String   @map("flock_id") @db.Uuid
+  recordDate      DateTime @map("record_date") @db.Date
+  timeOfDay       String?  @map("time_of_day") @db.VarChar(20)
+  temperatureC    Decimal? @map("temperature_c") @db.Decimal(5, 2)
+  humidityPct     Decimal? @map("humidity_pct") @db.Decimal(5, 2)
+  ammoniaPpm      Decimal? @map("ammonia_ppm") @db.Decimal(5, 2)
+  lightHours      Decimal? @map("light_hours") @db.Decimal(4, 2)
+  litterScore     Int?     @map("litter_score")
+  ventilationNote String?  @map("ventilation_note") @db.Text
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock           BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, recordDate])
+  @@map("environmental_records")
+}
+
+enum FlockTaskCategory {
+  vaccination
+  feed
+  water
+  environment
+  health
+  biosecurity
+  management
+}
+
+model FlockTask {
+  id          String      @id @default(uuid()) @db.Uuid
+  flockId     String      @map("flock_id") @db.Uuid
+  taskDate    DateTime    @map("task_date") @db.Date
+  ageDays     Int         @map("age_days")
+  category    FlockTaskCategory
+  title       String      @db.VarChar(200)
+  description String?     @db.Text
+  isCompleted Boolean     @default(false) @map("is_completed")
+  isSkipped   Boolean     @default(false) @map("is_skipped")
+  completedAt DateTime?   @map("completed_at") @db.Timestamptz(6)
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock       BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId, taskDate])
+  @@map("flock_tasks")
 }
 
 // ── FINANCIAL PERIODS ────────────────────

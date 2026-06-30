@@ -4,7 +4,7 @@ import { authenticate, requireRole } from '../auth/routes.js';
 
 const AlertCreateSchema = z.object({
   flockId: z.string().uuid(),
-  alertType: z.enum(['temperature_adjustment', 'vaccination_due', 'feed_transition', 'weight_check', 'mortality_threshold', 'environmental', 'financial']),
+  alertType: z.enum(['temperature_adjustment', 'vaccination_due', 'feed_transition', 'weight_check', 'mortality_threshold', 'environmental', 'financial', 'medication_due', 'withdrawal_due', 'vaccine_expiry', 'environmental_threshold', 'task_due']),
   title: z.string().min(1).max(200),
   message: z.string().min(1),
   severity: z.enum(['info', 'warning', 'critical']).optional(),
@@ -92,6 +92,7 @@ export async function buildAlertModule(app: FastifyInstance) {
   app.post('/generate', { preHandler: [authenticate] }, async (request) => {
     const authUser = (request as any).authUser;
     const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
 
     const flocks = await prisma.broilerFlock.findMany({
       where: { createdBy: authUser.userId, status: 'active' },
@@ -103,6 +104,8 @@ export async function buildAlertModule(app: FastifyInstance) {
     for (const flock of flocks) {
       const startDate = new Date(flock.startDate);
       const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const targetAge = flock.targetAge || 42;
+      const finisherDay = 25;
 
       // Temperature adjustment alert (weekly)
       if (ageDays <= 28 && ageDays % 7 === 0) {
@@ -123,13 +126,14 @@ export async function buildAlertModule(app: FastifyInstance) {
         );
       }
 
-      // Vaccination alerts
+      // Vaccination alerts using Zambia schedule for Ross 308
       const vaccinations = await prisma.vaccinationEvent.findMany({
         where: { flockId: flock.id },
       });
+      const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Zambia Schedule' : 'Standard Broiler Schedule';
       const upcomingVaccines = await prisma.vaccinationScheduleItem.findMany({
         where: {
-          schedule: { name: 'Ross 308 Comprehensive Schedule' },
+          schedule: { name: scheduleName },
           ageDays: { gt: ageDays - 2, lte: ageDays + 2 },
         },
       });
@@ -155,7 +159,7 @@ export async function buildAlertModule(app: FastifyInstance) {
         }
       }
 
-      // Feed transition alert
+      // Feed transition alerts
       if (flock.feedTransitionDay && ageDays === flock.feedTransitionDay) {
         generatedAlerts.push(
           await prisma.alert.create({
@@ -166,6 +170,132 @@ export async function buildAlertModule(app: FastifyInstance) {
               message: `Transition flock from Starter to Grower feed (Day ${flock.feedTransitionDay})`,
               severity: 'warning',
               dueDate: today,
+            },
+          })
+        );
+      }
+      if (ageDays === finisherDay && finisherDay <= targetAge) {
+        generatedAlerts.push(
+          await prisma.alert.create({
+            data: {
+              flockId: flock.id,
+              alertType: 'feed_transition',
+              title: 'Feed Transition: Grower to Finisher',
+              message: 'Transition flock from Grower to Finisher feed (Day 25)',
+              severity: 'warning',
+              dueDate: today,
+            },
+          })
+        );
+      }
+
+      // Medication withdrawal alerts
+      const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+      const medications = await prisma.medicationRecord.findMany({
+        where: {
+          flockId: flock.id,
+          withdrawalDate: { gte: today, lte: tomorrow },
+        },
+      });
+      for (const med of medications) {
+        generatedAlerts.push(
+          await prisma.alert.create({
+            data: {
+              flockId: flock.id,
+              alertType: 'withdrawal_due',
+              title: `Withdrawal Due: ${med.productName}`,
+              message: `Medication ${med.productName} withdrawal period ends today. Do not slaughter before ${med.withdrawalDate?.toISOString().split('T')[0]}.`,
+              severity: 'critical',
+              dueDate: today,
+            },
+          })
+        );
+      }
+
+      // Environmental threshold alerts
+      const latestEnv = await prisma.environmentalRecord.findFirst({
+        where: { flockId: flock.id },
+        orderBy: { recordDate: 'desc' },
+      });
+      if (latestEnv && latestEnv.recordDate.toISOString().split('T')[0] === todayStr) {
+        const targetTemp = ageDays <= 7 ? 32 : ageDays <= 14 ? 30 : ageDays <= 21 ? 28 : ageDays <= 28 ? 26 : 24;
+        const temp = latestEnv.temperatureC ? Number(latestEnv.temperatureC) : null;
+        if (temp !== null && (temp > targetTemp + 2 || temp < targetTemp - 2)) {
+          generatedAlerts.push(
+            await prisma.alert.create({
+              data: {
+                flockId: flock.id,
+                alertType: 'environmental_threshold',
+                title: 'Temperature Out of Range',
+                message: `Current temperature ${temp}°C is outside target range ${targetTemp - 2}–${targetTemp + 2}°C for day ${ageDays}.`,
+                severity: 'warning',
+                dueDate: today,
+              },
+            })
+          );
+        }
+        const humidity = latestEnv.humidityPct ? Number(latestEnv.humidityPct) : null;
+        if (humidity !== null && (humidity < 40 || humidity > 75)) {
+          generatedAlerts.push(
+            await prisma.alert.create({
+              data: {
+                flockId: flock.id,
+                alertType: 'environmental_threshold',
+                title: 'Humidity Out of Range',
+                message: `Current humidity ${humidity}% is outside target range 40–75%.`,
+                severity: 'warning',
+                dueDate: today,
+              },
+            })
+          );
+        }
+      }
+
+      // Daily pending tasks
+      const pendingTasks = await prisma.flockTask.findMany({
+        where: {
+          flockId: flock.id,
+          taskDate: { lte: today },
+          isCompleted: false,
+          isSkipped: false,
+        },
+      });
+      for (const task of pendingTasks) {
+        generatedAlerts.push(
+          await prisma.alert.create({
+            data: {
+              flockId: flock.id,
+              alertType: 'task_due',
+              title: `Task Due: ${task.title}`,
+              message: task.description || task.title,
+              severity: 'info',
+              dueDate: today,
+            },
+          })
+        );
+      }
+    }
+
+    // Vaccine inventory expiry alerts (global, not flock-specific)
+    const expiringVaccines = await prisma.vaccineInventory.findMany({
+      where: {
+        expiryDate: { lte: new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000) },
+        status: { in: ['available', 'in_use'] },
+      },
+    });
+    for (const vaccine of expiringVaccines) {
+      // Attach to the user's first active flock, or skip if none
+      const targetFlock = flocks[0];
+      if (targetFlock) {
+        generatedAlerts.push(
+          await prisma.alert.create({
+            data: {
+              flockId: targetFlock.id,
+              alertType: 'vaccine_expiry',
+              title: `Vaccine Expiring: ${vaccine.name}`,
+              message: `Batch ${vaccine.batchNumber} expires on ${vaccine.expiryDate.toISOString().split('T')[0]}.`,
+              severity: 'warning',
+              dueDate: vaccine.expiryDate,
             },
           })
         );

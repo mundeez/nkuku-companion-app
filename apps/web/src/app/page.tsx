@@ -6,13 +6,13 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api/client";
-import { Supplier, ProductionCycle, BroilerFlock } from "@/lib/types";
-import { TrendingUp, Users, Calendar, DollarSign, HeartPulse, Scale, AlertTriangle, Activity } from "lucide-react";
+import { Supplier, ProductionCycle, BroilerFlock, Alert } from "@/lib/types";
+import { TrendingUp, Users, Calendar, DollarSign, HeartPulse, Scale, AlertTriangle, Activity, Syringe, ClipboardList, Thermometer } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const [stats, setStats] = useState({ suppliers: 0, batches: 0, cycles: 0, activeFlocks: 0, pendingFlocks: 0, totalBirds: 0, mortalityRate: 0 });
+  const [stats, setStats] = useState({ suppliers: 0, batches: 0, cycles: 0, activeFlocks: 0, pendingFlocks: 0, totalBirds: 0, mortalityRate: 0, upcomingVaccinations: 0, openTasks: 0, envAlerts: 0 });
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -24,13 +24,17 @@ export default function DashboardPage() {
         apiFetch<Supplier[]>("/api/v1/suppliers"),
         apiFetch<ProductionCycle[]>("/api/v1/expansion-plan"),
         apiFetch<BroilerFlock[]>("/api/v1/broiler-flocks"),
-      ]).then(([suppliers, cycles, flocks]) => {
+        apiFetch<Alert[]>("/api/v1/alerts?status=open"),
+      ]).then(([suppliers, cycles, flocks, alerts]) => {
         const batchCount = cycles.reduce((sum, c) => sum + c.batches.length, 0);
         const activeFlocks = flocks.filter((f) => f.status === "active" && f.chicksCollected);
         const pendingFlocks = flocks.filter((f) => f.status === "active" && !f.chicksCollected);
         const totalBirds = activeFlocks.reduce((sum, f) => sum + f.currentCount, 0);
         const totalInitial = activeFlocks.reduce((sum, f) => sum + f.initialCount, 0);
         const mortalityRate = totalInitial > 0 ? ((totalInitial - totalBirds) / totalInitial * 100).toFixed(1) : "0";
+        const upcomingVaccinations = alerts.filter((a) => a.alertType === "vaccination_due").length;
+        const openTasks = alerts.filter((a) => a.alertType === "task_due").length;
+        const envAlerts = alerts.filter((a) => a.alertType === "environmental_threshold" || a.alertType === "temperature_adjustment").length;
         setStats({
           suppliers: suppliers.length,
           batches: batchCount,
@@ -39,6 +43,9 @@ export default function DashboardPage() {
           pendingFlocks: pendingFlocks.length,
           totalBirds,
           mortalityRate: Number(mortalityRate),
+          upcomingVaccinations,
+          openTasks,
+          envAlerts,
         });
       }).catch(() => {});
     }
@@ -93,6 +100,36 @@ export default function DashboardPage() {
           <CardContent>
             <div className={`text-2xl font-bold ${stats.mortalityRate > 10 ? "text-red-600" : ""}`}>{stats.mortalityRate}%</div>
             <p className="text-xs text-muted-foreground">Active flocks average</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Vaccinations Due</CardTitle>
+            <Syringe className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${stats.upcomingVaccinations > 0 ? "text-amber-600" : ""}`}>{stats.upcomingVaccinations}</div>
+            <p className="text-xs text-muted-foreground">Open alerts</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Open Tasks</CardTitle>
+            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.openTasks}</div>
+            <p className="text-xs text-muted-foreground">Pending checklist items</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Environment Alerts</CardTitle>
+            <Thermometer className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${stats.envAlerts > 0 ? "text-red-600" : ""}`}>{stats.envAlerts}</div>
+            <p className="text-xs text-muted-foreground">Temp / humidity out of range</p>
           </CardContent>
         </Card>
       </div>
@@ -157,6 +194,11 @@ export default function DashboardPage() {
             <Users className="h-5 w-5 mb-2 text-primary" />
             <div className="font-medium">Manage Suppliers</div>
             <div className="text-sm text-muted-foreground">Update feed prices</div>
+          </Link>
+          <Link href="/vaccine-inventory" className="block p-4 rounded-lg border hover:bg-accent transition-colors">
+            <Syringe className="h-5 w-5 mb-2 text-primary" />
+            <div className="font-medium">Vaccine Inventory</div>
+            <div className="text-sm text-muted-foreground">Stock, batches & expiry</div>
           </Link>
         </CardContent>
       </Card>
