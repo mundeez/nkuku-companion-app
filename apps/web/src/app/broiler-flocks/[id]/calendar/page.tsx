@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Printer, Syringe, Wheat } from "lucide-react";
+import { FlockSubNav } from "@/components/flock-subnav";
 
 export default function CalendarPage() {
   const params = useParams();
@@ -42,15 +43,11 @@ export default function CalendarPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <FlockSubNav />
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => router.push(`/broiler-flocks/${flockId}`)}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back to Flock
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Management Calendar</h1>
-            <div className="text-muted-foreground">{flock?.name} · Hatch: {flock?.startDate ? new Date(flock.startDate).toLocaleDateString() : "-"}</div>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold">Management Calendar</h1>
+          <div className="text-muted-foreground">{flock?.name} · Hatch: {flock?.startDate ? new Date(flock.startDate).toLocaleDateString() : "-"}</div>
         </div>
         <Button variant="outline" onClick={() => router.push(`/broiler-flocks/${flockId}/calendar/print`)}>
           <Printer className="h-4 w-4 mr-1" /> Print

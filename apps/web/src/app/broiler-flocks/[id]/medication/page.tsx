@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Pill, Trash2, AlertTriangle } from "lucide-react";
+import { FlockSubNav } from "@/components/flock-subnav";
 
 const categoryOptions = [
   "antibiotic", "coccidiostat", "electrolyte", "vitamin", "probiotic", "acidifier", "phytogenic", "other",
@@ -121,14 +122,10 @@ export default function MedicationPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" size="sm" onClick={() => router.push(`/broiler-flocks/${flockId}`)}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Flock
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Medication Register</h1>
-          <div className="text-muted-foreground">{flock?.name || "Loading..."}</div>
-        </div>
+      <FlockSubNav />
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Medication Register</h1>
+        <div className="text-muted-foreground">{flock?.name || "Loading..."}</div>
       </div>
 
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}

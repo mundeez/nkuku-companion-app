@@ -17,6 +17,7 @@ export function Navbar() {
     { href: "/broiler-flocks", label: "Broiler Flocks" },
     { href: "/diseases", label: "Diseases" },
     { href: "/alerts", label: "Alerts" },
+    { href: "/vaccine-inventory", label: "Vaccine Inventory" },
     { href: "/suppliers", label: "Suppliers" },
     { href: "/projections", label: "Projections" },
     { href: "/expansion-plan", label: "Expansion Plan" },
