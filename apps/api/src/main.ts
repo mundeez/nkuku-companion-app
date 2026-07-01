@@ -29,6 +29,7 @@ import { buildVaccineInventoryModule } from './modules/vaccine-inventory/routes.
 import { buildEnvironmentalRecordModule } from './modules/environmental-records/routes.js';
 import { buildFlockTaskModule } from './modules/flock-tasks/routes.js';
 import { buildFinancialEngineModule } from './modules/financial-engine/routes.js';
+import { buildDashboardModule } from './modules/dashboard/routes.js';
 import { SchedulerService } from './core/financial-engine/scheduler.service.js';
 import { DailyRecalculationService } from './core/financial-engine/daily-recalculation.service.js';
 import cron from 'node-cron';
@@ -93,6 +94,7 @@ await app.register(buildVaccineInventoryModule, { prefix: '/api/v1/vaccine-inven
 await app.register(buildEnvironmentalRecordModule, { prefix: '/api/v1/environmental-records' });
 await app.register(buildFlockTaskModule, { prefix: '/api/v1/flock-tasks' });
 await app.register(buildFinancialEngineModule, { prefix: '/api/v1/financial-engine' });
+await app.register(buildDashboardModule, { prefix: '/api/v1/dashboard' });
 
 // ── Health check ─────────────────────────
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

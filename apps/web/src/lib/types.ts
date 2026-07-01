@@ -369,3 +369,73 @@ export interface VaccinationScheduleItem {
   notes?: string;
   completed?: boolean;
 }
+
+// ── Dashboard Summary ─────────────────────────
+export interface DashboardKpis {
+  activeFlocks: number;
+  pendingFlocks: number;
+  totalFlocks: number;
+  totalBirds: number;
+  mortalityRate: number;
+  totalRevenue: number;
+  totalCost: number;
+  netProfit: number;
+  profitPerBird: number;
+  openAlerts: number;
+}
+
+export interface MonthlyTrendItem {
+  month: string;
+  revenue: number;
+  cost: number;
+}
+
+export interface CostBreakdownItem {
+  category: string;
+  amount: number;
+}
+
+export interface FlockProfitabilityItem {
+  flockId: string;
+  flockName: string;
+  breedName: string;
+  ageDays: number;
+  currentCount: number;
+  mortalityRate: number;
+  profit: number;
+  revenue: number;
+  cost: number;
+  status: string;
+}
+
+export interface AlertsBySeverity {
+  critical: number;
+  warning: number;
+  info: number;
+}
+
+export interface AlertsByTypeItem {
+  type: string;
+  count: number;
+  severity: string;
+}
+
+export interface RecentAlertItem {
+  id: string;
+  title: string;
+  severity: string;
+  alertType: string;
+  flockName: string;
+  createdAt: string;
+  dueDate: string;
+}
+
+export interface DashboardSummary {
+  kpis: DashboardKpis;
+  monthlyTrend: MonthlyTrendItem[];
+  costBreakdown: CostBreakdownItem[];
+  flockProfitability: FlockProfitabilityItem[];
+  alertsBySeverity: AlertsBySeverity;
+  alertsByType: AlertsByTypeItem[];
+  recentAlerts: RecentAlertItem[];
+}

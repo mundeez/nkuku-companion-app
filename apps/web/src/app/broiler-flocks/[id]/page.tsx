@@ -19,6 +19,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout, ClipboardList, Thermometer, Pill, CalendarDays, Printer } from "lucide-react";
+import { FlockTabChart } from "@/components/flock-tab-chart";
 
 function fmtCollectionDate(date: string | Date | undefined): string {
   if (!date) return "";
@@ -418,7 +419,7 @@ export default function FlockDetailPage() {
           </Dialog>
         </TabsContent>
 
-        <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} breedId={flock?.breedId} startDate={flock?.startDate} /></TabsContent>
         <TabsContent value="feed"><SimpleRecordTab flockId={flockId} records={feedRecords} type="feed" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} suppliers={suppliers} /></TabsContent>
         <TabsContent value="water"><SimpleRecordTab flockId={flockId} records={waterRecords} type="water" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
         <TabsContent value="mortality"><SimpleRecordTab flockId={flockId} records={mortalityEvents} type="mortality" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
@@ -429,7 +430,7 @@ export default function FlockDetailPage() {
   );
 }
 
-function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole, suppliers }: any) {
+function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole, suppliers, breedId, startDate }: any) {
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -781,6 +782,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
         <h3 className="text-lg font-medium">{config.title}</h3>
         {canEdit && <Button size="sm" onClick={openAdd}><Icon className="h-4 w-4 mr-1" />Add</Button>}
       </div>
+      <FlockTabChart type={type} records={records} flockId={flockId} breedId={breedId} startDate={startDate} />
       {records.length === 0 ? <p className="text-muted-foreground">No records yet.</p> : (
         <div className="space-y-2">{records.map((r: any) => (
           <Card key={r.id}><CardContent className="py-3 flex justify-between items-center">
