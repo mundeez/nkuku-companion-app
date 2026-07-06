@@ -12,7 +12,8 @@ const FlockCreateSchema = z.object({
   initialCount: z.number().int().min(1),
   targetWeight: z.number().positive().optional(),
   targetAge: z.number().int().positive().optional(),
-  feedTransitionDay: z.number().int().min(1).max(21).optional(),
+  feedTransitionDay: z.number().int().min(1).max(28).optional(),
+  finisherDay: z.number().int().min(20).max(42).optional(),
   chickPriceZmw: z.number().nonnegative().optional(),
   chicksCollected: z.boolean().optional(),
   collectionDate: dateOrIso.nullable().optional(),
@@ -25,7 +26,8 @@ const FlockUpdateSchema = z.object({
   supplierId: z.string().uuid().optional().nullable(),
   targetWeight: z.number().positive().optional(),
   targetAge: z.number().int().positive().optional(),
-  feedTransitionDay: z.number().int().min(1).max(21).optional(),
+  feedTransitionDay: z.number().int().min(1).max(28).optional(),
+  finisherDay: z.number().int().min(20).max(42).optional(),
   chickPriceZmw: z.number().nonnegative().optional().nullable(),
   chicksCollected: z.boolean().optional(),
   collectionDate: dateOrIso.nullable().optional(),
@@ -97,7 +99,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         currentCount: data.initialCount,
         targetWeight: data.targetWeight,
         targetAge: data.targetAge,
-        feedTransitionDay: data.feedTransitionDay ?? 11,
+        feedTransitionDay: data.feedTransitionDay ?? 18,
+        finisherDay: data.finisherDay ?? 29,
         chickPriceZmw: data.chickPriceZmw,
         chicksCollected: data.chicksCollected ?? false,
         collectionDate,
@@ -258,12 +261,12 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
     const startDate = new Date(flock.startDate);
     const targetAge = flock.targetAge || 42;
-    const feedTransitionDay = flock.feedTransitionDay || 11;
-    const finisherDay = 25;
+    const feedTransitionDay = flock.feedTransitionDay || 18;
+    const finisherDay = flock.finisherDay || 29;
     const today = new Date();
     const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Zambia Schedule' : 'Standard Broiler Schedule';
+    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Comprehensive Schedule' : 'Standard Broiler Schedule';
     const schedule = await prisma.vaccinationSchedule.findFirst({
       where: { name: scheduleName },
       include: { items: { orderBy: { sortOrder: 'asc' } } },
@@ -287,9 +290,9 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
 
     // Hatchery vaccines (day 1)
-    for (const item of schedule?.items.filter(i => i.ageDays === 1) || []) {
+    for (const item of schedule?.items.filter(i => i.ageDays === 0) || []) {
       const date = new Date(startDate.getTime() + 1 * 24 * 60 * 60 * 1000);
-      const completed = completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - 1) <= 1);
+      const completed = completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - 0) <= 1);
       events.push({
         ageDays: 1,
         date: date.toISOString().split('T')[0],
@@ -319,7 +322,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
 
     // On-farm vaccines (age > 1)
-    for (const item of schedule?.items.filter(i => i.ageDays > 1) || []) {
+    for (const item of schedule?.items.filter(i => i.ageDays > 0) || []) {
       const date = new Date(startDate.getTime() + item.ageDays * 24 * 60 * 60 * 1000);
       const completed = completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - item.ageDays) <= 1);
       events.push({
@@ -372,7 +375,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const today = new Date();
     const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Zambia Schedule' : 'Standard Broiler Schedule';
+    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Comprehensive Schedule' : 'Standard Broiler Schedule';
     const schedule = await prisma.vaccinationSchedule.findFirst({
       where: { name: scheduleName },
       include: { items: { orderBy: { sortOrder: 'asc' } } },
@@ -391,7 +394,9 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         completed: completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - d) <= 1),
       }));
 
-      const feedPhase = d < (flock.feedTransitionDay || 11) ? 'Starter' : d < 25 ? 'Grower' : 'Finisher';
+      const feedTransitionDay = flock.feedTransitionDay || 18;
+      const finisherDay = flock.finisherDay || 29;
+      const feedPhase = d < feedTransitionDay ? 'Starter' : d < finisherDay ? 'Grower' : 'Finisher';
       const managementTasks = [
         'Check temperature & humidity 2x daily',
         'Record mortality and culls',
@@ -399,18 +404,42 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         'Inspect litter quality',
       ];
       if (d > 0 && d % 7 === 0) managementTasks.push('Weekly weight sample');
-      if (d === (flock.feedTransitionDay || 11)) managementTasks.push('Feed transition: Starter to Grower');
-      if (d === 25) managementTasks.push('Feed transition: Grower to Finisher');
+      if (d === feedTransitionDay) managementTasks.push('Feed transition: Starter to Grower');
+      if (d === finisherDay) managementTasks.push('Feed transition: Grower to Finisher');
 
       const healthSupport = d === 0
-        ? 'Electrolytes + vitamins in water for first 3-5 days; probiotics recommended'
+        ? 'Day 1-3: Stress pack (glucose + electrolytes + vitamins A/D3/E/C) in drinking water. Rehydrates chicks, stimulates appetite, jumpstarts yolk-sac absorption. Hatchery vaccination complete.'
         : d === 1
-          ? 'Stress pack after transport and vaccination; monitor for dehydration'
-          : d === 10
-            ? 'Post-vaccination support: electrolytes/vitamins; watch respiratory signs'
-            : d === 14
-              ? 'Post-IBD vaccine support; monitor bursal reaction; maintain gut health'
-              : 'Monitor; vitamins/electrolytes if stress or heat';
+          ? 'Continue stress pack. Monitor for dehydration. Brooder temp 32-33C.'
+        : d === 2
+          ? 'Continue stress pack (Day 3 last day). Monitor chick activity and feed intake.'
+        : d === 9
+          ? 'PRE-VACCINATION (Day 10 IBD): Administer vitamins/electrolytes 24h before vaccination. Suspend chlorination 48h before. Prepare skim milk 2g/L stabilizer.'
+        : d === 10
+          ? 'IBD VACCINATION DAY: Suspend chlorination. Use skim milk 2g/L stabilizer. Withdraw water 1-2h before. Administer Cevamune/Nobilis D78 via drinking water. 2-hour consumption window.'
+        : d === 11
+          ? 'POST-IBD VACCINATION: Administer vitamins/electrolytes for 24h after vaccination. Monitor for vaccine reaction and respiratory signs.'
+        : d === 13
+          ? 'PRE-VACCINATION (Day 14 ND+IB): Administer vitamins/electrolytes 24h before. Suspend chlorination. Prepare skim milk stabilizer.'
+        : d === 14
+          ? 'ND+IB VACCINATION DAY: LaSota or Clone 30 via drinking water or eye-drop. Suspend chlorination. Skim milk stabilizer. Withdraw water 1-2h. Eye-drop ensures 100% intake.'
+        : d === 15
+          ? 'POST-ND+IB VACCINATION: Vitamins/electrolytes for 24h. Monitor for respiratory signs (snicking, rales). Maintain gut health.'
+        : d === 17
+          ? 'PRE-VACCINATION (Day 18 IBD booster): Administer vitamins/electrolytes 24h before. Suspend chlorination. Prepare skim milk stabilizer.'
+        : d === 18
+          ? 'IBD BOOSTER VACCINATION DAY: Live Intermediate Plus via drinking water. Skim milk stabilizer. Withdraw water 1-2h. Essential in Lusaka high-challenge areas.'
+        : d === 19
+          ? 'POST-IBD BOOSTER: Vitamins/electrolytes for 24h. Monitor bursal reaction. Maintain gut health.'
+        : d === 20
+          ? 'PRE-VACCINATION (Day 21 ND booster): Administer vitamins/electrolytes 24h before. Suspend chlorination. Prepare skim milk stabilizer.'
+        : d === 21
+          ? 'ND BOOSTER VACCINATION DAY: LaSota or Clone 30 via drinking water. Skim milk stabilizer. Withdraw water 1-2h. Secures immunity to processing weight. NDV genotype VII.2 in Lusaka - ensure full dose.'
+        : d === 22
+          ? 'POST-ND BOOSTER: Vitamins/electrolytes for 24h. Final immunity consolidation window. Monitor flock health.'
+        : d > 0 && d % 7 === 0
+          ? 'Weekly check: vitamins/electrolytes if heat stress. Provide Vitamin C during peak heat (11AM-3PM) in hot season.'
+          : 'Monitor; vitamins/electrolytes if stress or heat. Ensure clean water and proper ventilation.';
 
       days.push({
         day: d,

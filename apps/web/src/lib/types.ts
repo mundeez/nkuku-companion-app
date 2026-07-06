@@ -132,6 +132,7 @@ export interface BroilerFlock {
   targetWeight?: number;
   targetAge?: number;
   feedTransitionDay?: number;
+  finisherDay?: number;
   chickPriceZmw?: number;
   chicksCollected: boolean;
   collectionDate?: string;

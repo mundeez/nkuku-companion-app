@@ -105,32 +105,35 @@ export async function buildAlertModule(app: FastifyInstance) {
       const startDate = new Date(flock.startDate);
       const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const targetAge = flock.targetAge || 42;
-      const finisherDay = 25;
+      const finisherDay = flock.finisherDay || 29;
 
       // Temperature adjustment alert (weekly)
       if (ageDays <= 28 && ageDays % 7 === 0) {
         const temp = ageDays <= 7 ? 32 : ageDays <= 14 ? 30 : ageDays <= 21 ? 28 : 26;
-        generatedAlerts.push(
-          await prisma.alert.upsert({
-            where: { id: `temp-${flock.id}-${ageDays}` },
-            update: {},
-            create: {
-              flockId: flock.id,
-              alertType: 'temperature_adjustment',
-              title: 'Temperature Adjustment Required',
-              message: `Week ${Math.ceil(ageDays / 7)}: Adjust brooder temperature to ${temp}°C`,
-              severity: 'warning',
-              dueDate: today,
-            },
-          })
-        );
+        const existingTempAlert = await prisma.alert.findFirst({
+          where: { flockId: flock.id, alertType: 'temperature_adjustment', dueDate: today },
+        });
+        if (!existingTempAlert) {
+          generatedAlerts.push(
+            await prisma.alert.create({
+              data: {
+                flockId: flock.id,
+                alertType: 'temperature_adjustment',
+                title: 'Temperature Adjustment Required',
+                message: `Week ${Math.ceil(ageDays / 7)}: Adjust brooder temperature to ${temp}°C`,
+                severity: 'warning',
+                dueDate: today,
+              },
+            })
+          );
+        }
       }
 
       // Vaccination alerts using Zambia schedule for Ross 308
       const vaccinations = await prisma.vaccinationEvent.findMany({
         where: { flockId: flock.id },
       });
-      const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Zambia Schedule' : 'Standard Broiler Schedule';
+      const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Comprehensive Schedule' : 'Standard Broiler Schedule';
       const upcomingVaccines = await prisma.vaccinationScheduleItem.findMany({
         where: {
           schedule: { name: scheduleName },
@@ -181,7 +184,7 @@ export async function buildAlertModule(app: FastifyInstance) {
               flockId: flock.id,
               alertType: 'feed_transition',
               title: 'Feed Transition: Grower to Finisher',
-              message: 'Transition flock from Grower to Finisher feed (Day 25)',
+              message: `Transition flock from Grower to Finisher feed (Day ${finisherDay})`,
               severity: 'warning',
               dueDate: today,
             },

@@ -31,6 +31,7 @@ interface FlockFormData {
   targetWeight?: number;
   targetAge?: number;
   feedTransitionDay?: number;
+  finisherDay?: number;
   chickPriceZmw?: number;
   chicksCollected?: boolean;
   collectionDate?: string;
@@ -43,7 +44,8 @@ const emptyForm: FlockFormData = {
   initialCount: 500,
   targetWeight: 2.5,
   targetAge: 42,
-  feedTransitionDay: 11,
+  feedTransitionDay: 18,
+  finisherDay: 29,
   chicksCollected: false,
 };
 
@@ -105,7 +107,8 @@ export default function BroilerFlocksPage() {
       initialCount: flock.initialCount,
       targetWeight: flock.targetWeight ? Number(flock.targetWeight) : undefined,
       targetAge: flock.targetAge ? Number(flock.targetAge) : undefined,
-      feedTransitionDay: flock.feedTransitionDay ? Number(flock.feedTransitionDay) : 11,
+      feedTransitionDay: flock.feedTransitionDay ? Number(flock.feedTransitionDay) : 18,
+      finisherDay: flock.finisherDay ? Number(flock.finisherDay) : 29,
       chickPriceZmw: flock.chickPriceZmw ? Number(flock.chickPriceZmw) : undefined,
       chicksCollected: flock.chicksCollected,
       collectionDate: flock.collectionDate ? new Date(flock.collectionDate).toISOString().split("T")[0] : undefined,
@@ -404,6 +407,10 @@ export default function BroilerFlocksPage() {
               <Input type="number" value={form.feedTransitionDay || ""} onChange={(e) => setForm({ ...form, feedTransitionDay: Number(e.target.value) })} />
             </div>
             <div>
+              <Label>Finisher Start Day (Grower to Finisher)</Label>
+              <Input type="number" value={form.finisherDay || ""} onChange={(e) => setForm({ ...form, finisherDay: Number(e.target.value) })} />
+            </div>
+            <div>
               <Label>Supplier</Label>
               <select
                 className="w-full border rounded-md p-2 bg-background text-foreground"
@@ -520,6 +527,10 @@ export default function BroilerFlocksPage() {
             <div>
               <Label>Feed Transition Day</Label>
               <Input type="number" value={form.feedTransitionDay || ""} onChange={(e) => setForm({ ...form, feedTransitionDay: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label>Finisher Start Day</Label>
+              <Input type="number" value={form.finisherDay || ""} onChange={(e) => setForm({ ...form, finisherDay: Number(e.target.value) })} />
             </div>
             <div>
               <Label>Supplier</Label>

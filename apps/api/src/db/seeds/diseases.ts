@@ -91,7 +91,7 @@ export async function seedDiseases(prisma: PrismaClient) {
       mortalityRate: 'Variable; higher in young chicks',
       symptoms: 'Diarrhea, weakness, huddling, poor growth, pasty vent',
       prevention: 'Vaccination of breeders, biosecurity, feed hygiene, rodent control, clean water',
-      treatment: 'Broad-spectrum antibiotics as per veterinary recommendation and sensitivity testing; record withdrawal',
+      treatment: 'Broad-spectrum antibiotics as per veterinary recommendation and sensitivity testing. Withdrawal periods: Amoxicillin 5 days, Trimethoprim-sulfa 5-7 days, Enrofloxacin 8-10 days. Always complete full course and observe withdrawal before slaughter.',
       organicTreatments: 'Turmeric in water, basil leaf extract, probiotic supplements',
     },
     {
@@ -101,7 +101,7 @@ export async function seedDiseases(prisma: PrismaClient) {
       mortalityRate: 'Variable',
       symptoms: 'Respiratory signs, airsacculitis, septicemia, swollen joints, diarrhea',
       prevention: 'Good management, biosecurity, clean environment, proper ventilation, water sanitation, avoid stress',
-      treatment: 'Broad-spectrum antibiotics based on sensitivity testing; use only when bacterial disease is confirmed or strongly suspected under veterinary supervision',
+      treatment: 'Broad-spectrum antibiotics based on sensitivity testing. Withdrawal periods: Amoxicillin 5 days, Doxycycline 7 days, Enrofloxacin 8-10 days. Use only when bacterial disease is confirmed or strongly suspected under veterinary supervision. Observe withdrawal before slaughter.',
       organicTreatments: 'Lime water, clove extract, sage infusion; acidifiers and probiotics in water',
     },
     {
@@ -111,7 +111,7 @@ export async function seedDiseases(prisma: PrismaClient) {
       mortalityRate: 'Low to moderate',
       symptoms: 'Nasal discharge, coughing, sneezing, swollen sinuses, reduced growth',
       prevention: 'Biosecurity, sourcing Mycoplasma-free chicks, avoid stress, good ventilation',
-      treatment: 'Tylosin, tetracyclines, fluoroquinolones (vet prescription only); record withdrawal',
+      treatment: 'Tylosin (withdrawal 10 days), Doxycycline/Oxytetracycline (withdrawal 7-12 days), Enrofloxacin (withdrawal 8-10 days). Vet prescription only. Prophylactic use in day-old chicks (Days 1-3) for vertical bacterial transmission cleanup is acceptable; therapeutic use post-Day 14 requires full withdrawal period before slaughter. Never use antibiotics continuously as growth promoters.',
       organicTreatments: 'Garlic in water, oregano oil, echinacea',
     },
     {

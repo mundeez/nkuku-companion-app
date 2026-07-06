@@ -373,6 +373,7 @@ model BroilerFlock {
   targetWeight Decimal?    @map("target_weight") @db.Decimal(10, 3)
   targetAge    Int?        @map("target_age")
   feedTransitionDay Int?   @map("feed_transition_day")
+  finisherDay      Int?     @map("finisher_day")
   chickPriceZmw Decimal?  @map("chick_price_zmw") @db.Decimal(14, 2)
   chicksCollected Boolean  @default(false) @map("chicks_collected")
   collectionDate  DateTime? @map("collection_date") @db.Date
