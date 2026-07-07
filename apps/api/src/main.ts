@@ -30,6 +30,9 @@ import { buildEnvironmentalRecordModule } from './modules/environmental-records/
 import { buildFlockTaskModule } from './modules/flock-tasks/routes.js';
 import { buildFinancialEngineModule } from './modules/financial-engine/routes.js';
 import { buildDashboardModule } from './modules/dashboard/routes.js';
+import { buildAccountModule } from './modules/accounts/routes.js';
+import { buildJournalModule } from './modules/journal/routes.js';
+import { buildLedgerModule } from './modules/ledger/routes.js';
 import { SchedulerService } from './core/financial-engine/scheduler.service.js';
 import { DailyRecalculationService } from './core/financial-engine/daily-recalculation.service.js';
 import cron from 'node-cron';
@@ -95,6 +98,9 @@ await app.register(buildEnvironmentalRecordModule, { prefix: '/api/v1/environmen
 await app.register(buildFlockTaskModule, { prefix: '/api/v1/flock-tasks' });
 await app.register(buildFinancialEngineModule, { prefix: '/api/v1/financial-engine' });
 await app.register(buildDashboardModule, { prefix: '/api/v1/dashboard' });
+await app.register(buildAccountModule, { prefix: '/api/v1/accounts' });
+await app.register(buildJournalModule, { prefix: '/api/v1/journal' });
+await app.register(buildLedgerModule, { prefix: '/api/v1/ledger' });
 
 // ── Health check ─────────────────────────
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
