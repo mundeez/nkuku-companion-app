@@ -900,3 +900,110 @@ model FlockOverheadAllocation {
   @@index([flockId, allocationDate])
   @@map("flock_overhead_allocations")
 }
+
+// ── DOUBLE-ENTRY: CHART OF ACCOUNTS ──────
+model Account {
+  id            String        @id @default(uuid()) @db.Uuid
+  code          String        @unique @db.VarChar(10)
+  name          String        @db.VarChar(100)
+  accountType   AccountType   @map("account_type")
+  normalBalance NormalBalance @map("normal_balance")
+  parentCode    String?       @map("parent_code") @db.VarChar(10)
+  description   String?       @db.Text
+  isActive      Boolean       @default(true) @map("is_active")
+  isSystem      Boolean       @default(false) @map("is_system")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  journalLines  JournalLine[]
+
+  @@index([accountType])
+  @@map("accounts")
+}
+
+enum AccountType {
+  asset
+  liability
+  equity
+  revenue
+  expense
+}
+
+enum NormalBalance {
+  debit
+  credit
+}
+
+// ── DOUBLE-ENTRY: JOURNAL ENTRIES ────────
+model JournalEntry {
+  id            String              @id @default(uuid()) @db.Uuid
+  entryNumber   String              @unique @map("entry_number") @db.VarChar(20)
+  entryDate     DateTime            @map("entry_date") @db.Date
+  description   String              @db.VarChar(300)
+  reference     String?             @db.VarChar(100)
+  sourceType    JournalSourceType   @map("source_type")
+  sourceId      String?             @map("source_id") @db.Uuid
+  periodLabel   String?             @map("period_label") @db.VarChar(20)
+  isReversing   Boolean             @default(false) @map("is_reversing")
+  reversesId    String?             @map("reverses_id") @db.Uuid
+  postedBy      String?             @map("posted_by") @db.Uuid
+  postedAt      DateTime            @default(now()) @map("posted_at") @db.Timestamptz(6)
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  lines         JournalLine[]
+  reversedBy    JournalEntry?       @relation("ReversalOf", fields: [reversesId], references: [id])
+  reversals     JournalEntry[]      @relation("ReversalOf")
+
+  @@index([entryDate, periodLabel])
+  @@index([sourceType, sourceId])
+  @@map("journal_entries")
+}
+
+enum JournalSourceType {
+  manual
+  feed_record
+  vaccination_event
+  mortality_event
+  water_record
+  batch_expense
+  overhead_cost
+  sales
+  migration
+  period_close
+}
+
+// ── DOUBLE-ENTRY: JOURNAL LINES ──────────
+model JournalLine {
+  id            String       @id @default(uuid()) @db.Uuid
+  journalId     String       @map("journal_id") @db.Uuid
+  accountId     String       @map("account_id") @db.Uuid
+  debitZmw      Decimal?     @map("debit_zmw") @db.Decimal(14, 2)
+  creditZmw     Decimal?     @map("credit_zmw") @db.Decimal(14, 2)
+  description   String?      @db.VarChar(200)
+  flockId       String?      @map("flock_id") @db.Uuid
+  batchId       String?      @map("batch_id") @db.Uuid
+
+  journal       JournalEntry @relation(fields: [journalId], references: [id])
+  account       Account      @relation(fields: [accountId], references: [id])
+
+  @@index([journalId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+// ── DOUBLE-ENTRY: LEDGER BALANCES ────────
+model LedgerBalance {
+  id            String   @id @default(uuid()) @db.Uuid
+  accountId     String   @map("account_id") @db.Uuid
+  periodLabel   String   @map("period_label") @db.VarChar(20)
+  openingDebit  Decimal  @default(0) @map("opening_debit") @db.Decimal(14, 2)
+  openingCredit Decimal  @default(0) @map("opening_credit") @db.Decimal(14, 2)
+  periodDebit   Decimal  @default(0) @map("period_debit") @db.Decimal(14, 2)
+  periodCredit  Decimal  @default(0) @map("period_credit") @db.Decimal(14, 2)
+  closingDebit  Decimal  @default(0) @map("closing_debit") @db.Decimal(14, 2)
+  closingCredit Decimal  @default(0) @map("closing_credit") @db.Decimal(14, 2)
+  computedAt    DateTime @default(now()) @map("computed_at") @db.Timestamptz(6)
+
+  @@unique([accountId, periodLabel])
+  @@map("ledger_balances")
+}
