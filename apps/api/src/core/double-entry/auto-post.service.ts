@@ -25,7 +25,7 @@ export class AutoPostService {
     private readonly prisma: PrismaClient,
   ) {}
 
-  async postFromFinancialRecord(recordId: string, postedBy?: string): Promise<void> {
+  async postFromFinancialRecord(recordId: string, postedBy?: string, sourceType: string = 'manual'): Promise<void> {
     const record = await this.prisma.financialRecord.findUnique({ where: { id: recordId } });
     if (!record) throw new Error(`FinancialRecord not found: ${recordId}`);
 
@@ -55,7 +55,7 @@ export class AutoPostService {
       entryDate: record.recordDate,
       description: record.description,
       reference: record.id,
-      sourceType: 'manual',
+      sourceType: sourceType as any,
       sourceId: record.id,
       lines,
       postedBy,
