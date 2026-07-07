@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
 import 'api_service.dart';
 
 class AuthService {
@@ -19,7 +20,12 @@ class AuthService {
     }
   }
 
+  static String? _lastError;
+
+  static String? get lastError => _lastError;
+
   static Future<bool> login(String email, String password) async {
+    _lastError = null;
     try {
       final res = await ApiService.dio.post('/api/v1/auth/login', data: {
         'email': email,
@@ -33,7 +39,21 @@ class AuthService {
       await _prefs.setString('user_email', _user!['email']);
       await _prefs.setString('user_role', _user!['role']);
       return true;
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
+        _lastError = 'Connection timeout. Check your internet connection.';
+      } else if (e.type == DioExceptionType.connectionError) {
+        _lastError = 'Cannot connect to server. Check your internet connection.';
+      } else if (e.response?.statusCode == 401) {
+        _lastError = 'Invalid email or password.';
+      } else if (e.response?.statusCode == 404) {
+        _lastError = 'Server endpoint not found (404).';
+      } else {
+        _lastError = 'Server error: ${e.response?.statusCode ?? e.message}';
+      }
+      return false;
     } catch (e) {
+      _lastError = 'Unexpected error: $e';
       return false;
     }
   }
