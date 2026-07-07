@@ -77,7 +77,7 @@ class _IncomeStatementScreenState extends State<IncomeStatementScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(e.key.replaceAll('_', ' ').capitalize(), style: const TextStyle(fontSize: 14)),
+              Text(e.key.replaceAll('_', ' ').split(' ').map((w) => w.isEmpty ? '' : w[0].toUpperCase() + w.substring(1)).join(' '), style: const TextStyle(fontSize: 14)),
               Text('ZMW ${(e.value as num).toDouble().toStringAsFixed(2)}', style: TextStyle(fontSize: 14, color: color)),
             ],
           ),

@@ -20,6 +20,14 @@ const VaccinationEventCreateSchema = z.object({
 export async function buildVaccinationEventModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
+  // GET /api/v1/vaccination-events/schedules - list all vaccination schedules
+  app.get('/schedules', { preHandler: [authenticate] }, async () => {
+    return prisma.vaccinationSchedule.findMany({
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+      orderBy: { isDefault: 'desc' },
+    });
+  });
+
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
     const authUser = (request as any).authUser;

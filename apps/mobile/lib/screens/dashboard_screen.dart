@@ -8,6 +8,9 @@ import 'suppliers_screen.dart';
 import 'projections_screen.dart';
 import 'expansion_plan_screen.dart';
 import 'financials/financial_dashboard_screen.dart';
+import 'broiler/flocks_screen.dart';
+import 'broiler/vaccination_schedules_screen.dart';
+import 'broiler/diseases_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -114,6 +117,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     subtitle: 'View production cycles',
                     onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const ExpansionPlanScreen())),
+                  ),
+                  _ActionTile(
+                    icon: Icons.egg_alt,
+                    title: 'Broiler Flocks',
+                    subtitle: 'Manage active flocks & vaccination calendar',
+                    onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const FlocksScreen())),
+                  ),
+                  _ActionTile(
+                    icon: Icons.vaccines,
+                    title: 'Vaccination Schedules',
+                    subtitle: 'Ross 308 Lusaka vaccination programmes',
+                    onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const VaccinationSchedulesScreen())),
+                  ),
+                  _ActionTile(
+                    icon: Icons.medical_services,
+                    title: 'Disease Database',
+                    subtitle: 'Symptoms, treatment & withdrawal periods',
+                    onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const DiseasesScreen())),
                   ),
                   _ActionTile(
                     icon: Icons.account_balance_wallet,
