@@ -1,0 +1,150 @@
+import 'package:flutter/material.dart';
+import '../../services/ledger_service.dart';
+import 'journal_detail_screen.dart';
+
+class JournalListScreen extends StatefulWidget {
+  const JournalListScreen({super.key});
+
+  @override
+  State<JournalListScreen> createState() => _JournalListScreenState();
+}
+
+class _JournalListScreenState extends State<JournalListScreen> {
+  List<dynamic> _entries = [];
+  bool _loading = true;
+  String? _error;
+  String? _sourceType;
+
+  static const _sourceLabels = {
+    'manual': 'Manual',
+    'feed_record': 'Feed',
+    'vaccination_event': 'Vaccination',
+    'mortality_event': 'Mortality',
+    'sales': 'Sales',
+    'migration': 'Migration',
+    'period_close': 'Period Close',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final entries = await LedgerService.getJournalEntries(sourceType: _sourceType);
+      setState(() { _entries = entries; _loading = false; });
+    } catch (e) {
+      setState(() { _error = 'Failed to load journal entries'; _loading = false; });
+    }
+  }
+
+  String _fmt(dynamic v) {
+    if (v == null) return '0.00';
+    final n = double.tryParse(v.toString());
+    if (n == null) return '0.00';
+    return n.toStringAsFixed(2);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Journal Entries'),
+        actions: [
+          PopupMenuButton<String?>(
+            icon: const Icon(Icons.filter_list),
+            onSelected: (val) {
+              setState(() => _sourceType = val);
+              _load();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: null, child: Text('All sources')),
+              ..._sourceLabels.entries.map((e) =>
+                PopupMenuItem(value: e.key, child: Text(e.value))),
+            ],
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                    const SizedBox(height: 16),
+                    ElevatedButton(onPressed: _load, child: const Text('Retry')),
+                  ],
+                ))
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: _entries.isEmpty
+                      ? const Center(child: Text('No journal entries found'))
+                      : ListView.builder(
+                          itemCount: _entries.length,
+                          itemBuilder: (context, i) {
+                            final entry = _entries[i];
+                            final lines = entry['lines'] as List? ?? [];
+                            final totalDebit = lines.fold<double>(0, (s, l) =>
+                              s + double.tryParse(l['debitZmw']?.toString() ?? '0')!);
+                            return Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              child: ListTile(
+                                title: Text(entry['entryNumber'] ?? '',
+                                  style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(entry['description'] ?? '',
+                                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13)),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text((entry['entryDate'] ?? '').substring(0, 10),
+                                          style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                        const SizedBox(width: 8),
+                                        Chip(
+                                          label: Text(
+                                            _sourceLabels[entry['sourceType']] ?? entry['sourceType'] ?? '',
+                                            style: const TextStyle(fontSize: 10),
+                                          ),
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                        ),
+                                        if (entry['isReversing'] == true) ...[
+                                          const SizedBox(width: 4),
+                                          Chip(
+                                            label: const Text('Reversing', style: TextStyle(fontSize: 10, color: Colors.orange)),
+                                            visualDensity: VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                            backgroundColor: Colors.orange.withAlpha(20),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                trailing: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text('ZMW ${_fmt(totalDebit)}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                    Text('${lines.length} lines',
+                                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                  ],
+                                ),
+                                onTap: () => Navigator.push(context,
+                                  MaterialPageRoute(builder: (_) => JournalDetailScreen(id: entry['id']))),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+    );
+  }
+}

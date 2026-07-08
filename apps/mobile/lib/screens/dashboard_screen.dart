@@ -11,6 +11,7 @@ import 'financials/financial_dashboard_screen.dart';
 import 'broiler/flocks_screen.dart';
 import 'broiler/vaccination_schedules_screen.dart';
 import 'broiler/diseases_screen.dart';
+import 'ledger/ledger_dashboard_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -145,6 +146,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     subtitle: 'Statements, reports & exports',
                     onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const FinancialDashboardScreen())),
+                  ),
+                  _ActionTile(
+                    icon: Icons.menu_book,
+                    title: 'Ledger',
+                    subtitle: 'Trial balance, chart of accounts & journal',
+                    onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const LedgerDashboardScreen())),
                   ),
                 ],
               ),
