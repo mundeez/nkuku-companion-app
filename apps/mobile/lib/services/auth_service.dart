@@ -40,16 +40,22 @@ class AuthService {
       await _prefs.setString('user_role', _user!['role']);
       return true;
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
-        _lastError = 'Connection timeout. Check your internet connection.';
+      if (e.type == DioExceptionType.connectionTimeout) {
+        _lastError = 'Connection timeout after 30s. The server may be unreachable from your network.';
+      } else if (e.type == DioExceptionType.receiveTimeout) {
+        _lastError = 'Server response timeout. The server is slow to respond.';
       } else if (e.type == DioExceptionType.connectionError) {
-        _lastError = 'Cannot connect to server. Check your internet connection.';
+        _lastError = 'Cannot connect to server. ${e.error ?? e.message}';
+      } else if (e.type == DioExceptionType.sendTimeout) {
+        _lastError = 'Request send timeout. Check your connection.';
+      } else if (e.type == DioExceptionType.badCertificate) {
+        _lastError = 'SSL certificate error. The server certificate is not trusted.';
       } else if (e.response?.statusCode == 401) {
         _lastError = 'Invalid email or password.';
       } else if (e.response?.statusCode == 404) {
         _lastError = 'Server endpoint not found (404).';
       } else {
-        _lastError = 'Server error: ${e.response?.statusCode ?? e.message}';
+        _lastError = 'Error ${e.response?.statusCode ?? e.type}: ${e.message}';
       }
       return false;
     } catch (e) {

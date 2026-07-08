@@ -13,8 +13,10 @@ const String _baseUrl = 'https://nkuku.deeztechnology.solutions';
 class ApiService {
   static final Dio dio = Dio(BaseOptions(
     baseUrl: _baseUrl,
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
+    sendTimeout: const Duration(seconds: 30),
+    validateStatus: (status) => status != null && status < 500,
   ));
 
   static void setupInterceptors() {
