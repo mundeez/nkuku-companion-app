@@ -2,6 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { LedgerService } from '../../core/double-entry/ledger.service.js';
+import { GaapStatementService } from '../../core/double-entry/gaap-statement.service.js';
+import { ClosingService } from '../../core/double-entry/closing.service.js';
+import { JournalEngine } from '../../core/double-entry/journal.engine.js';
 
 const TrialBalanceQuerySchema = z.object({
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -16,6 +19,16 @@ const PeriodCloseSchema = z.object({
   periodLabel: z.string().regex(/^\d{4}-\d{2}$/),
 });
 
+const StatementQuerySchema = z.object({
+  fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
+const YearEndCloseSchema = z.object({
+  year: z.number().int().min(2000).max(2100),
+});
+
 function trialBalanceToCsv(tb: any): string {
   const header = 'Account Code,Account Name,Account Type,Debit Balance,Credit Balance';
   const rows = tb.lines.map((l: any) =>
@@ -28,6 +41,9 @@ function trialBalanceToCsv(tb: any): string {
 export async function buildLedgerModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
   const ledgerService = new LedgerService(prisma);
+  const gaapService = new GaapStatementService(prisma);
+  const engine = new JournalEngine(prisma);
+  const closingService = new ClosingService(prisma, engine);
 
   // GET /trial-balance — trial balance as of date
   app.get('/trial-balance', { preHandler: [authenticate] }, async (request, reply) => {
@@ -82,4 +98,107 @@ export async function buildLedgerModule(app: FastifyInstance) {
       return reply.status(400).send({ error: err.message });
     }
   });
+
+  // GET /income-statement — GAAP income statement from account balances
+  app.get('/income-statement', { preHandler: [authenticate] }, async (request, reply) => {
+    const q = StatementQuerySchema.parse(request.query);
+    const toDate = q.toDate ? new Date(q.toDate) : new Date();
+    const fromDate = q.fromDate ? new Date(q.fromDate) : new Date(new Date().getFullYear(), 0, 1);
+
+    const { format } = z.object({ format: z.string().optional() }).parse(request.query);
+    const stmt = await gaapService.generateIncomeStatement(fromDate, toDate);
+
+    if (format === 'csv') {
+      reply.header('Content-Type', 'text/csv');
+      reply.header('Content-Disposition', `attachment; filename="income-statement-${stmt.periodFrom}-to-${stmt.periodTo}.csv"`);
+      return reply.send(incomeStatementToCsv(stmt));
+    }
+
+    return stmt;
+  });
+
+  // GET /balance-sheet — GAAP balance sheet from account balances
+  app.get('/balance-sheet', { preHandler: [authenticate] }, async (request, reply) => {
+    const q = StatementQuerySchema.parse(request.query);
+    const asOfDate = q.asOf ? new Date(q.asOf) : new Date();
+
+    const { format } = z.object({ format: z.string().optional() }).parse(request.query);
+    const stmt = await gaapService.generateBalanceSheet(asOfDate);
+
+    if (format === 'csv') {
+      reply.header('Content-Type', 'text/csv');
+      reply.header('Content-Disposition', `attachment; filename="balance-sheet-${stmt.asOfDate}.csv"`);
+      return reply.send(balanceSheetToCsv(stmt));
+    }
+
+    return stmt;
+  });
+
+  // GET /cash-flow — cash flow statement (indirect method)
+  app.get('/cash-flow', { preHandler: [authenticate] }, async (request, reply) => {
+    const q = StatementQuerySchema.parse(request.query);
+    const toDate = q.toDate ? new Date(q.toDate) : new Date();
+    const fromDate = q.fromDate ? new Date(q.fromDate) : new Date(new Date().getFullYear(), 0, 1);
+
+    const stmt = await gaapService.generateCashFlow(fromDate, toDate);
+    return stmt;
+  });
+
+  // POST /year-end-close — post closing entries, reset income/expense accounts
+  app.post('/year-end-close', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const { year } = YearEndCloseSchema.parse(request.body);
+    const authUser = (request as any).authUser;
+    try {
+      const result = await closingService.yearEndClose(year, authUser.userId);
+      return reply.status(201).send(result);
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message });
+    }
+  });
+}
+
+// ── CSV Export Helpers ─────────────────────────────────
+
+function incomeStatementToCsv(stmt: any): string {
+  const lines: string[] = [];
+  lines.push(`Income Statement: ${stmt.periodFrom} to ${stmt.periodTo}`);
+  lines.push('');
+  lines.push('REVENUE');
+  lines.push('Account Code,Account Name,Amount');
+  stmt.revenue.forEach((l: any) => lines.push(`${l.accountCode},${l.accountName},${l.netBalance}`));
+  lines.push(`,Total Revenue,${stmt.totalRevenue}`);
+  lines.push('');
+  lines.push('COST OF GOODS SOLD');
+  stmt.costOfGoodsSold.forEach((l: any) => lines.push(`${l.accountCode},${l.accountName},${l.netBalance}`));
+  lines.push(`,Total COGS,${stmt.totalCogs}`);
+  lines.push(`,Gross Profit,${stmt.grossProfit}`);
+  lines.push('');
+  lines.push('OPERATING EXPENSES');
+  stmt.operatingExpenses.forEach((l: any) => lines.push(`${l.accountCode},${l.accountName},${l.netBalance}`));
+  lines.push(`,Total Operating Expenses,${stmt.totalOperatingExpenses}`);
+  lines.push(`,Operating Profit (EBIT),${stmt.operatingProfit}`);
+  lines.push(`,Net Profit,${stmt.netProfit}`);
+  return lines.join('\n');
+}
+
+function balanceSheetToCsv(stmt: any): string {
+  const lines: string[] = [];
+  lines.push(`Balance Sheet as of ${stmt.asOfDate}`);
+  lines.push('');
+  lines.push('ASSETS');
+  lines.push('Account Code,Account Name,Balance');
+  stmt.assets.forEach((l: any) => lines.push(`${l.accountCode},${l.accountName},${l.balance}`));
+  lines.push(`,Total Assets,${stmt.totalAssets}`);
+  lines.push('');
+  lines.push('LIABILITIES');
+  stmt.liabilities.forEach((l: any) => lines.push(`${l.accountCode},${l.accountName},${l.balance}`));
+  lines.push(`,Total Liabilities,${stmt.totalLiabilities}`);
+  lines.push('');
+  lines.push('EQUITY');
+  stmt.equity.forEach((l: any) => lines.push(`${l.accountCode},${l.accountName},${l.balance}`));
+  lines.push(`,Total Equity,${stmt.totalEquity}`);
+  lines.push(`,Total Liabilities + Equity,${stmt.totalLiabilitiesAndEquity}`);
+  lines.push('');
+  lines.push(`Balanced: ${stmt.isBalanced}`);
+  return lines.join('\n');
 }

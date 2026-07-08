@@ -64,8 +64,15 @@ export class JournalEngine {
       );
     }
 
-    const count = await this.prisma.journalEntry.count();
-    const entryNumber = `JE-${new Date().getFullYear()}-${String(count + 1).padStart(6, '0')}`;
+    const year = new Date().getFullYear();
+    const lastEntry = await this.prisma.journalEntry.findFirst({
+      where: { entryNumber: { startsWith: `JE-${year}-` } },
+      orderBy: { entryNumber: 'desc' },
+    });
+    const nextSeq = lastEntry
+      ? parseInt(lastEntry.entryNumber.split('-')[2], 10) + 1
+      : 1;
+    const entryNumber = `JE-${year}-${String(nextSeq).padStart(6, '0')}`;
 
     const periodLabel = input.entryDate.toISOString().substring(0, 7);
 

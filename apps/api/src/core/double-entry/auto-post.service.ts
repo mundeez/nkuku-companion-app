@@ -41,15 +41,12 @@ export class AutoPostService {
     const amount = Number(record.amountZmw);
     if (amount <= 0) return;
 
-    const lines: JournalLineInput[] = record.isIncome
-      ? [
-          { accountCode: mapping.credit, debitZmw: amount, description: record.description },
-          { accountCode: mapping.debit,  creditZmw: amount, description: record.description },
-        ]
-      : [
-          { accountCode: mapping.debit,  debitZmw: amount, description: record.description, flockId: record.flockId ?? undefined },
-          { accountCode: mapping.credit, creditZmw: amount, description: record.description },
-        ];
+    // The mapping already defines the correct debit/credit accounts for each category.
+    // For sales: debit=1010 (Cash), credit=4010 (Revenue) — use directly without swapping.
+    const lines: JournalLineInput[] = [
+      { accountCode: mapping.debit,  debitZmw: amount, description: record.description, flockId: record.flockId ?? undefined },
+      { accountCode: mapping.credit, creditZmw: amount, description: record.description },
+    ];
 
     await this.journalEngine.post({
       entryDate: record.recordDate,

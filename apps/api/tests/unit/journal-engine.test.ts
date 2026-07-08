@@ -17,6 +17,7 @@ describe('JournalEngine', () => {
         count: vi.fn().mockResolvedValue(0),
         create: vi.fn().mockResolvedValue({ id: 'je-1', entryNumber: 'JE-2026-000001' }),
         findUnique: vi.fn(),
+        findFirst: vi.fn().mockResolvedValue(null),
       },
       journalLine: { create: vi.fn() },
       $transaction: vi.fn().mockImplementation((fn) => fn(mockPrisma)),
@@ -140,7 +141,9 @@ describe('JournalEngine', () => {
   });
 
   it('generates sequential entry numbers', async () => {
-    mockPrisma.journalEntry.count.mockResolvedValue(42);
+    mockPrisma.journalEntry.findFirst.mockResolvedValue({
+      entryNumber: 'JE-2026-000042',
+    });
     await engine.post({
       entryDate: new Date('2026-07-07'),
       description: 'Test entry',
