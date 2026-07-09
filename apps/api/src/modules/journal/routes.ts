@@ -116,4 +116,16 @@ export async function buildJournalModule(app: FastifyInstance) {
       return reply.status(400).send({ error: err.message });
     }
   });
+
+  // ── 405 Guards: journal entries are immutable ─────
+  // No UPDATE or DELETE allowed — reversal is the only correction mechanism
+  app.patch('/:id', { preHandler: [authenticate] }, async (_request, reply) => {
+    reply.header('Allow', 'GET, POST');
+    return reply.status(405).send({ error: 'METHOD_NOT_ALLOWED', message: 'Journal entries are immutable. Use POST /:id/reverse to correct errors.' });
+  });
+
+  app.delete('/:id', { preHandler: [authenticate] }, async (_request, reply) => {
+    reply.header('Allow', 'GET, POST');
+    return reply.status(405).send({ error: 'METHOD_NOT_ALLOWED', message: 'Journal entries are immutable. Use POST /:id/reverse to correct errors.' });
+  });
 }

@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.egg_alt, size: 64, color: Colors.green),
+              Image.asset('assets/images/logo.png', height: 80),
               const SizedBox(height: 16),
               const Text(
                 'Nkuku Companion',

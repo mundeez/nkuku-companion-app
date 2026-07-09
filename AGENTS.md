@@ -23,6 +23,17 @@ docker compose exec api pnpm run test
 docker compose exec api npx prisma db push
 docker compose exec api npx prisma db seed   # only on fresh DB or after schema changes
 
+# Apply journal immutability rules (after db push)
+docker exec nkuku-companion-app-postgres-1 psql -U nkuku_user -d nkuku_db -f /docker-entrypoint-initdb.d/journal-immutability.sql
+# Or from host: docker compose exec api npx tsx -e "..." (see apps/api/prisma/sql/journal-immutability.sql)
+
+# Migrate FinancialRecord → double-entry (idempotent)
+docker compose exec api npx tsx src/db/seeds/migrate-to-double-entry.ts
+
+# Regenerate Prisma client (after schema changes, before restart)
+docker compose exec api npx prisma generate
+docker restart nkuku-companion-app-api-1
+
 # Rebuild with PRESERVED DATA (use this for code changes)
 docker compose down && docker compose up --build -d
 
@@ -42,11 +53,19 @@ docker compose exec api npx prisma db seed   # re-seed after full reset
 - API source: `apps/api/src/`
 - Prisma schema: `apps/api/prisma/schema.prisma`
 - Calculation engine: `apps/api/src/core/calculation-engine/`
+- Double-entry engine: `apps/api/src/core/double-entry/`
+- GAAP statements: `apps/api/src/core/double-entry/gaap-statement.service.ts`
+- Closing service: `apps/api/src/core/double-entry/closing.service.ts`
 - Unit tests: `apps/api/tests/unit/`
 - Integration tests: `apps/api/tests/integration/`
 - Seeds: `apps/api/src/db/seeds/main.ts`
+- Migration seed: `apps/api/src/db/seeds/migrate-to-double-entry.ts`
 - Broiler API modules: `apps/api/src/modules/broiler-*/`
 - Broiler web pages: `apps/web/src/app/broiler-flocks/`
+- Ledger web pages: `apps/web/src/app/ledger/`
+- Ledger mobile screens: `apps/mobile/lib/screens/ledger/`
+- Ledger API modules: `apps/api/src/modules/accounts/`, `journal/`, `ledger/`
+- Journal immutability SQL: `apps/api/prisma/sql/journal-immutability.sql`
 
 ## Milestone 1 Status (v0.1.0-alpha)
 - 10 Prisma tables migrated and seeded
@@ -111,6 +130,69 @@ docker compose exec api npx prisma db seed   # re-seed after full reset
 - **Feed Transition:** User-configurable (default: Day 11 for Ross 308)
 - **Vaccination:** Dual schedules (Standard Botswana + Ross 308 Comprehensive)
 - **Deployment Target:** Same domain as existing Nkuku app
+
+## Double-Entry Bookkeeping (Milestones B–G, v0.9.1–v1.0.0)
+
+### Database (3 new tables)
+- `accounts` — Chart of accounts (37 system accounts, GAAP hierarchy)
+- `journal_entries` — Header with entryDate, description, sourceType, reversalRef
+- `journal_lines` — Lines with accountCode, debitZmw/creditZmw, flockId
+
+### Chart of Accounts (37 system accounts)
+- Assets 1xxx: 1000 (header), 1010 Cash, 1020 AR, 1030-1070 Inventory/Prepaid, 1080/1081 Equipment & Accum. Depreciation
+- Liabilities 2xxx: 2000 (header), 2010 AP, 2020 Accrued, 2030 Deferred Revenue
+- Equity 3xxx: 3000 (header), 3010 Owner's Capital, 3020 Retained Earnings, 3030 Current Year Earnings
+- Revenue 4xxx: 4000 (header), 4010 Bird Sales, 4020 By-product, 4030 Other Income
+- COGS 5xxx: 5000 (header), 5010-5050 Chick/Feed/Vaccine/Medication/Mortality Loss
+- OpEx 6xxx: 6000 (header), 6010-6080 Labour/Electricity/Water/Transport/Litter/Maint/Insurance/Other
+
+### API Modules (3 new modules)
+| Module | Endpoints | Key Features |
+|--------|-----------|--------------|
+| accounts | GET /, GET /:code, POST, PATCH, DELETE | Chart of accounts CRUD with hierarchy |
+| journal | GET /, GET /:id, POST, POST /:id/reverse, PATCH (405), DELETE (405) | Manual journal entries with 405 immutability guards |
+| ledger | GET /trial-balance, GET /account/:code, GET /export/trial-balance, POST /period-close, GET /income-statement, GET /balance-sheet, GET /cash-flow, POST /year-end-close | GAAP financial statements + period close |
+
+### Double-Entry Core Services
+- `journal.engine.ts` — Balance validation, entry number sequencing, reversal posting
+- `auto-post.service.ts` — Auto-creates journal entries from FinancialRecord (sales, expenses, etc.)
+- `ledger.service.ts` — Trial balance, account ledger, period close
+- `gaap-statement.service.ts` — Income statement, balance sheet, cash flow (indirect method)
+- `closing.service.ts` — Year-end close with closing journal entries
+
+### Migration
+- `migrate-to-double-entry.ts` — Idempotent batched migration from FinancialRecord → JournalEntry + JournalLine
+- Run: `docker compose exec api npx tsx src/db/seeds/migrate-to-double-entry.ts`
+
+### Immutability (Milestone G)
+- PostgreSQL CREATE RULE on `journal_entries` and `journal_lines` (no UPDATE, no DELETE)
+- CHECK constraints: `one_side_only` (exactly one of debit/credit), `amounts_nonneg` (no negatives)
+- SQL file: `apps/api/prisma/sql/journal-immutability.sql` — run after `prisma db push`
+- API 405 guards on PATCH/DELETE `/api/v1/journal/:id`
+- Deprecation headers on v0.8.0 `/api/v1/financial-engine/*` endpoints (Sunset: 2027-01-01)
+
+### Web Frontend (10 new pages under /ledger)
+- `/ledger` — Trial balance with balance indicator
+- `/ledger/accounts` — Collapsible chart of accounts tree
+- `/ledger/accounts/[code]` — General ledger for one account
+- `/ledger/journal` — Journal entry list with filters
+- `/ledger/journal/new` — Multi-line entry form with live balance check
+- `/ledger/journal/[id]` — Entry detail with reverse action
+- `/ledger/close` — Year-end close wizard
+- `/ledger/income-statement` — GAAP income statement
+- `/ledger/balance-sheet` — GAAP balance sheet
+- `/ledger/cash-flow` — Cash flow statement
+
+### Mobile (6 new Flutter screens)
+- `ledger_dashboard_screen.dart` — Hub with trial balance summary
+- `trial_balance_screen.dart` — Two-column debit/credit table
+- `chart_of_accounts_screen.dart` — Expandable hierarchy by type
+- `account_ledger_screen.dart` — General ledger with running balance
+- `journal_list_screen.dart` — Paginated list with source type filter
+- `journal_detail_screen.dart` — Entry detail with lines table
+
+### Test Count
+- 124 tests total (12 unit + 112 integration) — all passing
 
 ## Milestone Close-Out Protocol
 At each milestone conclusion:

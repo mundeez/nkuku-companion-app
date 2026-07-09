@@ -21,6 +21,15 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
   const overheads = new OverheadAllocationService(prisma);
   const projections = new HarvestProjectionService(prisma);
 
+  // ── DEPRECATION NOTICE ─────────────────────
+  // v0.8.0 single-entry financial engine is superseded by v0.9.3+ double-entry GAAP statements.
+  // Successor endpoints: /api/v1/ledger/income-statement, /balance-sheet, /cash-flow
+  app.addHook('onRequest', async (_request, reply) => {
+    reply.header('Deprecation', 'true');
+    reply.header('Sunset', 'Sun, 01 Jan 2027 00:00:00 GMT');
+    reply.header('Link', '</api/v1/ledger/income-statement>; rel="successor-version"');
+  });
+
   // ── UNIFIED SUMMARY ──────────────────────
   app.get('/summary', { preHandler: [authenticate] }, async (request) => {
     const authUser = (request as any).authUser;
