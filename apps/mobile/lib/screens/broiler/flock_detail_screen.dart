@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../models/flock.dart';
 
@@ -23,7 +24,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadData();
   }
 
@@ -65,6 +66,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           controller: _tabController,
           tabs: const [
             Tab(icon: Icon(Icons.info), text: 'Overview'),
+            Tab(icon: Icon(Icons.thermostat), text: 'Environment'),
             Tab(icon: Icon(Icons.vaccines), text: 'Vaccination'),
             Tab(icon: Icon(Icons.medical_services), text: 'Health'),
           ],
@@ -85,6 +87,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   controller: _tabController,
                   children: [
                     _buildOverviewTab(),
+                    _buildEnvironmentTab(),
                     _buildVaccinationTab(),
                     _buildHealthTab(),
                   ],
@@ -113,6 +116,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 Text(flock.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text('Breed: ${flock.breedName ?? "Unknown"}'),
+                Text('Housing: ${flock.housingType.replaceAll('_', ' ')}'),
                 Text('Started: ${flock.startDate.split('T').first}'),
                 Text('Age: Day ${flock.ageDays ?? 0}'),
                 Text('Status: ${flock.status}'),
@@ -173,8 +177,100 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     );
   }
 
+  Widget _buildEnvironmentTab() {
+    final envDays = _calendarDays.where((d) => d.lightingTemperature != null).toList();
+
+    if (envDays.isEmpty) {
+      return const Center(child: Text('No environment targets scheduled'));
+    }
+
+    final docsUrl = '${ApiService.baseUrl}/docs/environment/Ross308_Zambia_Lighting_Temperature_Guide.md';
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: envDays.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              leading: const Icon(Icons.book),
+              title: const Text('Reference Guide'),
+              subtitle: const Text('Ross 308 Lighting & Temperature Guide'),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () async {
+                final uri = Uri.parse(docsUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          );
+        }
+        final day = envDays[index - 1];
+        final env = day.lightingTemperature!;
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.orange.withAlpha(30),
+                      child: Text('${day.day}'),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text('Day ${day.day}',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
+                    Text(day.date.split('T').first,
+                        style: const TextStyle(color: Colors.grey)),
+                  ],
+                ),
+                const Divider(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Light: ${env.lightHours ?? "-"}h / Dark: ${env.darkHours ?? "-"}h'),
+                          Text('Intensity: ${env.lightIntensityLux ?? "-"} lux'),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Temp: ${env.targetTempC ?? "-"}°C'),
+                          Text('Range: ${env.targetTempMinC ?? "-"}-${env.targetTempMaxC ?? "-"}°C'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text('Humidity: ${env.targetRhMinPct ?? "-"}-${env.targetRhMaxPct ?? "-"}%'),
+                if (env.notes != null && env.notes!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(env.notes!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildVaccinationTab() {
     final vaccineDays = _calendarDays.where((d) => d.vaccines.isNotEmpty).toList();
+    final vaccineDocsUrl = '${ApiService.baseUrl}/docs/vaccines/Ross308_Zambia_Broiler_Management_Guide.md';
 
     if (vaccineDays.isEmpty) {
       return const Center(child: Text('No vaccination events scheduled'));
@@ -182,9 +278,26 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: vaccineDays.length,
+      itemCount: vaccineDays.length + 1,
       itemBuilder: (context, index) {
-        final day = vaccineDays[index];
+        if (index == 0) {
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              leading: const Icon(Icons.book),
+              title: const Text('Reference Guide'),
+              subtitle: const Text('Ross 308 Vaccination Schedule'),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () async {
+                final uri = Uri.parse(vaccineDocsUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          );
+        }
+        final day = vaccineDays[index - 1];
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: Padding(

@@ -33,6 +33,7 @@ interface FlockFormData {
   feedTransitionDay?: number;
   finisherDay?: number;
   chickPriceZmw?: number;
+  housingType?: "whole_house" | "spot_brooding";
   chicksCollected?: boolean;
   collectionDate?: string;
 }
@@ -46,6 +47,7 @@ const emptyForm: FlockFormData = {
   targetAge: 42,
   feedTransitionDay: 18,
   finisherDay: 29,
+  housingType: "whole_house",
   chicksCollected: false,
 };
 
@@ -110,6 +112,7 @@ export default function BroilerFlocksPage() {
       feedTransitionDay: flock.feedTransitionDay ? Number(flock.feedTransitionDay) : 18,
       finisherDay: flock.finisherDay ? Number(flock.finisherDay) : 29,
       chickPriceZmw: flock.chickPriceZmw ? Number(flock.chickPriceZmw) : undefined,
+      housingType: flock.housingType || "whole_house",
       chicksCollected: flock.chicksCollected,
       collectionDate: flock.collectionDate ? new Date(flock.collectionDate).toISOString().split("T")[0] : undefined,
     });
@@ -263,7 +266,7 @@ export default function BroilerFlocksPage() {
                   {getStatusBadge(flock.status, flock.chicksCollected)}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {flock.breed?.name} | Day {ageDays}
+                  {flock.breed?.name} | {flock.housingType?.replace("_", " ")} | Day {ageDays}
                 </p>
               </CardHeader>
               <CardContent>
@@ -409,6 +412,16 @@ export default function BroilerFlocksPage() {
             <div>
               <Label>Finisher Start Day (Grower to Finisher)</Label>
               <Input type="number" value={form.finisherDay || ""} onChange={(e) => setForm({ ...form, finisherDay: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label>Housing Type</Label>
+              <Select value={form.housingType} onValueChange={(v) => setForm({ ...form, housingType: v as any })}>
+                <SelectTrigger><SelectValue placeholder="Select housing type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="whole_house">Whole House</SelectItem>
+                  <SelectItem value="spot_brooding">Spot Brooding</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Supplier</Label>

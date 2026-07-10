@@ -8,7 +8,7 @@ import { BroilerFlock, FlockCalendarDay } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Printer, Syringe, Wheat } from "lucide-react";
+import { ArrowLeft, Printer, Syringe, Wheat, Thermometer, Sun, Droplets } from "lucide-react";
 import { FlockSubNav } from "@/components/flock-subnav";
 
 export default function CalendarPage() {
@@ -69,6 +69,23 @@ export default function CalendarPage() {
                 <Wheat className="h-4 w-4 text-yellow-600" />
                 <span className="font-medium">{day.feedPhase}</span>
               </div>
+
+              {day.lightingTemperature && (
+                <div className="mb-2 grid grid-cols-3 gap-1 text-xs">
+                  <div className="flex items-center gap-1" title="Light / dark hours">
+                    <Sun className="h-3 w-3 text-amber-500" />
+                    <span>{day.lightingTemperature.lightHours}h</span>
+                  </div>
+                  <div className="flex items-center gap-1" title="Target temperature (min-max °C)">
+                    <Thermometer className="h-3 w-3 text-red-500" />
+                    <span>{day.lightingTemperature.targetTempC}°C</span>
+                  </div>
+                  <div className="flex items-center gap-1" title="Target relative humidity (%)">
+                    <Droplets className="h-3 w-3 text-blue-500" />
+                    <span>{day.lightingTemperature.targetRhMinPct}-{day.lightingTemperature.targetRhMaxPct}</span>
+                  </div>
+                </div>
+              )}
 
               {day.vaccines.length > 0 && (
                 <div className="mb-2 space-y-1">

@@ -41,9 +41,9 @@ export default function PrintCalendarPage() {
   return (
     <div className="p-6 text-sm print:p-0">
       <div className="mb-4 print:mb-2">
-        <h1 className="text-2xl font-bold">Ross 308 Broiler Vaccination & Management Calendar</h1>
+        <h1 className="text-2xl font-bold">Ross 308 Broiler Vaccination, Environment & Management Calendar</h1>
         <p className="text-muted-foreground">
-          Flock: {flock?.name} · Breed: {flock?.breed?.name} · Hatch Date: {flock?.startDate ? new Date(flock.startDate).toLocaleDateString() : "-"} · Target: Day {flock?.targetAge || 42}
+          Flock: {flock?.name} · Breed: {flock?.breed?.name} · Housing: {flock?.housingType?.replace("_", " ")} · Hatch Date: {flock?.startDate ? new Date(flock.startDate).toLocaleDateString() : "-"} · Target: Day {flock?.targetAge || 42}
         </p>
       </div>
 
@@ -52,6 +52,9 @@ export default function PrintCalendarPage() {
           <tr className="bg-gray-100">
             <th className="border border-gray-300 p-2 text-left">Day</th>
             <th className="border border-gray-300 p-2 text-left">Date</th>
+            <th className="border border-gray-300 p-2 text-left">Light / Dark</th>
+            <th className="border border-gray-300 p-2 text-left">Temp (°C)</th>
+            <th className="border border-gray-300 p-2 text-left">RH (%)</th>
             <th className="border border-gray-300 p-2 text-left">Vaccination / Booster</th>
             <th className="border border-gray-300 p-2 text-left">Feed Phase</th>
             <th className="border border-gray-300 p-2 text-left">Management Tasks</th>
@@ -63,6 +66,15 @@ export default function PrintCalendarPage() {
             <tr key={day.day} className={day.vaccines.length > 0 ? "bg-green-50" : ""}>
               <td className="border border-gray-300 p-2 font-medium">{day.age}</td>
               <td className="border border-gray-300 p-2">{new Date(day.date).toLocaleDateString()}</td>
+              <td className="border border-gray-300 p-2">
+                {day.lightingTemperature ? `${day.lightingTemperature.lightHours}h / ${day.lightingTemperature.darkHours}h` : ""}
+              </td>
+              <td className="border border-gray-300 p-2">
+                {day.lightingTemperature ? `${day.lightingTemperature.targetTempC} (${day.lightingTemperature.targetTempMinC}-${day.lightingTemperature.targetTempMaxC})` : ""}
+              </td>
+              <td className="border border-gray-300 p-2">
+                {day.lightingTemperature ? `${day.lightingTemperature.targetRhMinPct}-${day.lightingTemperature.targetRhMaxPct}` : ""}
+              </td>
               <td className="border border-gray-300 p-2">
                 {day.vaccines.length > 0
                   ? day.vaccines.map((v) => `${v.vaccineName} (${v.completed ? "Done" : "Due"})`).join("; ")
@@ -81,7 +93,7 @@ export default function PrintCalendarPage() {
       </table>
 
       <div className="mt-4 text-xs text-muted-foreground print:hidden">
-        <p>Based on Aviagen Ross 308 guidelines and Zambia-specific research (NDV genotype VII.2, IBD MDA/Deventer formula, Ceva Transmune, MSD Southern Africa schedule). Always follow local veterinary advice and product labels.</p>
+        <p>Based on Aviagen Ross 308 guidelines and Zambia-specific research. Lighting/temperature data follows the Ross 308 Broiler Management Handbook and regional broiler extension guidance. Vaccination schedule follows NDV genotype VII.2, IBD MDA/Deventer formula, Ceva Transmune, and MSD Southern Africa schedules. Always follow local veterinary advice and product labels.</p>
       </div>
     </div>
   );

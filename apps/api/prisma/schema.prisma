@@ -26,6 +26,7 @@ model User {
   createdCycles      ProductionCycle[] @relation("CycleCreatedBy")
   createdFlocks      BroilerFlock[]    @relation("FlockCreatedBy")
   monthlyOverheads   MonthlyOverhead[]
+  createdLightingTemperatureSchedules LightingTemperatureSchedule[] @relation("LightingTemperatureScheduleCreatedBy")
 
   @@map("users")
 }
@@ -340,6 +341,7 @@ model Breed {
 
   performanceTargets PerformanceTarget[]
   flocks             BroilerFlock[]
+  lightingTemperatureSchedules LightingTemperatureSchedule[]
 
   @@map("breeds")
 }
@@ -381,6 +383,7 @@ model BroilerFlock {
   salePriceZmw    Decimal?    @map("sale_price_zmw") @db.Decimal(14, 2)
   soldDate        DateTime?   @map("sold_date") @db.Date
   status       FlockStatus @default(active)
+  housingType  HousingType @default(whole_house) @map("housing_type")
   createdBy    String?     @map("created_by") @db.Uuid
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -409,6 +412,11 @@ enum FlockStatus {
   sold
   completed
   cancelled
+}
+
+enum HousingType {
+  whole_house
+  spot_brooding
 }
 
 model GrowthRecord {
@@ -630,6 +638,53 @@ model VaccinationScheduleItem {
 
   @@index([scheduleId, sortOrder])
   @@map("vaccination_schedule_items")
+}
+
+// ── LIGHTING & TEMPERATURE SCHEDULES ───────
+
+model LightingTemperatureSchedule {
+  id          String   @id @default(uuid()) @db.Uuid
+  breedId     String?  @map("breed_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  isDefault   Boolean  @default(false) @map("is_default")
+  description String?  @db.Text
+  housingType HousingType @default(whole_house) @map("housing_type")
+  createdBy   String?  @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  breed       Breed?   @relation(fields: [breedId], references: [id], onDelete: SetNull)
+  creator     User?    @relation("LightingTemperatureScheduleCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  items       LightingTemperatureScheduleItem[]
+
+  @@unique([name])
+  @@index([breedId, housingType, createdBy])
+  @@map("lighting_temperature_schedules")
+}
+
+model LightingTemperatureScheduleItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  scheduleId        String   @map("schedule_id") @db.Uuid
+  ageDays           Int      @map("age_days")
+  lightHours        Decimal? @map("light_hours") @db.Decimal(4, 2)
+  darkHours         Decimal? @map("dark_hours") @db.Decimal(4, 2)
+  lightIntensityLux Int?     @map("light_intensity_lux")
+  darkIntensityLux  Int?     @map("dark_intensity_lux")
+  targetTempC       Decimal? @map("target_temp_c") @db.Decimal(5, 2)
+  targetTempMinC    Decimal? @map("target_temp_min_c") @db.Decimal(5, 2)
+  targetTempMaxC    Decimal? @map("target_temp_max_c") @db.Decimal(5, 2)
+  targetRhMinPct    Int?     @map("target_rh_min_pct")
+  targetRhMaxPct    Int?     @map("target_rh_max_pct")
+  notes             String?  @db.Text
+  sortOrder         Int      @map("sort_order")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  schedule LightingTemperatureSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([scheduleId, ageDays])
+  @@index([scheduleId, sortOrder])
+  @@map("lighting_temperature_schedule_items")
 }
 
 // ── MEDICATION & VACCINE MANAGEMENT ───────

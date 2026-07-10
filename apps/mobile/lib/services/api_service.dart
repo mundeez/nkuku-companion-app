@@ -11,6 +11,8 @@ import 'auth_service.dart';
 const String _baseUrl = 'https://nkuku.deeztechnology.solutions';
 
 class ApiService {
+  static String get baseUrl => _baseUrl;
+
   static final Dio dio = Dio(BaseOptions(
     baseUrl: _baseUrl,
     connectTimeout: const Duration(seconds: 30),

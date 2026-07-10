@@ -25,6 +25,9 @@ RUN pnpm install
 # Copy source and build
 COPY apps/web/src ./src
 COPY apps/web/public ./public
+
+# Copy reference docs into public so they can be viewed in the app
+COPY docs ./public/docs
 RUN pnpm run build
 
 # Copy static files into standalone output so the server can serve them

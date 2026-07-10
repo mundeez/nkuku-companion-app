@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 
 const AlertCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -215,42 +216,68 @@ export async function buildAlertModule(app: FastifyInstance) {
         );
       }
 
-      // Environmental threshold alerts
+      // Environmental threshold alerts (schedule-driven)
       const latestEnv = await prisma.environmentalRecord.findFirst({
         where: { flockId: flock.id },
         orderBy: { recordDate: 'desc' },
       });
       if (latestEnv && latestEnv.recordDate.toISOString().split('T')[0] === todayStr) {
-        const targetTemp = ageDays <= 7 ? 32 : ageDays <= 14 ? 30 : ageDays <= 21 ? 28 : ageDays <= 28 ? 26 : 24;
-        const temp = latestEnv.temperatureC ? Number(latestEnv.temperatureC) : null;
-        if (temp !== null && (temp > targetTemp + 2 || temp < targetTemp - 2)) {
-          generatedAlerts.push(
-            await prisma.alert.create({
-              data: {
-                flockId: flock.id,
-                alertType: 'environmental_threshold',
-                title: 'Temperature Out of Range',
-                message: `Current temperature ${temp}°C is outside target range ${targetTemp - 2}–${targetTemp + 2}°C for day ${ageDays}.`,
-                severity: 'warning',
-                dueDate: today,
-              },
-            })
-          );
-        }
-        const humidity = latestEnv.humidityPct ? Number(latestEnv.humidityPct) : null;
-        if (humidity !== null && (humidity < 40 || humidity > 75)) {
-          generatedAlerts.push(
-            await prisma.alert.create({
-              data: {
-                flockId: flock.id,
-                alertType: 'environmental_threshold',
-                title: 'Humidity Out of Range',
-                message: `Current humidity ${humidity}% is outside target range 40–75%.`,
-                severity: 'warning',
-                dueDate: today,
-              },
-            })
-          );
+        const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, authUser.userId);
+        const envItem = envSchedule?.items?.find((i: any) => i.ageDays === ageDays);
+
+        if (envItem) {
+          const temp = latestEnv.temperatureC ? Number(latestEnv.temperatureC) : null;
+          const tempMin = envItem.targetTempMinC ? Number(envItem.targetTempMinC) : (envItem.targetTempC ? Number(envItem.targetTempC) - 2 : null);
+          const tempMax = envItem.targetTempMaxC ? Number(envItem.targetTempMaxC) : (envItem.targetTempC ? Number(envItem.targetTempC) + 2 : null);
+          if (temp !== null && tempMin !== null && tempMax !== null && (temp < tempMin || temp > tempMax)) {
+            generatedAlerts.push(
+              await prisma.alert.create({
+                data: {
+                  flockId: flock.id,
+                  alertType: 'environmental_threshold',
+                  title: 'Temperature Out of Range',
+                  message: `Current temperature ${temp}°C is outside target range ${tempMin}–${tempMax}°C for day ${ageDays}.`,
+                  severity: 'warning',
+                  dueDate: today,
+                },
+              })
+            );
+          }
+
+          const humidity = latestEnv.humidityPct ? Number(latestEnv.humidityPct) : null;
+          const rhMin = envItem.targetRhMinPct ?? null;
+          const rhMax = envItem.targetRhMaxPct ?? null;
+          if (humidity !== null && rhMin !== null && rhMax !== null && (humidity < rhMin || humidity > rhMax)) {
+            generatedAlerts.push(
+              await prisma.alert.create({
+                data: {
+                  flockId: flock.id,
+                  alertType: 'environmental_threshold',
+                  title: 'Humidity Out of Range',
+                  message: `Current humidity ${humidity}% is outside target range ${rhMin}–${rhMax}%.`,
+                  severity: 'warning',
+                  dueDate: today,
+                },
+              })
+            );
+          }
+
+          const lightHours = latestEnv.lightHours ? Number(latestEnv.lightHours) : null;
+          const targetLightHours = envItem.lightHours ? Number(envItem.lightHours) : null;
+          if (lightHours !== null && targetLightHours !== null && Math.abs(lightHours - targetLightHours) > 0.5) {
+            generatedAlerts.push(
+              await prisma.alert.create({
+                data: {
+                  flockId: flock.id,
+                  alertType: 'environmental_threshold',
+                  title: 'Light Hours Out of Range',
+                  message: `Recorded light hours ${lightHours}h differs from target ${targetLightHours}h for day ${ageDays}.`,
+                  severity: 'info',
+                  dueDate: today,
+                },
+              })
+            );
+          }
         }
       }
 

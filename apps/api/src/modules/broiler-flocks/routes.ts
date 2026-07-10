@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -15,6 +16,7 @@ const FlockCreateSchema = z.object({
   feedTransitionDay: z.number().int().min(1).max(28).optional(),
   finisherDay: z.number().int().min(20).max(42).optional(),
   chickPriceZmw: z.number().nonnegative().optional(),
+  housingType: z.enum(['whole_house', 'spot_brooding']).optional(),
   chicksCollected: z.boolean().optional(),
   collectionDate: dateOrIso.nullable().optional(),
   chickQualityNotes: z.string().max(500).optional().nullable(),
@@ -29,6 +31,7 @@ const FlockUpdateSchema = z.object({
   feedTransitionDay: z.number().int().min(1).max(28).optional(),
   finisherDay: z.number().int().min(20).max(42).optional(),
   chickPriceZmw: z.number().nonnegative().optional().nullable(),
+  housingType: z.enum(['whole_house', 'spot_brooding']).optional(),
   chicksCollected: z.boolean().optional(),
   collectionDate: dateOrIso.nullable().optional(),
   chickQualityNotes: z.string().max(500).optional().nullable(),
@@ -102,6 +105,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         feedTransitionDay: data.feedTransitionDay ?? 18,
         finisherDay: data.finisherDay ?? 29,
         chickPriceZmw: data.chickPriceZmw,
+        housingType: data.housingType ?? 'whole_house',
         chicksCollected: data.chicksCollected ?? false,
         collectionDate,
         chickQualityNotes: data.chickQualityNotes,
@@ -381,6 +385,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       include: { items: { orderBy: { sortOrder: 'asc' } } },
     });
 
+    const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, authUser.userId);
+
     const completedVaccines = await prisma.vaccinationEvent.findMany({
       where: { flockId: id },
       orderBy: { adminDate: 'asc' },
@@ -441,11 +447,25 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
           ? 'Weekly check: vitamins/electrolytes if heat stress. Provide Vitamin C during peak heat (11AM-3PM) in hot season.'
           : 'Monitor; vitamins/electrolytes if stress or heat. Ensure clean water and proper ventilation.';
 
+      const envItem = envSchedule?.items?.find((i: any) => i.ageDays === d) || null;
+      const lightingTemperature = envItem ? {
+        lightHours: envItem.lightHours,
+        darkHours: envItem.darkHours,
+        lightIntensityLux: envItem.lightIntensityLux,
+        targetTempC: envItem.targetTempC,
+        targetTempMinC: envItem.targetTempMinC,
+        targetTempMaxC: envItem.targetTempMaxC,
+        targetRhMinPct: envItem.targetRhMinPct,
+        targetRhMaxPct: envItem.targetRhMaxPct,
+        notes: envItem.notes,
+      } : null;
+
       days.push({
         day: d,
         age: `Day ${d}`,
         date: date.toISOString().split('T')[0],
         vaccines,
+        lightingTemperature,
         feedPhase,
         managementTasks,
         healthSupport,

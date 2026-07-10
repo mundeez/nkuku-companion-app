@@ -4,13 +4,19 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
-import { BroilerFlock, EnvironmentalRecord } from "@/lib/types";
+import { BroilerFlock, EnvironmentalRecord, LightingTemperatureScheduleItemData } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Thermometer, Droplets, Wind, Sun, Trash2 } from "lucide-react";
+import { ArrowLeft, Thermometer, Droplets, Wind, Sun, Trash2, Target, BookOpen } from "lucide-react";
 import { FlockSubNav } from "@/components/flock-subnav";
+
+interface CurrentSchedule {
+  schedule: { id: string; name: string; description?: string } | null;
+  ageDays: number;
+  item: LightingTemperatureScheduleItemData | null;
+}
 
 export default function EnvironmentPage() {
   const params = useParams();
@@ -20,6 +26,8 @@ export default function EnvironmentPage() {
 
   const [flock, setFlock] = useState<BroilerFlock | null>(null);
   const [records, setRecords] = useState<EnvironmentalRecord[]>([]);
+  const [current, setCurrent] = useState<CurrentSchedule | null>(null);
+  const [fullSchedule, setFullSchedule] = useState<LightingTemperatureScheduleItemData[]>([]);
   const [form, setForm] = useState({
     recordDate: new Date().toISOString().split("T")[0],
     timeOfDay: "Morning",
@@ -42,6 +50,14 @@ export default function EnvironmentPage() {
       .catch((err) => setError(err.message));
     apiFetch<EnvironmentalRecord[]>(`/api/v1/environmental-records?flockId=${flockId}`)
       .then(setRecords)
+      .catch((err) => setError(err.message));
+    apiFetch<CurrentSchedule>(`/api/v1/lighting-temperature-schedules/current?flockId=${flockId}`)
+      .then((res) => {
+        setCurrent(res);
+      })
+      .catch((err) => setError(err.message));
+    apiFetch<{ days: any[] }>(`/api/v1/broiler-flocks/${flockId}/summary`)
+      .then((res) => setFullSchedule((res.days || []).map((d: any) => d.lightingTemperature).filter(Boolean)))
       .catch((err) => setError(err.message));
   }
 
@@ -120,12 +136,18 @@ export default function EnvironmentPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2"><Thermometer className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Latest Temp</span></div>
             <p className="text-2xl font-bold mt-1">{latest?.temperatureC != null ? `${latest.temperatureC}°C` : "-"}</p>
+            {current?.item && current.item.targetTempC != null && (
+              <p className="text-xs text-muted-foreground mt-1">Target {current.item.targetTempC}°C (±{current.item.targetTempC - (current.item.targetTempMinC ?? current.item.targetTempC - 1)}°C)</p>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2"><Droplets className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Latest Humidity</span></div>
             <p className="text-2xl font-bold mt-1">{latest?.humidityPct != null ? `${latest.humidityPct}%` : "-"}</p>
+            {current?.item && current.item.targetRhMinPct != null && current.item.targetRhMaxPct != null && (
+              <p className="text-xs text-muted-foreground mt-1">Target {current.item.targetRhMinPct}-{current.item.targetRhMaxPct}%</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -138,9 +160,76 @@ export default function EnvironmentPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2"><Sun className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Light Hours</span></div>
             <p className="text-2xl font-bold mt-1">{latest?.lightHours != null ? `${latest.lightHours}h` : "-"}</p>
+            {current?.item && current.item.lightHours != null && current.item.darkHours != null && (
+              <p className="text-xs text-muted-foreground mt-1">Target {current.item.lightHours}h / {current.item.darkHours}h dark</p>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Today&apos;s Targets — Day {current?.ageDays ?? "-"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {current?.item ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div><span className="text-muted-foreground">Schedule</span><p className="font-medium">{current.schedule?.name ?? "-"}</p></div>
+              <div><span className="text-muted-foreground">Temp</span><p className="font-medium">{current.item.targetTempC}°C ({current.item.targetTempMinC}-{current.item.targetTempMaxC}°C)</p></div>
+              <div><span className="text-muted-foreground">Humidity</span><p className="font-medium">{current.item.targetRhMinPct}-{current.item.targetRhMaxPct}%</p></div>
+              <div><span className="text-muted-foreground">Light</span><p className="font-medium">{current.item.lightHours}h light / {current.item.darkHours}h dark</p></div>
+              <div><span className="text-muted-foreground">Light intensity</span><p className="font-medium">{current.item.lightIntensityLux} lux</p></div>
+              {current.item.notes && <div className="col-span-2 md:col-span-4"><span className="text-muted-foreground">Notes</span><p className="font-medium">{current.item.notes}</p></div>}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No lighting/temperature target found for today.</p>
+          )}
+          <div className="mt-4 text-sm">
+            <a href="/docs/environment/Ross308_Zambia_Lighting_Temperature_Guide.md" target="_blank" className="inline-flex items-center gap-1 text-primary hover:underline">
+              <BookOpen className="h-4 w-4" /> Reference: Ross 308 Lighting &amp; Temperature Guide
+            </a>
+          </div>
+        </CardContent>
+      </Card>
+
+      {fullSchedule.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader><CardTitle>Full Schedule</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="p-2">Day</th>
+                    <th className="p-2">Light</th>
+                    <th className="p-2">Dark</th>
+                    <th className="p-2">Lux</th>
+                    <th className="p-2">Temp (°C)</th>
+                    <th className="p-2">RH (%)</th>
+                    <th className="p-2 hidden md:table-cell">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fullSchedule.map((item, idx) => (
+                    <tr key={idx} className="border-b last:border-0">
+                      <td className="p-2">Day {item.ageDays}</td>
+                      <td className="p-2">{item.lightHours}h</td>
+                      <td className="p-2">{item.darkHours}h</td>
+                      <td className="p-2">{item.lightIntensityLux}</td>
+                      <td className="p-2">{item.targetTempC} ({item.targetTempMinC}-{item.targetTempMaxC})</td>
+                      <td className="p-2">{item.targetRhMinPct}-{item.targetRhMaxPct}</td>
+                      <td className="p-2 hidden md:table-cell max-w-xs truncate">{item.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {canCreateEdit && (
         <Card className="mb-6">
