@@ -4,6 +4,7 @@ import { seedRoss308Performance } from './ross308-performance';
 import { seedCobb500Performance } from './cobb500-performance';
 import { seedDiseases } from './diseases';
 import { seedVaccinationSchedules } from './vaccination-schedules';
+import { seedLightingTemperatureSchedules } from './lighting-temperature-schedules';
 import { seedChartOfAccounts } from './chart-of-accounts';
 import { seedSupplierCategoryTemplates } from './supplier-templates';
 import bcrypt from 'bcryptjs';
@@ -214,6 +215,7 @@ async function main() {
   await seedCobb500Performance(prisma);
   await seedDiseases(prisma);
   await seedVaccinationSchedules(prisma);
+  await seedLightingTemperatureSchedules(prisma);
   await seedChartOfAccounts(prisma);
 
   // ── Financial System Seeds ──

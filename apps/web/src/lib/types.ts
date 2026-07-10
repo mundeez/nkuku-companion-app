@@ -134,6 +134,7 @@ export interface BroilerFlock {
   feedTransitionDay?: number;
   finisherDay?: number;
   chickPriceZmw?: number;
+  housingType: "whole_house" | "spot_brooding";
   chicksCollected: boolean;
   collectionDate?: string;
   chickQualityNotes?: string;
@@ -354,9 +355,36 @@ export interface FlockCalendarDay {
   age: string;
   date: string;
   vaccines: VaccinationScheduleItem[];
+  lightingTemperature?: LightingTemperatureScheduleItemData;
   feedPhase: string;
   managementTasks: string[];
   healthSupport: string;
+}
+
+export interface LightingTemperatureSchedule {
+  id: string;
+  name: string;
+  description?: string;
+  housingType: "whole_house" | "spot_brooding";
+  breedId?: string;
+  isDefault: boolean;
+  items: LightingTemperatureScheduleItemData[];
+}
+
+export interface LightingTemperatureScheduleItemData {
+  id: string;
+  scheduleId: string;
+  ageDays: number;
+  lightHours?: number;
+  darkHours?: number;
+  lightIntensityLux?: number;
+  darkIntensityLux?: number;
+  targetTempC?: number;
+  targetTempMinC?: number;
+  targetTempMaxC?: number;
+  targetRhMinPct?: number;
+  targetRhMaxPct?: number;
+  notes?: string;
 }
 
 export interface VaccinationScheduleItem {

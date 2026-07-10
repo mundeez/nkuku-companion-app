@@ -12,6 +12,7 @@ class BroilerFlock {
   final int? finisherDay;
   final double? chickPriceZmw;
   final double? salePriceZmw;
+  final String housingType;
   final String status;
   final int? ageDays;
 
@@ -29,6 +30,7 @@ class BroilerFlock {
     this.finisherDay,
     this.chickPriceZmw,
     this.salePriceZmw,
+    this.housingType = 'whole_house',
     required this.status,
     this.ageDays,
   });
@@ -54,6 +56,7 @@ class BroilerFlock {
       salePriceZmw: json['salePriceZmw'] != null
           ? double.tryParse(json['salePriceZmw'].toString())
           : (json['sale_price_zmw'] != null ? double.tryParse(json['sale_price_zmw'].toString()) : null),
+      housingType: json['housingType'] ?? json['housing_type'] ?? 'whole_house',
       status: json['status'] ?? 'active',
       ageDays: json['ageDays'] ?? json['age_days'],
     );
@@ -153,11 +156,91 @@ class Disease {
   }
 }
 
+class LightingTemperatureSchedule {
+  final String id;
+  final String name;
+  final String description;
+  final String housingType;
+  final bool isDefault;
+  final List<LightingTemperatureScheduleItem> items;
+
+  LightingTemperatureSchedule({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.housingType,
+    required this.isDefault,
+    required this.items,
+  });
+
+  factory LightingTemperatureSchedule.fromJson(Map<String, dynamic> json) {
+    return LightingTemperatureSchedule(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      description: json['description'] ?? '',
+      housingType: json['housingType'] ?? json['housing_type'] ?? 'whole_house',
+      isDefault: json['isDefault'] ?? json['is_default'] ?? false,
+      items: (json['items'] as List?)?.map((e) => LightingTemperatureScheduleItem.fromJson(e)).toList() ?? [],
+    );
+  }
+}
+
+class LightingTemperatureScheduleItem {
+  final String id;
+  final String scheduleId;
+  final int ageDays;
+  final double? lightHours;
+  final double? darkHours;
+  final int? lightIntensityLux;
+  final int? darkIntensityLux;
+  final double? targetTempC;
+  final double? targetTempMinC;
+  final double? targetTempMaxC;
+  final int? targetRhMinPct;
+  final int? targetRhMaxPct;
+  final String? notes;
+
+  LightingTemperatureScheduleItem({
+    required this.id,
+    required this.scheduleId,
+    required this.ageDays,
+    this.lightHours,
+    this.darkHours,
+    this.lightIntensityLux,
+    this.darkIntensityLux,
+    this.targetTempC,
+    this.targetTempMinC,
+    this.targetTempMaxC,
+    this.targetRhMinPct,
+    this.targetRhMaxPct,
+    this.notes,
+  });
+
+  factory LightingTemperatureScheduleItem.fromJson(Map<String, dynamic> json) {
+    return LightingTemperatureScheduleItem(
+      id: json['id'] ?? '',
+      scheduleId: json['scheduleId'] ?? json['schedule_id'] ?? '',
+      ageDays: json['ageDays'] ?? json['age_days'] ?? 0,
+      lightHours: json['lightHours'] != null ? double.tryParse(json['lightHours'].toString()) : null,
+      darkHours: json['darkHours'] != null ? double.tryParse(json['darkHours'].toString()) : null,
+      lightIntensityLux: json['lightIntensityLux'] ?? json['light_intensity_lux'],
+      darkIntensityLux: json['darkIntensityLux'] ?? json['dark_intensity_lux'],
+      targetTempC: json['targetTempC'] != null ? double.tryParse(json['targetTempC'].toString()) : null,
+      targetTempMinC: json['targetTempMinC'] != null ? double.tryParse(json['targetTempMinC'].toString()) : null,
+      targetTempMaxC: json['targetTempMaxC'] != null ? double.tryParse(json['targetTempMaxC'].toString()) : null,
+      targetRhMinPct: json['targetRhMinPct'] ?? json['target_rh_min_pct'],
+      targetRhMaxPct: json['targetRhMaxPct'] ?? json['target_rh_max_pct'],
+      notes: json['notes'],
+    );
+  }
+}
+
 class CalendarDay {
   final int day;
   final String date;
   final String feedPhase;
   final List<VaccinationScheduleItem> vaccines;
+  final LightingTemperatureScheduleItem? lightingTemperature;
   final List<String> managementTasks;
   final String healthSupport;
 
@@ -166,6 +249,7 @@ class CalendarDay {
     required this.date,
     required this.feedPhase,
     required this.vaccines,
+    this.lightingTemperature,
     required this.managementTasks,
     required this.healthSupport,
   });
@@ -176,6 +260,9 @@ class CalendarDay {
       date: json['date'] ?? '',
       feedPhase: json['feedPhase'] ?? json['feed_phase'] ?? '',
       vaccines: (json['vaccines'] as List?)?.map((e) => VaccinationScheduleItem.fromJson(e)).toList() ?? [],
+      lightingTemperature: json['lightingTemperature'] != null
+          ? LightingTemperatureScheduleItem.fromJson(json['lightingTemperature'])
+          : null,
       managementTasks: List<String>.from(json['managementTasks'] ?? json['management_tasks'] ?? []),
       healthSupport: json['healthSupport'] ?? json['health_support'] ?? '',
     );

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -75,6 +76,8 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
       where: { name: scheduleName },
       include: { items: { orderBy: { sortOrder: 'asc' } } },
     });
+
+    const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, authUser.userId);
 
     const generatedTasks = [];
 
@@ -207,6 +210,59 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
                   category: 'vaccination',
                   title: `Vaccination: ${item.vaccineName}`,
                   description: `Administer via ${item.adminMethod}. ${item.notes || ''}`,
+                },
+              })
+            );
+          }
+        }
+      }
+
+      // Environment/lighting/temperature tasks from schedule
+      const envItem = envSchedule?.items?.find((i: any) => i.ageDays === ageDays);
+      if (envItem) {
+        const envTasks = [] as { title: string; description: string }[];
+        const lightHours = Number(envItem.lightHours);
+        const darkHours = Number(envItem.darkHours);
+        if (ageDays === 0) {
+          envTasks.push({
+            title: 'Preheat house and prepare brooding',
+            description: `Target ${envItem.targetTempC}°C, humidity ${envItem.targetRhMinPct}-${envItem.targetRhMaxPct}%, litter 28-32°C. ${lightHours}h light at ${envItem.lightIntensityLux} lux.`,
+          });
+        } else if (ageDays === 4 && darkHours > 1) {
+          envTasks.push({
+            title: 'Start light step-down',
+            description: `Begin reducing light hours toward ${lightHours}h light / ${darkHours}h dark.`,
+          });
+        } else if (ageDays === 7) {
+          envTasks.push({
+            title: 'Confirm grow-out lighting programme',
+            description: `Target ${lightHours}h light / ${darkHours}h dark at ${envItem.lightIntensityLux} lux.`,
+          });
+        } else if (ageDays >= 40 && lightHours === 23) {
+          envTasks.push({
+            title: 'Pre-catch lighting: 23h light',
+            description: 'Return to 23 hours light for 3 days before catching.',
+          });
+        }
+
+        for (const envTask of envTasks) {
+          const existing = await prisma.flockTask.findFirst({
+            where: {
+              flockId,
+              taskDate: { gte: new Date(dateStr), lt: new Date(taskDate.getTime() + 24 * 60 * 60 * 1000) },
+              title: envTask.title,
+            },
+          });
+          if (!existing) {
+            generatedTasks.push(
+              await prisma.flockTask.create({
+                data: {
+                  flockId,
+                  taskDate: new Date(dateStr),
+                  ageDays,
+                  category: 'environment',
+                  title: envTask.title,
+                  description: envTask.description,
                 },
               })
             );
