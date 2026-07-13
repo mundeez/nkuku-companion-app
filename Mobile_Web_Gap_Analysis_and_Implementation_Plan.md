@@ -3,6 +3,7 @@
 **Date:** 2026-07-10
 **Scope:** `apps/mobile` (Flutter 3.x) vs `apps/web` (Next.js 14)
 **Reference:** Live web app at https://nkuku.deeztechnology.solutions
+**Milestone progress:** M3-1 ✅ (`17cb8ce`) · M3-2 ✅ · Next: M3-3
 
 ---
 
@@ -419,7 +420,7 @@ Ordering is by dependency and stated priority: **daily broiler operations first*
 
 ## 9. Next Action
 
-Proceed with **Milestone M3-1 — Foundation, Auth & Dashboard Parity**.
+Proceed with **Milestone M3-3 — Broiler Operations Continued (Medication, Environment, Tasks, Calendar)**.
 
 ---
 

@@ -39,6 +39,7 @@ class _ProjectionsScreenState extends State<ProjectionsScreen> {
 
   Future<void> _calculate() async {
     if (_selectedSupplier == null) return;
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _loading = true);
     try {
       final res = await ApiService.dio.post('/api/v1/projections/calculate', data: {
@@ -46,13 +47,15 @@ class _ProjectionsScreenState extends State<ProjectionsScreen> {
         'supplierId': _selectedSupplier!.id,
         'salesPricePerBird': double.parse(_priceController.text),
       });
+      if (!mounted) return;
       setState(() {
         _projection = ProjectionResult.fromJson(res.data);
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Calculation failed')),
       );
     }
@@ -72,8 +75,9 @@ class _ProjectionsScreenState extends State<ProjectionsScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    DropdownButtonFormField<Supplier>(
-                      value: _selectedSupplier,
+                    DropdownButtonFormField<Supplier?>(
+                      key: ValueKey(_selectedSupplier),
+                      initialValue: _selectedSupplier,
                       decoration: const InputDecoration(labelText: 'Supplier'),
                       items: _suppliers.map((s) => DropdownMenuItem(
                         value: s,

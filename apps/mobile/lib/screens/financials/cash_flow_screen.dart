@@ -19,15 +19,18 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
   }
 
   Future<void> _load() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final res = await ApiService.dio.get('/api/v1/financial-engine/cash-flow');
+      if (!mounted) return;
       setState(() {
         _data = res.data;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Failed to load cash flow')),
       );
     }

@@ -26,10 +26,12 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
   }
 
   Future<void> _load() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final summaryRes = await ApiService.dio.get('/api/v1/financial-engine/summary');
       final trendRes = await ApiService.dio.get('/api/v1/financial-engine/monthly-trend?year=${DateTime.now().year}');
       final projRes = await ApiService.dio.get('/api/v1/financial-engine/projections');
+      if (!mounted) return;
       setState(() {
         _summary = summaryRes.data;
         _trend = trendRes.data as List;
@@ -37,8 +39,9 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Failed to load financial data')),
       );
     }
@@ -83,7 +86,7 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
                       Switch(
                         value: _showProjections,
                         onChanged: (v) => setState(() => _showProjections = v),
-                        activeColor: Colors.amber,
+                        activeThumbColor: Colors.amber,
                       ),
                     ],
                   ),

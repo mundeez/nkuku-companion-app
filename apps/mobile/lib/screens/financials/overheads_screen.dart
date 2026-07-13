@@ -34,26 +34,31 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
   }
 
   Future<void> _load() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final res = await ApiService.dio.get('/api/v1/financial-engine/overheads');
+      if (!mounted) return;
       setState(() {
         _overheads = res.data;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Failed to load overheads')),
       );
     }
   }
 
   Future<void> _create() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await ApiService.dio.post('/api/v1/financial-engine/overheads', data: {
         ..._form,
         'amountZmw': double.parse(_form['amountZmw']!),
       });
+      if (!mounted) return;
       setState(() {
         _showForm = false;
         _form['description'] = '';
@@ -61,18 +66,22 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
       });
       _load();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         const SnackBar(content: Text('Failed to add overhead')),
       );
     }
   }
 
   Future<void> _delete(String id) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await ApiService.dio.delete('/api/v1/financial-engine/overheads/$id');
+      if (!mounted) return;
       _load();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         const SnackBar(content: Text('Failed to delete overhead')),
       );
     }
@@ -109,7 +118,8 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
                             ),
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
-                              value: _form['category'],
+                              key: ValueKey(_form['category']),
+                              initialValue: _form['category'],
                               decoration: const InputDecoration(labelText: 'Category'),
                               items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c.replaceAll('_', ' ')))).toList(),
                               onChanged: (v) => setState(() => _form['category'] = v!),
@@ -127,7 +137,8 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
                             ),
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
-                              value: _form['contractType'],
+                              key: ValueKey(_form['contractType']),
+                              initialValue: _form['contractType'],
                               decoration: const InputDecoration(labelText: 'Contract Type'),
                               items: _contractTypes.map((c) => DropdownMenuItem(value: c, child: Text(c.replaceAll('_', ' ')))).toList(),
                               onChanged: (v) => setState(() => _form['contractType'] = v!),

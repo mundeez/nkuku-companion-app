@@ -1,7 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../services/api_service.dart';
+import '../../models/financial_record.dart';
+import '../../models/feed_record.dart';
 import '../../models/flock.dart';
+import '../../models/growth_record.dart';
+import '../../models/mortality_event.dart';
+import '../../models/vaccination_event.dart';
+import '../../models/water_record.dart';
+import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/broiler_service.dart';
+import 'records/financial_record_form.dart';
+import 'records/feed_record_form.dart';
+import 'records/growth_record_form.dart';
+import 'records/mortality_event_form.dart';
+import 'records/vaccination_event_form.dart';
+import 'records/water_record_form.dart';
 
 class FlockDetailScreen extends StatefulWidget {
   final String flockId;
@@ -21,10 +35,23 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   bool _loading = true;
   String? _error;
 
+  List<GrowthRecord> _growthRecords = [];
+  GrowthRecordAnalysis? _growthAnalysis;
+  List<FeedRecord> _feedRecords = [];
+  FeedSummary? _feedSummary;
+  List<WaterRecord> _waterRecords = [];
+  WaterRatio? _waterRatio;
+  List<MortalityEvent> _mortalityEvents = [];
+  MortalitySummary? _mortalitySummary;
+  List<VaccinationEvent> _vaccinationEvents = [];
+  VaccinationScheduleStatus? _vaccinationStatus;
+  List<FinancialRecord> _financialRecords = [];
+  FinancialSummary? _financialSummary;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
     _loadData();
   }
 
@@ -40,20 +67,125 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       _error = null;
     });
     try {
-      final flockRes = await ApiService.dio.get('/api/v1/broiler-flocks/${widget.flockId}');
-      _flock = BroilerFlock.fromJson(flockRes.data['flock'] ?? flockRes.data);
-
+      final flock = await BroilerService.getFlock(widget.flockId);
       final calRes = await ApiService.dio.get('/api/v1/broiler-flocks/${widget.flockId}/summary');
       final days = (calRes.data['days'] as List).map((e) => CalendarDay.fromJson(e)).toList();
+
+      final results = await Future.wait([
+        BroilerService.getGrowthRecords(widget.flockId),
+        BroilerService.getFeedRecords(widget.flockId),
+        BroilerService.getWaterRecords(widget.flockId),
+        BroilerService.getMortalityEvents(widget.flockId),
+        BroilerService.getVaccinationEvents(widget.flockId),
+        BroilerService.getFinancialRecords(widget.flockId),
+      ]);
+
+      final growth = results[0] as List<GrowthRecord>;
+      final feed = results[1] as List<FeedRecord>;
+      final water = results[2] as List<WaterRecord>;
+      final mortality = results[3] as List<MortalityEvent>;
+      final vaccination = results[4] as List<VaccinationEvent>;
+      final financial = results[5] as List<FinancialRecord>;
+
+      final analysis = await BroilerService.getGrowthAnalysis(widget.flockId);
+      final feedSummary = await BroilerService.getFeedSummary(widget.flockId);
+      final waterRatio = await BroilerService.getWaterRatio(widget.flockId);
+      final mortalitySummary = await BroilerService.getMortalitySummary(widget.flockId);
+      final vaccinationStatus = await BroilerService.getVaccinationScheduleStatus(widget.flockId);
+      final financialSummary = await BroilerService.getFinancialSummary(widget.flockId);
+
       setState(() {
+        _flock = flock;
         _calendarDays = days;
+        _growthRecords = growth;
+        _growthAnalysis = analysis;
+        _feedRecords = feed;
+        _feedSummary = feedSummary;
+        _waterRecords = water;
+        _waterRatio = waterRatio;
+        _mortalityEvents = mortality;
+        _mortalitySummary = mortalitySummary;
+        _vaccinationEvents = vaccination;
+        _vaccinationStatus = vaccinationStatus;
+        _financialRecords = financial;
+        _financialSummary = financialSummary;
         _loading = false;
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load flock details';
+        _error = 'Failed to load flock details: $e';
         _loading = false;
       });
+    }
+  }
+
+  void _navigateToForm(Widget form) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => form),
+    );
+    if (result == true && mounted) _loadData();
+  }
+
+  void _onAddRecord() {
+    if (_flock == null || !AuthService.canEdit) return;
+    final flock = _flock!;
+    switch (_tabController.index) {
+      case 1:
+        _navigateToForm(GrowthRecordForm(flockId: flock.id));
+        break;
+      case 2:
+        _navigateToForm(FeedRecordForm(flockId: flock.id));
+        break;
+      case 3:
+        _navigateToForm(WaterRecordForm(flockId: flock.id));
+        break;
+      case 4:
+        _navigateToForm(MortalityEventForm(flockId: flock.id, currentCount: flock.currentCount));
+        break;
+      case 5:
+        _navigateToForm(VaccinationEventForm(flockId: flock.id, flockAgeDays: flock.ageDays ?? 0));
+        break;
+      case 6:
+        _navigateToForm(FinancialRecordForm(flockId: flock.id));
+        break;
+    }
+  }
+
+  Widget? get _floatingActionButton {
+    if (!AuthService.canEdit) return null;
+    if (_tabController.index == 0 || _tabController.index == 7) return null;
+    return FloatingActionButton(
+      onPressed: _onAddRecord,
+      child: const Icon(Icons.add),
+    );
+  }
+
+  Future<void> _deleteRecord<T>({
+    required String label,
+    required T record,
+    required String Function(T) name,
+    required Future<void> Function() onDelete,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete $label?'),
+        content: Text('Delete ${name(record)}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await onDelete();
+      if (mounted) _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      }
     }
   }
 
@@ -62,34 +194,49 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.flockName),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
+        ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.info), text: 'Overview'),
-            Tab(icon: Icon(Icons.thermostat), text: 'Environment'),
+            Tab(icon: Icon(Icons.trending_up), text: 'Growth'),
+            Tab(icon: Icon(Icons.grass), text: 'Feed'),
+            Tab(icon: Icon(Icons.water_drop), text: 'Water'),
+            Tab(icon: Icon(Icons.warning), text: 'Mortality'),
             Tab(icon: Icon(Icons.vaccines), text: 'Vaccination'),
-            Tab(icon: Icon(Icons.medical_services), text: 'Health'),
+            Tab(icon: Icon(Icons.attach_money), text: 'Financial'),
+            Tab(icon: Icon(Icons.thermostat), text: 'Environment'),
           ],
         ),
       ),
+      floatingActionButton: _floatingActionButton,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(_error!, style: const TextStyle(color: Colors.red)),
-                    const SizedBox(height: 16),
-                    ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
-                  ],
-                ))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_error!, style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: 16),
+                      ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
+                    ],
+                  ),
+                )
               : TabBarView(
                   controller: _tabController,
                   children: [
                     _buildOverviewTab(),
-                    _buildEnvironmentTab(),
+                    _buildGrowthTab(),
+                    _buildFeedTab(),
+                    _buildWaterTab(),
+                    _buildMortalityTab(),
                     _buildVaccinationTab(),
-                    _buildHealthTab(),
+                    _buildFinancialTab(),
+                    _buildEnvironmentTab(),
                   ],
                 ),
     );
@@ -116,6 +263,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 Text(flock.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Text('Breed: ${flock.breedName ?? "Unknown"}'),
+                Text('Supplier: ${flock.supplierName ?? "None"}'),
                 Text('Housing: ${flock.housingType.replaceAll('_', ' ')}'),
                 Text('Started: ${flock.startDate.split('T').first}'),
                 Text('Age: Day ${flock.ageDays ?? 0}'),
@@ -147,10 +295,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 _FeedPhaseRow(phase: 'Grower', dayRange: 'Day ${feedTransition + 1} - $finisherDay', color: Colors.teal),
                 _FeedPhaseRow(phase: 'Finisher', dayRange: 'Day ${finisherDay + 1}+', color: Colors.brown),
                 const SizedBox(height: 8),
-                Text('Transition day: Day $feedTransition (configurable)',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                Text('Finisher start: Day $finisherDay (configurable)',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text('Transition day: Day $feedTransition (configurable)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text('Finisher start: Day $finisherDay (configurable)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
           ),
@@ -165,10 +311,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 children: [
                   const Text('Targets', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  if (flock.targetWeight != null)
-                    Text('Target weight: ${flock.targetWeight} kg'),
-                  if (flock.targetAge != null)
-                    Text('Target age: Day ${flock.targetAge}'),
+                  if (flock.targetWeight != null) Text('Target weight: ${flock.targetWeight} kg'),
+                  if (flock.targetAge != null) Text('Target age: Day ${flock.targetAge}'),
                 ],
               ),
             ),
@@ -177,14 +321,260 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     );
   }
 
+  Widget _buildGrowthTab() {
+    final analysis = _growthAnalysis;
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (analysis != null)
+            _SummaryCard(children: [
+              _SummaryRow('Current age', 'Day ${analysis.ageDays}'),
+              _SummaryRow('Records', '${analysis.records.length}'),
+              _SummaryRow('FCR', analysis.fcr?.toStringAsFixed(2) ?? '-'),
+            ]),
+          const SizedBox(height: 12),
+          if (_growthRecords.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No growth records yet.')))
+          else
+            ..._growthRecords.reversed.map((r) => _RecordCard(
+                  title: 'Day ${r.recordDate.difference(DateTime.parse(_flock!.startDate)).inDays}',
+                  subtitle: '${r.avgWeight} kg avg · ${r.sampleSize} sampled',
+                  trailing: Text(r.recordDate.toIso8601String().split('T').first),
+                  onEdit: AuthService.canEdit
+                      ? () => _navigateToForm(GrowthRecordForm(flockId: widget.flockId, record: r))
+                      : null,
+                  onDelete: AuthService.canDelete
+                      ? () => _deleteRecord<GrowthRecord>(
+                            label: 'growth record',
+                            record: r,
+                            name: (r) => '${r.avgWeight} kg on ${r.recordDate.toIso8601String().split('T').first}',
+                            onDelete: () => BroilerService.deleteGrowthRecord(r.id),
+                          )
+                      : null,
+                )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedTab() {
+    final summary = _feedSummary;
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (summary != null)
+            _SummaryCard(children: [
+              _SummaryRow('Total feed', '${summary.totalFeedKg.toStringAsFixed(1)} kg'),
+              _SummaryRow('Total cost', 'ZMW ${summary.totalCostZmw.toStringAsFixed(2)}'),
+              _SummaryRow('Cost/bird', 'ZMW ${summary.costPerBird.toStringAsFixed(2)}'),
+            ]),
+          const SizedBox(height: 12),
+          if (_feedRecords.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No feed records yet.')))
+          else
+            ..._feedRecords.reversed.map((r) => _RecordCard(
+                  title: '${r.feedType} · ${r.quantityKg.toStringAsFixed(1)} kg',
+                  subtitle: r.supplierName != null ? 'Supplier: ${r.supplierName}' : null,
+                  trailing: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(r.recordDate.toIso8601String().split('T').first),
+                      if (r.costZmw != null) Text('ZMW ${r.costZmw!.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  onEdit: AuthService.canEdit
+                      ? () => _navigateToForm(FeedRecordForm(flockId: widget.flockId, record: r))
+                      : null,
+                  onDelete: AuthService.canDelete
+                      ? () => _deleteRecord<FeedRecord>(
+                            label: 'feed record',
+                            record: r,
+                            name: (r) => '${r.quantityKg.toStringAsFixed(1)} kg ${r.feedType}',
+                            onDelete: () => BroilerService.deleteFeedRecord(r.id),
+                          )
+                      : null,
+                )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWaterTab() {
+    final ratio = _waterRatio;
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (ratio != null)
+            _SummaryCard(children: [
+              _SummaryRow('Total water', '${ratio.totalWaterLiters.toStringAsFixed(1)} L'),
+              _SummaryRow('Total feed', '${ratio.totalFeedKg.toStringAsFixed(1)} kg'),
+              _SummaryRow('Water:feed', ratio.waterToFeedRatio ?? '-'),
+            ]),
+          const SizedBox(height: 12),
+          if (_waterRecords.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No water records yet.')))
+          else
+            ..._waterRecords.reversed.map((r) => _RecordCard(
+                  title: '${r.quantityLiters.toStringAsFixed(1)} L',
+                  subtitle: 'pH ${r.ph?.toStringAsFixed(1) ?? '-'} · ${r.temperature?.toStringAsFixed(1) ?? '-'}°C',
+                  trailing: Text(r.recordDate.toIso8601String().split('T').first),
+                  onEdit: AuthService.canEdit
+                      ? () => _navigateToForm(WaterRecordForm(flockId: widget.flockId, record: r))
+                      : null,
+                  onDelete: AuthService.canDelete
+                      ? () => _deleteRecord<WaterRecord>(
+                            label: 'water record',
+                            record: r,
+                            name: (r) => '${r.quantityLiters.toStringAsFixed(1)} L',
+                            onDelete: () => BroilerService.deleteWaterRecord(r.id),
+                          )
+                      : null,
+                )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMortalityTab() {
+    final summary = _mortalitySummary;
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (summary != null)
+            _SummaryCard(children: [
+              _SummaryRow('Total deaths', '${summary.totalDeaths}'),
+              _SummaryRow('Mortality rate', '${summary.mortalityRate}%'),
+              _SummaryRow('Current count', '${summary.currentCount}'),
+            ]),
+          const SizedBox(height: 12),
+          if (_mortalityEvents.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No mortality events yet.')))
+          else
+            ..._mortalityEvents.reversed.map((r) => _RecordCard(
+                  title: '${r.count} birds · ${r.cause ?? 'Unknown cause'}',
+                  subtitle: r.ageDays != null ? 'Age day ${r.ageDays}' : null,
+                  trailing: Text(r.eventDate.toIso8601String().split('T').first),
+                  onEdit: AuthService.canEdit
+                      ? () => _navigateToForm(MortalityEventForm(flockId: widget.flockId, record: r))
+                      : null,
+                  onDelete: AuthService.canDelete
+                      ? () => _deleteRecord<MortalityEvent>(
+                            label: 'mortality event',
+                            record: r,
+                            name: (r) => '${r.count} birds on ${r.eventDate.toIso8601String().split('T').first}',
+                            onDelete: () => BroilerService.deleteMortalityEvent(r.id),
+                          )
+                      : null,
+                )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVaccinationTab() {
+    final status = _vaccinationStatus;
+    final completed = status?.completed ?? _vaccinationEvents;
+    final overdue = status?.overdue ?? <VaccinationScheduleItem>[];
+    final upcoming = status?.upcoming ?? <VaccinationScheduleItem>[];
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (overdue.isNotEmpty)
+            _SummaryCard(children: [
+              const Text('Overdue', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              ...overdue.map((i) => _SummaryRow(i.vaccineName, 'Day ${i.ageDays}')),
+            ]),
+          if (upcoming.isNotEmpty)
+            _SummaryCard(children: [
+              const Text('Upcoming', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              ...upcoming.map((i) => _SummaryRow(i.vaccineName, 'Day ${i.ageDays}')),
+            ]),
+          const SizedBox(height: 12),
+          if (completed.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No vaccination records yet.')))
+          else
+            ...completed.reversed.map((r) => _RecordCard(
+                  title: r.vaccineName,
+                  subtitle: '${r.adminMethod} · Day ${r.ageDays}${r.batchNumber != null ? ' · Batch ${r.batchNumber}' : ''}',
+                  trailing: Text(r.adminDate.toIso8601String().split('T').first),
+                  onEdit: AuthService.canEdit
+                      ? () => _navigateToForm(VaccinationEventForm(flockId: widget.flockId, record: r))
+                      : null,
+                  onDelete: AuthService.canDelete
+                      ? () => _deleteRecord<VaccinationEvent>(
+                            label: 'vaccination event',
+                            record: r,
+                            name: (r) => r.vaccineName,
+                            onDelete: () => BroilerService.deleteVaccinationEvent(r.id),
+                          )
+                      : null,
+                )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinancialTab() {
+    final summary = _financialSummary;
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (summary != null)
+            _SummaryCard(children: [
+              _SummaryRow('Revenue', 'ZMW ${summary.totalRevenue.toStringAsFixed(2)}'),
+              _SummaryRow('Costs', 'ZMW ${summary.totalCost.toStringAsFixed(2)}'),
+              _SummaryRow('Profit', 'ZMW ${summary.profit.toStringAsFixed(2)}'),
+              _SummaryRow('Profit/bird', 'ZMW ${summary.profitPerBird.toStringAsFixed(2)}'),
+            ]),
+          const SizedBox(height: 12),
+          if (_financialRecords.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No financial records yet.')))
+          else
+            ..._financialRecords.map((r) => _RecordCard(
+                  title: '${r.category} · ${r.description}',
+                  subtitle: r.isSystemGenerated ? 'System-generated' : null,
+                  trailing: Text(
+                    '${r.isIncome ? '+' : '-'} ZMW ${r.amountZmw.toStringAsFixed(2)}',
+                    style: TextStyle(color: r.isIncome ? Colors.green : Colors.red, fontWeight: FontWeight.bold),
+                  ),
+                  onEdit: AuthService.canEdit && !r.isSystemGenerated
+                      ? () => _navigateToForm(FinancialRecordForm(flockId: widget.flockId, record: r))
+                      : null,
+                  onDelete: AuthService.canDelete && !r.isSystemGenerated
+                      ? () => _deleteRecord<FinancialRecord>(
+                            label: 'financial record',
+                            record: r,
+                            name: (r) => r.description,
+                            onDelete: () => BroilerService.deleteFinancialRecord(r.id),
+                          )
+                      : null,
+                )),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEnvironmentTab() {
     final envDays = _calendarDays.where((d) => d.lightingTemperature != null).toList();
+    final docsUrl = '${ApiService.baseUrl}/docs/environment/Ross308_Zambia_Lighting_Temperature_Guide.md';
 
     if (envDays.isEmpty) {
       return const Center(child: Text('No environment targets scheduled'));
     }
-
-    final docsUrl = '${ApiService.baseUrl}/docs/environment/Ross308_Zambia_Lighting_Temperature_Guide.md';
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -224,11 +614,9 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text('Day ${day.day}',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      child: Text('Day ${day.day}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
-                    Text(day.date.split('T').first,
-                        style: const TextStyle(color: Colors.grey)),
+                    Text(day.date.split('T').first, style: const TextStyle(color: Colors.grey)),
                   ],
                 ),
                 const Divider(),
@@ -238,8 +626,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Light: ${env.lightHours ?? "-"}h / Dark: ${env.darkHours ?? "-"}h'),
-                          Text('Intensity: ${env.lightIntensityLux ?? "-"} lux'),
+                          Text('Light: ${env.lightHours ?? "-"}h'),
+                          Text('Dark: ${env.darkHours ?? "-"}h'),
                         ],
                       ),
                     ),
@@ -262,143 +650,6 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 ],
               ],
             ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildVaccinationTab() {
-    final vaccineDays = _calendarDays.where((d) => d.vaccines.isNotEmpty).toList();
-    final vaccineDocsUrl = '${ApiService.baseUrl}/docs/vaccines/Ross308_Zambia_Broiler_Management_Guide.md';
-
-    if (vaccineDays.isEmpty) {
-      return const Center(child: Text('No vaccination events scheduled'));
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: vaccineDays.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: const Icon(Icons.book),
-              title: const Text('Reference Guide'),
-              subtitle: const Text('Ross 308 Vaccination Schedule'),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () async {
-                final uri = Uri.parse(vaccineDocsUrl);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
-          );
-        }
-        final day = vaccineDays[index - 1];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.green.withAlpha(30),
-                      child: Text('${day.day}'),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text('Day ${day.day}',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-                    Text(day.date.split('T').first,
-                        style: const TextStyle(color: Colors.grey)),
-                  ],
-                ),
-                const Divider(),
-                ...day.vaccines.map((v) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(v.vaccineName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Chip(
-                                label: Text(v.vaccineType),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              const SizedBox(width: 8),
-                              Chip(
-                                label: Text(v.adminMethod),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                            ],
-                          ),
-                          if (v.notes != null && v.notes!.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(v.notes!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                          ],
-                        ],
-                      ),
-                    )),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildHealthTab() {
-    final healthDays = _calendarDays.where((d) =>
-        d.healthSupport.isNotEmpty &&
-        d.healthSupport != 'Monitor; vitamins/electrolytes if stress or heat. Ensure clean water and proper ventilation.'
-    ).toList();
-
-    if (healthDays.isEmpty) {
-      return const Center(child: Text('No health support notes for this flock'));
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: healthDays.length,
-      itemBuilder: (context, index) {
-        final day = healthDays[index];
-        final isVaccinationDay = day.healthSupport.contains('VACCINATION DAY');
-        final isPreVaccination = day.healthSupport.contains('PRE-VACCINATION');
-        final isPostVaccination = day.healthSupport.contains('POST-');
-
-        Color cardColor;
-        IconData icon;
-        if (isVaccinationDay) {
-          cardColor = Colors.red.withAlpha(20);
-          icon = Icons.vaccines;
-        } else if (isPreVaccination) {
-          cardColor = Colors.orange.withAlpha(20);
-          icon = Icons.warning;
-        } else if (isPostVaccination) {
-          cardColor = Colors.green.withAlpha(20);
-          icon = Icons.check_circle;
-        } else {
-          cardColor = Colors.blue.withAlpha(20);
-          icon = Icons.health_and_safety;
-        }
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          color: cardColor,
-          child: ListTile(
-            leading: Icon(icon, color: Colors.green),
-            title: Text('Day ${day.day} - ${day.feedPhase}'),
-            subtitle: Text(day.healthSupport, style: const TextStyle(fontSize: 12)),
-            isThreeLine: true,
           ),
         );
       },
@@ -447,6 +698,83 @@ class _FeedPhaseRow extends StatelessWidget {
           Text('$phase: ', style: const TextStyle(fontWeight: FontWeight.w600)),
           Text(dayRange),
         ],
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  final List<Widget> children;
+
+  const _SummaryCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _SummaryRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecordCard extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final Widget trailing;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  const _RecordCard({
+    required this.title,
+    this.subtitle,
+    required this.trailing,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        title: Text(title),
+        subtitle: subtitle != null ? Text(subtitle!) : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            trailing,
+            if (onEdit != null)
+              IconButton(icon: const Icon(Icons.edit), onPressed: onEdit),
+            if (onDelete != null)
+              IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: onDelete),
+          ],
+        ),
       ),
     );
   }

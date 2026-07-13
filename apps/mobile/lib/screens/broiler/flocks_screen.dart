@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
 import '../../models/flock.dart';
+import '../../services/auth_service.dart';
+import '../../services/broiler_service.dart';
 import 'flock_detail_screen.dart';
+import 'flock_form_screen.dart';
 
 class FlocksScreen extends StatefulWidget {
   const FlocksScreen({super.key});
@@ -27,17 +29,57 @@ class _FlocksScreenState extends State<FlocksScreen> {
       _error = null;
     });
     try {
-      final res = await ApiService.dio.get('/api/v1/broiler-flocks');
-      final flocks = (res.data as List).map((e) => BroilerFlock.fromJson(e)).toList();
+      final flocks = await BroilerService.getFlocks();
+      if (!mounted) return;
       setState(() {
         _flocks = flocks;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = 'Failed to load flocks';
+        _error = 'Failed to load flocks: $e';
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _createFlock() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FlockFormScreen()),
+    );
+    if (result != null) _loadFlocks();
+  }
+
+  Future<void> _editFlock(BroilerFlock flock) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => FlockFormScreen(flock: flock)),
+    );
+    if (result != null) _loadFlocks();
+  }
+
+  Future<void> _deleteFlock(BroilerFlock flock) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete flock?'),
+        content: Text('This will permanently delete "${flock.name}" and all its records.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await BroilerService.deleteFlock(flock.id);
+      if (mounted) _loadFlocks();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      }
     }
   }
 
@@ -63,21 +105,29 @@ class _FlocksScreenState extends State<FlocksScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadFlocks),
         ],
       ),
+      floatingActionButton: AuthService.canEdit
+          ? FloatingActionButton(
+              onPressed: _createFlock,
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _loadFlocks,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 16),
-                      ElevatedButton(onPressed: _loadFlocks, child: const Text('Retry')),
-                    ],
-                  ))
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(_error!, style: const TextStyle(color: Colors.red)),
+                        const SizedBox(height: 16),
+                        ElevatedButton(onPressed: _loadFlocks, child: const Text('Retry')),
+                      ],
+                    ),
+                  )
                 : _flocks.isEmpty
-                    ? const Center(child: Text('No flocks yet. Create one from the web app.'))
+                    ? const Center(child: Text('No flocks yet. Tap + to create one.'))
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
                         itemCount: _flocks.length,
@@ -125,13 +175,29 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                   ),
                                 ],
                               ),
-                              trailing: const Icon(Icons.chevron_right),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _editFlock(flock);
+                                  } else if (value == 'delete') {
+                                    _deleteFlock(flock);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  if (AuthService.canEdit)
+                                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  if (AuthService.canDelete)
+                                    const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                  if (!AuthService.canEdit && !AuthService.canDelete)
+                                    const PopupMenuItem(value: 'noop', enabled: false, child: Text('No actions')),
+                                ],
+                              ),
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => FlockDetailScreen(flockId: flock.id, flockName: flock.name),
                                 ),
-                              ),
+                              ).then((_) => _loadFlocks()),
                             ),
                           );
                         },

@@ -3,6 +3,8 @@ class BroilerFlock {
   final String name;
   final String breedId;
   final String? breedName;
+  final String? supplierId;
+  final String? supplierName;
   final String startDate;
   final int initialCount;
   final int currentCount;
@@ -15,12 +17,17 @@ class BroilerFlock {
   final String housingType;
   final String status;
   final int? ageDays;
+  final bool? chicksCollected;
+  final String? collectionDate;
+  final String? chickQualityNotes;
 
   BroilerFlock({
     required this.id,
     required this.name,
     required this.breedId,
     this.breedName,
+    this.supplierId,
+    this.supplierName,
     required this.startDate,
     required this.initialCount,
     required this.currentCount,
@@ -33,6 +40,9 @@ class BroilerFlock {
     this.housingType = 'whole_house',
     required this.status,
     this.ageDays,
+    this.chicksCollected,
+    this.collectionDate,
+    this.chickQualityNotes,
   });
 
   factory BroilerFlock.fromJson(Map<String, dynamic> json) {
@@ -41,6 +51,8 @@ class BroilerFlock {
       name: json['name'],
       breedId: json['breedId'] ?? json['breed_id'] ?? '',
       breedName: json['breed']?['name'],
+      supplierId: json['supplierId'] ?? json['supplier_id'],
+      supplierName: json['supplier']?['name'],
       startDate: json['startDate'] ?? json['start_date'] ?? '',
       initialCount: json['initialCount'] ?? json['initial_count'] ?? 0,
       currentCount: json['currentCount'] ?? json['current_count'] ?? 0,
@@ -59,6 +71,77 @@ class BroilerFlock {
       housingType: json['housingType'] ?? json['housing_type'] ?? 'whole_house',
       status: json['status'] ?? 'active',
       ageDays: json['ageDays'] ?? json['age_days'],
+      chicksCollected: json['chicksCollected'] ?? json['chicks_collected'],
+      collectionDate: json['collectionDate'] ?? json['collection_date'],
+      chickQualityNotes: json['chickQualityNotes'] ?? json['chick_quality_notes'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'breedId': breedId,
+      'startDate': startDate.split('T').first,
+      'initialCount': initialCount,
+      if (supplierId != null) 'supplierId': supplierId,
+      if (targetWeight != null) 'targetWeight': targetWeight,
+      if (targetAge != null) 'targetAge': targetAge,
+      'feedTransitionDay': feedTransitionDay ?? 18,
+      'finisherDay': finisherDay ?? 29,
+      if (chickPriceZmw != null) 'chickPriceZmw': chickPriceZmw,
+      if (housingType.isNotEmpty) 'housingType': housingType,
+      if (chicksCollected != null) 'chicksCollected': chicksCollected,
+      if (collectionDate != null) 'collectionDate': collectionDate,
+      if (chickQualityNotes != null && chickQualityNotes!.isNotEmpty)
+        'chickQualityNotes': chickQualityNotes,
+    };
+  }
+
+  BroilerFlock copyWith({
+    String? id,
+    String? name,
+    String? breedId,
+    String? breedName,
+    String? supplierId,
+    String? supplierName,
+    String? startDate,
+    int? initialCount,
+    int? currentCount,
+    double? targetWeight,
+    int? targetAge,
+    int? feedTransitionDay,
+    int? finisherDay,
+    double? chickPriceZmw,
+    double? salePriceZmw,
+    String? housingType,
+    String? status,
+    int? ageDays,
+    bool? chicksCollected,
+    String? collectionDate,
+    String? chickQualityNotes,
+  }) {
+    return BroilerFlock(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      breedId: breedId ?? this.breedId,
+      breedName: breedName ?? this.breedName,
+      supplierId: supplierId ?? this.supplierId,
+      supplierName: supplierName ?? this.supplierName,
+      startDate: startDate ?? this.startDate,
+      initialCount: initialCount ?? this.initialCount,
+      currentCount: currentCount ?? this.currentCount,
+      targetWeight: targetWeight ?? this.targetWeight,
+      targetAge: targetAge ?? this.targetAge,
+      feedTransitionDay: feedTransitionDay ?? this.feedTransitionDay,
+      finisherDay: finisherDay ?? this.finisherDay,
+      chickPriceZmw: chickPriceZmw ?? this.chickPriceZmw,
+      salePriceZmw: salePriceZmw ?? this.salePriceZmw,
+      housingType: housingType ?? this.housingType,
+      status: status ?? this.status,
+      ageDays: ageDays ?? this.ageDays,
+      chicksCollected: chicksCollected ?? this.chicksCollected,
+      collectionDate: collectionDate ?? this.collectionDate,
+      chickQualityNotes: chickQualityNotes ?? this.chickQualityNotes,
     );
   }
 }
