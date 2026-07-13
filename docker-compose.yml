@@ -47,6 +47,8 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       OWNER_EMAIL: ${OWNER_EMAIL:-owner@nkuku.local}
       OWNER_PASSWORD: ${OWNER_PASSWORD:-change_me}
+      NTFY_BASE_URL: ${NTFY_BASE_URL:-http://ntfy}
+      NTFY_DEFAULT_TOPIC: ${NTFY_DEFAULT_TOPIC:-nkuku-alerts}
     volumes:
       - ./apps/api/src:/app/src:ro
       - ./apps/api/prisma:/app/prisma:ro
@@ -102,11 +104,32 @@ services:
       - nkuku_public
     restart: unless-stopped
 
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    command: ["serve"]
+    environment:
+      NTFY_BASE_URL: ${NTFY_BASE_URL:-http://localhost:30085}
+      NTFY_CACHE_FILE: "/var/cache/ntfy/cache.db"
+      NTFY_ATTACHMENT_CACHE_DIR: "/var/cache/ntfy/attachments"
+    volumes:
+      - ntfy_data:/var/cache/ntfy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/v1/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "30085:80"
+    networks:
+      - nkuku_public
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
   api_node_modules:
   web_node_modules:
+  ntfy_data:
 
 networks:
   nkuku_internal:

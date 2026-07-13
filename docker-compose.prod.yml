@@ -54,6 +54,8 @@ services:
       OWNER_EMAIL: ${OWNER_EMAIL}
       OWNER_PASSWORD: ${OWNER_PASSWORD}
       CORS_ORIGINS: ${CORS_ORIGINS}
+      NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.deeztechnology.solutions}
+      NTFY_DEFAULT_TOPIC: ${NTFY_DEFAULT_TOPIC:-nkuku-alerts}
     # Bind to localhost only — ISPConfig nginx proxies in from the outside
     ports:
       - "127.0.0.1:30001:3001"
@@ -86,9 +88,31 @@ services:
       - nkuku_public
     restart: unless-stopped
 
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    command: ["serve"]
+    environment:
+      NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.deeztechnology.solutions}
+      NTFY_CACHE_FILE: "/var/cache/ntfy/cache.db"
+      NTFY_ATTACHMENT_CACHE_DIR: "/var/cache/ntfy/attachments"
+    volumes:
+      - ntfy_data:/var/cache/ntfy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/v1/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # Bind to localhost only — ISPConfig nginx proxies in from the outside
+    ports:
+      - "127.0.0.1:30085:80"
+    networks:
+      - nkuku_public
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
+  ntfy_data:
 
 networks:
   nkuku_internal:

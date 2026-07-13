@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'api_service.dart';
@@ -10,6 +11,29 @@ class AuthService {
   static bool get isLoggedIn => _token != null && _token!.isNotEmpty;
   static String? get token => _token;
   static Map<String, dynamic>? get user => _user;
+  static String? get role => _user?['role'];
+
+  static bool get isOwner => role == 'owner';
+  static bool get isManager => role == 'manager';
+  static bool get isViewer => role == 'viewer';
+  static bool get canEdit => isOwner || isManager;
+  static bool get canDelete => isOwner;
+
+  static final List<VoidCallback> _authStateListeners = [];
+
+  static void addAuthStateListener(VoidCallback listener) {
+    _authStateListeners.add(listener);
+  }
+
+  static void removeAuthStateListener(VoidCallback listener) {
+    _authStateListeners.remove(listener);
+  }
+
+  static void _notifyAuthStateChanged() {
+    for (final listener in _authStateListeners) {
+      listener();
+    }
+  }
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -37,7 +61,8 @@ class AuthService {
       await _prefs.setString('access_token', _token!);
       await _prefs.setString('refresh_token', data['refreshToken']);
       await _prefs.setString('user_email', _user!['email']);
-      await _prefs.setString('user_role', _user!['role']);
+      await _prefs.setString('user_role', _user!['role'] ?? 'viewer');
+      _notifyAuthStateChanged();
       return true;
     } on DioException catch (e) {
       if (e.type == DioExceptionType.connectionTimeout) {
@@ -71,6 +96,7 @@ class AuthService {
     await _prefs.remove('refresh_token');
     await _prefs.remove('user_email');
     await _prefs.remove('user_role');
+    _notifyAuthStateChanged();
   }
 }
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import 'dashboard_screen.dart';
+import '../widgets/bottom_nav.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _loading = false; });
     if (ok && mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        MaterialPageRoute(builder: (_) => const BottomNavShell()),
       );
     } else {
       setState(() { _error = AuthService.lastError ?? 'Invalid credentials'; });
@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Image.asset('assets/images/logo.png', height: 80),
+              Image.asset('assets/images/logo.png', height: 96, fit: BoxFit.contain),
               const SizedBox(height: 16),
               const Text(
                 'Nkuku Companion',

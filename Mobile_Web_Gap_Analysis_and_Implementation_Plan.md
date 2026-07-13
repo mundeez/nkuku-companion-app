@@ -307,7 +307,14 @@ Ordering is by dependency and stated priority: **daily broiler operations first*
 - `AlertsScreen`: list, filter by severity, generate, resolve, mark read.
 - `VaccineInventoryScreen`: full CRUD with expiry warning chips.
 - `SuppliersScreen`: add create/edit/delete, inline price editing, simple stage management (reorder buttons, not drag-and-drop).
-- Wire up `flutter_local_notifications` for alert push notifications.
+- Push notifications powered by a self-hosted **ntfy** instance (`https://ntfy.deeztechnology.solutions`). The API publishes alert messages to per-user ntfy topics; mobile listens via an SSE subscription and uses `flutter_local_notifications` to surface local notifications while the app is foregrounded or backgrounded.
+
+**Infrastructure**
+- Add an `ntfy` service to both `docker-compose.yml` and `docker-compose.prod.yml` using the official `binwiederhier/ntfy` image.
+- Dev compose exposes ntfy internally on the `nkuku_public` network and publishes to host port `30085:80` for browser/client access.
+- Prod compose binds ntfy to `127.0.0.1:30085:80` and relies on the existing reverse proxy (ISPConfig) to route `https://ntfy.deeztechnology.solutions` to it.
+- API environment variables: `NTFY_BASE_URL` (defaults to `http://ntfy` in dev, `https://ntfy.deeztechnology.solutions` in prod) and `NTFY_DEFAULT_TOPIC`.
+- Persist ntfy messages/cache in a Docker volume (`ntfy_data`).
 
 **Files / modules**
 
@@ -317,13 +324,15 @@ Ordering is by dependency and stated priority: **daily broiler operations first*
 | `lib/screens/vaccine_inventory_screen.dart` | **New** |
 | `lib/screens/suppliers_screen.dart` | Add CRUD actions |
 | `lib/models/supplier.dart` | Extend with editable fields |
-| `lib/services/notification_service.dart` | **New** — notification permission + scheduling |
+| `lib/services/notification_service.dart` | **New** — ntfy topic registration, SSE subscription, local notification display, and permission handling |
 
 **Rollback:** Revert `suppliers_screen.dart` to current read-only version if editing breaks.
 
 **Verification**
 - Integration tests for alerts and vaccine inventory CRUD.
 - Notification permission prompt smoke test on Android and iOS.
+- Verify the ntfy service is healthy at `http://ntfy:80` (dev) / `https://ntfy.deeztechnology.solutions` (prod).
+- Publish a test message through the API and confirm it appears as a local notification on the device.
 
 ---
 
@@ -396,13 +405,21 @@ Ordering is by dependency and stated priority: **daily broiler operations first*
 
 ---
 
-## 8. Questions Requiring Decision Before Implementation
+## 8. Decisions Made
 
-1. **Intentional divergences** — which items in Section 5 do you accept as mobile-only behaviour?
-2. **Offline support** — keep `drift`/SQLite for future offline caching, or remove it now?
-3. **Year-end close** — confirm web-only, or simplified mobile version?
-4. **Journal entry creation** — simplified form on mobile, or full web parity?
-5. **Notification delivery** — local only, or integrate with a push service (FCM/APNs)?
+| Question | Decision |
+|----------|----------|
+| Intentional divergences | Accept all four: Year-end close and Audit log web-only; Print calendar replaced by native share; Supplier reordering uses buttons instead of drag-and-drop. |
+| Offline support / Drift | Keep `drift` / `sqlite3_flutter_libs`; pin versions and add a future offline-sync milestone. |
+| Year-end close | Web-only. |
+| Journal entry creation on mobile | Simplified form (2+ lines, basic account picker). |
+| Notification delivery | Self-hosted ntfy (`https://ntfy.deeztechnology.solutions`) for push notifications; mobile uses SSE + `flutter_local_notifications`. Firebase dependencies removed.
+
+---
+
+## 9. Next Action
+
+Proceed with **Milestone M3-1 — Foundation, Auth & Dashboard Parity**.
 
 ---
 

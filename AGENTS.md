@@ -243,14 +243,22 @@ In ISPConfig:
 The directives already include `X-Forwarded-Proto` so the backend correctly detects HTTPS.
 
 ### Step 6 — Mobile APK for Production
-Edit `apps/mobile/lib/services/api_service.dart`:
-```dart
-const String _baseUrl = 'https://nkuku.deeztechnology.solutions/api';
+The API base URL is set at build time via `--dart-define=APP_API_BASE_URL=...`. No source edit is required.
+
+**Development builds**
+```bash
+# Android emulator
+cd apps/mobile
+flutter build apk --debug --dart-define=APP_API_BASE_URL=http://10.0.2.2:30001
+
+# iOS simulator
+flutter build ios --debug --dart-define=APP_API_BASE_URL=http://localhost:30001
 ```
-Then rebuild:
+
+**Production build**
 ```bash
 cd apps/mobile
-flutter build apk --release
+flutter build apk --release --dart-define=APP_API_BASE_URL=https://nkuku.deeztechnology.solutions
 ```
 
 ### Updates (subsequent deploys)

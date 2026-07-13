@@ -1,17 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
+import '../models/dashboard_summary.dart';
+import '../services/dashboard_service.dart';
 import '../services/auth_service.dart';
-import '../services/api_service.dart';
-import '../models/supplier.dart';
-import '../models/cycle.dart';
-import 'login_screen.dart';
-import 'suppliers_screen.dart';
-import 'projections_screen.dart';
-import 'expansion_plan_screen.dart';
-import 'financials/financial_dashboard_screen.dart';
-import 'broiler/flocks_screen.dart';
-import 'broiler/vaccination_schedules_screen.dart';
-import 'broiler/diseases_screen.dart';
-import 'ledger/ledger_dashboard_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -21,44 +13,41 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _suppliers = 0;
-  int _cycles = 0;
-  int _batches = 0;
+  DashboardSummary? _summary;
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    ApiService.setupInterceptors();
-    _loadStats();
+    _loadSummary();
   }
 
-  Future<void> _loadStats() async {
+  Future<void> _loadSummary() async {
     try {
-      final suppliersRes = await ApiService.dio.get('/api/v1/suppliers');
-      final cyclesRes = await ApiService.dio.get('/api/v1/expansion-plan');
-      final suppliers = (suppliersRes.data as List).map((e) => Supplier.fromJson(e)).toList();
-      final cycles = (cyclesRes.data as List).map((e) => ProductionCycle.fromJson(e)).toList();
-      setState(() {
-        _suppliers = suppliers.length;
-        _cycles = cycles.length;
-        _batches = cycles.fold(0, (sum, c) => sum + c.batches.length);
-        _loading = false;
-      });
+      setState(() => _loading = true);
+      final summary = await DashboardService.fetchSummary();
+      if (mounted) {
+        setState(() {
+          _summary = summary;
+          _error = null;
+          _loading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
-  }
-
-  void _logout() {
-    AuthService.logout();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -69,130 +58,186 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-            tooltip: 'Logout',
-          ),
+          if (AuthService.canEdit)
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined),
+              onPressed: () {
+                // TODO(M3-4): navigate to AlertsScreen
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Alerts screen coming in M3-4')),
+                );
+              },
+            ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadStats,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  _StatCard(
-                    icon: Icons.store,
-                    label: 'Suppliers',
-                    value: _suppliers.toString(),
-                    color: Colors.blue,
-                  ),
-                  _StatCard(
-                    icon: Icons.repeat,
-                    label: 'Cycles',
-                    value: _cycles.toString(),
-                    color: Colors.orange,
-                  ),
-                  _StatCard(
-                    icon: Icons.egg_alt,
-                    label: 'Batches',
-                    value: _batches.toString(),
-                    color: Colors.green,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  _ActionTile(
-                    icon: Icons.calculate,
-                    title: 'Run Projection',
-                    subtitle: 'Calculate costs & profits',
-                    onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ProjectionsScreen())),
-                  ),
-                  _ActionTile(
-                    icon: Icons.store,
-                    title: 'Suppliers',
-                    subtitle: 'View feed suppliers',
-                    onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const SuppliersScreen())),
-                  ),
-                  _ActionTile(
-                    icon: Icons.calendar_month,
-                    title: 'Expansion Plan',
-                    subtitle: 'View production cycles',
-                    onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ExpansionPlanScreen())),
-                  ),
-                  _ActionTile(
-                    icon: Icons.egg_alt,
-                    title: 'Broiler Flocks',
-                    subtitle: 'Manage active flocks & vaccination calendar',
-                    onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const FlocksScreen())),
-                  ),
-                  _ActionTile(
-                    icon: Icons.vaccines,
-                    title: 'Vaccination Schedules',
-                    subtitle: 'Ross 308 Lusaka vaccination programmes',
-                    onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const VaccinationSchedulesScreen())),
-                  ),
-                  _ActionTile(
-                    icon: Icons.medical_services,
-                    title: 'Disease Database',
-                    subtitle: 'Symptoms, treatment & withdrawal periods',
-                    onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const DiseasesScreen())),
-                  ),
-                  _ActionTile(
-                    icon: Icons.account_balance_wallet,
-                    title: 'Financials',
-                    subtitle: 'Statements, reports & exports',
-                    onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const FinancialDashboardScreen())),
-                  ),
-                  _ActionTile(
-                    icon: Icons.menu_book,
-                    title: 'Ledger',
-                    subtitle: 'Trial balance, chart of accounts & journal',
-                    onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const LedgerDashboardScreen())),
-                  ),
-                ],
-              ),
+        onRefresh: _loadSummary,
+        child: _buildBody(theme),
       ),
+    );
+  }
+
+  Widget _buildBody(ThemeData theme) {
+    if (_loading && _summary == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Failed to load dashboard', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: _loadSummary, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+    final s = _summary!;
+    final k = s.kpis;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _KpiGrid(kpis: k),
+        const SizedBox(height: 24),
+        _SectionTitle(title: 'Financials', action: s.monthlyTrend.isEmpty ? const Text('No data yet', style: TextStyle(color: Colors.grey)) : null),
+        const SizedBox(height: 12),
+        if (s.monthlyTrend.isNotEmpty) _MonthlyTrendCard(items: s.monthlyTrend),
+        const SizedBox(height: 24),
+        _SectionTitle(title: 'Cost Breakdown'),
+        const SizedBox(height: 12),
+        if (s.costBreakdown.isNotEmpty) _CostBreakdownCard(items: s.costBreakdown),
+        const SizedBox(height: 24),
+        _SectionTitle(title: 'Flock Profitability'),
+        const SizedBox(height: 12),
+        if (s.flockProfitability.isNotEmpty)
+          _FlockProfitabilityList(items: s.flockProfitability)
+        else
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No flocks with financial data yet.'),
+            ),
+          ),
+        const SizedBox(height: 24),
+        _SectionTitle(
+          title: 'Recent Alerts',
+          action: Text('${k.openAlerts} open', style: TextStyle(color: k.openAlerts > 0 ? theme.colorScheme.error : Colors.grey)),
+        ),
+        const SizedBox(height: 12),
+        if (s.recentAlerts.isNotEmpty)
+          _RecentAlertsList(alerts: s.recentAlerts)
+        else
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No recent alerts.'),
+            ),
+          ),
+        const SizedBox(height: 32),
+      ],
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final IconData icon;
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final Widget? action;
+
+  const _SectionTitle({required this.title, this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        if (action != null) action!,
+      ],
+    );
+  }
+}
+
+class _KpiGrid extends StatelessWidget {
+  final DashboardKpis kpis;
+
+  const _KpiGrid({required this.kpis});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _Kpi('Active Flocks', kpis.activeFlocks.toString(), Icons.trending_up, Colors.blue, subtitle: '${kpis.pendingFlocks} pending'),
+      _Kpi('Total Birds', kpis.totalBirds.toString(), Icons.egg_alt, Colors.green, subtitle: 'Across active flocks'),
+      _Kpi('Mortality Rate', '${kpis.mortalityRate.toStringAsFixed(1)}%', Icons.warning, _mortalityColor(kpis.mortalityRate), subtitle: 'Active flocks avg'),
+      _Kpi('Net Profit', 'ZMW ${_fmt(kpis.netProfit)}', Icons.account_balance_wallet, kpis.netProfit < 0 ? Colors.red : Colors.green, subtitle: 'All flocks'),
+      _Kpi('Profit / Bird', 'ZMW ${_fmt(kpis.profitPerBird)}', Icons.attach_money, kpis.profitPerBird < 0 ? Colors.red : Colors.green, subtitle: 'Per bird'),
+      _Kpi('Open Alerts', kpis.openAlerts.toString(), Icons.notifications_active, kpis.openAlerts > 0 ? Colors.orange : Colors.grey, subtitle: '${kpis.openAlerts} critical'),
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.55,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: items.length,
+      itemBuilder: (_, i) => _KpiCard(item: items[i]),
+    );
+  }
+
+  Color _mortalityColor(double rate) {
+    if (rate > 10) return Colors.red;
+    if (rate > 5) return Colors.orange;
+    return Colors.blue;
+  }
+}
+
+class _Kpi {
   final String label;
   final String value;
+  final IconData icon;
   final Color color;
+  final String subtitle;
 
-  const _StatCard({required this.icon, required this.label, required this.value, required this.color});
+  _Kpi(this.label, this.value, this.icon, this.color, {required this.subtitle});
+}
+
+class _KpiCard extends StatelessWidget {
+  final _Kpi item;
+
+  const _KpiCard({required this.item});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            CircleAvatar(
-              backgroundColor: color.withAlpha(30),
-              child: Icon(icon, color: color),
+            Row(
+              children: [
+                Icon(item.icon, size: 18, color: item.color),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(item.label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ),
+              ],
             ),
-            const SizedBox(width: 16),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: Colors.grey)),
-                Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                Text(item.value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: item.color)),
+                Text(item.subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
               ],
             ),
           ],
@@ -202,26 +247,196 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _ActionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
+class _MonthlyTrendCard extends StatelessWidget {
+  final List<MonthlyTrendItem> items;
 
-  const _ActionTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  const _MonthlyTrendCard({required this.items});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.green),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+    final maxY = items.map((e) => e.revenue > e.cost ? e.revenue : e.cost).reduce((a, b) => a > b ? a : b).toDouble();
+    final interval = maxY > 0 ? maxY / 4 : 1.0;
+
+    return SizedBox(
+      height: 220,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: BarChart(
+            BarChartData(
+              maxY: maxY * 1.2,
+              gridData: FlGridData(show: true, drawVerticalLine: false),
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (v, _) {
+                      final idx = v.toInt();
+                      if (idx < 0 || idx >= items.length) return const SizedBox.shrink();
+                      return Text(items[idx].month.substring(0, 3), style: const TextStyle(fontSize: 10));
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: true, reservedSize: 40, interval: interval),
+                ),
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: List.generate(items.length, (i) {
+                return BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(toY: items[i].revenue, color: Colors.green, width: 6, borderRadius: BorderRadius.circular(2)),
+                    BarChartRodData(toY: items[i].cost, color: Colors.red, width: 6, borderRadius: BorderRadius.circular(2)),
+                  ],
+                );
+              }),
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
+class _CostBreakdownCard extends StatelessWidget {
+  final List<CostBreakdownItem> items;
+
+  const _CostBreakdownCard({required this.items});
+
+  static const _categoryColors = {
+    'chick_purchase': Colors.blue,
+    'feed': Colors.orange,
+    'vaccines': Colors.green,
+    'medication': Colors.purple,
+    'labor': Colors.pink,
+    'utilities': Colors.cyan,
+    'equipment': Colors.deepOrange,
+    'sales': Colors.lightGreen,
+    'other': Colors.grey,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final total = items.fold<double>(0, (sum, e) => sum + e.amount);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 180,
+              child: PieChart(
+                PieChartData(
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 32,
+                  sections: items.where((e) => e.amount > 0).map((e) {
+                    final pct = total > 0 ? e.amount / total : 0.0;
+                    return PieChartSectionData(
+                      value: e.amount,
+                      title: '${(pct * 100).toStringAsFixed(0)}%',
+                      color: _categoryColors[e.category] ?? Colors.grey,
+                      radius: 48,
+                      titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: items.where((e) => e.amount > 0).map((e) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 10, height: 10, decoration: BoxDecoration(color: _categoryColors[e.category] ?? Colors.grey, borderRadius: BorderRadius.circular(2))),
+                    const SizedBox(width: 4),
+                    Text('${e.category}: ZMW ${_fmt(e.amount)}', style: const TextStyle(fontSize: 11)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FlockProfitabilityList extends StatelessWidget {
+  final List<FlockProfitabilityItem> items;
+
+  const _FlockProfitabilityList({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Column(
+        children: items.map((f) {
+          return ListTile(
+            dense: true,
+            title: Text('${f.flockName} (${f.breedName})'),
+            subtitle: Text('Age ${f.ageDays}d · ${f.currentCount} birds · mortality ${f.mortalityRate.toStringAsFixed(1)}%'),
+            trailing: Text(
+              'ZMW ${_fmt(f.profit)}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: f.profit < 0 ? Colors.red : Colors.green,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _RecentAlertsList extends StatelessWidget {
+  final List<RecentAlertItem> alerts;
+
+  const _RecentAlertsList({required this.alerts});
+
+  Color _severityColor(String severity) {
+    switch (severity) {
+      case 'critical':
+        return Colors.red;
+      case 'warning':
+        return Colors.orange;
+      default:
+        return Colors.blue;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Column(
+        children: alerts.take(5).map((a) {
+          return ListTile(
+            dense: true,
+            leading: Icon(Icons.warning, color: _severityColor(a.severity)),
+            title: Text(a.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text('${a.flockName} · ${_timeAgo(a.createdAt)}'),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+String _fmt(double n) {
+  final f = NumberFormat('#,##0', 'en_ZM');
+  return f.format(n);
+}
+
+String _timeAgo(DateTime date) {
+  final diff = DateTime.now().difference(date);
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  return '${diff.inDays}d ago';
+}
