@@ -29,9 +29,11 @@ describe('Lighting & Temperature Schedules', () => {
       body: JSON.stringify({
         name: 'Env Test Flock',
         breedId,
-        startDate: '2026-06-01',
+        orderDate: '2026-07-01',
         initialCount: 500,
         housingType: 'whole_house',
+        chicksCollected: true,
+        collectionDate: '2026-07-05',
       }),
     }).then((r) => r.json());
     flockId = flock.id;

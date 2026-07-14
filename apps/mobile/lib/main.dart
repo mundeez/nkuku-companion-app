@@ -3,11 +3,13 @@ import 'screens/login_screen.dart';
 import 'widgets/bottom_nav.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
 import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AuthService.init();
+  await NotificationService.init();
   ApiService.setupInterceptors();
   runApp(const NkukuApp());
 }
@@ -29,6 +31,9 @@ class _NkukuAppState extends State<NkukuApp> {
     _themeProvider.addListener(_onThemeChanged);
     AuthService.addAuthStateListener(_onAuthChanged);
     ApiService.onAuthFailure = _onAuthFailure;
+    if (AuthService.isLoggedIn) {
+      NotificationService.startListening();
+    }
   }
 
   void _onThemeChanged() {
@@ -36,7 +41,14 @@ class _NkukuAppState extends State<NkukuApp> {
   }
 
   void _onAuthChanged() {
-    if (mounted) setState(() => _isLoggedIn = AuthService.isLoggedIn);
+    if (mounted) {
+      setState(() => _isLoggedIn = AuthService.isLoggedIn);
+      if (AuthService.isLoggedIn) {
+        NotificationService.startListening();
+      } else {
+        NotificationService.stop();
+      }
+    }
   }
 
   void _onAuthFailure() {

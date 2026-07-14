@@ -26,7 +26,7 @@ interface FlockFormData {
   name: string;
   breedId: string;
   supplierId?: string;
-  startDate: string;
+  orderDate: string;
   initialCount: number;
   targetWeight?: number;
   targetAge?: number;
@@ -41,7 +41,7 @@ interface FlockFormData {
 const emptyForm: FlockFormData = {
   name: "",
   breedId: "",
-  startDate: new Date().toISOString().split("T")[0],
+  orderDate: new Date().toISOString().split("T")[0],
   initialCount: 500,
   targetWeight: 2.5,
   targetAge: 42,
@@ -105,7 +105,7 @@ export default function BroilerFlocksPage() {
       name: flock.name,
       breedId: flock.breedId,
       supplierId: flock.supplierId,
-      startDate: new Date(flock.startDate).toISOString().split("T")[0],
+      orderDate: flock.orderDate ? new Date(flock.orderDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
       initialCount: flock.initialCount,
       targetWeight: flock.targetWeight ? Number(flock.targetWeight) : undefined,
       targetAge: flock.targetAge ? Number(flock.targetAge) : undefined,
@@ -133,7 +133,8 @@ export default function BroilerFlocksPage() {
     }
   }
 
-  function getAgeDays(startDate: string): number {
+  function getAgeDays(startDate?: string | null): number | null {
+    if (!startDate) return null;
     const today = new Date();
     const start = new Date(startDate);
     return Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -266,11 +267,23 @@ export default function BroilerFlocksPage() {
                   {getStatusBadge(flock.status, flock.chicksCollected)}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {flock.breed?.name} | {flock.housingType?.replace("_", " ")} | Day {ageDays}
+                  {flock.breed?.name} | {flock.housingType?.replace("_", " ")}
                 </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Age</span>
+                    <span className={`font-medium ${ageDays === null ? "text-amber-600" : ""}`}>
+                      {ageDays === null ? "Pending collection" : `Day ${ageDays}`}
+                    </span>
+                  </div>
+                  {flock.orderDate && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Ordered</span>
+                      <span className="font-medium">{new Date(flock.orderDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Birds</span>
                     <span className="font-medium">{flock.currentCount} / {flock.initialCount}</span>
@@ -369,7 +382,7 @@ export default function BroilerFlocksPage() {
         <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-0">
             <DialogTitle>Create New Flock</DialogTitle>
-            <DialogDescription>Enter flock details. Start date = Day 0.</DialogDescription>
+            <DialogDescription>Enter flock details. Start date is set automatically when chicks are collected.</DialogDescription>
           </DialogHeader>
           <div className="overflow-y-auto px-6 py-4 space-y-4">
             <div>
@@ -388,8 +401,8 @@ export default function BroilerFlocksPage() {
               </Select>
             </div>
             <div>
-              <Label>Start Date (Day 0)</Label>
-              <Input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+              <Label>Order Date</Label>
+              <Input type="date" value={form.orderDate} onChange={(e) => setForm({ ...form, orderDate: e.target.value })} required />
             </div>
             <div>
               <Label>Initial Bird Count</Label>
@@ -505,7 +518,7 @@ export default function BroilerFlocksPage() {
           </div>
           <DialogFooter className="p-6 pt-0">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={formLoading || !form.name || !form.breedId}>
+            <Button onClick={handleCreate} disabled={formLoading || !form.name || !form.breedId || !form.orderDate}>
               {formLoading ? "Creating..." : "Create Flock"}
             </Button>
           </DialogFooter>
@@ -522,6 +535,10 @@ export default function BroilerFlocksPage() {
             <div>
               <Label>Flock Name</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div>
+              <Label>Order Date</Label>
+              <Input type="date" value={form.orderDate || ""} onChange={(e) => setForm({ ...form, orderDate: e.target.value })} />
             </div>
             <div>
               <Label>Initial Bird Count</Label>

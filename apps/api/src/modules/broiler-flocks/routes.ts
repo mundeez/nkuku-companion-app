@@ -9,7 +9,7 @@ const FlockCreateSchema = z.object({
   name: z.string().min(1).max(100),
   breedId: z.string().uuid(),
   supplierId: z.string().uuid().optional(),
-  startDate: dateOrIso,
+  orderDate: dateOrIso,
   initialCount: z.number().int().min(1),
   targetWeight: z.number().positive().optional(),
   targetAge: z.number().int().positive().optional(),
@@ -26,6 +26,7 @@ const FlockUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   breedId: z.string().uuid().optional(),
   supplierId: z.string().uuid().optional().nullable(),
+  orderDate: dateOrIso.nullable().optional(),
   targetWeight: z.number().positive().optional(),
   targetAge: z.number().int().positive().optional(),
   feedTransitionDay: z.number().int().min(1).max(28).optional(),
@@ -89,14 +90,17 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const data = FlockCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
-    const startDate = new Date(data.startDate);
+    const orderDate = new Date(data.orderDate);
     const collectionDate = data.collectionDate ? new Date(data.collectionDate) : null;
+    // startDate is derived from collectionDate; null until chicks are collected
+    const startDate = (data.chicksCollected && collectionDate) ? collectionDate : null;
 
     const flock = await prisma.broilerFlock.create({
       data: {
         name: data.name,
         breedId: data.breedId,
         supplierId: data.supplierId,
+        orderDate,
         startDate,
         initialCount: data.initialCount,
         currentCount: data.initialCount,
@@ -124,7 +128,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         data: {
           flockId: flock.id,
           sourceTable: 'broiler_flocks',
-          recordDate: startDate,
+          recordDate: orderDate,
           category: 'chick_purchase',
           description: `Day-old chicks - ${supplier?.name || 'Unknown'} (${data.initialCount} birds)`,
           amountZmw: data.chickPriceZmw * data.initialCount,
@@ -144,6 +148,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const authUser = (request as any).authUser;
 
     const updateData: any = { ...raw };
+    if (raw.orderDate) updateData.orderDate = new Date(raw.orderDate);
+    if (raw.orderDate === null) updateData.orderDate = null;
     if (raw.collectionDate) updateData.collectionDate = new Date(raw.collectionDate);
     if (raw.collectionDate === null) updateData.collectionDate = null;
     if (raw.chickQualityNotes === '') updateData.chickQualityNotes = null;
@@ -152,6 +158,17 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       where: { id, createdBy: authUser.userId },
     });
     if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    // When chicksCollected transitions to true, auto-set startDate = collectionDate
+    if (raw.chicksCollected === true && !existing.chicksCollected) {
+      const collDate = raw.collectionDate ? new Date(raw.collectionDate) : (existing.collectionDate ? new Date(existing.collectionDate) : new Date());
+      updateData.startDate = collDate;
+      updateData.collectionDate = collDate;
+    }
+    // When chicksCollected transitions to false, clear startDate
+    if (raw.chicksCollected === false && existing.chicksCollected) {
+      updateData.startDate = null;
+    }
 
     if (raw.status === 'sold' && existing.status !== 'sold') {
       updateData.soldDate = raw.soldDate ? new Date(raw.soldDate) : new Date();
@@ -223,15 +240,15 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
-    // Calculate current age in days
+    // Calculate current age in days (null if not yet collected)
     const today = new Date();
-    const startDate = new Date(flock.startDate);
-    const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const startDate = flock.startDate ? new Date(flock.startDate) : null;
+    const ageDays = startDate ? Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
     // Get target weight for current age
-    const target = await prisma.performanceTarget.findUnique({
+    const target = ageDays !== null ? await prisma.performanceTarget.findUnique({
       where: { breedId_ageDays: { breedId: flock.breedId, ageDays } },
-    });
+    }) : null;
 
     // Calculate mortality rate
     const totalMortality = await prisma.mortalityEvent.aggregate({
@@ -262,6 +279,11 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       include: { breed: true },
     });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    // If chicks not yet collected (no startDate), return empty calendar
+    if (!flock.startDate) {
+      return { flock, ageDays: null, events: [] };
+    }
 
     const startDate = new Date(flock.startDate);
     const targetAge = flock.targetAge || 42;
@@ -374,6 +396,11 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
+    // If chicks not yet collected (no startDate), return minimal summary
+    if (!flock.startDate) {
+      return { flock, ageDays: null, targetAge: flock.targetAge || 42, days: [] };
+    }
+
     const startDate = new Date(flock.startDate);
     const targetAge = flock.targetAge || 42;
     const today = new Date();
@@ -484,6 +511,11 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       include: { breed: true },
     });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    // If chicks not yet collected (no startDate), return null performance
+    if (!flock.startDate) {
+      return { flock, ageDays: null, target: null, records: [] };
+    }
 
     const today = new Date();
     const startDate = new Date(flock.startDate);

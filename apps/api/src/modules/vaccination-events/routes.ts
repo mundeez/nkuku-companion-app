@@ -53,6 +53,11 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
+    // If chicks not yet collected (no startDate), return empty schedule
+    if (!flock.startDate) {
+      return { schedule: [], ageDays: null };
+    }
+
     const today = new Date();
     const startDate = new Date(flock.startDate);
     const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));

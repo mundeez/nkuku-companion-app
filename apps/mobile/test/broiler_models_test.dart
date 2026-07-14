@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nkuku_mobile/models/breed.dart';
+import 'package:nkuku_mobile/models/environmental_record.dart';
 import 'package:nkuku_mobile/models/feed_record.dart';
 import 'package:nkuku_mobile/models/financial_record.dart';
 import 'package:nkuku_mobile/models/flock.dart';
+import 'package:nkuku_mobile/models/flock_task.dart';
 import 'package:nkuku_mobile/models/growth_record.dart';
+import 'package:nkuku_mobile/models/medication_record.dart';
 import 'package:nkuku_mobile/models/mortality_event.dart';
 import 'package:nkuku_mobile/models/vaccination_event.dart';
 import 'package:nkuku_mobile/models/water_record.dart';
@@ -253,6 +256,230 @@ void main() {
       expect(breed.name, 'Ross 308');
       expect(breed.performanceTargets.length, 1);
       expect(breed.performanceTargets.first.targetWeightG, 180.5);
+    });
+  });
+
+  group('MedicationRecord', () {
+    test('round-trips full record', () {
+      final json = {
+        'id': 'med1',
+        'flockId': 'f1',
+        'recordDate': '2026-06-15',
+        'productName': 'Enrofloxacin',
+        'category': 'antibiotic',
+        'dose': '10 mg/kg',
+        'route': 'oral',
+        'startDate': '2026-06-15',
+        'endDate': '2026-06-20',
+        'withdrawalDays': 7,
+        'costZmw': 250.0,
+        'veterinarian': 'Dr. Phiri',
+        'notes': 'Respiratory infection',
+      };
+      final r = MedicationRecord.fromJson(json);
+      expect(r.productName, 'Enrofloxacin');
+      expect(r.category, 'antibiotic');
+      expect(r.dose, '10 mg/kg');
+      expect(r.withdrawalDays, 7);
+      expect(r.costZmw, 250.0);
+      expect(r.endDate, DateTime(2026, 6, 20));
+      final j = r.toJson();
+      expect(j['productName'], 'Enrofloxacin');
+      expect(j['startDate'], '2026-06-15');
+      expect(j['endDate'], '2026-06-20');
+      expect(j['costZmw'], 250.0);
+    });
+
+    test('parses snake_case aliases', () {
+      final json = {
+        'id': 'med2',
+        'flock_id': 'f1',
+        'record_date': '2026-07-01',
+        'product_name': 'Vitamin C',
+        'category': 'vitamin',
+        'start_date': '2026-07-01',
+      };
+      final r = MedicationRecord.fromJson(json);
+      expect(r.flockId, 'f1');
+      expect(r.productName, 'Vitamin C');
+      expect(r.category, 'vitamin');
+    });
+
+    test('handles optional nulls', () {
+      final json = {
+        'id': 'med3',
+        'flockId': 'f1',
+        'recordDate': '2026-06-01',
+        'productName': 'Probiotic Plus',
+        'category': 'probiotic',
+        'startDate': '2026-06-01',
+      };
+      final r = MedicationRecord.fromJson(json);
+      expect(r.dose, isNull);
+      expect(r.costZmw, isNull);
+      expect(r.endDate, isNull);
+      expect(r.withdrawalDate, isNull);
+    });
+
+    test('copyWith preserves unchanged fields', () {
+      final original = MedicationRecord(
+        id: 'med4',
+        flockId: 'f1',
+        recordDate: DateTime(2026, 6, 1),
+        productName: 'Coccidiostatic',
+        category: 'coccidiostat',
+        startDate: DateTime(2026, 6, 1),
+      );
+      final copy = original.copyWith(productName: 'Updated');
+      expect(copy.productName, 'Updated');
+      expect(copy.flockId, 'f1');
+      expect(copy.category, 'coccidiostat');
+    });
+  });
+
+  group('EnvironmentalRecord', () {
+    test('round-trips full record', () {
+      final json = {
+        'id': 'env1',
+        'flockId': 'f1',
+        'recordDate': '2026-06-15',
+        'timeOfDay': 'morning',
+        'temperatureC': 32.5,
+        'humidityPct': 65.0,
+        'ammoniaPpm': 12.0,
+        'lightHours': 20.0,
+        'litterScore': 3,
+        'ventilationNote': 'Side curtains open',
+        'notes': 'Hot day',
+      };
+      final r = EnvironmentalRecord.fromJson(json);
+      expect(r.temperatureC, 32.5);
+      expect(r.humidityPct, 65.0);
+      expect(r.litterScore, 3);
+      expect(r.timeOfDay, 'morning');
+      final j = r.toJson();
+      expect(j['temperatureC'], 32.5);
+      expect(j['humidityPct'], 65.0);
+      expect(j['lightHours'], 20.0);
+      expect(j['litterScore'], 3);
+    });
+
+    test('parses snake_case aliases', () {
+      final json = {
+        'id': 'env2',
+        'flock_id': 'f1',
+        'record_date': '2026-07-01',
+        'temperature_c': '28',
+        'humidity_pct': '70',
+        'ammonia_ppm': '8.5',
+        'light_hours': '18',
+        'litter_score': 2,
+        'ventilation_note': 'Fan on',
+      };
+      final r = EnvironmentalRecord.fromJson(json);
+      expect(r.flockId, 'f1');
+      expect(r.temperatureC, 28.0);
+      expect(r.humidityPct, 70.0);
+      expect(r.litterScore, 2);
+    });
+
+    test('handles all-null optional fields', () {
+      final json = {
+        'id': 'env3',
+        'flockId': 'f1',
+        'recordDate': '2026-06-01',
+      };
+      final r = EnvironmentalRecord.fromJson(json);
+      expect(r.temperatureC, isNull);
+      expect(r.humidityPct, isNull);
+      expect(r.ammoniaPpm, isNull);
+      expect(r.lightHours, isNull);
+      expect(r.litterScore, isNull);
+    });
+
+    test('toJson omits null optional fields', () {
+      final r = EnvironmentalRecord(
+        id: 'env4',
+        flockId: 'f1',
+        recordDate: DateTime(2026, 6, 1),
+      );
+      final j = r.toJson();
+      expect(j.containsKey('temperatureC'), isFalse);
+      expect(j.containsKey('humidityPct'), isFalse);
+      expect(j['flockId'], 'f1');
+    });
+  });
+
+  group('FlockTask', () {
+    test('round-trips full task', () {
+      final json = {
+        'id': 'task1',
+        'flockId': 'f1',
+        'taskDate': '2026-06-15',
+        'ageDays': 14,
+        'category': 'vaccination',
+        'title': 'Vaccination: Newcastle',
+        'description': 'Administer via drinking water.',
+        'isCompleted': false,
+        'isSkipped': false,
+      };
+      final t = FlockTask.fromJson(json);
+      expect(t.title, 'Vaccination: Newcastle');
+      expect(t.category, 'vaccination');
+      expect(t.ageDays, 14);
+      expect(t.isCompleted, false);
+      final j = t.toJson();
+      expect(j['title'], 'Vaccination: Newcastle');
+      expect(j['ageDays'], 14);
+      expect(j['taskDate'], '2026-06-15');
+    });
+
+    test('parses snake_case aliases', () {
+      final json = {
+        'id': 'task2',
+        'flock_id': 'f1',
+        'task_date': '2026-07-01',
+        'age_days': 21,
+        'category': 'management',
+        'title': 'Weekly weight sample',
+        'is_completed': true,
+        'is_skipped': false,
+        'completed_at': '2026-07-01T08:00:00Z',
+      };
+      final t = FlockTask.fromJson(json);
+      expect(t.flockId, 'f1');
+      expect(t.ageDays, 21);
+      expect(t.isCompleted, true);
+      expect(t.completedAt, isNotNull);
+    });
+
+    test('defaults isCompleted and isSkipped to false', () {
+      final json = {
+        'id': 'task3',
+        'flockId': 'f1',
+        'taskDate': '2026-06-01',
+        'ageDays': 0,
+        'category': 'environment',
+        'title': 'Check temperature',
+      };
+      final t = FlockTask.fromJson(json);
+      expect(t.isCompleted, false);
+      expect(t.isSkipped, false);
+    });
+
+    test('copyWith preserves unchanged fields', () {
+      final original = FlockTask(
+        id: 'task4',
+        flockId: 'f1',
+        taskDate: DateTime(2026, 6, 1),
+        ageDays: 5,
+        category: 'feed',
+        title: 'Feed transition',
+      );
+      final copy = original.copyWith(isCompleted: true);
+      expect(copy.isCompleted, true);
+      expect(copy.title, 'Feed transition');
+      expect(copy.category, 'feed');
     });
   });
 }

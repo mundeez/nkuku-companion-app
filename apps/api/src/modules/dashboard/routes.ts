@@ -88,7 +88,7 @@ export async function buildDashboardModule(app: FastifyInstance) {
         const initial = f.initialCount || 0;
         const current = f.currentCount || 0;
         const mortRate = initial > 0 ? Number(((initial - current) / initial * 100).toFixed(1)) : 0;
-        const ageDays = Math.floor((now.getTime() - new Date(f.startDate).getTime()) / 86400000);
+        const ageDays = f.startDate ? Math.floor((now.getTime() - new Date(f.startDate).getTime()) / 86400000) : null;
         return {
           flockId: f.id,
           flockName: f.name,

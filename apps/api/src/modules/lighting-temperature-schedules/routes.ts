@@ -68,6 +68,11 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
+    // If chicks not yet collected (no startDate), return null item
+    if (!flock.startDate) {
+      return { schedule: null, ageDays: null, item: null };
+    }
+
     const today = new Date();
     const startDate = new Date(flock.startDate);
     const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));

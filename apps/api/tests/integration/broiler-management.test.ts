@@ -53,11 +53,13 @@ describe('Broiler Management API', () => {
         body: JSON.stringify({
           name: 'Test Flock Integration',
           breedId,
-          startDate: '2026-06-01',
+          orderDate: '2026-05-28',
           initialCount: 500,
           targetWeight: 2.5,
           targetAge: 42,
           feedTransitionDay: 11,
+          chicksCollected: true,
+          collectionDate: '2026-06-01',
         }),
       });
       expect(res.status).toBe(200);
@@ -65,6 +67,8 @@ describe('Broiler Management API', () => {
       expect(data.name).toBe('Test Flock Integration');
       expect(data.currentCount).toBe(500);
       expect(data.status).toBe('active');
+      expect(data.startDate).not.toBeNull();
+      expect(data.orderDate).not.toBeNull();
       flockId = data.id;
     });
 

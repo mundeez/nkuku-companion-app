@@ -3,6 +3,23 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 
+function publishNtfy(topic: string, title: string, message: string, priority: 'default' | 'urgent') {
+  const baseUrl = process.env.NTFY_BASE_URL || 'http://ntfy';
+  fetch(`${baseUrl}/${topic}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain',
+      'Title': title,
+      'Priority': priority,
+      'Tags': 'bell',
+    },
+    body: message,
+  }).catch((err) => {
+    // Best-effort notifications: never throw
+    console.error('ntfy publish failed:', err);
+  });
+}
+
 const AlertCreateSchema = z.object({
   flockId: z.string().uuid(),
   alertType: z.enum(['temperature_adjustment', 'vaccination_due', 'feed_transition', 'weight_check', 'mortality_threshold', 'environmental', 'financial', 'medication_due', 'withdrawal_due', 'vaccine_expiry', 'environmental_threshold', 'task_due']),
@@ -103,6 +120,7 @@ export async function buildAlertModule(app: FastifyInstance) {
     const generatedAlerts = [];
 
     for (const flock of flocks) {
+      if (!flock.startDate) continue; // skip flocks not yet collected
       const startDate = new Date(flock.startDate);
       const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const targetAge = flock.targetAge || 42;
@@ -330,6 +348,14 @@ export async function buildAlertModule(app: FastifyInstance) {
           })
         );
       }
+    }
+
+    if (generatedAlerts.length > 0) {
+      const criticalCount = generatedAlerts.filter((a: any) => a.severity === 'critical').length;
+      const message = `Generated ${generatedAlerts.length} alert(s) for your active flocks. ${criticalCount} critical.`;
+      const priority = criticalCount > 0 ? 'urgent' : 'default';
+      const topic = process.env.NTFY_DEFAULT_TOPIC || 'nkuku-alerts';
+      publishNtfy(topic, 'Nkuku Alerts', message, priority);
     }
 
     return { generated: generatedAlerts.length, alerts: generatedAlerts };

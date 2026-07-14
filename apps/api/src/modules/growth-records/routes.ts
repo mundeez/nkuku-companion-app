@@ -49,8 +49,9 @@ export async function buildGrowthRecordModule(app: FastifyInstance) {
     });
 
     const today = new Date();
-    const startDate = new Date(flock.startDate);
-    const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const ageDays = flock.startDate
+      ? Math.floor((today.getTime() - new Date(flock.startDate).getTime()) / (1000 * 60 * 60 * 24))
+      : null;
 
     // Get performance targets for comparison
     const targets = await prisma.performanceTarget.findMany({
