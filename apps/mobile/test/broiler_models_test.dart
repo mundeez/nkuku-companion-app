@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nkuku_mobile/models/alert.dart';
 import 'package:nkuku_mobile/models/breed.dart';
 import 'package:nkuku_mobile/models/environmental_record.dart';
 import 'package:nkuku_mobile/models/feed_record.dart';
@@ -8,7 +9,9 @@ import 'package:nkuku_mobile/models/flock_task.dart';
 import 'package:nkuku_mobile/models/growth_record.dart';
 import 'package:nkuku_mobile/models/medication_record.dart';
 import 'package:nkuku_mobile/models/mortality_event.dart';
+import 'package:nkuku_mobile/models/supplier.dart';
 import 'package:nkuku_mobile/models/vaccination_event.dart';
+import 'package:nkuku_mobile/models/vaccine_inventory.dart';
 import 'package:nkuku_mobile/models/water_record.dart';
 
 void main() {
@@ -480,6 +483,217 @@ void main() {
       expect(copy.isCompleted, true);
       expect(copy.title, 'Feed transition');
       expect(copy.category, 'feed');
+    });
+  });
+
+  group('Alert', () {
+    test('parses camelCase JSON', () {
+      final json = {
+        'id': 'a1',
+        'flockId': 'f1',
+        'flock': {'name': 'Ross Flock'},
+        'alertType': 'vaccination_due',
+        'title': 'Vaccination Due: Newcastle',
+        'message': 'Administer Newcastle vaccine',
+        'severity': 'critical',
+        'dueDate': '2026-06-20T00:00:00.000Z',
+        'isRead': false,
+        'isResolved': false,
+        'createdAt': '2026-06-15T08:00:00.000Z',
+      };
+      final a = Alert.fromJson(json);
+      expect(a.id, 'a1');
+      expect(a.flockName, 'Ross Flock');
+      expect(a.severity, 'critical');
+      expect(a.isRead, false);
+      expect(a.isResolved, false);
+    });
+
+    test('parses snake_case aliases', () {
+      final json = {
+        'id': 'a2',
+        'flock_id': 'f1',
+        'alert_type': 'temperature_adjustment',
+        'title': 'Temperature Adjustment Required',
+        'message': 'Adjust brooder temperature to 30°C',
+        'severity': 'warning',
+        'due_date': '2026-06-21T00:00:00.000Z',
+        'is_read': true,
+        'is_resolved': false,
+      };
+      final a = Alert.fromJson(json);
+      expect(a.flockId, 'f1');
+      expect(a.alertType, 'temperature_adjustment');
+      expect(a.isRead, true);
+    });
+
+    test('copyWith changes only specified fields', () {
+      final a = Alert(
+        id: 'a3',
+        flockId: 'f1',
+        alertType: 'task_due',
+        title: 'Task Due',
+        message: 'A task is due',
+        severity: 'info',
+        dueDate: DateTime(2026, 6, 20),
+        isRead: false,
+        isResolved: false,
+      );
+      final updated = a.copyWith(isRead: true, isResolved: true);
+      expect(updated.isRead, true);
+      expect(updated.isResolved, true);
+      expect(updated.title, 'Task Due');
+    });
+
+    test('AlertGenerateResult parses generated count', () {
+      final json = {
+        'generated': 3,
+        'alerts': [
+          {
+            'id': 'a4',
+            'flockId': 'f1',
+            'alertType': 'feed_transition',
+            'title': 'Feed Transition',
+            'message': 'Switch to grower feed',
+            'severity': 'warning',
+            'dueDate': '2026-06-20T00:00:00.000Z',
+            'isRead': false,
+            'isResolved': false,
+          }
+        ],
+      };
+      final result = AlertGenerateResult.fromJson(json);
+      expect(result.generated, 3);
+      expect(result.alerts.length, 1);
+      expect(result.alerts.first.alertType, 'feed_transition');
+    });
+  });
+
+  group('VaccineInventory', () {
+    test('round-trips full record', () {
+      final json = {
+        'id': 'vi1',
+        'name': 'Newcastle IBD',
+        'disease': 'Newcastle Disease',
+        'supplier': 'MSD Animal Health',
+        'batchNumber': 'ND2026-01',
+        'quantityDoses': 500,
+        'expiryDate': '2026-12-31T00:00:00.000Z',
+        'status': 'available',
+        'costZmw': 1500.0,
+        'notes': 'Refrigerate at 2-8°C',
+        'createdAt': '2026-06-01T08:00:00.000Z',
+      };
+      final v = VaccineInventory.fromJson(json);
+      expect(v.name, 'Newcastle IBD');
+      expect(v.quantityDoses, 500);
+      expect(v.status, 'available');
+      expect(v.costZmw, 1500.0);
+      expect(v.isExpired, false);
+    });
+
+    test('parses snake_case aliases', () {
+      final json = {
+        'id': 'vi2',
+        'name': 'Gumboro',
+        'batch_number': 'GUM-001',
+        'quantity_doses': 250,
+        'expiry_date': '2020-01-01T00:00:00.000Z',
+        'status': 'expired',
+        'cost_zmw': '500',
+      };
+      final v = VaccineInventory.fromJson(json);
+      expect(v.batchNumber, 'GUM-001');
+      expect(v.quantityDoses, 250);
+      expect(v.status, 'expired');
+      expect(v.costZmw, 500.0);
+      expect(v.isExpired, true);
+    });
+
+    test('isExpiringSoon is true within 7 days', () {
+      final soon = DateTime.now().add(const Duration(days: 3));
+      final v = VaccineInventory(
+        id: 'vi3',
+        name: 'Test Vaccine',
+        batchNumber: 'T001',
+        quantityDoses: 100,
+        expiryDate: soon,
+        status: 'available',
+      );
+      expect(v.isExpiringSoon, true);
+      expect(v.isExpired, false);
+    });
+
+    test('toJson emits YYYY-MM-DD for expiryDate', () {
+      final v = VaccineInventory(
+        id: 'vi4',
+        name: 'Test',
+        batchNumber: 'T002',
+        quantityDoses: 50,
+        expiryDate: DateTime(2027, 6, 15),
+        status: 'available',
+      );
+      final j = v.toJson();
+      expect(j['expiryDate'], '2027-06-15');
+    });
+  });
+
+  group('Supplier / FeedStage', () {
+    test('parses supplier with feedStages', () {
+      final json = {
+        'id': 's1',
+        'name': 'NUTRI FEED',
+        'description': 'Quality feed supplier',
+        'chickenType': 'Broiler',
+        'contact': '+260 211 000001',
+        'isDefault': true,
+        'isActive': true,
+        'feedStages': [
+          {
+            'id': 'fs1',
+            'stageName': 'Starter',
+            'stageType': 'feed',
+            'unitSizeKg': 50.0,
+            'unitPriceZmw': 420.0,
+            'intakePerBirdKg': 0.8,
+            'sortOrder': 0,
+            'isActive': true,
+          },
+        ],
+      };
+      final s = Supplier.fromJson(json);
+      expect(s.name, 'NUTRI FEED');
+      expect(s.contact, '+260 211 000001');
+      expect(s.isDefault, true);
+      expect(s.feedStages.length, 1);
+      expect(s.feedStages.first.stageName, 'Starter');
+      expect(s.feedStages.first.unitPriceZmw, 420.0);
+    });
+
+    test('toJson emits required fields', () {
+      final s = Supplier(
+        id: 's2',
+        name: 'TestSupplier',
+        isDefault: false,
+        feedStages: [],
+      );
+      final j = s.toJson();
+      expect(j['name'], 'TestSupplier');
+      expect(j['isDefault'], false);
+    });
+
+    test('FeedStage copyWith works', () {
+      final fs = FeedStage(
+        id: 'fs2',
+        stageName: 'Grower',
+        stageType: 'feed',
+        unitSizeKg: 50.0,
+        unitPriceZmw: 380.0,
+        intakePerBirdKg: 1.5,
+      );
+      final updated = fs.copyWith(unitPriceZmw: 400.0);
+      expect(updated.unitPriceZmw, 400.0);
+      expect(updated.stageName, 'Grower');
     });
   });
 }

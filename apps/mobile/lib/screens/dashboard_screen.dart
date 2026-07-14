@@ -3,7 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../models/dashboard_summary.dart';
 import '../services/dashboard_service.dart';
-import '../services/auth_service.dart';
+import 'alerts_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -58,15 +58,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          if (AuthService.canEdit)
-            IconButton(
+          IconButton(
               icon: const Icon(Icons.notifications_outlined),
-              onPressed: () {
-                // TODO(M3-4): navigate to AlertsScreen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Alerts screen coming in M3-4')),
-                );
-              },
+              tooltip: 'Alerts',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AlertsScreen()),
+              ),
             ),
         ],
       ),

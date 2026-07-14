@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:dio/dio.dart';
-import 'api_service.dart';
 import 'auth_service.dart';
 
 /// NotificationService — subscribes to ntfy via SSE and surfaces

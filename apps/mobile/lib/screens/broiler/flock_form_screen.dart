@@ -105,7 +105,7 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
     _selectedSupplierId = flock.supplierId;
     _housingType = flock.housingType;
     _chicksCollected = flock.chicksCollected ?? false;
-    _startDate = DateTime.parse(flock.startDate);
+    _startDate = DateTime.parse(flock.startDate ?? DateTime.now().toIso8601String());
     if (flock.collectionDate != null) {
       _collectionDate = DateTime.tryParse(flock.collectionDate!);
     }

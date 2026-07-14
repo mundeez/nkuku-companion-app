@@ -502,8 +502,8 @@ class _SupplierDialogState extends State<_SupplierDialog> {
                 decoration: const InputDecoration(labelText: 'Name *'),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                      return 'Required';
-                    }
+                    return 'Required';
+                  }
                   return null;
                 },
                 textCapitalization: TextCapitalization.words,
@@ -635,11 +635,15 @@ class _FeedStageDialogState extends State<_FeedStageDialog> {
 
   String? _requiredDouble(String? value) {
     if (value == null || value.trim().isEmpty) {
-                      return 'Required';
-                    }
+      return 'Required';
+    }
     final parsed = double.tryParse(value.trim());
-    if (parsed == null) return 'Invalid number';
-    if (parsed < 0) return 'Must be zero or greater';
+    if (parsed == null) {
+      return 'Invalid number';
+    }
+    if (parsed < 0) {
+      return 'Must be zero or greater';
+    }
     return null;
   }
 
@@ -698,8 +702,8 @@ class _FeedStageDialogState extends State<_FeedStageDialog> {
                 decoration: const InputDecoration(labelText: 'Stage name *'),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                      return 'Required';
-                    }
+                    return 'Required';
+                  }
                   return null;
                 },
                 textCapitalization: TextCapitalization.words,
@@ -735,10 +739,11 @@ class _FeedStageDialogState extends State<_FeedStageDialog> {
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                        return null;
-                      }
-                        if (int.tryParse(value.trim()) == null)
+                          return null;
+                        }
+                        if (int.tryParse(value.trim()) == null) {
                           return 'Invalid';
+                        }
                         return null;
                       },
                     ),
@@ -753,10 +758,11 @@ class _FeedStageDialogState extends State<_FeedStageDialog> {
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                        return null;
-                      }
-                        if (int.tryParse(value.trim()) == null)
+                          return null;
+                        }
+                        if (int.tryParse(value.trim()) == null) {
                           return 'Invalid';
+                        }
                         return null;
                       },
                     ),

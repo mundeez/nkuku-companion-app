@@ -367,7 +367,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No growth records yet.')))
           else
             ..._growthRecords.reversed.map((r) => _RecordCard(
-                  title: 'Day ${r.recordDate.difference(DateTime.parse(_flock!.startDate)).inDays}',
+                  title: 'Day ${r.recordDate.difference(DateTime.parse(_flock!.startDate ?? r.recordDate.toIso8601String())).inDays}',
                   subtitle: '${r.avgWeight} kg avg · ${r.sampleSize} sampled',
                   trailing: Text(r.recordDate.toIso8601String().split('T').first),
                   onEdit: AuthService.canEdit
