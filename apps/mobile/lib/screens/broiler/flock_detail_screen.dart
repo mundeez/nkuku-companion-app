@@ -1,21 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../models/environmental_record.dart';
 import '../../models/financial_record.dart';
 import '../../models/feed_record.dart';
 import '../../models/flock.dart';
 import '../../models/growth_record.dart';
+import '../../models/medication_record.dart';
 import '../../models/mortality_event.dart';
 import '../../models/vaccination_event.dart';
 import '../../models/water_record.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
+import 'calendar_screen.dart';
+import 'medication_screen.dart';
+import 'records/environmental_record_form.dart';
 import 'records/financial_record_form.dart';
 import 'records/feed_record_form.dart';
 import 'records/growth_record_form.dart';
+import 'records/medication_record_form.dart';
 import 'records/mortality_event_form.dart';
 import 'records/vaccination_event_form.dart';
 import 'records/water_record_form.dart';
+import 'tasks_screen.dart';
 
 class FlockDetailScreen extends StatefulWidget {
   final String flockId;
@@ -47,11 +54,13 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   VaccinationScheduleStatus? _vaccinationStatus;
   List<FinancialRecord> _financialRecords = [];
   FinancialSummary? _financialSummary;
+  List<MedicationRecord> _medicationRecords = [];
+  List<EnvironmentalRecord> _environmentalRecords = [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 8, vsync: this);
+    _tabController = TabController(length: 11, vsync: this);
     _loadData();
   }
 
@@ -78,6 +87,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         BroilerService.getMortalityEvents(widget.flockId),
         BroilerService.getVaccinationEvents(widget.flockId),
         BroilerService.getFinancialRecords(widget.flockId),
+        BroilerService.getMedicationRecords(widget.flockId),
+        BroilerService.getEnvironmentalRecords(widget.flockId),
       ]);
 
       final growth = results[0] as List<GrowthRecord>;
@@ -86,6 +97,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       final mortality = results[3] as List<MortalityEvent>;
       final vaccination = results[4] as List<VaccinationEvent>;
       final financial = results[5] as List<FinancialRecord>;
+      final medication = results[6] as List<MedicationRecord>;
+      final environment = results[7] as List<EnvironmentalRecord>;
 
       final analysis = await BroilerService.getGrowthAnalysis(widget.flockId);
       final feedSummary = await BroilerService.getFeedSummary(widget.flockId);
@@ -109,6 +122,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         _vaccinationStatus = vaccinationStatus;
         _financialRecords = financial;
         _financialSummary = financialSummary;
+        _medicationRecords = medication;
+        _environmentalRecords = environment;
         _loading = false;
       });
     } catch (e) {
@@ -149,12 +164,18 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       case 6:
         _navigateToForm(FinancialRecordForm(flockId: flock.id));
         break;
+      case 7:
+        _navigateToForm(EnvironmentalRecordForm(flockId: flock.id));
+        break;
+      case 8:
+        _navigateToForm(MedicationRecordForm(flockId: flock.id));
+        break;
     }
   }
 
   Widget? get _floatingActionButton {
     if (!AuthService.canEdit) return null;
-    if (_tabController.index == 0 || _tabController.index == 7) return null;
+    if (_tabController.index == 0 || _tabController.index == 10) return null;
     return FloatingActionButton(
       onPressed: _onAddRecord,
       child: const Icon(Icons.add),
@@ -209,6 +230,9 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             Tab(icon: Icon(Icons.vaccines), text: 'Vaccination'),
             Tab(icon: Icon(Icons.attach_money), text: 'Financial'),
             Tab(icon: Icon(Icons.thermostat), text: 'Environment'),
+            Tab(icon: Icon(Icons.medication), text: 'Medication'),
+            Tab(icon: Icon(Icons.task_alt), text: 'Tasks'),
+            Tab(icon: Icon(Icons.calendar_month), text: 'Calendar'),
           ],
         ),
       ),
@@ -237,6 +261,9 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     _buildVaccinationTab(),
                     _buildFinancialTab(),
                     _buildEnvironmentTab(),
+                    _buildMedicationTab(),
+                    _buildTasksTab(),
+                    _buildCalendarTab(),
                   ],
                 ),
     );
@@ -572,88 +599,195 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     final envDays = _calendarDays.where((d) => d.lightingTemperature != null).toList();
     final docsUrl = '${ApiService.baseUrl}/docs/environment/Ross308_Zambia_Lighting_Temperature_Guide.md';
 
-    if (envDays.isEmpty) {
-      return const Center(child: Text('No environment targets scheduled'));
-    }
+    // Combine header + logged records section + target schedule items
+    // Sections: [0] docs link, [1] "Logged Records" header, [2..n] logged records,
+    //           [n+1] "Targets" header, [n+2..] target days
+    final loggedCount = _environmentalRecords.length;
+    final targetCount = envDays.length;
+    // indices: 0=docs, 1=loggedHeader, 2..loggedCount+1=logged,
+    //          loggedCount+2=targetsHeader, loggedCount+3..end=targets
+    final totalItems = 1 + 1 + loggedCount + 1 + targetCount;
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: envDays.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: totalItems,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: const Icon(Icons.book),
+                title: const Text('Reference Guide'),
+                subtitle: const Text('Ross 308 Lighting & Temperature Guide'),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () async {
+                  final uri = Uri.parse(docsUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
+            );
+          }
+
+          // Logged records section header
+          if (index == 1) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Logged Readings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  if (_environmentalRecords.isEmpty)
+                    const Text('None yet', style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            );
+          }
+
+          // Logged records
+          if (index >= 2 && index <= loggedCount + 1) {
+            final r = _environmentalRecords[index - 2];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: const Icon(Icons.thermostat, color: Colors.teal),
+                title: Text(r.recordDate.toIso8601String().split('T').first +
+                    (r.timeOfDay != null ? ' · ${r.timeOfDay}' : '')),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (r.temperatureC != null) Text('Temp: ${r.temperatureC}°C'),
+                    if (r.humidityPct != null) Text('Humidity: ${r.humidityPct}%'),
+                    if (r.ammoniaPpm != null) Text('Ammonia: ${r.ammoniaPpm} ppm'),
+                    if (r.lightHours != null) Text('Light: ${r.lightHours}h'),
+                    if (r.litterScore != null) Text('Litter: ${r.litterScore}/5'),
+                    if (r.notes != null && r.notes!.isNotEmpty) Text(r.notes!),
+                  ],
+                ),
+                isThreeLine: true,
+                trailing: AuthService.canEdit
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _navigateToForm(
+                              EnvironmentalRecordForm(flockId: widget.flockId, record: r),
+                            ),
+                          ),
+                          if (AuthService.canDelete)
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _deleteRecord<EnvironmentalRecord>(
+                                label: 'environmental record',
+                                record: r,
+                                name: (r) => r.recordDate.toIso8601String().split('T').first,
+                                onDelete: () => BroilerService.deleteEnvironmentalRecord(r.id),
+                              ),
+                            ),
+                        ],
+                      )
+                    : null,
+              ),
+            );
+          }
+
+          // Target schedule header
+          if (index == loggedCount + 2) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Target Schedule (Ross 308)',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            );
+          }
+
+          // Target schedule days
+          if (envDays.isEmpty) {
+            return const Center(child: Padding(padding: EdgeInsets.all(16), child: Text('No environment targets scheduled')));
+          }
+          final dayIndex = index - (loggedCount + 3);
+          if (dayIndex < 0 || dayIndex >= envDays.length) return const SizedBox.shrink();
+          final day = envDays[dayIndex];
+          final env = day.lightingTemperature!;
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: const Icon(Icons.book),
-              title: const Text('Reference Guide'),
-              subtitle: const Text('Ross 308 Lighting & Temperature Guide'),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () async {
-                final uri = Uri.parse(docsUrl);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.orange.withAlpha(30),
+                        child: Text('${day.day}'),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text('Day ${day.day}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      ),
+                      Text(day.date.split('T').first, style: const TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                  const Divider(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Light: ${env.lightHours ?? "-"}h'),
+                            Text('Dark: ${env.darkHours ?? "-"}h'),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Temp: ${env.targetTempC ?? "-"}°C'),
+                            Text('Range: ${env.targetTempMinC ?? "-"}-${env.targetTempMaxC ?? "-"}°C'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Humidity: ${env.targetRhMinPct ?? "-"}-${env.targetRhMaxPct ?? "-"}%'),
+                  if (env.notes != null && env.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(env.notes!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ],
+              ),
             ),
           );
-        }
-        final day = envDays[index - 1];
-        final env = day.lightingTemperature!;
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.orange.withAlpha(30),
-                      child: Text('${day.day}'),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text('Day ${day.day}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-                    Text(day.date.split('T').first, style: const TextStyle(color: Colors.grey)),
-                  ],
-                ),
-                const Divider(),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Light: ${env.lightHours ?? "-"}h'),
-                          Text('Dark: ${env.darkHours ?? "-"}h'),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Temp: ${env.targetTempC ?? "-"}°C'),
-                          Text('Range: ${env.targetTempMinC ?? "-"}-${env.targetTempMaxC ?? "-"}°C'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text('Humidity: ${env.targetRhMinPct ?? "-"}-${env.targetRhMaxPct ?? "-"}%'),
-                if (env.notes != null && env.notes!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(env.notes!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
+        },
+      ),
     );
+  }
+
+  Widget _buildMedicationTab() {
+    return MedicationScreen(
+      flockId: widget.flockId,
+      records: _medicationRecords,
+      onRefresh: _loadData,
+    );
+  }
+
+  Widget _buildTasksTab() {
+    return TasksScreen(flockId: widget.flockId);
+  }
+
+  Widget _buildCalendarTab() {
+    if (_flock == null) return const Center(child: CircularProgressIndicator());
+    return CalendarScreen(flock: _flock!, days: _calendarDays);
   }
 }
 

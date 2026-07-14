@@ -1,10 +1,13 @@
 import 'dart:developer';
 import 'package:dio/dio.dart';
 import '../models/breed.dart';
+import '../models/environmental_record.dart';
 import '../models/financial_record.dart';
 import '../models/feed_record.dart';
 import '../models/flock.dart';
+import '../models/flock_task.dart';
 import '../models/growth_record.dart';
+import '../models/medication_record.dart';
 import '../models/mortality_event.dart';
 import '../models/supplier.dart';
 import '../models/vaccination_event.dart';
@@ -288,6 +291,107 @@ class BroilerService {
     _assertOk(res);
   }
 
+  // Medication records
+  static Future<List<MedicationRecord>> getMedicationRecords(String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/medication-records',
+      queryParameters: {'flockId': flockId},
+    );
+    _assertOk(res);
+    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    return (res.data as List).map((e) => MedicationRecord.fromJson(e)).toList();
+  }
+
+  static Future<MedicationRecord> createMedicationRecord(MedicationRecord record) async {
+    final res = await ApiService.dio.post('/api/v1/medication-records', data: record.toJson());
+    _assertOk(res);
+    return MedicationRecord.fromJson(res.data);
+  }
+
+  static Future<MedicationRecord> updateMedicationRecord(String id, MedicationRecord record) async {
+    final res = await ApiService.dio.patch('/api/v1/medication-records/$id', data: record.toJson());
+    _assertOk(res);
+    return MedicationRecord.fromJson(res.data);
+  }
+
+  static Future<void> deleteMedicationRecord(String id) async {
+    final res = await ApiService.dio.delete('/api/v1/medication-records/$id');
+    _assertOk(res);
+  }
+
+  // Environmental records
+  static Future<List<EnvironmentalRecord>> getEnvironmentalRecords(String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/environmental-records',
+      queryParameters: {'flockId': flockId},
+    );
+    _assertOk(res);
+    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    return (res.data as List).map((e) => EnvironmentalRecord.fromJson(e)).toList();
+  }
+
+  static Future<EnvironmentalRecord> createEnvironmentalRecord(EnvironmentalRecord record) async {
+    final res = await ApiService.dio.post('/api/v1/environmental-records', data: record.toJson());
+    _assertOk(res);
+    return EnvironmentalRecord.fromJson(res.data);
+  }
+
+  static Future<EnvironmentalRecord> updateEnvironmentalRecord(String id, EnvironmentalRecord record) async {
+    final res = await ApiService.dio.patch('/api/v1/environmental-records/$id', data: record.toJson());
+    _assertOk(res);
+    return EnvironmentalRecord.fromJson(res.data);
+  }
+
+  static Future<void> deleteEnvironmentalRecord(String id) async {
+    final res = await ApiService.dio.delete('/api/v1/environmental-records/$id');
+    _assertOk(res);
+  }
+
+  // Flock tasks
+  static Future<List<FlockTask>> getFlockTasks(String flockId, {String? status}) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/flock-tasks',
+      queryParameters: {'flockId': flockId, if (status != null) 'status': status},
+    );
+    _assertOk(res);
+    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    return (res.data as List).map((e) => FlockTask.fromJson(e)).toList();
+  }
+
+  static Future<FlockTaskGenerateResult> generateFlockTasks(String flockId) async {
+    final res = await ApiService.dio.post('/api/v1/flock-tasks/generate', data: {'flockId': flockId});
+    _assertOk(res);
+    return FlockTaskGenerateResult.fromJson(res.data);
+  }
+
+  static Future<FlockTask> createFlockTask(FlockTask task) async {
+    final res = await ApiService.dio.post('/api/v1/flock-tasks', data: task.toJson());
+    _assertOk(res);
+    return FlockTask.fromJson(res.data);
+  }
+
+  static Future<FlockTask> updateFlockTask(String id, {bool? isCompleted, bool? isSkipped, String? notes}) async {
+    final res = await ApiService.dio.patch('/api/v1/flock-tasks/$id', data: {
+      if (isCompleted != null) 'isCompleted': isCompleted,
+      if (isSkipped != null) 'isSkipped': isSkipped,
+      if (notes != null) 'notes': notes,
+    });
+    _assertOk(res);
+    return FlockTask.fromJson(res.data);
+  }
+
+  static Future<void> deleteFlockTask(String id) async {
+    final res = await ApiService.dio.delete('/api/v1/flock-tasks/$id');
+    _assertOk(res);
+  }
+
+  // Calendar (flock summary)
+  static Future<FlockCalendarSummary> getFlockCalendarSummary(String flockId) async {
+    final res = await ApiService.dio.get('/api/v1/broiler-flocks/$flockId/summary');
+    _assertOk(res);
+    return FlockCalendarSummary.fromJson(res.data);
+  }
+
   static void _assertOk(Response<dynamic> res) {
     if (res.statusCode == null || res.statusCode! >= 400) {
       final message = res.data is Map ? (res.data['error'] ?? res.data['message'] ?? 'Request failed') : 'Request failed';
@@ -434,6 +538,38 @@ class FinancialSummary {
       profit: (json['profit'] ?? 0).toDouble(),
       profitPerBird: (json['profitPerBird'] ?? 0).toDouble(),
       currentCount: json['currentCount'] ?? 0,
+    );
+  }
+}
+
+class FlockTaskGenerateResult {
+  final int generated;
+  final List<FlockTask> tasks;
+
+  FlockTaskGenerateResult({required this.generated, required this.tasks});
+
+  factory FlockTaskGenerateResult.fromJson(Map<String, dynamic> json) {
+    return FlockTaskGenerateResult(
+      generated: json['generated'] ?? 0,
+      tasks: (json['tasks'] as List? ?? []).map((e) => FlockTask.fromJson(e)).toList(),
+    );
+  }
+}
+
+class FlockCalendarSummary {
+  final BroilerFlock flock;
+  final int ageDays;
+  final int targetAge;
+  final List<CalendarDay> days;
+
+  FlockCalendarSummary({required this.flock, required this.ageDays, required this.targetAge, required this.days});
+
+  factory FlockCalendarSummary.fromJson(Map<String, dynamic> json) {
+    return FlockCalendarSummary(
+      flock: BroilerFlock.fromJson(json['flock'] as Map<String, dynamic>),
+      ageDays: json['ageDays'] ?? 0,
+      targetAge: json['targetAge'] ?? 0,
+      days: (json['days'] as List? ?? []).map((e) => CalendarDay.fromJson(e)).toList(),
     );
   }
 }
