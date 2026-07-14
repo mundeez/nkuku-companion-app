@@ -59,7 +59,10 @@ export default function FlockDetailPage() {
 
   function loadAll() {
     apiFetch<any>(`/api/v1/broiler-flocks/${flockId}`)
-      .then((d) => { setFlock(d); setAgeDays(Math.floor((new Date().getTime() - new Date(d.startDate).getTime()) / 86400000)); })
+      .then((d) => {
+        setFlock(d);
+        setAgeDays(d.startDate ? Math.floor((new Date().getTime() - new Date(d.startDate).getTime()) / 86400000) : -1);
+      })
       .catch((err) => setError(err.message));
     apiFetch<GrowthRecord[]>(`/api/v1/growth-records?flockId=${flockId}`).then(setGrowthRecords).catch(() => {});
     apiFetch<FeedRecord[]>(`/api/v1/feed-records?flockId=${flockId}`).then(setFeedRecords).catch(() => {});
@@ -144,7 +147,7 @@ export default function FlockDetailPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">{flock.name}</h1>
-          <div className="text-muted-foreground">{flock.breed?.name} | Day {ageDays} | {getStatusBadge(flock.status, flock.chicksCollected)}</div>
+          <div className="text-muted-foreground">{flock.breed?.name} | {ageDays < 0 ? "Pending collection" : `Day ${ageDays}`} | {getStatusBadge(flock.status, flock.chicksCollected)}</div>
         </div>
       </div>
 
@@ -203,6 +206,10 @@ export default function FlockDetailPage() {
             <Card><CardHeader><CardTitle className="text-base">Flock Summary</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
+                {flock.orderDate && (
+                  <div className="flex justify-between"><span>Order Date</span><span className="font-medium">{new Date(flock.orderDate).toLocaleDateString()}</span></div>
+                )}
+                <div className="flex justify-between"><span>Start Date</span><span className="font-medium">{flock.startDate ? new Date(flock.startDate).toLocaleDateString() : "Pending collection"}</span></div>
                 <div className="flex justify-between"><span>Total Feed</span><span className="font-medium">{totalFeed.toFixed(1)} kg</span></div>
                 <div className="flex justify-between"><span>Total Water</span><span className="font-medium">{totalWater.toFixed(1)} liters</span></div>
                 <div className="flex justify-between"><span>Total Cost</span><span className="font-medium">ZMW {totalCost.toFixed(2)}</span></div>

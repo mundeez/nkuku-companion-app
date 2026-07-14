@@ -126,7 +126,8 @@ export interface BroilerFlock {
   breed: Breed;
   supplierId?: string;
   supplier?: Supplier;
-  startDate: string;
+  orderDate?: string;
+  startDate?: string | null;
   initialCount: number;
   currentCount: number;
   targetWeight?: number;

@@ -5,7 +5,8 @@ class BroilerFlock {
   final String? breedName;
   final String? supplierId;
   final String? supplierName;
-  final String startDate;
+  final String? startDate;
+  final String? orderDate;
   final int initialCount;
   final int currentCount;
   final double? targetWeight;
@@ -28,7 +29,8 @@ class BroilerFlock {
     this.breedName,
     this.supplierId,
     this.supplierName,
-    required this.startDate,
+    this.startDate,
+    this.orderDate,
     required this.initialCount,
     required this.currentCount,
     this.targetWeight,
@@ -53,7 +55,8 @@ class BroilerFlock {
       breedName: json['breed']?['name'],
       supplierId: json['supplierId'] ?? json['supplier_id'],
       supplierName: json['supplier']?['name'],
-      startDate: json['startDate'] ?? json['start_date'] ?? '',
+      orderDate: json['orderDate'] ?? json['order_date'],
+      startDate: json['startDate'] ?? json['start_date'],
       initialCount: json['initialCount'] ?? json['initial_count'] ?? 0,
       currentCount: json['currentCount'] ?? json['current_count'] ?? 0,
       targetWeight: json['targetWeight'] != null
@@ -81,7 +84,8 @@ class BroilerFlock {
     return {
       'name': name,
       'breedId': breedId,
-      'startDate': startDate.split('T').first,
+      if (startDate != null) 'startDate': startDate!.split('T').first,
+      if (orderDate != null) 'orderDate': orderDate!.split('T').first,
       'initialCount': initialCount,
       if (supplierId != null) 'supplierId': supplierId,
       if (targetWeight != null) 'targetWeight': targetWeight,
@@ -105,6 +109,7 @@ class BroilerFlock {
     String? supplierId,
     String? supplierName,
     String? startDate,
+    String? orderDate,
     int? initialCount,
     int? currentCount,
     double? targetWeight,
@@ -128,6 +133,7 @@ class BroilerFlock {
       supplierId: supplierId ?? this.supplierId,
       supplierName: supplierName ?? this.supplierName,
       startDate: startDate ?? this.startDate,
+      orderDate: orderDate ?? this.orderDate,
       initialCount: initialCount ?? this.initialCount,
       currentCount: currentCount ?? this.currentCount,
       targetWeight: targetWeight ?? this.targetWeight,

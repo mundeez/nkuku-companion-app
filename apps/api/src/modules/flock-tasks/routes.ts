@@ -66,6 +66,9 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
+    // If chicks not yet collected (no startDate), no tasks to generate
+    if (!flock.startDate) return { generated: 0, tasks: [] };
+
     const startDate = new Date(flock.startDate);
     const targetAge = flock.targetAge || 42;
     const feedTransitionDay = flock.feedTransitionDay || 11;

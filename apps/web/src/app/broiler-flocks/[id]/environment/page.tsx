@@ -215,7 +215,7 @@ export default function EnvironmentPage() {
                 <tbody>
                   {fullSchedule.map((item, idx) => (
                     <tr key={idx} className="border-b last:border-0">
-                      <td className="p-2">Day {item.ageDays}</td>
+                      <td className="p-2 font-medium">{item.ageDays}</td>
                       <td className="p-2">{item.lightHours}h</td>
                       <td className="p-2">{item.darkHours}h</td>
                       <td className="p-2">{item.lightIntensityLux}</td>

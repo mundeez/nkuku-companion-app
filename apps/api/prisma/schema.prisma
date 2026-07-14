@@ -369,7 +369,8 @@ model BroilerFlock {
   name         String      @db.VarChar(100)
   breedId      String      @map("breed_id") @db.Uuid
   supplierId   String?     @map("supplier_id") @db.Uuid
-  startDate    DateTime    @map("start_date") @db.Date
+  orderDate    DateTime?   @map("order_date") @db.Date
+  startDate    DateTime?   @map("start_date") @db.Date
   initialCount Int         @map("initial_count")
   currentCount Int         @map("current_count")
   targetWeight Decimal?    @map("target_weight") @db.Decimal(10, 3)
