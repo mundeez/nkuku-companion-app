@@ -476,6 +476,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
       const envItem = envSchedule?.items?.find((i: any) => i.ageDays === d) || null;
       const lightingTemperature = envItem ? {
+        ageDays: d,
         lightHours: envItem.lightHours,
         darkHours: envItem.darkHours,
         lightIntensityLux: envItem.lightIntensityLux,

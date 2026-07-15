@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
+import '../../services/ledger_service.dart';
 
 class BalanceSheetScreen extends StatefulWidget {
   const BalanceSheetScreen({super.key});
@@ -12,19 +12,30 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
   Map<String, dynamic>? _data;
   bool _loading = true;
 
+  late DateTime _asOfDate;
+
   @override
   void initState() {
     super.initState();
+    _asOfDate = DateTime.now();
     _load();
+  }
+
+  String _fmtDate(DateTime d) => d.toIso8601String().substring(0, 10);
+
+  double _parseAmount(dynamic v) {
+    if (v == null) return 0;
+    return double.tryParse(v.toString()) ?? 0;
   }
 
   Future<void> _load() async {
     final messenger = ScaffoldMessenger.of(context);
+    setState(() => _loading = true);
     try {
-      final res = await ApiService.dio.get('/api/v1/financial-engine/balance-sheet');
+      final data = await LedgerService.getBalanceSheet(asOf: _fmtDate(_asOfDate));
       if (!mounted) return;
       setState(() {
-        _data = res.data;
+        _data = data;
         _loading = false;
       });
     } catch (e) {
@@ -36,14 +47,34 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
     }
   }
 
+  Future<void> _pickAsOfDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _asOfDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _asOfDate) {
+      setState(() => _asOfDate = picked);
+      _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final assets = _data?['assets'];
-    final liabilities = _data?['liabilities'];
-    final equity = _data?['equity'];
+    final isBalanced = _data?['isBalanced'] == true;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Balance Sheet')),
+      appBar: AppBar(
+        title: const Text('Balance Sheet'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: _pickAsOfDate,
+            tooltip: 'As of date',
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -52,44 +83,33 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   if (_data != null) ...[
+                    _buildHeader(isBalanced),
+                    const SizedBox(height: 16),
                     _buildSectionTitle('Assets'),
-                    _buildSubSection('Current Assets', [
-                      _RowItem('Cash', (assets?['current']?['cash'] ?? 0).toDouble()),
-                      _RowItem('Receivables', (assets?['current']?['receivables'] ?? 0).toDouble()),
-                      _RowItem('Inventory', (assets?['current']?['inventory'] ?? 0).toDouble()),
-                    ]),
-                    _buildTotalRow('Total Current Assets', (assets?['current']?['total'] ?? 0).toDouble()),
-                    const Divider(),
-                    _buildSubSection('Fixed Assets', [
-                      _RowItem('Equipment', (assets?['fixed']?['equipment'] ?? 0).toDouble()),
-                      _RowItem('Facilities', (assets?['fixed']?['facilities'] ?? 0).toDouble()),
-                    ]),
-                    _buildTotalRow('Total Fixed Assets', (assets?['fixed']?['total'] ?? 0).toDouble()),
+                    ..._buildAccountRows(_data!['assets'] as List? ?? []),
+                    _buildTotalRow(
+                      'Total Assets',
+                      _parseAmount(_data!['totalAssets']),
+                    ),
                     const Divider(height: 32),
-                    _buildGrandTotalRow('Total Assets', (assets?['total'] ?? 0).toDouble()),
-                    const SizedBox(height: 24),
                     _buildSectionTitle('Liabilities'),
-                    _buildSubSection('Current Liabilities', [
-                      _RowItem('Payables', (liabilities?['current']?['payables'] ?? 0).toDouble()),
-                      _RowItem('Short-term Debt', (liabilities?['current']?['shortTermDebt'] ?? 0).toDouble()),
-                    ]),
-                    _buildTotalRow('Total Current Liabilities', (liabilities?['current']?['total'] ?? 0).toDouble()),
-                    const Divider(),
-                    _buildSubSection('Long-term Liabilities', [
-                      _RowItem('Loans', (liabilities?['longTerm']?['loans'] ?? 0).toDouble()),
-                    ]),
-                    _buildTotalRow('Total Long-term Liabilities', (liabilities?['longTerm']?['total'] ?? 0).toDouble()),
+                    ..._buildAccountRows(_data!['liabilities'] as List? ?? []),
+                    _buildTotalRow(
+                      'Total Liabilities',
+                      _parseAmount(_data!['totalLiabilities']),
+                    ),
                     const Divider(height: 32),
-                    _buildGrandTotalRow('Total Liabilities', (liabilities?['total'] ?? 0).toDouble()),
-                    const SizedBox(height: 24),
                     _buildSectionTitle('Equity'),
-                    _buildSubSection('', [
-                      _RowItem('Owner Capital', (equity?['ownerCapital'] ?? 0).toDouble()),
-                      _RowItem('Retained Earnings', (equity?['retainedEarnings'] ?? 0).toDouble()),
-                    ]),
-                    _buildGrandTotalRow('Total Equity', (equity?['total'] ?? 0).toDouble()),
+                    ..._buildAccountRows(_data!['equity'] as List? ?? []),
+                    _buildTotalRow(
+                      'Total Equity',
+                      _parseAmount(_data!['totalEquity']),
+                    ),
                     const SizedBox(height: 24),
-                    _buildGrandTotalRow('Total Liabilities + Equity', (_data?['totalLiabilitiesAndEquity'] ?? 0).toDouble()),
+                    _buildGrandTotalRow(
+                      'Total Liabilities + Equity',
+                      _parseAmount(_data!['totalLiabilitiesAndEquity']),
+                    ),
                   ],
                 ],
               ),
@@ -97,33 +117,82 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+  Widget _buildHeader(bool isBalanced) {
+    final asOfDate = _data!['asOfDate'] ?? _fmtDate(_asOfDate);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(Icons.date_range, color: Colors.green),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'As of: $asOfDate',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Icon(
+              isBalanced ? Icons.check_circle : Icons.warning,
+              color: isBalanced ? Colors.green : Colors.red,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isBalanced ? 'Balanced' : 'Unbalanced',
+              style: TextStyle(
+                color: isBalanced ? Colors.green : Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildSubSection(String title, List<_RowItem> items) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (title.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 4),
-            child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ...items.map((item) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(item.label, style: const TextStyle(fontSize: 14)),
-              Text('ZMW ${item.value.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14)),
-            ],
-          ),
-        )),
-      ],
+  List<Widget> _buildAccountRows(List items) {
+    if (items.isEmpty) {
+      return const [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+          child: Text('No items', style: TextStyle(color: Colors.grey)),
+        ),
+      ];
+    }
+    return items.map((item) {
+      final line = item as Map<String, dynamic>;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                '${line['accountCode'] ?? ''} — ${line['accountName'] ?? ''}',
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+            Text(
+              'ZMW ${_parseAmount(line['balance']).toStringAsFixed(2)}',
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.green,
+        ),
+      ),
     );
   }
 
@@ -133,8 +202,14 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text('ZMW ${value.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Text(
+            'ZMW ${value.toStringAsFixed(2)}',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -150,16 +225,20 @@ class _BalanceSheetScreenState extends State<BalanceSheetScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Text('ZMW ${value.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            'ZMW ${value.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.green,
+            ),
+          ),
         ],
       ),
     );
   }
-}
-
-class _RowItem {
-  final String label;
-  final double value;
-  _RowItem(this.label, this.value);
 }

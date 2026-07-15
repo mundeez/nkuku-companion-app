@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
+import '../../services/ledger_service.dart';
 
 class IncomeStatementScreen extends StatefulWidget {
   const IncomeStatementScreen({super.key});
@@ -12,19 +12,36 @@ class _IncomeStatementScreenState extends State<IncomeStatementScreen> {
   Map<String, dynamic>? _data;
   bool _loading = true;
 
+  late DateTime _fromDate;
+  late DateTime _toDate;
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _toDate = now;
+    _fromDate = DateTime(now.year, 1, 1);
     _load();
+  }
+
+  String _fmtDate(DateTime d) => d.toIso8601String().substring(0, 10);
+
+  double _parseAmount(dynamic v) {
+    if (v == null) return 0;
+    return double.tryParse(v.toString()) ?? 0;
   }
 
   Future<void> _load() async {
     final messenger = ScaffoldMessenger.of(context);
+    setState(() => _loading = true);
     try {
-      final res = await ApiService.dio.get('/api/v1/financial-engine/income-statement');
+      final data = await LedgerService.getIncomeStatement(
+        fromDate: _fmtDate(_fromDate),
+        toDate: _fmtDate(_toDate),
+      );
       if (!mounted) return;
       setState(() {
-        _data = res.data;
+        _data = data;
         _loading = false;
       });
     } catch (e) {
@@ -36,10 +53,50 @@ class _IncomeStatementScreenState extends State<IncomeStatementScreen> {
     }
   }
 
+  Future<void> _pickFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fromDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _fromDate) {
+      setState(() => _fromDate = picked);
+      _load();
+    }
+  }
+
+  Future<void> _pickToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _toDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _toDate) {
+      setState(() => _toDate = picked);
+      _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Income Statement')),
+      appBar: AppBar(
+        title: const Text('Income Statement'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: _pickFromDate,
+            tooltip: 'From date',
+          ),
+          IconButton(
+            icon: const Icon(Icons.date_range),
+            onPressed: _pickToDate,
+            tooltip: 'To date',
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -48,20 +105,64 @@ class _IncomeStatementScreenState extends State<IncomeStatementScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   if (_data != null) ...[
-                    _buildSection('Revenue', _data!['revenue']['byCategory'] ?? {}, Colors.green),
-                    _buildTotalRow('Total Revenue', (_data!['revenue']['total'] ?? 0).toDouble(), Colors.green),
+                    _buildPeriodHeader(),
+                    const SizedBox(height: 16),
+                    _buildSection(
+                      'Revenue',
+                      _data!['revenue'] as List? ?? [],
+                      Colors.green,
+                    ),
+                    _buildTotalRow(
+                      'Total Revenue',
+                      _parseAmount(_data!['totalRevenue']),
+                      Colors.green,
+                    ),
                     const Divider(),
-                    _buildSection('Cost of Goods Sold', _data!['cogs']['byCategory'] ?? {}, Colors.red),
-                    _buildTotalRow('Total COGS', (_data!['cogs']['total'] ?? 0).toDouble(), Colors.red),
+                    _buildSection(
+                      'Cost of Goods Sold',
+                      _data!['costOfGoodsSold'] as List? ?? [],
+                      Colors.red,
+                    ),
+                    _buildTotalRow(
+                      'Total COGS',
+                      _parseAmount(_data!['totalCogs']),
+                      Colors.red,
+                    ),
                     const Divider(),
-                    _buildTotalRow('Gross Profit', (_data!['grossProfit'] ?? 0).toDouble(), (_data!['grossProfit'] ?? 0) >= 0 ? Colors.green : Colors.red),
-                    Text('Gross Margin: ${(_data!['grossMargin'] ?? 0).toStringAsFixed(1)}%', style: const TextStyle(color: Colors.grey)),
+                    _buildTotalRow(
+                      'Gross Profit',
+                      _parseAmount(_data!['grossProfit']),
+                      _parseAmount(_data!['grossProfit']) >= 0
+                          ? Colors.green
+                          : Colors.red,
+                    ),
                     const Divider(),
-                    _buildSection('Operating Expenses', _data!['operatingExpenses']['byCategory'] ?? {}, Colors.red),
-                    _buildTotalRow('Total OpEx', (_data!['operatingExpenses']['total'] ?? 0).toDouble(), Colors.red),
+                    _buildSection(
+                      'Operating Expenses',
+                      _data!['operatingExpenses'] as List? ?? [],
+                      Colors.red,
+                    ),
+                    _buildTotalRow(
+                      'Total OpEx',
+                      _parseAmount(_data!['totalOperatingExpenses']),
+                      Colors.red,
+                    ),
                     const Divider(),
-                    _buildTotalRow('Net Profit', (_data!['netProfit'] ?? 0).toDouble(), (_data!['netProfit'] ?? 0) >= 0 ? Colors.green : Colors.red),
-                    Text('Net Margin: ${(_data!['netMargin'] ?? 0).toStringAsFixed(1)}%', style: const TextStyle(color: Colors.grey)),
+                    _buildTotalRow(
+                      'Operating Profit (EBIT)',
+                      _parseAmount(_data!['operatingProfit']),
+                      _parseAmount(_data!['operatingProfit']) >= 0
+                          ? Colors.green
+                          : Colors.red,
+                    ),
+                    const Divider(),
+                    _buildTotalRow(
+                      'Net Profit',
+                      _parseAmount(_data!['netProfit']),
+                      _parseAmount(_data!['netProfit']) >= 0
+                          ? Colors.green
+                          : Colors.red,
+                    ),
                   ],
                 ],
               ),
@@ -69,22 +170,63 @@ class _IncomeStatementScreenState extends State<IncomeStatementScreen> {
     );
   }
 
-  Widget _buildSection(String title, Map<String, dynamic> items, Color color) {
+  Widget _buildPeriodHeader() {
+    final periodFrom = _data!['periodFrom'] ?? _fmtDate(_fromDate);
+    final periodTo = _data!['periodTo'] ?? _fmtDate(_toDate);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(Icons.date_range, color: Colors.green),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Period: $periodFrom to $periodTo',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection(String title, List items, Color color) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
-        ...items.entries.map((e) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(e.key.replaceAll('_', ' ').split(' ').map((w) => w.isEmpty ? '' : w[0].toUpperCase() + w.substring(1)).join(' '), style: const TextStyle(fontSize: 14)),
-              Text('ZMW ${(e.value as num).toDouble().toStringAsFixed(2)}', style: TextStyle(fontSize: 14, color: color)),
-            ],
+        ...items.map((item) {
+          final line = item as Map<String, dynamic>;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${line['accountCode'] ?? ''} — ${line['accountName'] ?? ''}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+                Text(
+                  'ZMW ${_parseAmount(line['netBalance']).toStringAsFixed(2)}',
+                  style: TextStyle(fontSize: 14, color: color),
+                ),
+              ],
+            ),
+          );
+        }),
+        if (items.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Text('No items', style: TextStyle(color: Colors.grey)),
           ),
-        )),
       ],
     );
   }
@@ -95,14 +237,20 @@ class _IncomeStatementScreenState extends State<IncomeStatementScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Text('ZMW ${value.toStringAsFixed(2)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            'ZMW ${value.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
   }
-}
-
-extension StringExtension on String {
-  String get capitalize => isEmpty ? '' : '${this[0].toUpperCase()}${substring(1)}';
 }

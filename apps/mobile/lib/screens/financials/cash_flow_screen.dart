@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
+import '../../services/ledger_service.dart';
 
 class CashFlowScreen extends StatefulWidget {
   const CashFlowScreen({super.key});
@@ -12,19 +12,36 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
   Map<String, dynamic>? _data;
   bool _loading = true;
 
+  late DateTime _fromDate;
+  late DateTime _toDate;
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _toDate = now;
+    _fromDate = DateTime(now.year, 1, 1);
     _load();
+  }
+
+  String _fmtDate(DateTime d) => d.toIso8601String().substring(0, 10);
+
+  double _parseAmount(dynamic v) {
+    if (v == null) return 0;
+    return double.tryParse(v.toString()) ?? 0;
   }
 
   Future<void> _load() async {
     final messenger = ScaffoldMessenger.of(context);
+    setState(() => _loading = true);
     try {
-      final res = await ApiService.dio.get('/api/v1/financial-engine/cash-flow');
+      final data = await LedgerService.getCashFlow(
+        fromDate: _fmtDate(_fromDate),
+        toDate: _fmtDate(_toDate),
+      );
       if (!mounted) return;
       setState(() {
-        _data = res.data;
+        _data = data;
         _loading = false;
       });
     } catch (e) {
@@ -36,14 +53,50 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
     }
   }
 
+  Future<void> _pickFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fromDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _fromDate) {
+      setState(() => _fromDate = picked);
+      _load();
+    }
+  }
+
+  Future<void> _pickToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _toDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _toDate) {
+      setState(() => _toDate = picked);
+      _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final operating = _data?['operating'];
-    final investing = _data?['investing'];
-    final financing = _data?['financing'];
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Cash Flow Statement')),
+      appBar: AppBar(
+        title: const Text('Cash Flow Statement'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: _pickFromDate,
+            tooltip: 'From date',
+          ),
+          IconButton(
+            icon: const Icon(Icons.date_range),
+            onPressed: _pickToDate,
+            tooltip: 'To date',
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -52,31 +105,24 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   if (_data != null) ...[
+                    _buildPeriodHeader(),
+                    const SizedBox(height: 16),
                     _buildSection(
                       'Operating Activities',
-                      [
-                        _RowItem('Inflows', (operating?['inflows'] ?? 0).toDouble(), Colors.green),
-                        _RowItem('Outflows', (operating?['outflows'] ?? 0).toDouble(), Colors.red),
-                      ],
-                      net: (operating?['net'] ?? 0).toDouble(),
+                      _data!['operatingActivities'] as List? ?? [],
+                      net: _parseAmount(_data!['netOperatingCashFlow']),
                     ),
                     const SizedBox(height: 16),
                     _buildSection(
                       'Investing Activities',
-                      [
-                        _RowItem('Inflows', (investing?['inflows'] ?? 0).toDouble(), Colors.green),
-                        _RowItem('Outflows', (investing?['outflows'] ?? 0).toDouble(), Colors.red),
-                      ],
-                      net: (investing?['net'] ?? 0).toDouble(),
+                      _data!['investingActivities'] as List? ?? [],
+                      net: _parseAmount(_data!['netInvestingCashFlow']),
                     ),
                     const SizedBox(height: 16),
                     _buildSection(
                       'Financing Activities',
-                      [
-                        _RowItem('Inflows', (financing?['inflows'] ?? 0).toDouble(), Colors.green),
-                        _RowItem('Outflows', (financing?['outflows'] ?? 0).toDouble(), Colors.red),
-                      ],
-                      net: (financing?['net'] ?? 0).toDouble(),
+                      _data!['financingActivities'] as List? ?? [],
+                      net: _parseAmount(_data!['netFinancingCashFlow']),
                     ),
                     const SizedBox(height: 24),
                     Container(
@@ -88,22 +134,26 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Net Change', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                          Text(
-                            'ZMW ${(_data?['netChange'] ?? 0).toDouble().toStringAsFixed(2)}',
+                          const Text(
+                            'Net Cash Flow',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: (_data?['netChange'] ?? 0) >= 0 ? Colors.green : Colors.red,
+                            ),
+                          ),
+                          Text(
+                            'ZMW ${_parseAmount(_data!['netCashFlow']).toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: _parseAmount(_data!['netCashFlow']) >= 0
+                                  ? Colors.green
+                                  : Colors.red,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildSimpleRow('Opening Balance', (_data?['openingBalance'] ?? 0).toDouble()),
-                    const Divider(),
-                    _buildSimpleRow('Closing Balance', (_data?['closingBalance'] ?? 0).toDouble(), bold: true),
                   ],
                 ],
               ),
@@ -111,36 +161,88 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
     );
   }
 
-  Widget _buildSection(String title, List<_RowItem> items, {required double net}) {
+  Widget _buildPeriodHeader() {
+    final periodFrom = _data!['periodFrom'] ?? _fmtDate(_fromDate);
+    final periodTo = _data!['periodTo'] ?? _fmtDate(_toDate);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(Icons.date_range, color: Colors.green),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Period: $periodFrom to $periodTo',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection(String title, List items, {required double net}) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
-            const SizedBox(height: 8),
-            ...items.map((item) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(item.label, style: const TextStyle(fontSize: 14)),
-                  Text(
-                    'ZMW ${item.value.toStringAsFixed(2)}',
-                    style: TextStyle(fontSize: 14, color: item.color),
-                  ),
-                ],
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
               ),
-            )),
+            ),
+            const SizedBox(height: 8),
+            ...items.map((item) {
+              final line = item as Map<String, dynamic>;
+              final amount = _parseAmount(line['amount']);
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        line['label'] ?? '',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    Text(
+                      'ZMW ${amount.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: amount >= 0 ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (items.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Text('No items', style: TextStyle(color: Colors.grey)),
+              ),
             const Divider(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Net', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Net',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Text(
                   'ZMW ${net.toStringAsFixed(2)}',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: net >= 0 ? Colors.green : Colors.red),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: net >= 0 ? Colors.green : Colors.red,
+                  ),
                 ),
               ],
             ),
@@ -149,27 +251,4 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
       ),
     );
   }
-
-  Widget _buildSimpleRow(String label, double value, {bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
-          Text(
-            'ZMW ${value.toStringAsFixed(2)}',
-            style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RowItem {
-  final String label;
-  final double value;
-  final Color color;
-  _RowItem(this.label, this.value, this.color);
 }

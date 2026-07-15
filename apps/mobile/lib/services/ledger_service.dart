@@ -31,10 +31,18 @@ class LedgerService {
   }
 
   /// GET /api/v1/journal
-  static Future<List<dynamic>> getJournalEntries({String? sourceType}) async {
+  static Future<List<dynamic>> getJournalEntries({
+    String? sourceType,
+    String? fromDate,
+    String? toDate,
+  }) async {
     final res = await ApiService.dio.get(
       '/api/v1/journal',
-      queryParameters: {if (sourceType != null) 'sourceType': sourceType},
+      queryParameters: {
+        if (sourceType != null) 'sourceType': sourceType,
+        if (fromDate != null) 'fromDate': fromDate,
+        if (toDate != null) 'toDate': toDate,
+      },
     );
     return res.data as List<dynamic>;
   }
@@ -42,6 +50,22 @@ class LedgerService {
   /// GET /api/v1/journal/:id
   static Future<Map<String, dynamic>> getJournalEntry(String id) async {
     final res = await ApiService.dio.get('/api/v1/journal/$id');
+    return res.data as Map<String, dynamic>;
+  }
+
+  /// POST /api/v1/journal — create manual journal entry
+  static Future<Map<String, dynamic>> createJournalEntry({
+    required String entryDate,
+    required String description,
+    String? reference,
+    required List<Map<String, dynamic>> lines,
+  }) async {
+    final res = await ApiService.dio.post('/api/v1/journal', data: {
+      'entryDate': entryDate,
+      'description': description,
+      if (reference != null) 'reference': reference,
+      'lines': lines,
+    });
     return res.data as Map<String, dynamic>;
   }
 
