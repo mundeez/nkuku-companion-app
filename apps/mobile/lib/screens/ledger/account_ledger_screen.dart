@@ -42,6 +42,28 @@ class _AccountLedgerScreenState extends State<AccountLedgerScreen> {
     }
   }
 
+  Future<void> _pickDate({required bool isFrom}) async {
+    final initial = isFrom
+        ? DateTime.tryParse(_fromDate) ?? DateTime.now()
+        : DateTime.tryParse(_toDate) ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked == null) return;
+    final str = picked.toIso8601String().substring(0, 10);
+    setState(() {
+      if (isFrom) {
+        _fromDate = str;
+      } else {
+        _toDate = str;
+      }
+    });
+    _load();
+  }
+
   String _fmt(dynamic v) {
     if (v == null) return '—';
     final n = double.tryParse(v.toString());
@@ -52,7 +74,21 @@ class _AccountLedgerScreenState extends State<AccountLedgerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.code} — ${widget.name}')),
+      appBar: AppBar(
+        title: Text('${widget.code} — ${widget.name}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today_outlined),
+            tooltip: 'From date',
+            onPressed: () => _pickDate(isFrom: true),
+          ),
+          IconButton(
+            icon: const Icon(Icons.event_available),
+            tooltip: 'To date',
+            onPressed: () => _pickDate(isFrom: false),
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -62,6 +98,25 @@ class _AccountLedgerScreenState extends State<AccountLedgerScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      // Date range chip row
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          children: [
+                            Chip(
+                              label: Text('From: $_fromDate',
+                                  style: const TextStyle(fontSize: 12)),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            const SizedBox(width: 8),
+                            Chip(
+                              label: Text('To: $_toDate',
+                                  style: const TextStyle(fontSize: 12)),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ],
+                        ),
+                      ),
                       // Summary cards
                       Row(
                         children: [

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/ledger_service.dart';
+import '../../services/auth_service.dart';
 import 'journal_detail_screen.dart';
+import 'journal_entry_form_screen.dart';
 
 class JournalListScreen extends StatefulWidget {
   const JournalListScreen({super.key});
@@ -14,6 +16,8 @@ class _JournalListScreenState extends State<JournalListScreen> {
   bool _loading = true;
   String? _error;
   String? _sourceType;
+  String? _fromDate;
+  String? _toDate;
 
   static const _sourceLabels = {
     'manual': 'Manual',
@@ -34,7 +38,11 @@ class _JournalListScreenState extends State<JournalListScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final entries = await LedgerService.getJournalEntries(sourceType: _sourceType);
+      final entries = await LedgerService.getJournalEntries(
+        sourceType: _sourceType,
+        fromDate: _fromDate,
+        toDate: _toDate,
+      );
       setState(() { _entries = entries; _loading = false; });
     } catch (e) {
       setState(() { _error = 'Failed to load journal entries'; _loading = false; });
@@ -48,12 +56,49 @@ class _JournalListScreenState extends State<JournalListScreen> {
     return n.toStringAsFixed(2);
   }
 
+
+  Future<void> _pickFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.tryParse(_fromDate ?? '') ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() => _fromDate = picked.toIso8601String().substring(0, 10));
+      _load();
+    }
+  }
+
+  Future<void> _pickToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.tryParse(_toDate ?? '') ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() => _toDate = picked.toIso8601String().substring(0, 10));
+      _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Journal Entries'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today_outlined),
+            tooltip: 'From date',
+            onPressed: _pickFromDate,
+          ),
+          IconButton(
+            icon: const Icon(Icons.event_available),
+            tooltip: 'To date',
+            onPressed: _pickToDate,
+          ),
           PopupMenuButton<String?>(
             icon: const Icon(Icons.filter_list),
             onSelected: (val) {
@@ -145,6 +190,19 @@ class _JournalListScreenState extends State<JournalListScreen> {
                           },
                         ),
                 ),
+      floatingActionButton: AuthService.canEdit
+          ? FloatingActionButton(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const JournalEntryFormScreen()),
+                );
+                if (result == true) _load();
+              },
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }
