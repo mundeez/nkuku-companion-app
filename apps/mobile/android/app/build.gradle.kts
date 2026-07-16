@@ -25,6 +25,11 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // APP_API_BASE_URL — passed via --dart-define at build time.
+        // The Dart default (api_service.dart) is the production URL, so
+        // release builds work out of the box. Override for dev:
+        //   flutter build apk --dart-define=APP_API_BASE_URL=http://10.0.2.2:30001
     }
 
     buildTypes {
