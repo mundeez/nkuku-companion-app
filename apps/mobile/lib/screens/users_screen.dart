@@ -36,6 +36,10 @@ class _UsersScreenState extends State<UsersScreen> {
         return Colors.green;
       case 'manager':
         return Colors.blue;
+      case 'flock_minder':
+        return Colors.amber;
+      case 'sales_person':
+        return Colors.purple;
       default:
         return Colors.grey;
     }
@@ -344,6 +348,8 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   items: const [
                     DropdownMenuItem(value: 'owner', child: Text('Owner')),
                     DropdownMenuItem(value: 'manager', child: Text('Manager')),
+                    DropdownMenuItem(value: 'flock_minder', child: Text('Flock Minder')),
+                    DropdownMenuItem(value: 'sales_person', child: Text('Sales Person')),
                     DropdownMenuItem(value: 'viewer', child: Text('Viewer')),
                   ],
                   onChanged: (v) => setState(() => _role = v ?? 'viewer'),

@@ -31,6 +31,100 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
   const audit = new AuditService(prisma);
 
+  // GET /all — list all sale records for the user (for sales dashboard)
+  app.get('/all', { preHandler: [authenticate] }, async (request) => {
+    const authUser = (request as any).authUser;
+    const query = z.object({
+      fromDate: z.string().optional(),
+      toDate: z.string().optional(),
+      paymentStatus: z.enum(['pending', 'partial', 'paid']).optional(),
+    }).parse(request.query);
+
+    const where: any = { flock: { createdBy: authUser.userId } };
+    if (query.fromDate) where.saleDate = { gte: new Date(query.fromDate) };
+    if (query.toDate) where.saleDate = { ...where.saleDate, lte: new Date(query.toDate) };
+    if (query.paymentStatus) where.paymentStatus = query.paymentStatus;
+
+    return prisma.saleRecord.findMany({
+      where,
+      include: { flock: { select: { name: true, breed: { select: { name: true } } } } },
+      orderBy: { saleDate: 'desc' },
+    });
+  });
+
+  // GET /dashboard — global sales summary for the sales dashboard
+  app.get('/dashboard', { preHandler: [authenticate] }, async (request) => {
+    const authUser = (request as any).authUser;
+    const query = z.object({
+      fromDate: z.string().optional(),
+      toDate: z.string().optional(),
+    }).parse(request.query);
+
+    const where: any = { flock: { createdBy: authUser.userId } };
+    if (query.fromDate) where.saleDate = { gte: new Date(query.fromDate) };
+    if (query.toDate) where.saleDate = { ...where.saleDate, lte: new Date(query.toDate) };
+
+    const totals = await prisma.saleRecord.aggregate({
+      where,
+      _sum: { birdCount: true, totalAmountZmw: true, amountPaidZmw: true },
+      _count: { _all: true },
+    });
+
+    const paymentBreakdown = await prisma.saleRecord.groupBy({
+      by: ['paymentStatus'],
+      where,
+      _count: { _all: true },
+      _sum: { totalAmountZmw: true },
+    });
+
+    // Top customers by revenue
+    const topCustomers = await prisma.saleRecord.groupBy({
+      by: ['customerName'],
+      where: { ...where, customerName: { not: null } },
+      _sum: { totalAmountZmw: true },
+      _count: { _all: true },
+      orderBy: { _sum: { totalAmountZmw: 'desc' } },
+      take: 10,
+    });
+
+    // Daily sales for charting (last 30 days by default)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentSales = await prisma.saleRecord.findMany({
+      where: { ...where, saleDate: { gte: thirtyDaysAgo } },
+      orderBy: { saleDate: 'asc' },
+      select: { saleDate: true, birdCount: true, totalAmountZmw: true },
+    });
+
+    const dailySales: Record<string, { birds: number; revenue: number }> = {};
+    for (const s of recentSales) {
+      const dateKey = s.saleDate.toISOString().split('T')[0];
+      if (!dailySales[dateKey]) dailySales[dateKey] = { birds: 0, revenue: 0 };
+      dailySales[dateKey].birds += s.birdCount;
+      dailySales[dateKey].revenue += Number(s.totalAmountZmw);
+    }
+
+    return {
+      totalRevenue: totals._sum.totalAmountZmw ? Number(totals._sum.totalAmountZmw) : 0,
+      totalBirdsSold: totals._sum.birdCount ?? 0,
+      totalPaid: totals._sum.amountPaidZmw ? Number(totals._sum.amountPaidZmw) : 0,
+      outstanding: (totals._sum.totalAmountZmw ? Number(totals._sum.totalAmountZmw) : 0) - (totals._sum.amountPaidZmw ? Number(totals._sum.amountPaidZmw) : 0),
+      salesCount: totals._count._all,
+      avgPricePerBird: totals._sum.birdCount ? Number(totals._sum.totalAmountZmw ?? 0) / totals._sum.birdCount : 0,
+      paymentBreakdown: paymentBreakdown.map((row) => ({
+        paymentStatus: row.paymentStatus,
+        count: row._count._all,
+        totalAmount: row._sum.totalAmountZmw ? Number(row._sum.totalAmountZmw) : 0,
+      })),
+      topCustomers: topCustomers.map((row) => ({
+        customerName: row.customerName,
+        totalAmount: row._sum.totalAmountZmw ? Number(row._sum.totalAmountZmw) : 0,
+        saleCount: row._count._all,
+      })),
+      dailySales: Object.entries(dailySales).map(([date, data]) => ({ date, ...data })),
+    };
+  });
+
   // GET /?flockId=...
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
@@ -102,7 +196,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       totalPaid,
       outstanding,
       salesCount,
-      paymentBreakdown: paymentBreakdown.map((row) => ({
+      paymentBreakdown: paymentBreakdown.map((row: any) => ({
         paymentStatus: row.paymentStatus,
         count: row._count._all,
         totalAmount: row._sum.totalAmountZmw ? Number(row._sum.totalAmountZmw) : 0,
@@ -146,6 +240,12 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
         notes: `${notesPrefix}${originalNotes}`,
         createdBy: authUser.userId,
       },
+    });
+
+    // Decrement flock currentCount by birdCount sold
+    await prisma.broilerFlock.update({
+      where: { id: flockId },
+      data: { currentCount: { decrement: data.birdCount } },
     });
 
     await audit.log({
@@ -244,6 +344,12 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     }
 
     await prisma.saleRecord.delete({ where: { id } });
+
+    // Restore flock currentCount by birdCount that was sold
+    await prisma.broilerFlock.update({
+      where: { id: record.flockId },
+      data: { currentCount: { increment: record.birdCount } },
+    });
 
     await audit.log({
       userId: authUser.userId,

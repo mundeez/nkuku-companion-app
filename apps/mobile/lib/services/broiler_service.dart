@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'package:dio/dio.dart';
 import '../models/breed.dart';
+import '../models/document.dart';
 import '../models/environmental_record.dart';
 import '../models/financial_record.dart';
 import '../models/feed_record.dart';
@@ -9,6 +10,7 @@ import '../models/flock_task.dart';
 import '../models/growth_record.dart';
 import '../models/medication_record.dart';
 import '../models/mortality_event.dart';
+import '../models/sale_record.dart';
 import '../models/supplier.dart';
 import '../models/vaccination_event.dart';
 import '../models/water_record.dart';
@@ -390,6 +392,76 @@ class BroilerService {
     final res = await ApiService.dio.get('/api/v1/broiler-flocks/$flockId/summary');
     _assertOk(res);
     return FlockCalendarSummary.fromJson(res.data);
+  }
+
+  // Sale records
+  static Future<List<SaleRecord>> getSaleRecords(String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/sale-records',
+      queryParameters: {'flockId': flockId},
+    );
+    _assertOk(res);
+    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    return (res.data as List).map((e) => SaleRecord.fromJson(e)).toList();
+  }
+
+  static Future<Map<String, dynamic>> getSaleRecordSummary(String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/sale-records/summary',
+      queryParameters: {'flockId': flockId},
+    );
+    _assertOk(res);
+    return res.data as Map<String, dynamic>;
+  }
+
+  static Future<SaleRecord> createSaleRecord(SaleRecord record) async {
+    final res = await ApiService.dio.post('/api/v1/sale-records', data: record.toJson());
+    _assertOk(res);
+    return SaleRecord.fromJson(res.data);
+  }
+
+  static Future<SaleRecord> updateSaleRecord(String id, SaleRecord record) async {
+    final res = await ApiService.dio.patch('/api/v1/sale-records/$id', data: record.toJson());
+    _assertOk(res);
+    return SaleRecord.fromJson(res.data);
+  }
+
+  static Future<void> deleteSaleRecord(String id) async {
+    final res = await ApiService.dio.delete('/api/v1/sale-records/$id');
+    _assertOk(res);
+  }
+
+  // Documents
+  static Future<List<DocumentRecord>> getDocuments(String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/documents',
+      queryParameters: {'flockId': flockId},
+    );
+    _assertOk(res);
+    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    return (res.data as List).map((e) => DocumentRecord.fromJson(e)).toList();
+  }
+
+  static Future<DocumentRecord> uploadDocument({
+    required String flockId,
+    required String filePath,
+    required String category,
+    String recordType = 'flock',
+  }) async {
+    final formData = FormData.fromMap({
+      'flockId': flockId,
+      'category': category,
+      'recordType': recordType,
+      'file': await MultipartFile.fromFile(filePath),
+    });
+    final res = await ApiService.dio.post('/api/v1/documents', data: formData);
+    _assertOk(res);
+    return DocumentRecord.fromJson(res.data);
+  }
+
+  static Future<void> deleteDocument(String id) async {
+    final res = await ApiService.dio.delete('/api/v1/documents/$id');
+    _assertOk(res);
   }
 
   static void _assertOk(Response<dynamic> res) {

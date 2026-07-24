@@ -15,14 +15,15 @@ export function Navbar() {
   const navLinks = [
     { href: "/", label: "Dashboard" },
     { href: "/broiler-flocks", label: "Broiler Flocks" },
+    ...(user?.role === "owner" || user?.role === "manager" || user?.role === "sales_person" ? [{ href: "/sales", label: "Sales" }] : []),
     { href: "/diseases", label: "Diseases" },
     { href: "/alerts", label: "Alerts" },
     { href: "/vaccine-inventory", label: "Vaccine Inventory" },
     { href: "/suppliers", label: "Suppliers" },
     { href: "/projections", label: "Projections" },
     { href: "/expansion-plan", label: "Expansion Plan" },
-    { href: "/financials", label: "Financials" },
-    { href: "/ledger", label: "Ledger" },
+    ...(user?.role === "owner" || user?.role === "manager" || user?.role === "viewer" ? [{ href: "/financials", label: "Financials" }] : []),
+    ...(user?.role === "owner" || user?.role === "manager" || user?.role === "viewer" ? [{ href: "/ledger", label: "Ledger" }] : []),
     ...(user?.role === "owner" ? [{ href: "/users", label: "Users" }] : []),
   ];
 
