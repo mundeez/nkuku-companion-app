@@ -111,12 +111,12 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       outstanding: (totals._sum.totalAmountZmw ? Number(totals._sum.totalAmountZmw) : 0) - (totals._sum.amountPaidZmw ? Number(totals._sum.amountPaidZmw) : 0),
       salesCount: totals._count._all,
       avgPricePerBird: totals._sum.birdCount ? Number(totals._sum.totalAmountZmw ?? 0) / totals._sum.birdCount : 0,
-      paymentBreakdown: paymentBreakdown.map((row) => ({
+      paymentBreakdown: paymentBreakdown.map((row: any) => ({
         paymentStatus: row.paymentStatus,
         count: row._count._all,
         totalAmount: row._sum.totalAmountZmw ? Number(row._sum.totalAmountZmw) : 0,
       })),
-      topCustomers: topCustomers.map((row) => ({
+      topCustomers: topCustomers.map((row: any) => ({
         customerName: row.customerName,
         totalAmount: row._sum.totalAmountZmw ? Number(row._sum.totalAmountZmw) : 0,
         saleCount: row._count._all,

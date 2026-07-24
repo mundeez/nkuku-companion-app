@@ -22,7 +22,7 @@ class _DocumentFormState extends State<DocumentForm> {
   final _categories = ['receipt', 'invoice', 'quotation', 'other'];
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'png', 'webp', 'doc', 'docx', 'csv'],
     );
@@ -51,10 +51,12 @@ class _DocumentFormState extends State<DocumentForm> {
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) setState(() {
-        _error = e.toString();
-        _uploading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _uploading = false;
+        });
+      }
     }
   }
 

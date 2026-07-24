@@ -105,10 +105,12 @@ class _SaleRecordFormState extends State<SaleRecordForm> {
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) setState(() {
-        _error = e.toString();
-        _saving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _saving = false;
+        });
+      }
     }
   }
 

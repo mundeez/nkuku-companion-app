@@ -940,7 +940,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                             label: 'document',
                             record: doc,
                             name: (d) => d.fileName,
-                            onDelete: () => BroilerService.deleteDocument(d.id),
+                            onDelete: () => BroilerService.deleteDocument(doc.id),
                           ),
                         ),
                     ],

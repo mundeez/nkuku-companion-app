@@ -164,7 +164,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     return { ...safe, downloadUrl: `/api/v1/documents/${created.id}/download` };
   });
 
-  // GET /:id/download — stream file back to client
+  // GET /:id/download — stream file back to client (download mode)
   app.get('/:id/download', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = DocumentIdSchema.parse(request.params);
     const authUser = (request as any).authUser;
@@ -191,6 +191,36 @@ export async function buildDocumentModule(app: FastifyInstance) {
     const buffer = fs.readFileSync(fullPath);
     reply.header('Content-Type', doc.mimeType);
     reply.header('Content-Disposition', `attachment; filename="${doc.fileName}"`);
+    return reply.send(buffer);
+  });
+
+  // GET /:id/view — stream file inline for in-browser viewing (PDFs, images)
+  app.get('/:id/view', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = DocumentIdSchema.parse(request.params);
+    const authUser = (request as any).authUser;
+
+    const doc = await prisma.document.findUnique({ where: { id } });
+    if (!doc) {
+      return reply.status(404).send({ error: 'NOT_FOUND' });
+    }
+
+    if (doc.flockId) {
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: doc.flockId, createdBy: authUser.userId },
+      });
+      if (!flock) {
+        return reply.status(404).send({ error: 'NOT_FOUND' });
+      }
+    }
+
+    const fullPath = path.resolve(UPLOAD_DIR, doc.filePath);
+    if (!fs.existsSync(fullPath)) {
+      return reply.status(404).send({ error: 'FILE_NOT_FOUND' });
+    }
+
+    const buffer = fs.readFileSync(fullPath);
+    reply.header('Content-Type', doc.mimeType);
+    reply.header('Content-Disposition', 'inline');
     return reply.send(buffer);
   });
 
