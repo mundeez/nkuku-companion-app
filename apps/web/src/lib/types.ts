@@ -138,6 +138,8 @@ export interface BroilerFlock {
   housingType: "whole_house" | "spot_brooding";
   chicksCollected: boolean;
   collectionDate?: string;
+  expectedCollectionStart?: string | null;
+  expectedCollectionEnd?: string | null;
   chickQualityNotes?: string;
   status: "active" | "completed" | "cancelled";
   createdAt: string;

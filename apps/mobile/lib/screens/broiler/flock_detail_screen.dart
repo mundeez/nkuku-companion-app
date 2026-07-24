@@ -294,6 +294,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 Text('Housing: ${flock.housingType.replaceAll('_', ' ')}'),
                 Text('Ordered: ${flock.orderDate != null ? flock.orderDate!.split('T').first : '-'}'),
                 Text('Started: ${flock.startDate != null ? flock.startDate!.split('T').first : 'Pending collection'}'),
+                if (flock.expectedCollectionStart != null && flock.expectedCollectionEnd != null)
+                  Text('Est. Collection: ${flock.expectedCollectionStart!.split('T').first} – ${flock.expectedCollectionEnd!.split('T').first}'),
                 Text('Age: ${flock.startDate == null ? 'Pending collection' : 'Day ${flock.ageDays ?? 0}'}'),
                 Text('Status: ${flock.status}'),
               ],

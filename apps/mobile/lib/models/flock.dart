@@ -7,6 +7,8 @@ class BroilerFlock {
   final String? supplierName;
   final String? startDate;
   final String? orderDate;
+  final String? expectedCollectionStart;
+  final String? expectedCollectionEnd;
   final int initialCount;
   final int currentCount;
   final double? targetWeight;
@@ -31,6 +33,8 @@ class BroilerFlock {
     this.supplierName,
     this.startDate,
     this.orderDate,
+    this.expectedCollectionStart,
+    this.expectedCollectionEnd,
     required this.initialCount,
     required this.currentCount,
     this.targetWeight,
@@ -57,6 +61,8 @@ class BroilerFlock {
       supplierName: json['supplier']?['name'],
       orderDate: json['orderDate'] ?? json['order_date'],
       startDate: json['startDate'] ?? json['start_date'],
+      expectedCollectionStart: json['expectedCollectionStart'] ?? json['expected_collection_start'],
+      expectedCollectionEnd: json['expectedCollectionEnd'] ?? json['expected_collection_end'],
       initialCount: json['initialCount'] ?? json['initial_count'] ?? 0,
       currentCount: json['currentCount'] ?? json['current_count'] ?? 0,
       targetWeight: json['targetWeight'] != null
@@ -86,6 +92,8 @@ class BroilerFlock {
       'breedId': breedId,
       if (startDate != null) 'startDate': startDate!.split('T').first,
       if (orderDate != null) 'orderDate': orderDate!.split('T').first,
+      if (expectedCollectionStart != null) 'expectedCollectionStart': expectedCollectionStart!.split('T').first,
+      if (expectedCollectionEnd != null) 'expectedCollectionEnd': expectedCollectionEnd!.split('T').first,
       'initialCount': initialCount,
       if (supplierId != null) 'supplierId': supplierId,
       if (targetWeight != null) 'targetWeight': targetWeight,
@@ -110,6 +118,8 @@ class BroilerFlock {
     String? supplierName,
     String? startDate,
     String? orderDate,
+    String? expectedCollectionStart,
+    String? expectedCollectionEnd,
     int? initialCount,
     int? currentCount,
     double? targetWeight,
@@ -134,6 +144,8 @@ class BroilerFlock {
       supplierName: supplierName ?? this.supplierName,
       startDate: startDate ?? this.startDate,
       orderDate: orderDate ?? this.orderDate,
+      expectedCollectionStart: expectedCollectionStart ?? this.expectedCollectionStart,
+      expectedCollectionEnd: expectedCollectionEnd ?? this.expectedCollectionEnd,
       initialCount: initialCount ?? this.initialCount,
       currentCount: currentCount ?? this.currentCount,
       targetWeight: targetWeight ?? this.targetWeight,
