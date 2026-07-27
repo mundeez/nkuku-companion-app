@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../models/document.dart';
 import '../../models/environmental_record.dart';
 import '../../models/financial_record.dart';
 import '../../models/feed_record.dart';
@@ -7,6 +8,7 @@ import '../../models/flock.dart';
 import '../../models/growth_record.dart';
 import '../../models/medication_record.dart';
 import '../../models/mortality_event.dart';
+import '../../models/sale_record.dart';
 import '../../models/vaccination_event.dart';
 import '../../models/water_record.dart';
 import '../../services/api_service.dart';
@@ -14,12 +16,14 @@ import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
 import 'calendar_screen.dart';
 import 'medication_screen.dart';
+import 'records/document_form.dart';
 import 'records/environmental_record_form.dart';
 import 'records/financial_record_form.dart';
 import 'records/feed_record_form.dart';
 import 'records/growth_record_form.dart';
 import 'records/medication_record_form.dart';
 import 'records/mortality_event_form.dart';
+import 'records/sale_record_form.dart';
 import 'records/vaccination_event_form.dart';
 import 'records/water_record_form.dart';
 import 'tasks_screen.dart';
@@ -56,11 +60,14 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   FinancialSummary? _financialSummary;
   List<MedicationRecord> _medicationRecords = [];
   List<EnvironmentalRecord> _environmentalRecords = [];
+  List<SaleRecord> _saleRecords = [];
+  Map<String, dynamic>? _saleSummary;
+  List<DocumentRecord> _documents = [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 11, vsync: this);
+    _tabController = TabController(length: 13, vsync: this);
     _loadData();
   }
 
@@ -89,6 +96,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         BroilerService.getFinancialRecords(widget.flockId),
         BroilerService.getMedicationRecords(widget.flockId),
         BroilerService.getEnvironmentalRecords(widget.flockId),
+        BroilerService.getSaleRecords(widget.flockId),
+        BroilerService.getDocuments(widget.flockId),
       ]);
 
       final growth = results[0] as List<GrowthRecord>;
@@ -99,6 +108,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       final financial = results[5] as List<FinancialRecord>;
       final medication = results[6] as List<MedicationRecord>;
       final environment = results[7] as List<EnvironmentalRecord>;
+      final sales = results[8] as List<SaleRecord>;
+      final documents = results[9] as List<DocumentRecord>;
 
       final analysis = await BroilerService.getGrowthAnalysis(widget.flockId);
       final feedSummary = await BroilerService.getFeedSummary(widget.flockId);
@@ -106,6 +117,12 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       final mortalitySummary = await BroilerService.getMortalitySummary(widget.flockId);
       final vaccinationStatus = await BroilerService.getVaccinationScheduleStatus(widget.flockId);
       final financialSummary = await BroilerService.getFinancialSummary(widget.flockId);
+      Map<String, dynamic>? saleSummary;
+      try {
+        saleSummary = await BroilerService.getSaleRecordSummary(widget.flockId);
+      } catch (_) {
+        saleSummary = null;
+      }
 
       setState(() {
         _flock = flock;
@@ -124,6 +141,9 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         _financialSummary = financialSummary;
         _medicationRecords = medication;
         _environmentalRecords = environment;
+        _saleRecords = sales;
+        _saleSummary = saleSummary;
+        _documents = documents;
         _loading = false;
       });
     } catch (e) {
@@ -143,39 +163,63 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   }
 
   void _onAddRecord() {
-    if (_flock == null || !AuthService.canEdit) return;
+    if (_flock == null) return;
     final flock = _flock!;
     switch (_tabController.index) {
       case 1:
+        if (!AuthService.canEdit) return;
         _navigateToForm(GrowthRecordForm(flockId: flock.id));
         break;
       case 2:
+        if (!AuthService.canEdit) return;
         _navigateToForm(FeedRecordForm(flockId: flock.id));
         break;
       case 3:
+        if (!AuthService.canEdit) return;
         _navigateToForm(WaterRecordForm(flockId: flock.id));
         break;
       case 4:
+        if (!AuthService.canEdit) return;
         _navigateToForm(MortalityEventForm(flockId: flock.id, currentCount: flock.currentCount));
         break;
       case 5:
+        if (!AuthService.canEdit) return;
         _navigateToForm(VaccinationEventForm(flockId: flock.id, flockAgeDays: flock.ageDays ?? 0));
         break;
       case 6:
+        if (!AuthService.canEdit) return;
         _navigateToForm(FinancialRecordForm(flockId: flock.id));
         break;
       case 7:
+        if (!AuthService.canEdit) return;
         _navigateToForm(EnvironmentalRecordForm(flockId: flock.id));
         break;
       case 8:
+        if (!AuthService.canEdit) return;
         _navigateToForm(MedicationRecordForm(flockId: flock.id));
+        break;
+      case 11:
+        if (!AuthService.canManageSales) return;
+        _navigateToForm(SaleRecordForm(flockId: flock.id));
+        break;
+      case 12:
+        if (!AuthService.canManageDocuments) return;
+        _navigateToForm(DocumentForm(flockId: flock.id));
         break;
     }
   }
 
   Widget? get _floatingActionButton {
-    if (!AuthService.canEdit) return null;
-    if (_tabController.index == 0 || _tabController.index == 10) return null;
+    final index = _tabController.index;
+    // No FAB on Overview (0), Tasks (9), or Calendar (10)
+    if (index == 0 || index == 9 || index == 10) return null;
+    if (index == 11) {
+      if (!AuthService.canManageSales) return null;
+    } else if (index == 12) {
+      if (!AuthService.canManageDocuments) return null;
+    } else {
+      if (!AuthService.canEdit) return null;
+    }
     return FloatingActionButton(
       onPressed: _onAddRecord,
       child: const Icon(Icons.add),
@@ -233,6 +277,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             Tab(icon: Icon(Icons.medication), text: 'Medication'),
             Tab(icon: Icon(Icons.task_alt), text: 'Tasks'),
             Tab(icon: Icon(Icons.calendar_month), text: 'Calendar'),
+            Tab(icon: Icon(Icons.point_of_sale), text: 'Sales'),
+            Tab(icon: Icon(Icons.attach_file), text: 'Docs'),
           ],
         ),
       ),
@@ -264,6 +310,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     _buildMedicationTab(),
                     _buildTasksTab(),
                     _buildCalendarTab(),
+                    _buildSalesTab(),
+                    _buildDocumentsTab(),
                   ],
                 ),
     );
@@ -294,6 +342,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 Text('Housing: ${flock.housingType.replaceAll('_', ' ')}'),
                 Text('Ordered: ${flock.orderDate != null ? flock.orderDate!.split('T').first : '-'}'),
                 Text('Started: ${flock.startDate != null ? flock.startDate!.split('T').first : 'Pending collection'}'),
+                if (flock.expectedCollectionStart != null && flock.expectedCollectionEnd != null)
+                  Text('Est. Collection: ${flock.expectedCollectionStart!.split('T').first} – ${flock.expectedCollectionEnd!.split('T').first}'),
                 Text('Age: ${flock.startDate == null ? 'Pending collection' : 'Day ${flock.ageDays ?? 0}'}'),
                 Text('Status: ${flock.status}'),
               ],
@@ -772,6 +822,155 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         },
       ),
     );
+  }
+
+  Widget _buildSalesTab() {
+    final summary = _saleSummary;
+    final totalBirdsSold = summary != null
+        ? (summary['totalBirdsSold'] ?? summary['total_birds_sold'] ?? 0)
+        : _saleRecords.fold(0, (sum, r) => sum + r.birdCount);
+    final totalRevenue = summary != null
+        ? double.tryParse((summary['totalRevenueZmw'] ?? summary['total_revenue_zmw'] ?? 0).toString()) ?? 0
+        : _saleRecords.fold(0.0, (sum, r) => sum + r.totalAmountZmw);
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(label: 'Birds sold', value: '$totalBirdsSold', color: Colors.green),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatCard(
+                  label: 'Total revenue',
+                  value: 'ZMW ${totalRevenue.toStringAsFixed(2)}',
+                  color: Colors.teal,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_saleRecords.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No sale records yet.')))
+          else
+            ..._saleRecords.reversed.map((r) {
+              final statusColor = r.paymentStatus == 'paid'
+                  ? Colors.green
+                  : r.paymentStatus == 'partial'
+                      ? Colors.orange
+                      : Colors.grey;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  title: Text(r.saleDate.toIso8601String().split('T').first),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (r.customerName != null && r.customerName!.isNotEmpty)
+                        Text('Customer: ${r.customerName}'),
+                      Text('${r.birdCount} birds · ZMW ${r.totalAmountZmw.toStringAsFixed(2)}'),
+                      if (r.avgWeightKg != null) Text('Avg weight: ${r.avgWeightKg} kg'),
+                    ],
+                  ),
+                  trailing: Chip(
+                    label: Text(
+                      r.paymentStatus,
+                      style: TextStyle(fontSize: 10, color: statusColor),
+                    ),
+                    backgroundColor: statusColor.withAlpha(30),
+                  ),
+                  onTap: AuthService.canManageSales
+                      ? () => _navigateToForm(SaleRecordForm(flockId: widget.flockId, record: r))
+                      : null,
+                  onLongPress: AuthService.canManageSales
+                      ? () => _deleteRecord<SaleRecord>(
+                            label: 'sale record',
+                            record: r,
+                            name: (r) =>
+                                'sale on ${r.saleDate.toIso8601String().split('T').first} (${r.birdCount} birds)',
+                            onDelete: () => BroilerService.deleteSaleRecord(r.id),
+                          )
+                      : null,
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentsTab() {
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (_documents.isEmpty)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No documents yet.')))
+          else
+            ..._documents.map((doc) {
+              final icon = _documentIcon(doc.mimeType);
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: Icon(icon, size: 36),
+                  title: Text(doc.fileName),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${doc.fileSizeKb} KB · ${doc.category}'),
+                      Text('Uploaded: ${doc.createdAt.toIso8601String().split('T').first}'),
+                    ],
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.download),
+                        onPressed: () => _downloadDocument(doc),
+                      ),
+                      if (AuthService.canManageDocuments)
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _deleteRecord<DocumentRecord>(
+                            label: 'document',
+                            record: doc,
+                            name: (d) => d.fileName,
+                            onDelete: () => BroilerService.deleteDocument(doc.id),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  IconData _documentIcon(String mimeType) {
+    if (mimeType.contains('pdf')) return Icons.picture_as_pdf;
+    if (mimeType.contains('image')) return Icons.image;
+    if (mimeType.contains('word') || mimeType.contains('document')) return Icons.description;
+    if (mimeType.contains('csv') || mimeType.contains('sheet')) return Icons.table_chart;
+    return Icons.attach_file;
+  }
+
+  Future<void> _downloadDocument(DocumentRecord doc) async {
+    final url = '${ApiService.baseUrl}/api/v1/documents/${doc.id}/download';
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open document: $url')),
+      );
+    }
   }
 
   Widget _buildMedicationTab() {

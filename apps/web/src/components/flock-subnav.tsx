@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { ClipboardList, Thermometer, Pill, CalendarDays, ArrowLeft } from "lucide-react";
+import { ClipboardList, Thermometer, Pill, CalendarDays, ArrowLeft, ShoppingCart, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const subPages = [
@@ -10,6 +10,8 @@ const subPages = [
   { segment: "environment", label: "Environment", icon: Thermometer },
   { segment: "medication", label: "Medication", icon: Pill },
   { segment: "calendar", label: "Calendar", icon: CalendarDays },
+  { segment: "sales", label: "Sales", icon: ShoppingCart },
+  { segment: "documents", label: "Documents", icon: FileText },
 ];
 
 export function FlockSubNav() {

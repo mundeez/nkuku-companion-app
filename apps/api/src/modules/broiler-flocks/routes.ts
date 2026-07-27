@@ -19,6 +19,8 @@ const FlockCreateSchema = z.object({
   housingType: z.enum(['whole_house', 'spot_brooding']).optional(),
   chicksCollected: z.boolean().optional(),
   collectionDate: dateOrIso.nullable().optional(),
+  expectedCollectionStart: dateOrIso.nullable().optional(),
+  expectedCollectionEnd: dateOrIso.nullable().optional(),
   chickQualityNotes: z.string().max(500).optional().nullable(),
 });
 
@@ -35,6 +37,8 @@ const FlockUpdateSchema = z.object({
   housingType: z.enum(['whole_house', 'spot_brooding']).optional(),
   chicksCollected: z.boolean().optional(),
   collectionDate: dateOrIso.nullable().optional(),
+  expectedCollectionStart: dateOrIso.nullable().optional(),
+  expectedCollectionEnd: dateOrIso.nullable().optional(),
   chickQualityNotes: z.string().max(500).optional().nullable(),
   status: z.enum(['active', 'sold', 'completed', 'cancelled']).optional(),
   salePriceZmw: z.number().nonnegative().optional().nullable(),
@@ -112,6 +116,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         housingType: data.housingType ?? 'whole_house',
         chicksCollected: data.chicksCollected ?? false,
         collectionDate,
+        expectedCollectionStart: data.expectedCollectionStart ? new Date(data.expectedCollectionStart) : null,
+        expectedCollectionEnd: data.expectedCollectionEnd ? new Date(data.expectedCollectionEnd) : null,
         chickQualityNotes: data.chickQualityNotes,
         createdBy: authUser.userId,
       },
@@ -152,6 +158,10 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     if (raw.orderDate === null) updateData.orderDate = null;
     if (raw.collectionDate) updateData.collectionDate = new Date(raw.collectionDate);
     if (raw.collectionDate === null) updateData.collectionDate = null;
+    if (raw.expectedCollectionStart) updateData.expectedCollectionStart = new Date(raw.expectedCollectionStart);
+    if (raw.expectedCollectionStart === null) updateData.expectedCollectionStart = null;
+    if (raw.expectedCollectionEnd) updateData.expectedCollectionEnd = new Date(raw.expectedCollectionEnd);
+    if (raw.expectedCollectionEnd === null) updateData.expectedCollectionEnd = null;
     if (raw.chickQualityNotes === '') updateData.chickQualityNotes = null;
 
     const existing = await prisma.broilerFlock.findFirst({
@@ -164,6 +174,9 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const collDate = raw.collectionDate ? new Date(raw.collectionDate) : (existing.collectionDate ? new Date(existing.collectionDate) : new Date());
       updateData.startDate = collDate;
       updateData.collectionDate = collDate;
+      // Clear the estimate fields since chicks are now collected
+      updateData.expectedCollectionStart = null;
+      updateData.expectedCollectionEnd = null;
     }
     // When chicksCollected transitions to false, clear startDate
     if (raw.chicksCollected === false && existing.chicksCollected) {

@@ -42,3 +42,6 @@ docker-compose.override.yml
 *.pem
 *.key
 certs/
+
+# Uploads
+apps/api/uploads/

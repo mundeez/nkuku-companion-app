@@ -36,6 +36,8 @@ interface FlockFormData {
   housingType?: "whole_house" | "spot_brooding";
   chicksCollected?: boolean;
   collectionDate?: string;
+  expectedCollectionStart?: string;
+  expectedCollectionEnd?: string;
 }
 
 const emptyForm: FlockFormData = {
@@ -115,6 +117,8 @@ export default function BroilerFlocksPage() {
       housingType: flock.housingType || "whole_house",
       chicksCollected: flock.chicksCollected,
       collectionDate: flock.collectionDate ? new Date(flock.collectionDate).toISOString().split("T")[0] : undefined,
+      expectedCollectionStart: flock.expectedCollectionStart ? new Date(flock.expectedCollectionStart).toISOString().split("T")[0] : undefined,
+      expectedCollectionEnd: flock.expectedCollectionEnd ? new Date(flock.expectedCollectionEnd).toISOString().split("T")[0] : undefined,
     });
     setEditOpen(true);
   }
@@ -323,6 +327,14 @@ export default function BroilerFlocksPage() {
                       <span>Chicks Pending Collection</span>
                     </div>
                   )}
+                  {!flock.chicksCollected && flock.expectedCollectionStart && flock.expectedCollectionEnd && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Est. Collection</span>
+                      <span className="font-medium text-blue-600">
+                        {new Date(flock.expectedCollectionStart).toLocaleDateString()} – {new Date(flock.expectedCollectionEnd).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
                   {flock.chicksCollected && flock.collectionDate && (
                     <div className="text-xs text-muted-foreground">
                       Collected: {(() => {
@@ -514,6 +526,18 @@ export default function BroilerFlocksPage() {
                   Chicks are booked and paid for. Mark as collected when picked up from hatchery.
                 </p>
               )}
+              {!form.chicksCollected && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label>Est. Collection (Earliest)</Label>
+                    <Input type="date" value={form.expectedCollectionStart || ""} onChange={(e) => setForm({ ...form, expectedCollectionStart: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Est. Collection (Latest)</Label>
+                    <Input type="date" value={form.expectedCollectionEnd || ""} onChange={(e) => setForm({ ...form, expectedCollectionEnd: e.target.value })} />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter className="p-6 pt-0">
@@ -639,6 +663,18 @@ export default function BroilerFlocksPage() {
                 <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded">
                   Chicks are booked and paid for. Mark as collected when picked up from hatchery.
                 </p>
+              )}
+              {!form.chicksCollected && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label>Est. Collection (Earliest)</Label>
+                    <Input type="date" value={form.expectedCollectionStart || ""} onChange={(e) => setForm({ ...form, expectedCollectionStart: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Est. Collection (Latest)</Label>
+                    <Input type="date" value={form.expectedCollectionEnd || ""} onChange={(e) => setForm({ ...form, expectedCollectionEnd: e.target.value })} />
+                  </div>
+                </div>
               )}
             </div>
             <div>

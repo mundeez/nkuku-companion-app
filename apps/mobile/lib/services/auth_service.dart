@@ -16,8 +16,13 @@ class AuthService {
   static bool get isOwner => role == 'owner';
   static bool get isManager => role == 'manager';
   static bool get isViewer => role == 'viewer';
+  static bool get isFlockMinder => role == 'flock_minder';
+  static bool get isSalesPerson => role == 'sales_person';
   static bool get canEdit => isOwner || isManager;
   static bool get canDelete => isOwner;
+  static bool get canManageSales => isOwner || isManager || isSalesPerson;
+  static bool get canManageDocuments => isOwner || isManager || isFlockMinder || isSalesPerson;
+  static bool get canManageFlockOps => isOwner || isManager || isFlockMinder;
 
   static final List<VoidCallback> _authStateListeners = [];
 

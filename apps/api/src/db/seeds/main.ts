@@ -31,6 +31,20 @@ async function main() {
   });
   console.log('[SEED] Owner user:', owner.email);
 
+  // ── 1b. Seed optional role test users (disabled by default) ──
+  const testPasswordHash = await bcrypt.hash('test123456', 12);
+  for (const { email, name, role } of [
+    { email: 'flock_minder@nkuku.local', name: 'Flock Minder', role: 'flock_minder' as const },
+    { email: 'sales_person@nkuku.local', name: 'Sales Person', role: 'sales_person' as const },
+  ]) {
+    await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: { email, name, role, passwordHash: testPasswordHash, isActive: false },
+    });
+    console.log(`[SEED] Test user (${role}):`, email, '(disabled)');
+  }
+
   // ── 2. Seed Supplier Category Templates ──
   await seedSupplierCategoryTemplates(prisma);
 

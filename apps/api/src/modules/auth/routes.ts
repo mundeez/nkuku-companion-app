@@ -11,7 +11,7 @@ const LoginSchema = z.object({
 const TokenPayloadSchema = z.object({
   userId: z.string(),
   email: z.string(),
-  role: z.enum(['owner', 'manager', 'viewer']),
+  role: z.enum(['owner', 'manager', 'flock_minder', 'sales_person', 'viewer']),
 });
 
 export type TokenPayload = z.infer<typeof TokenPayloadSchema>;

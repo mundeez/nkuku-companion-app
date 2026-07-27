@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   name: string | null;
-  role: "owner" | "manager" | "viewer";
+  role: "owner" | "manager" | "flock_minder" | "sales_person" | "viewer";
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -138,6 +138,8 @@ export interface BroilerFlock {
   housingType: "whole_house" | "spot_brooding";
   chicksCollected: boolean;
   collectionDate?: string;
+  expectedCollectionStart?: string | null;
+  expectedCollectionEnd?: string | null;
   chickQualityNotes?: string;
   status: "active" | "completed" | "cancelled";
   createdAt: string;
@@ -468,4 +470,63 @@ export interface DashboardSummary {
   alertsBySeverity: AlertsBySeverity;
   alertsByType: AlertsByTypeItem[];
   recentAlerts: RecentAlertItem[];
+}
+
+// ── SALE RECORDS ──────────────────────────────
+
+export type PaymentStatus = "pending" | "partial" | "paid";
+
+export interface SaleRecord {
+  id: string;
+  flockId: string;
+  saleDate: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  birdCount: number;
+  avgWeightKg: number | null;
+  pricePerBirdZmw: number;
+  totalAmountZmw: number;
+  paymentStatus: PaymentStatus;
+  amountPaidZmw: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  flock?: { name: string; breed?: { name: string } };
+}
+
+export interface SaleRecordSummary {
+  totalBirdsSold: number;
+  totalRevenue: number;
+  totalPaid: number;
+  outstanding: number;
+  salesCount: number;
+  paymentBreakdown: Array<{ paymentStatus: string; count: number; totalAmount: number }>;
+}
+
+export interface SalesDashboardSummary {
+  totalRevenue: number;
+  totalBirdsSold: number;
+  totalPaid: number;
+  outstanding: number;
+  salesCount: number;
+  avgPricePerBird: number;
+  paymentBreakdown: { paymentStatus: string; count: number; totalAmount: number }[];
+  topCustomers: { customerName: string | null; totalAmount: number; saleCount: number }[];
+  dailySales: { date: string; birds: number; revenue: number }[];
+}
+
+// ── DOCUMENT RECORDS ───────────────────────────
+
+export interface DocumentRecord {
+  id: string;
+  flockId: string | null;
+  recordType: string;
+  recordId: string | null;
+  fileName: string;
+  mimeType: string;
+  fileSizeKb: number;
+  category: string;
+  uploadedBy: string | null;
+  createdAt: string;
+  downloadUrl?: string;
 }

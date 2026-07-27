@@ -1,8 +1,8 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export type ApiError = { error: string; message?: string };
 
-function getToken(): string | null {
+export function getToken(): string | null {
   if (typeof window !== "undefined") {
     return localStorage.getItem("nkuku_access_token");
   }
@@ -45,6 +45,25 @@ export async function apiFetch<T = any>(
     throw new Error(errorCode);
   }
   return data as T;
+}
+
+export async function apiUpload(
+  path: string,
+  formData: FormData,
+): Promise<any> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  // Do NOT set Content-Type — browser sets it with boundary automatically
+  const url = API_URL ? `${API_URL}${path}` : path;
+  const res = await fetch(url, { method: "POST", headers, body: formData });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const errorCode = data?.error || `HTTP ${res.status}`;
+    handleAuthError(errorCode);
+    throw new Error(errorCode);
+  }
+  return data;
 }
 
 export async function login(email: string, password: string) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
+import 'users_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -15,16 +16,27 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          // Account section
+          _SectionHeader(title: 'Account'),
           ListTile(
-            leading: const Icon(Icons.person),
+            leading: CircleAvatar(
+              backgroundColor: theme.colorScheme.primaryContainer,
+              child: Text(
+                (AuthService.user?['email'] ?? '?')[0].toUpperCase(),
+                style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+              ),
+            ),
             title: Text(AuthService.user?['email'] ?? 'Unknown user'),
             subtitle: Text('Role: ${AuthService.role ?? 'unknown'}'),
           ),
           const Divider(),
+
+          // Appearance section
+          _SectionHeader(title: 'Appearance'),
           ListTile(
             leading: const Icon(Icons.brightness_6),
             title: const Text('Theme'),
-            subtitle: Text(themeProvider.mode.name.substring(0, 1).toUpperCase() + themeProvider.mode.name.substring(1)),
+            subtitle: Text(_themeLabel(themeProvider.mode)),
             trailing: DropdownButton<AppThemeMode>(
               value: themeProvider.mode,
               underline: const SizedBox.shrink(),
@@ -34,7 +46,7 @@ class SettingsScreen extends StatelessWidget {
               items: AppThemeMode.values.map((m) {
                 return DropdownMenuItem(
                   value: m,
-                  child: Text(m.name.substring(0, 1).toUpperCase() + m.name.substring(1)),
+                  child: Text(_themeLabel(m)),
                 );
               }).toList(),
             ),
@@ -45,6 +57,76 @@ class SettingsScreen extends StatelessWidget {
             onTap: themeProvider.toggle,
           ),
           const Divider(),
+
+          // Preferences section
+          _SectionHeader(title: 'Preferences'),
+          ListTile(
+            leading: const Icon(Icons.trending_up),
+            title: const Text('Primary Breed'),
+            subtitle: const Text('Ross 308 (Aviagen 2022 targets)'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Breed selection is configured per flock')),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.attach_money),
+            title: const Text('Currency'),
+            subtitle: const Text('ZMW — Zambian Kwacha'),
+            trailing: const Chip(label: Text('Default')),
+          ),
+          ListTile(
+            leading: const Icon(Icons.notifications_outlined),
+            title: const Text('Notifications'),
+            subtitle: const Text('Push alerts via ntfy'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notifications are enabled. Alerts are pushed from the API.')),
+              );
+            },
+          ),
+          const Divider(),
+
+          // Admin section (owner only)
+          if (AuthService.isOwner) ...[
+            _SectionHeader(title: 'Administration'),
+            ListTile(
+              leading: const Icon(Icons.people, color: Colors.green),
+              title: const Text('User Management'),
+              subtitle: const Text('Manage users and roles'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const UsersScreen()),
+              ),
+            ),
+            const Divider(),
+          ],
+
+          // About section
+          _SectionHeader(title: 'About'),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Nkuku Companion'),
+            subtitle: const Text('Broiler chicken production management\nv1.0.0'),
+            isThreeLine: true,
+          ),
+          ListTile(
+            leading: const Icon(Icons.vaccines_outlined),
+            title: const Text('Vaccination Schedules'),
+            subtitle: const Text('Standard Broiler + Ross 308 Comprehensive'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.local_hospital_outlined),
+            title: const Text('Disease Database'),
+            subtitle: const Text('10 diseases with organic treatments'),
+          ),
+          const Divider(),
+
+          // Logout
           ListTile(
             leading: Icon(Icons.logout, color: theme.colorScheme.error),
             title: Text('Logout', style: TextStyle(color: theme.colorScheme.error)),
@@ -59,6 +141,37 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  String _themeLabel(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.light:
+        return 'Light';
+      case AppThemeMode.dark:
+        return 'Dark';
+      case AppThemeMode.system:
+        return 'System';
+    }
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.primary,
+        ),
       ),
     );
   }

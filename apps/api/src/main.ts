@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
@@ -23,6 +24,7 @@ import { buildMortalityEventModule } from './modules/mortality-events/routes.js'
 import { buildVaccinationEventModule } from './modules/vaccination-events/routes.js';
 import { buildLightingTemperatureScheduleModule } from './modules/lighting-temperature-schedules/routes.js';
 import { buildFinancialRecordModule } from './modules/financial-records/routes.js';
+import { buildSaleRecordModule } from './modules/sale-records/routes.js';
 import { buildAlertModule } from './modules/alerts/routes.js';
 import { buildDiseaseModule } from './modules/diseases/routes.js';
 import { buildMedicationRecordModule } from './modules/medication-records/routes.js';
@@ -34,6 +36,7 @@ import { buildDashboardModule } from './modules/dashboard/routes.js';
 import { buildAccountModule } from './modules/accounts/routes.js';
 import { buildJournalModule } from './modules/journal/routes.js';
 import { buildLedgerModule } from './modules/ledger/routes.js';
+import { buildDocumentModule } from './modules/documents/routes.js';
 import { SchedulerService } from './core/financial-engine/scheduler.service.js';
 import { DailyRecalculationService } from './core/financial-engine/daily-recalculation.service.js';
 import cron from 'node-cron';
@@ -52,6 +55,10 @@ const corsOrigins = process.env.CORS_ORIGINS
   : true;
 
 await app.register(cors, { origin: corsOrigins, credentials: true });
+
+await app.register(multipart, {
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 await app.register(swagger, {
   swagger: {
@@ -92,6 +99,7 @@ await app.register(buildMortalityEventModule, { prefix: '/api/v1/mortality-event
 await app.register(buildVaccinationEventModule, { prefix: '/api/v1/vaccination-events' });
 await app.register(buildLightingTemperatureScheduleModule, { prefix: '/api/v1/lighting-temperature-schedules' });
 await app.register(buildFinancialRecordModule, { prefix: '/api/v1/financial-records' });
+await app.register(buildSaleRecordModule, { prefix: '/api/v1/sale-records' });
 await app.register(buildAlertModule, { prefix: '/api/v1/alerts' });
 await app.register(buildDiseaseModule, { prefix: '/api/v1/diseases' });
 await app.register(buildMedicationRecordModule, { prefix: '/api/v1/medication-records' });
@@ -103,6 +111,7 @@ await app.register(buildDashboardModule, { prefix: '/api/v1/dashboard' });
 await app.register(buildAccountModule, { prefix: '/api/v1/accounts' });
 await app.register(buildJournalModule, { prefix: '/api/v1/journal' });
 await app.register(buildLedgerModule, { prefix: '/api/v1/ledger' });
+await app.register(buildDocumentModule, { prefix: '/api/v1/documents' });
 
 // ── Health check ─────────────────────────
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

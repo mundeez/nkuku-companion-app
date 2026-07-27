@@ -209,6 +209,9 @@ export default function FlockDetailPage() {
                 {flock.orderDate && (
                   <div className="flex justify-between"><span>Order Date</span><span className="font-medium">{new Date(flock.orderDate).toLocaleDateString()}</span></div>
                 )}
+                {!flock.chicksCollected && flock.expectedCollectionStart && flock.expectedCollectionEnd && (
+                  <div className="flex justify-between"><span>Est. Collection</span><span className="font-medium text-blue-600">{new Date(flock.expectedCollectionStart).toLocaleDateString()} – {new Date(flock.expectedCollectionEnd).toLocaleDateString()}</span></div>
+                )}
                 <div className="flex justify-between"><span>Start Date</span><span className="font-medium">{flock.startDate ? new Date(flock.startDate).toLocaleDateString() : "Pending collection"}</span></div>
                 <div className="flex justify-between"><span>Total Feed</span><span className="font-medium">{totalFeed.toFixed(1)} kg</span></div>
                 <div className="flex justify-between"><span>Total Water</span><span className="font-medium">{totalWater.toFixed(1)} liters</span></div>

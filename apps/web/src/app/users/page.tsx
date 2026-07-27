@@ -38,7 +38,7 @@ interface UserFormData {
   name: string;
   email: string;
   password: string;
-  role: "owner" | "manager" | "viewer";
+  role: "owner" | "manager" | "flock_minder" | "sales_person" | "viewer";
   isActive: boolean;
 }
 
@@ -210,7 +210,26 @@ export default function UsersPage() {
                 <TableCell className="font-medium">{u.name || "—"}</TableCell>
                 <TableCell>{u.email}</TableCell>
                 <TableCell>
-                  <Badge variant={u.role === "owner" ? "default" : u.role === "manager" ? "secondary" : "outline"}>
+                  <Badge
+                    variant={
+                      u.role === "owner"
+                        ? "default"
+                        : u.role === "manager"
+                        ? "secondary"
+                        : u.role === "flock_minder"
+                        ? "outline"
+                        : u.role === "sales_person"
+                        ? "outline"
+                        : "outline"
+                    }
+                    className={
+                      u.role === "flock_minder"
+                        ? "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                        : u.role === "sales_person"
+                        ? "bg-purple-100 text-purple-800 hover:bg-purple-100"
+                        : ""
+                    }
+                  >
                     {u.role}
                   </Badge>
                 </TableCell>
@@ -269,6 +288,8 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="owner">Owner</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="flock_minder">Flock Minder</SelectItem>
+                  <SelectItem value="sales_person">Sales Person</SelectItem>
                   <SelectItem value="viewer">Viewer</SelectItem>
                 </SelectContent>
               </Select>
@@ -321,6 +342,8 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="owner">Owner</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="flock_minder">Flock Minder</SelectItem>
+                  <SelectItem value="sales_person">Sales Person</SelectItem>
                   <SelectItem value="viewer">Viewer</SelectItem>
                 </SelectContent>
               </Select>
