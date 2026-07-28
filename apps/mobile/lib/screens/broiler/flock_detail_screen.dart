@@ -28,6 +28,15 @@ import 'records/vaccination_event_form.dart';
 import 'records/water_record_form.dart';
 import 'tasks_screen.dart';
 
+/// Wraps a future so that errors are swallowed and null is returned instead.
+Future<T?> _safeCall<T>(Future<T> future) async {
+  try {
+    return await future;
+  } catch (_) {
+    return null;
+  }
+}
+
 class FlockDetailScreen extends StatefulWidget {
   final String flockId;
   final String flockName;
@@ -84,20 +93,25 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     });
     try {
       final flock = await BroilerService.getFlock(widget.flockId);
-      final calRes = await ApiService.dio.get('/api/v1/broiler-flocks/${widget.flockId}/summary');
-      final days = (calRes.data['days'] as List).map((e) => CalendarDay.fromJson(e)).toList();
+      List<CalendarDay> days = [];
+      try {
+        final calRes = await ApiService.dio.get('/api/v1/broiler-flocks/${widget.flockId}/summary');
+        days = (calRes.data['days'] as List).map((e) => CalendarDay.fromJson(e)).toList();
+      } catch (_) {
+        // Calendar is optional — continue without it
+      }
 
       final results = await Future.wait([
-        BroilerService.getGrowthRecords(widget.flockId),
-        BroilerService.getFeedRecords(widget.flockId),
-        BroilerService.getWaterRecords(widget.flockId),
-        BroilerService.getMortalityEvents(widget.flockId),
-        BroilerService.getVaccinationEvents(widget.flockId),
-        BroilerService.getFinancialRecords(widget.flockId),
-        BroilerService.getMedicationRecords(widget.flockId),
-        BroilerService.getEnvironmentalRecords(widget.flockId),
-        BroilerService.getSaleRecords(widget.flockId),
-        BroilerService.getDocuments(widget.flockId),
+        BroilerService.getGrowthRecords(widget.flockId).catchError((_) => <GrowthRecord>[]),
+        BroilerService.getFeedRecords(widget.flockId).catchError((_) => <FeedRecord>[]),
+        BroilerService.getWaterRecords(widget.flockId).catchError((_) => <WaterRecord>[]),
+        BroilerService.getMortalityEvents(widget.flockId).catchError((_) => <MortalityEvent>[]),
+        BroilerService.getVaccinationEvents(widget.flockId).catchError((_) => <VaccinationEvent>[]),
+        BroilerService.getFinancialRecords(widget.flockId).catchError((_) => <FinancialRecord>[]),
+        BroilerService.getMedicationRecords(widget.flockId).catchError((_) => <MedicationRecord>[]),
+        BroilerService.getEnvironmentalRecords(widget.flockId).catchError((_) => <EnvironmentalRecord>[]),
+        BroilerService.getSaleRecords(widget.flockId).catchError((_) => <SaleRecord>[]),
+        BroilerService.getDocuments(widget.flockId).catchError((_) => <DocumentRecord>[]),
       ]);
 
       final growth = results[0] as List<GrowthRecord>;
@@ -111,12 +125,12 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       final sales = results[8] as List<SaleRecord>;
       final documents = results[9] as List<DocumentRecord>;
 
-      final analysis = await BroilerService.getGrowthAnalysis(widget.flockId);
-      final feedSummary = await BroilerService.getFeedSummary(widget.flockId);
-      final waterRatio = await BroilerService.getWaterRatio(widget.flockId);
-      final mortalitySummary = await BroilerService.getMortalitySummary(widget.flockId);
-      final vaccinationStatus = await BroilerService.getVaccinationScheduleStatus(widget.flockId);
-      final financialSummary = await BroilerService.getFinancialSummary(widget.flockId);
+      final analysis = await _safeCall(BroilerService.getGrowthAnalysis(widget.flockId));
+      final feedSummary = await _safeCall(BroilerService.getFeedSummary(widget.flockId));
+      final waterRatio = await _safeCall(BroilerService.getWaterRatio(widget.flockId));
+      final mortalitySummary = await _safeCall(BroilerService.getMortalitySummary(widget.flockId));
+      final vaccinationStatus = await _safeCall(BroilerService.getVaccinationScheduleStatus(widget.flockId));
+      final financialSummary = await _safeCall(BroilerService.getFinancialSummary(widget.flockId));
       Map<String, dynamic>? saleSummary;
       try {
         saleSummary = await BroilerService.getSaleRecordSummary(widget.flockId);

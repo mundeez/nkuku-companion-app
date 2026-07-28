@@ -126,14 +126,14 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   });
 
   // GET /?flockId=...
-  app.get('/', { preHandler: [authenticate] }, async (request) => {
+  app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
     const authUser = (request as any).authUser;
 
     const flock = await prisma.broilerFlock.findFirst({
       where: { id: flockId, createdBy: authUser.userId },
     });
-    if (!flock) return { error: 'NOT_FOUND' };
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
     return prisma.saleRecord.findMany({
       where: { flockId },
@@ -158,14 +158,14 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   });
 
   // GET /summary?flockId=...
-  app.get('/summary', { preHandler: [authenticate] }, async (request) => {
+  app.get('/summary', { preHandler: [authenticate] }, async (request, reply) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
     const authUser = (request as any).authUser;
 
     const flock = await prisma.broilerFlock.findFirst({
       where: { id: flockId, createdBy: authUser.userId },
     });
-    if (!flock) return { error: 'NOT_FOUND' };
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
     const birdSum = await prisma.saleRecord.aggregate({
       where: { flockId },
@@ -205,14 +205,14 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   });
 
   // POST /
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager', 'sales_person')] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager', 'sales_person')] }, async (request, reply) => {
     const { flockId, ...data } = SaleRecordCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
 
     const flock = await prisma.broilerFlock.findFirst({
       where: { id: flockId, createdBy: authUser.userId },
     });
-    if (!flock) return { error: 'NOT_FOUND' };
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
     const description = `Sale: ${data.birdCount} birds${data.customerName ? ' to ' + data.customerName : ''}`;
 

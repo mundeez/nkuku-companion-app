@@ -36,7 +36,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
   const audit = new AuditService(prisma);
 
   // GET / — list documents (optionally filtered by flockId / recordType)
-  app.get('/', { preHandler: [authenticate] }, async (request) => {
+  app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
     const { flockId, recordType } = DocumentQuerySchema.parse(request.query);
     const authUser = (request as any).authUser;
 
@@ -44,7 +44,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
       const flock = await prisma.broilerFlock.findFirst({
         where: { id: flockId, createdBy: authUser.userId },
       });
-      if (!flock) return { error: 'NOT_FOUND' };
+      if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
     const where: any = {};

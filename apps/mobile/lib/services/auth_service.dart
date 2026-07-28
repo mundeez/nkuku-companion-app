@@ -43,9 +43,11 @@ class AuthService {
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
     _token = _prefs.getString('access_token');
-    final userJson = _prefs.getString('user');
-    if (userJson != null) {
-      _user = {'email': _prefs.getString('user_email'), 'role': _prefs.getString('user_role')};
+    // Restore user object from individually stored fields
+    final userEmail = _prefs.getString('user_email');
+    final userRole = _prefs.getString('user_role');
+    if (userEmail != null) {
+      _user = {'email': userEmail, 'role': userRole ?? 'viewer'};
     }
   }
 

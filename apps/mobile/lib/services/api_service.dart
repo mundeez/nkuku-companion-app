@@ -39,6 +39,17 @@ class ApiService {
         }
         handler.next(options);
       },
+      onResponse: (response, handler) {
+        // Check for auth failures on "successful" responses (validateStatus allows <500)
+        final status = response.statusCode;
+        if (status == 401 || status == 403) {
+          log('Auth failure ($status) on ${response.requestOptions.path} — logging out', name: 'ApiService');
+          AuthService.logout().then((_) {
+            onAuthFailure?.call();
+          });
+        }
+        handler.next(response);
+      },
       onError: (error, handler) {
         final status = error.response?.statusCode;
         if (status == 401 || status == 403) {
