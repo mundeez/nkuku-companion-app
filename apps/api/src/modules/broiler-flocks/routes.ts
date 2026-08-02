@@ -62,7 +62,11 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
     return prisma.broilerFlock.findMany({
       where,
-      include: { breed: true, supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } } },
+      include: {
+        breed: true,
+        supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } },
+        financialRecords: { select: { amountZmw: true, isIncome: true, category: true } },
+      },
       orderBy: { startDate: 'desc' },
     });
   });

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Eye, TrendingUp, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, TrendingUp, AlertTriangle, DollarSign } from "lucide-react";
 
 interface FlockFormData {
   name: string;
@@ -262,6 +262,15 @@ export default function BroilerFlocksPage() {
           const mortality = flock.initialCount > 0
             ? ((flock.initialCount - flock.currentCount) / flock.initialCount * 100).toFixed(1)
             : "0";
+          const salePrice = flock.salePriceZmw != null ? Number(flock.salePriceZmw) : 0;
+          const projectedProfit = salePrice * flock.currentCount;
+          const finRecs = flock.financialRecords || [];
+          const finCost = finRecs.filter((r) => !r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
+          const hasChickFin = finRecs.some((r) => r.category === "chick_purchase" && !r.isIncome);
+          const chickCost = !hasChickFin && flock.chickPriceZmw ? Number(flock.chickPriceZmw) * flock.initialCount : 0;
+          const totalCost = finCost + chickCost;
+          const totalRevenue = finRecs.filter((r) => r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
+          const actualProfit = totalRevenue - totalCost;
 
           return (
             <Card key={flock.id} className="hover:shadow-md transition-shadow">
@@ -296,6 +305,20 @@ export default function BroilerFlocksPage() {
                     <span className="text-muted-foreground">Mortality</span>
                     <span className={`font-medium ${Number(mortality) > 10 ? "text-red-600" : ""}`}>
                       {mortality}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Sale Price/Bird</span>
+                    <span className="font-medium">{salePrice > 0 ? `ZMW ${salePrice.toFixed(2)}` : "-"}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Projected Profit</span>
+                    <span className="font-medium text-blue-600">ZMW {projectedProfit.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Actual Profit</span>
+                    <span className={`font-medium ${actualProfit > 0 ? "text-green-600" : actualProfit < 0 ? "text-red-600" : ""}`}>
+                      ZMW {actualProfit.toFixed(2)}
                     </span>
                   </div>
                   {flock.targetWeight && (

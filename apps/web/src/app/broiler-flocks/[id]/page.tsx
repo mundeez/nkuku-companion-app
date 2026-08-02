@@ -179,7 +179,7 @@ export default function FlockDetailPage() {
 
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <Card><CardContent className="pt-6">
           <div className="flex items-center gap-2"><Scale className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Birds</span></div>
           <p className="text-2xl font-bold mt-1">{flock.currentCount}</p><p className="text-xs text-muted-foreground">of {flock.initialCount}</p>
@@ -213,6 +213,11 @@ export default function FlockDetailPage() {
               </Button>
             )}
           </div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6">
+          <div className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Actual Profit (ZMW)</span></div>
+          <p className={`text-2xl font-bold mt-1 ${(totalRevenue - totalCost) > 0 ? "text-green-600" : (totalRevenue - totalCost) < 0 ? "text-red-600" : ""}`}>{(totalRevenue - totalCost).toFixed(2)}</p>
+          <p className="text-xs text-muted-foreground">Rev ZMW {totalRevenue.toFixed(2)} − Cost ZMW {totalCost.toFixed(2)}</p>
         </CardContent></Card>
       </div>
 

@@ -145,6 +145,7 @@ export interface BroilerFlock {
   status: "active" | "completed" | "cancelled";
   createdAt: string;
   updatedAt: string;
+  financialRecords?: { amountZmw: number; isIncome: boolean; category: FinancialCategory }[];
 }
 
 export interface GrowthRecord {
