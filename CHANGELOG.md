@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.3.3-alpha — 2026-08-02
+
+### Changed
+- **Renamed profit labels to revenue/profit correctly.** Both the flock list
+  cards and the flock detail dashboard now distinguish between revenue and
+  profit:
+  - **Projected Revenue** = sale price per bird × remaining birds
+  - **Projected Profit** = projected revenue − total costs
+  - **Actual Revenue** = sales income recorded so far (no costs subtracted)
+  - **Actual Profit** = actual revenue − total costs
+- Flock detail dashboard cards now show revenue as the headline figure with
+  profit shown beneath it (color-coded green/red).
+- Flock list cards now show all four figures: Sale Price/Bird, Projected
+  Revenue, Projected Profit, Actual Revenue, Actual Profit.
+- Added testing guideline to `AGENTS.md`: never modify existing flocks for
+  testing — always create new flocks specifically for test runs.
+
+### Files Modified
+- `apps/web/src/app/broiler-flocks/[id]/page.tsx`
+- `apps/web/src/app/broiler-flocks/page.tsx`
+- `AGENTS.md`
+- `package.json` (version bump)
+
+### Test Summary
+- 127 backend tests pass (12 unit + 115 integration).
+- Web production build passes (typecheck + lint via `next build`).
+
 ## v1.3.2-alpha — 2026-08-02
 
 ### Changed

@@ -263,7 +263,7 @@ export default function BroilerFlocksPage() {
             ? ((flock.initialCount - flock.currentCount) / flock.initialCount * 100).toFixed(1)
             : "0";
           const salePrice = flock.salePriceZmw != null ? Number(flock.salePriceZmw) : 0;
-          const projectedProfit = salePrice * flock.currentCount;
+          const projectedRevenue = salePrice * flock.currentCount;
           const finRecs = flock.financialRecords || [];
           const finCost = finRecs.filter((r) => !r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
           const hasChickFin = finRecs.some((r) => r.category === "chick_purchase" && !r.isIncome);
@@ -271,6 +271,7 @@ export default function BroilerFlocksPage() {
           const totalCost = finCost + chickCost;
           const totalRevenue = finRecs.filter((r) => r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
           const actualProfit = totalRevenue - totalCost;
+          const projectedProfit = projectedRevenue - totalCost;
 
           return (
             <Card key={flock.id} className="hover:shadow-md transition-shadow">
@@ -312,8 +313,16 @@ export default function BroilerFlocksPage() {
                     <span className="font-medium">{salePrice > 0 ? `ZMW ${salePrice.toFixed(2)}` : "-"}</span>
                   </div>
                   <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Projected Revenue</span>
+                    <span className="font-medium text-blue-600">ZMW {projectedRevenue.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Projected Profit</span>
-                    <span className="font-medium text-blue-600">ZMW {projectedProfit.toFixed(2)}</span>
+                    <span className={`font-medium ${projectedProfit > 0 ? "text-green-600" : projectedProfit < 0 ? "text-red-600" : ""}`}>ZMW {projectedProfit.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Actual Revenue</span>
+                    <span className="font-medium">ZMW {totalRevenue.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Actual Profit</span>

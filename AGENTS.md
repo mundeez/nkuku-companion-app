@@ -1,5 +1,8 @@
 # Nkuku Companion App — Project Information
 
+## Testing Guidelines
+- **Never modify existing flocks for testing.** When testing flock-related features, always create new flocks specifically for that purpose. Existing flocks contain real user data and must not be altered during test runs.
+
 ## Verified Working Ports (Milestone 1 & 2)
 - API: http://localhost:30001
 - Web: http://localhost:30000

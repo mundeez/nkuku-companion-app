@@ -162,8 +162,10 @@ export default function FlockDetailPage() {
   const chickPurchaseCost = !hasChickFinancialRecord && flock.chickPriceZmw ? Number(flock.chickPriceZmw) * flock.initialCount : 0;
   const totalCost = financialCost + chickPurchaseCost;
   const totalRevenue = financialRecords.filter((r) => r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
+  const actualProfit = totalRevenue - totalCost;
   const projectedSalePerBird = parseFloat(projectedSalePrice);
-  const projectedProfit = !isNaN(projectedSalePerBird) && projectedSalePerBird > 0 ? projectedSalePerBird * flock.currentCount : 0;
+  const projectedRevenue = !isNaN(projectedSalePerBird) && projectedSalePerBird > 0 ? projectedSalePerBird * flock.currentCount : 0;
+  const projectedProfit = projectedRevenue - totalCost;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -193,9 +195,10 @@ export default function FlockDetailPage() {
           <p className="text-2xl font-bold mt-1">{flock.initialCount > 0 ? ((flock.initialCount - flock.currentCount) / flock.initialCount * 100).toFixed(1) : "0"}%</p><p className="text-xs text-muted-foreground">{totalMortality} birds</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6">
-          <div className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Projected Profit (ZMW)</span></div>
-          <p className="text-2xl font-bold mt-1">{projectedProfit.toFixed(2)}</p>
+          <div className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Projected Revenue (ZMW)</span></div>
+          <p className="text-2xl font-bold mt-1">{projectedRevenue.toFixed(2)}</p>
           <p className="text-xs text-muted-foreground">{flock.currentCount} birds × {projectedSalePrice || "0"}/bird</p>
+          <p className="text-xs mt-1">Profit: <span className={`font-medium ${projectedProfit > 0 ? "text-green-600" : projectedProfit < 0 ? "text-red-600" : ""}`}>ZMW {projectedProfit.toFixed(2)}</span></p>
           <div className="flex items-center gap-1 mt-2">
             <Input
               type="number"
@@ -215,9 +218,10 @@ export default function FlockDetailPage() {
           </div>
         </CardContent></Card>
         <Card><CardContent className="pt-6">
-          <div className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Actual Profit (ZMW)</span></div>
-          <p className={`text-2xl font-bold mt-1 ${(totalRevenue - totalCost) > 0 ? "text-green-600" : (totalRevenue - totalCost) < 0 ? "text-red-600" : ""}`}>{(totalRevenue - totalCost).toFixed(2)}</p>
-          <p className="text-xs text-muted-foreground">Rev ZMW {totalRevenue.toFixed(2)} − Cost ZMW {totalCost.toFixed(2)}</p>
+          <div className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Actual Revenue (ZMW)</span></div>
+          <p className="text-2xl font-bold mt-1">{totalRevenue.toFixed(2)}</p>
+          <p className="text-xs mt-1">Profit: <span className={`font-medium ${actualProfit > 0 ? "text-green-600" : actualProfit < 0 ? "text-red-600" : ""}`}>ZMW {actualProfit.toFixed(2)}</span></p>
+          <p className="text-xs text-muted-foreground">Cost: ZMW {totalCost.toFixed(2)}</p>
         </CardContent></Card>
       </div>
 
