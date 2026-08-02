@@ -135,6 +135,7 @@ export interface BroilerFlock {
   feedTransitionDay?: number;
   finisherDay?: number;
   chickPriceZmw?: number;
+  salePriceZmw?: number | null;
   housingType: "whole_house" | "spot_brooding";
   chicksCollected: boolean;
   collectionDate?: string;

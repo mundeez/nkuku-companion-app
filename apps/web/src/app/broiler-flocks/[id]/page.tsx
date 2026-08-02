@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
 import { BroilerFlock, GrowthRecord, FeedRecord, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -54,6 +55,8 @@ export default function FlockDetailPage() {
   const [editNotesOpen, setEditNotesOpen] = useState(false);
   const [notesForm, setNotesForm] = useState("");
   const [saving, setSaving] = useState(false);
+  const [projectedSalePrice, setProjectedSalePrice] = useState<string>("");
+  const [savingSalePrice, setSavingSalePrice] = useState(false);
 
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
 
@@ -61,6 +64,7 @@ export default function FlockDetailPage() {
     apiFetch<any>(`/api/v1/broiler-flocks/${flockId}`)
       .then((d) => {
         setFlock(d);
+        setProjectedSalePrice(d.salePriceZmw != null ? String(d.salePriceZmw) : "");
         setAgeDays(d.startDate ? Math.floor((new Date().getTime() - new Date(d.startDate).getTime()) / 86400000) : -1);
       })
       .catch((err) => setError(err.message));
@@ -108,6 +112,26 @@ export default function FlockDetailPage() {
     }
   }
 
+  async function saveProjectedSalePrice() {
+    const parsed = parseFloat(projectedSalePrice);
+    if (projectedSalePrice !== "" && (isNaN(parsed) || parsed < 0)) {
+      alert("Please enter a valid projected sales amount per bird.");
+      return;
+    }
+    setSavingSalePrice(true);
+    try {
+      await apiFetch(`/api/v1/broiler-flocks/${flockId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ salePriceZmw: projectedSalePrice === "" ? null : parsed }),
+      });
+      loadAll();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSavingSalePrice(false);
+    }
+  }
+
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
     if (user && flockId) loadAll();
@@ -138,6 +162,8 @@ export default function FlockDetailPage() {
   const chickPurchaseCost = !hasChickFinancialRecord && flock.chickPriceZmw ? Number(flock.chickPriceZmw) * flock.initialCount : 0;
   const totalCost = financialCost + chickPurchaseCost;
   const totalRevenue = financialRecords.filter((r) => r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
+  const projectedSalePerBird = parseFloat(projectedSalePrice);
+  const projectedProfit = !isNaN(projectedSalePerBird) && projectedSalePerBird > 0 ? projectedSalePerBird * flock.currentCount : 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -167,8 +193,26 @@ export default function FlockDetailPage() {
           <p className="text-2xl font-bold mt-1">{flock.initialCount > 0 ? ((flock.initialCount - flock.currentCount) / flock.initialCount * 100).toFixed(1) : "0"}%</p><p className="text-xs text-muted-foreground">{totalMortality} birds</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6">
-          <div className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Profit (ZMW)</span></div>
-          <p className="text-2xl font-bold mt-1">{(totalRevenue - totalCost).toFixed(2)}</p>
+          <div className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Projected Profit (ZMW)</span></div>
+          <p className="text-2xl font-bold mt-1">{projectedProfit.toFixed(2)}</p>
+          <p className="text-xs text-muted-foreground">{flock.currentCount} birds × {projectedSalePrice || "0"}/bird</p>
+          <div className="flex items-center gap-1 mt-2">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Sale price/bird"
+              value={projectedSalePrice}
+              onChange={(e) => setProjectedSalePrice(e.target.value)}
+              disabled={!canCreateEdit}
+              className="h-7 text-xs"
+            />
+            {canCreateEdit && (
+              <Button size="sm" variant="outline" onClick={saveProjectedSalePrice} disabled={savingSalePrice} className="h-7 px-2 text-xs">
+                {savingSalePrice ? "Saving..." : "Save"}
+              </Button>
+            )}
+          </div>
         </CardContent></Card>
       </div>
 
