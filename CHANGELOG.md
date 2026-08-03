@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.4.4-alpha — 2026-08-03
+
+### Fixed
+- **Cost Breakdown chart — two-line labels.** Reverted to the original
+  inline pie label design but split each label into two lines: category
+  name on top, ZMW amount on the bottom. This halves the horizontal width
+  of each label (e.g. "chick purchase" + "ZMW 7700" instead of
+  "chick_purchase: ZMW 7700" on one line), preventing truncation without
+  shrinking the chart. Uses custom label render with two `<tspan>` elements.
+
 ## v1.4.3-alpha — 2026-08-03
 
 ### Fixed
