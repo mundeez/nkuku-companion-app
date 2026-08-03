@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.7-alpha — 2026-08-03
+
+### Changed
+- **Cost Breakdown chart — clean design, slightly bigger.** Reverted the
+  label nudging hack from v1.4.6. Back to the clean two-line label design
+  (two <text> elements, no x offset manipulation). Increased chart height
+  from 300→340px for a bigger pie while keeping outerRadius at 80 — the
+  value that fits all labels within the 304px SVG width without hacks.
+
 ## v1.4.6-alpha — 2026-08-03
 
 ### Changed
