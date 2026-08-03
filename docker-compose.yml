@@ -1,36 +1,4 @@
-version: "3.9"
-
 services:
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: nkuku_db
-      POSTGRES_USER: nkuku_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_password_change_me}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nkuku_user -d nkuku_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - nkuku_internal
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - nkuku_internal
-    restart: unless-stopped
-
   api:
     build:
       context: .
@@ -38,8 +6,8 @@ services:
       target: development
     environment:
       NODE_ENV: development
-      DATABASE_URL: ${DATABASE_URL:-postgresql://nkuku_user:dev_password_change_me@postgres:5432/nkuku_db}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://nkuku_user:dev_password_change_me@shared-postgres:5432/nkuku_db}
+      REDIS_URL: ${REDIS_URL:-redis://shared-redis:6379}
       PORT: ${API_PORT:-3001}
       HOST: 0.0.0.0
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_min_64_chars_long_for_dev_only}
@@ -55,15 +23,10 @@ services:
       - ./apps/api/tests:/app/tests:ro
       - ./apps/api/vitest.config.ts:/app/vitest.config.ts:ro
       - api_node_modules:/app/node_modules
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     ports:
       - "30001:3001"
     networks:
-      - nkuku_internal
+      - shared-net
       - nkuku_public
     restart: unless-stopped
     command: ["sh", "-c", "npx prisma migrate deploy && pnpm run dev"]
@@ -125,12 +88,11 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
-  redis_data:
   api_node_modules:
   web_node_modules:
   ntfy_data:
 
 networks:
-  nkuku_internal:
+  shared-net:
+    external: true
   nkuku_public:

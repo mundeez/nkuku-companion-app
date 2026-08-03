@@ -160,7 +160,11 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                       ),
                                       const SizedBox(width: 8),
                                       Chip(
-                                        label: Text('Day ${flock.ageDays ?? 0}'),
+                                        label: Text(
+                                          flock.startDate == null
+                                              ? 'Pending'
+                                              : 'Day ${flock.ageDays ?? 0}',
+                                        ),
                                         visualDensity: VisualDensity.compact,
                                       ),
                                       const SizedBox(width: 8),

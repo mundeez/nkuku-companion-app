@@ -60,7 +60,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     if (query.status) where.status = query.status;
     if (query.breedId) where.breedId = query.breedId;
 
-    return prisma.broilerFlock.findMany({
+    const flocks = await prisma.broilerFlock.findMany({
       where,
       include: {
         breed: true,
@@ -68,6 +68,13 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         financialRecords: { select: { amountZmw: true, isIncome: true, category: true } },
       },
       orderBy: { startDate: 'desc' },
+    });
+
+    const today = new Date();
+    return flocks.map((f: any) => {
+      const start = f.startDate ? new Date(f.startDate) : null;
+      const ageDays = start ? Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      return { ...f, ageDays };
     });
   });
 
@@ -92,7 +99,10 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       },
     });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
-    return flock;
+    const today = new Date();
+    const start = flock.startDate ? new Date(flock.startDate) : null;
+    const ageDays = start ? Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    return { ...flock, ageDays };
   });
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
