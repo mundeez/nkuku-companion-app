@@ -949,6 +949,19 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                       ),
                       if (AuthService.canManageDocuments)
                         IconButton(
+                          icon: const Icon(Icons.edit, size: 20),
+                          onPressed: () async {
+                            final result = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DocumentForm(flockId: widget.flockId, record: doc),
+                              ),
+                            );
+                            if (result == true) _loadData();
+                          },
+                        ),
+                      if (AuthService.canManageDocuments)
+                        IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
                           onPressed: () => _deleteRecord<DocumentRecord>(
                             label: 'document',

@@ -91,6 +91,33 @@ class _AlertsScreenState extends State<AlertsScreen> {
     }
   }
 
+  Future<void> _deleteAlert(Alert alert) async {
+    if (!AuthService.canDelete) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete alert?'),
+        content: Text('Delete "${alert.title}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await AlertsService.delete(alert.id);
+      setState(() => _alerts.removeWhere((a) => a.id == alert.id));
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   void _showDetail(Alert alert) {
     showModalBottomSheet(
       context: context,
@@ -99,6 +126,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
         alert: alert,
         onMarkRead: !alert.isRead && AuthService.canEdit ? () => _markRead(alert) : null,
         onResolve: !alert.isResolved && AuthService.canEdit ? () => _markResolved(alert) : null,
+        onDelete: AuthService.canDelete ? () => _deleteAlert(alert) : null,
       ),
     );
   }
@@ -281,11 +309,13 @@ class _AlertDetailSheet extends StatelessWidget {
   final Alert alert;
   final VoidCallback? onMarkRead;
   final VoidCallback? onResolve;
+  final VoidCallback? onDelete;
 
   const _AlertDetailSheet({
     required this.alert,
     this.onMarkRead,
     this.onResolve,
+    this.onDelete,
   });
 
   @override
@@ -338,7 +368,7 @@ class _AlertDetailSheet extends StatelessWidget {
               const SizedBox(height: 4),
               Text(alert.message),
               const SizedBox(height: 24),
-              if (onMarkRead != null || onResolve != null)
+              if (onMarkRead != null || onResolve != null || onDelete != null)
                 Row(
                   children: [
                     if (onMarkRead != null) ...[
@@ -364,6 +394,17 @@ class _AlertDetailSheet extends StatelessWidget {
                       ),
                   ],
                 ),
+              if (onDelete != null) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    onDelete!();
+                  },
+                ),
+              ],
             ],
           ),
         ),

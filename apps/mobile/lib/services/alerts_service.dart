@@ -27,4 +27,8 @@ class AlertsService {
     final res = await ApiService.dio.post('/api/v1/alerts/generate');
     return AlertGenerateResult.fromJson(res.data);
   }
+
+  static Future<void> delete(String id) async {
+    await ApiService.dio.delete('/api/v1/alerts/$id');
+  }
 }

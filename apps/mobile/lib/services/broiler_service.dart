@@ -464,6 +464,15 @@ class BroilerService {
     _assertOk(res);
   }
 
+  static Future<DocumentRecord> updateDocument(String id, {String? category, String? recordType}) async {
+    final data = <String, dynamic>{};
+    if (category != null) data['category'] = category;
+    if (recordType != null) data['recordType'] = recordType;
+    final res = await ApiService.dio.patch('/api/v1/documents/$id', data: data);
+    _assertOk(res);
+    return DocumentRecord.fromJson(res.data);
+  }
+
   static void _assertOk(Response<dynamic> res) {
     if (res.statusCode == null || res.statusCode! >= 400) {
       final message = res.data is Map ? (res.data['error'] ?? res.data['message'] ?? 'Request failed') : 'Request failed';

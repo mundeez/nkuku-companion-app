@@ -269,4 +269,55 @@ export async function buildDocumentModule(app: FastifyInstance) {
 
     return { deleted: true };
   });
+
+  // PATCH /:id — update document metadata (category, recordType)
+  app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager', 'flock_minder', 'sales_person')] }, async (request, reply) => {
+    const { id } = DocumentIdSchema.parse(request.params);
+    const authUser = (request as any).authUser;
+    const body = z.object({
+      category: z.enum(['receipt', 'invoice', 'quotation', 'other']).optional(),
+      recordType: z.string().max(50).optional(),
+    }).parse(request.body);
+
+    const doc = await prisma.document.findUnique({ where: { id } });
+    if (!doc) {
+      return reply.status(404).send({ error: 'NOT_FOUND' });
+    }
+
+    if (doc.flockId) {
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: doc.flockId, createdBy: authUser.userId },
+      });
+      if (!flock) {
+        return reply.status(404).send({ error: 'NOT_FOUND' });
+      }
+    }
+
+    // Non-owner roles may only edit documents they uploaded
+    if (authUser.role !== 'owner' && doc.uploadedBy !== authUser.userId) {
+      return reply.status(403).send({ error: 'FORBIDDEN' });
+    }
+
+    const updateData: any = {};
+    if (body.category !== undefined) updateData.category = body.category;
+    if (body.recordType !== undefined) updateData.recordType = body.recordType;
+
+    const updated = await prisma.document.update({
+      where: { id },
+      data: updateData,
+    });
+
+    await audit.log({
+      userId: authUser.userId,
+      entityType: 'Document',
+      entityId: id,
+      action: 'update',
+      previousState: { ...doc, filePath: undefined },
+      newState: { ...updated, filePath: undefined },
+      ipAddress: request.ip,
+    });
+
+    const { filePath, ...safe } = updated;
+    return { ...safe, downloadUrl: `/api/v1/documents/${updated.id}/download` };
+  });
 }

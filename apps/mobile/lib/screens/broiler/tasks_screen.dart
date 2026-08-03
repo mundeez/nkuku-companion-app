@@ -48,6 +48,15 @@ class _TasksScreenState extends State<TasksScreen> {
     }
   }
 
+  Future<void> _showCreateDialog() async {
+    if (!AuthService.canEdit) return;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => _TaskCreateDialog(flockId: widget.flockId),
+    );
+    if (result == true) _load();
+  }
+
   Future<void> _toggleComplete(FlockTask task, bool value) async {
     if (!AuthService.canEdit) return;
     try {
@@ -93,6 +102,13 @@ class _TasksScreenState extends State<TasksScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: AuthService.canEdit
+          ? FloatingActionButton.extended(
+              icon: const Icon(Icons.add),
+              label: const Text('New Task'),
+              onPressed: _showCreateDialog,
+            )
+          : null,
       body: _loading && _tasks.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : _error != null && _tasks.isEmpty
@@ -173,6 +189,136 @@ class _TasksScreenState extends State<TasksScreen> {
                     },
                   ),
                 ),
+    );
+  }
+}
+
+class _TaskCreateDialog extends StatefulWidget {
+  final String flockId;
+  const _TaskCreateDialog({required this.flockId});
+
+  @override
+  State<_TaskCreateDialog> createState() => _TaskCreateDialogState();
+}
+
+class _TaskCreateDialogState extends State<_TaskCreateDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  final _ageController = TextEditingController(text: '0');
+  DateTime _taskDate = DateTime.now();
+  String _category = 'management';
+  bool _saving = false;
+  String? _error;
+
+  final _categories = [
+    'vaccination', 'feed', 'water', 'environment',
+    'health', 'biosecurity', 'management',
+  ];
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    _ageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _taskDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _taskDate = picked);
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() { _saving = true; _error = null; });
+    try {
+      final task = FlockTask(
+        id: '',
+        flockId: widget.flockId,
+        taskDate: _taskDate,
+        ageDays: int.parse(_ageController.text.trim()),
+        category: _category,
+        title: _titleController.text.trim(),
+        description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+      );
+      await BroilerService.createFlockTask(task);
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _saving = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New Task'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(labelText: 'Title'),
+                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _category,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: _categories
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c[0].toUpperCase() + c.substring(1))))
+                    .toList(),
+                onChanged: (v) => setState(() => _category = v!),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today),
+                title: Text(_taskDate.toIso8601String().split('T').first),
+                trailing: const Text('Change'),
+                onTap: _pickDate,
+              ),
+              TextFormField(
+                controller: _ageController,
+                decoration: const InputDecoration(labelText: 'Age (days)'),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  final n = int.tryParse(v ?? '');
+                  if (n == null || n < 0) return 'Enter a valid number';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _descController,
+                decoration: const InputDecoration(labelText: 'Description (optional)'),
+                maxLines: 2,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: _saving ? null : () => Navigator.pop(context, false), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Save'),
+        ),
+      ],
     );
   }
 }

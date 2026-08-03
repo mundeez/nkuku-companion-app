@@ -106,6 +106,20 @@ export async function buildAlertModule(app: FastifyInstance) {
     });
   });
 
+  // DELETE /:id — delete an alert (owner/manager only)
+  app.delete('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const authUser = (request as any).authUser;
+
+    const alert = await prisma.alert.findFirst({
+      where: { id, flock: { createdBy: authUser.userId } },
+    });
+    if (!alert) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    await prisma.alert.delete({ where: { id } });
+    return { deleted: true };
+  });
+
   // POST /api/v1/alerts/generate - Generate alerts for active flocks
   app.post('/generate', { preHandler: [authenticate] }, async (request) => {
     const authUser = (request as any).authUser;
