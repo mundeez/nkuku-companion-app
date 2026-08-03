@@ -40,7 +40,44 @@ export async function buildFeedStageModule(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = FeedStageUpdateSchema.parse(request.body);
-    return prisma.feedStage.update({ where: { id }, data, include: { supplier: true } });
+    const authUser = (request as any).authUser;
+
+    // Fetch the existing record to compare price/size before updating
+    const existing = await prisma.feedStage.findUnique({ where: { id } });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    const updated = await prisma.feedStage.update({
+      where: { id },
+      data,
+      include: { supplier: true },
+    });
+
+    // Record price/size change in audit trail if either field changed
+    const priceChanged = data.unitPriceZmw !== undefined && Number(data.unitPriceZmw) !== Number(existing.unitPriceZmw);
+    const sizeChanged = data.unitSizeKg !== undefined && Number(data.unitSizeKg) !== Number(existing.unitSizeKg);
+    if (priceChanged || sizeChanged) {
+      await prisma.feedStagePriceHistory.create({
+        data: {
+          feedStageId: id,
+          oldUnitPriceZmw: existing.unitPriceZmw,
+          newUnitPriceZmw: data.unitPriceZmw !== undefined ? data.unitPriceZmw : existing.unitPriceZmw,
+          oldUnitSizeKg: existing.unitSizeKg,
+          newUnitSizeKg: data.unitSizeKg !== undefined ? data.unitSizeKg : existing.unitSizeKg,
+          changedBy: authUser?.userId ?? null,
+        },
+      });
+    }
+
+    return updated;
+  });
+
+  // GET /api/v1/feed-stages/:id/price-history
+  app.get('/:id/price-history', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    return prisma.feedStagePriceHistory.findMany({
+      where: { feedStageId: id },
+      orderBy: { changedAt: 'desc' },
+    });
   });
 
   // DELETE /api/v1/feed-stages/:id

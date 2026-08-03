@@ -82,10 +82,32 @@ model FeedStage {
 
   supplier          Supplier    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   batchExpenses     BatchExpense[]
+  priceHistory      FeedStagePriceHistory[]
 
   @@unique([supplierId, stageName])
   @@index([supplierId, sortOrder])
   @@map("feed_stages")
+}
+
+// ── FEED STAGE PRICE HISTORY ───────────────
+// Audit trail of every unitPriceZmw change on a FeedStage.
+// Records the old price, new price, who changed it, and when.
+// This ensures historical pricing is preserved for accountability
+// even after a supplier's current price is updated.
+model FeedStagePriceHistory {
+  id              String   @id @default(uuid()) @db.Uuid
+  feedStageId     String   @map("feed_stage_id") @db.Uuid
+  oldUnitPriceZmw Decimal  @map("old_unit_price_zmw") @db.Decimal(12, 2)
+  newUnitPriceZmw Decimal  @map("new_unit_price_zmw") @db.Decimal(12, 2)
+  oldUnitSizeKg   Decimal  @map("old_unit_size_kg") @db.Decimal(10, 3)
+  newUnitSizeKg   Decimal  @map("new_unit_size_kg") @db.Decimal(10, 3)
+  changedBy       String?  @map("changed_by") @db.Uuid
+  changedAt       DateTime @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  feedStage       FeedStage @relation(fields: [feedStageId], references: [id], onDelete: Cascade)
+
+  @@index([feedStageId, changedAt])
+  @@map("feed_stage_price_history")
 }
 
 enum StageType {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
-import { Supplier, FeedStage, SupplierCategoryTemplate, SupplierCategoryTemplateItem } from "@/lib/types";
+import { Supplier, FeedStage, FeedStagePriceHistory, SupplierCategoryTemplate, SupplierCategoryTemplateItem } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -27,7 +27,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Pencil, Trash2, Plus, X, AlertTriangle, GripVertical } from "lucide-react";
+import { Pencil, Trash2, Plus, X, AlertTriangle, GripVertical, History } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -208,6 +208,11 @@ export default function SuppliersPage() {
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [stagePrice, setStagePrice] = useState("");
   const [priceSaving, setPriceSaving] = useState(false);
+
+  const [priceHistoryOpen, setPriceHistoryOpen] = useState(false);
+  const [priceHistorySupplier, setPriceHistorySupplier] = useState<Supplier | null>(null);
+  const [priceHistory, setPriceHistory] = useState<FeedStagePriceHistory[]>([]);
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -550,6 +555,21 @@ export default function SuppliersPage() {
     setStagePrice(stage.unitPriceZmw.toString());
   }
 
+  async function openPriceHistory(supplier: Supplier) {
+    setPriceHistorySupplier(supplier);
+    setPriceHistoryOpen(true);
+    setPriceHistoryLoading(true);
+    setPriceHistory([]);
+    try {
+      const data = await apiFetch<FeedStagePriceHistory[]>(`/api/v1/suppliers/${supplier.id}/price-history`);
+      setPriceHistory(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load price history.");
+    } finally {
+      setPriceHistoryLoading(false);
+    }
+  }
+
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
 
@@ -615,6 +635,9 @@ export default function SuppliersPage() {
                             </Badge>
                           )}
                         </div>
+                        <Button variant="ghost" size="sm" onClick={() => openPriceHistory(supplier)} title="Price history">
+                          <History className="h-4 w-4" />
+                        </Button>
                         {canCreateEdit && (
                           <Button variant="ghost" size="sm" onClick={() => openEdit(supplier)}>
                             <Pencil className="h-4 w-4" />
@@ -920,6 +943,63 @@ export default function SuppliersPage() {
               {formLoading ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={priceHistoryOpen} onOpenChange={setPriceHistoryOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Price History — {priceHistorySupplier?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Audit trail of every price change for this supplier's feed stages. Historical financial records are unaffected by these changes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto px-6 py-4 flex-1">
+            {priceHistoryLoading ? (
+              <p className="text-muted-foreground text-sm">Loading...</p>
+            ) : priceHistory.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No price changes recorded yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Stage</TableHead>
+                    <TableHead>Old Price (ZMW)</TableHead>
+                    <TableHead>New Price (ZMW)</TableHead>
+                    <TableHead>Unit Size</TableHead>
+                    <TableHead>Changed At</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {priceHistory.map((h) => {
+                    const priceDiff = h.newUnitPriceZmw - h.oldUnitPriceZmw;
+                    const sizeChanged = h.newUnitSizeKg !== h.oldUnitSizeKg;
+                    return (
+                      <TableRow key={h.id}>
+                        <TableCell className="font-medium">{h.stageName}</TableCell>
+                        <TableCell>{h.oldUnitPriceZmw.toFixed(2)}</TableCell>
+                        <TableCell>
+                          <span className="font-medium">{h.newUnitPriceZmw.toFixed(2)}</span>{" "}
+                          <span className={`text-xs ${priceDiff > 0 ? "text-red-600" : priceDiff < 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                            ({priceDiff > 0 ? "+" : ""}{priceDiff.toFixed(2)})
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {sizeChanged ? `${h.oldUnitSizeKg} → ${h.newUnitSizeKg} kg` : `${h.newUnitSizeKg} kg`}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(h.changedAt).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

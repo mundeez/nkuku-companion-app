@@ -106,5 +106,35 @@ export async function buildSupplierModule(app: FastifyInstance) {
     await prisma.supplier.delete({ where: { id } });
     return { deleted: true };
   });
+
+  // GET /api/v1/suppliers/:id/price-history
+  // Returns price change history for all feed stages of this supplier
+  app.get('/:id/price-history', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const supplier = await prisma.supplier.findUnique({
+      where: { id },
+      select: { id: true, name: true, feedStages: { select: { id: true, stageName: true } } },
+    });
+    if (!supplier) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    const stageIds = supplier.feedStages.map((s) => s.id);
+    const history = await prisma.feedStagePriceHistory.findMany({
+      where: { feedStageId: { in: stageIds } },
+      orderBy: { changedAt: 'desc' },
+      include: { feedStage: { select: { stageName: true } } },
+    });
+
+    return history.map((h) => ({
+      id: h.id,
+      feedStageId: h.feedStageId,
+      stageName: h.feedStage.stageName,
+      oldUnitPriceZmw: Number(h.oldUnitPriceZmw),
+      newUnitPriceZmw: Number(h.newUnitPriceZmw),
+      oldUnitSizeKg: Number(h.oldUnitSizeKg),
+      newUnitSizeKg: Number(h.newUnitSizeKg),
+      changedBy: h.changedBy,
+      changedAt: h.changedAt,
+    }));
+  });
 }
 

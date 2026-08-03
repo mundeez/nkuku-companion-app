@@ -31,6 +31,18 @@ export interface FeedStage {
   sortOrder: number;
 }
 
+export interface FeedStagePriceHistory {
+  id: string;
+  feedStageId: string;
+  stageName: string;
+  oldUnitPriceZmw: number;
+  newUnitPriceZmw: number;
+  oldUnitSizeKg: number;
+  newUnitSizeKg: number;
+  changedBy?: string | null;
+  changedAt: string;
+}
+
 export interface SupplierCategoryTemplate {
   id: string;
   category: string;

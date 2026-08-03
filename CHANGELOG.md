@@ -1,5 +1,51 @@
 # Changelog
 
+## v1.4.0-alpha — 2026-08-03
+
+### Added
+- **Supplier price history / audit trail.** Every time a feed stage's
+  `unitPriceZmw` or `unitSizeKg` is updated via `PATCH /api/v1/feed-stages/:id`,
+  the API now automatically records the old and new values, who made the
+  change, and when — in a new `FeedStagePriceHistory` table.
+- **Price history API endpoints:**
+  - `GET /api/v1/feed-stages/:id/price-history` — history for a single stage
+  - `GET /api/v1/suppliers/:id/price-history` — history for all stages of a
+    supplier (includes stage name, old/new price, old/new unit size,
+    changed-by, changed-at)
+- **Price history UI on Suppliers page.** Each supplier card now has a
+  history icon button that opens a dialog showing the full audit trail:
+  stage name, old price, new price (with diff highlighted green/red), unit
+  size changes, and timestamp.
+- Added `FeedStagePriceHistory` TypeScript interface.
+
+### Database Changes
+- New table: `feed_stage_price_history` (id, feed_stage_id, old/new
+  unit_price_zmw, old/new unit_size_kg, changed_by, changed_at). Applied
+  via `prisma db push`. No data migration needed — the table starts empty
+  and populates on future price changes.
+
+### Files Modified
+- `apps/api/prisma/schema.prisma` — new `FeedStagePriceHistory` model
+- `apps/api/src/modules/feed-stages/routes.ts` — auto-record on PATCH + GET history
+- `apps/api/src/modules/suppliers/routes.ts` — supplier-level GET history
+- `apps/web/src/app/suppliers/page.tsx` — price history dialog + button
+- `apps/web/src/lib/types.ts` — `FeedStagePriceHistory` interface
+- `package.json` (version bump)
+
+### Test Summary
+- 126 backend tests pass (1 pre-existing flaky alert-generation test fails
+  independently of this change — confirmed by stashing changes and re-running).
+- Web production build passes (typecheck + lint via `next build`).
+
+### Notes
+- Historical financial records were already snapshotted at creation time
+  (feed record `costZmw` and financial record `amountZmw` are copies, not
+  live references). This feature adds visibility into *when* and *how*
+  supplier prices changed, complementing the existing snapshot behavior.
+- The price history table starts empty — it only records changes made
+  from now on. Past price changes (before this feature) are not
+  retroactively logged.
+
 ## v1.3.3-alpha — 2026-08-02
 
 ### Changed
