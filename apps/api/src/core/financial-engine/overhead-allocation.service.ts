@@ -10,6 +10,18 @@ export interface MonthlyOverheadInput {
   createdBy: string;
 }
 
+// Map OverheadCategory → FinancialCategory (the FinancialRecord.category enum)
+const OVERHEAD_TO_FINANCIAL_CATEGORY: Record<string, string> = {
+  medication: 'medication',
+  vaccination: 'vaccines',
+  labour: 'labor',
+  electricity: 'utilities',
+  water: 'utilities',
+  litter: 'other',
+  transport_to_market: 'other',
+  other: 'other',
+};
+
 export class OverheadAllocationService {
   constructor(private prisma: PrismaClient) {}
 
@@ -110,11 +122,12 @@ export class OverheadAllocationService {
     }
 
     // Delete previous allocations for this overhead
+    const financialCategory = OVERHEAD_TO_FINANCIAL_CATEGORY[overhead.category] ?? 'other';
     await this.prisma.financialRecord.deleteMany({
       where: {
         sourceTable: 'overhead_allocations',
         isSystemGenerated: true,
-        category: overhead.category,
+        category: financialCategory as any,
         recordDate: {
           gte: monthStart,
           lte: monthEnd,
@@ -153,7 +166,7 @@ export class OverheadAllocationService {
           flockId,
           sourceTable: 'overhead_allocations',
           recordDate: monthEnd,
-          category: overhead.category,
+          category: financialCategory as any,
           description: `Overhead allocation — ${overhead.description || overhead.category} — ${overhead.yearMonth}`,
           amountZmw: allocatedAmount,
           isIncome: false,
