@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.4.3-alpha — 2026-08-03
+
+### Fixed
+- **Cost Breakdown chart — vaccines label truncation.** With 5 categories
+  the legend wrapped to 4 rows (~80px). The 320px chart height left the
+  last item "vaccines: ZMW 346" clipped at the SVG bottom edge. Increased
+  chart height to 380px, reduced outerRadius to 80, moved cy to 35%.
+
 ## v1.4.2-alpha — 2026-08-03
 
 ### Fixed
