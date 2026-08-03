@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.3-alpha — 2026-08-03
+
+### Changed
+- **Removed prominent harvest stat cards from flock detail page.** Per
+  user request, the two large harvest cards at the top of the flock
+  detail page have been removed. Harvest info remains in the header
+  subtitle and in the Flock Summary card in the Overview tab.
+
 ## v1.5.2-alpha — 2026-08-03
 
 ### Changed
