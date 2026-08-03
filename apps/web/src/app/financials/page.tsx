@@ -131,7 +131,7 @@ export default function FinancialsDashboard() {
         <Card>
           <CardHeader><CardTitle>Cost Breakdown by Category</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={360}>
               <PieChart>
                 <Pie
                   data={kpi.categoryBreakdown}
@@ -142,18 +142,19 @@ export default function FinancialsDashboard() {
                     const name = category.replace(/_/g, " ");
                     const amount = `ZMW ${Number(cost).toFixed(0)}`;
                     const anchor = props.textAnchor || "middle";
+                    const lx = anchor === "start" ? x - 4 : anchor === "end" ? x + 4 : x;
                     return (
                       <g>
-                        <text x={x} y={y - 8} textAnchor={anchor} dominantBaseline="central" fontSize={11} fontWeight={600} fill="hsl(var(--foreground))">
+                        <text x={lx} y={y - 8} textAnchor={anchor} dominantBaseline="central" fontSize={11} fontWeight={600} fill="hsl(var(--foreground))">
                           {name}
                         </text>
-                        <text x={x} y={y + 8} textAnchor={anchor} dominantBaseline="central" fontSize={11} fill="hsl(var(--muted-foreground))">
+                        <text x={lx} y={y + 8} textAnchor={anchor} dominantBaseline="central" fontSize={11} fill="hsl(var(--muted-foreground))">
                           {amount}
                         </text>
                       </g>
                     );
                   }}
-                  outerRadius={80}
+                  outerRadius={82}
                   fill="#8884d8"
                   dataKey="cost"
                   nameKey="category"
