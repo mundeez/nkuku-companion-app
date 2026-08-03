@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.5.0-alpha — 2026-08-03
+
+### Added
+- **Harvest Date & Days to Harvest on broiler flock cards.** Each flock
+  card on /broiler-flocks now shows two new fields:
+  - Harvest Date: the date when the flock reaches targetAge (default 42
+    days) of age, computed as startDate + targetAge.
+  - Days to Harvest: remaining days until harvest (targetAge - ageDays).
+  Both show "Pending collection" when chicks aren't collected yet. Days
+  to Harvest is color-coded: red when due/overdue, orange within 7 days.
+- **Harvest info on flock detail page.** The header subtitle now includes
+  the harvest date and days remaining. The Flock Summary card in the
+  Overview tab also shows both fields.
+
 ## v1.4.7-alpha — 2026-08-03
 
 ### Changed
