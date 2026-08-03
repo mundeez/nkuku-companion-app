@@ -96,6 +96,20 @@ class _FlocksScreenState extends State<FlocksScreen> {
     }
   }
 
+  Color _harvestColor(int? days) {
+    if (days == null) return Colors.amber;
+    if (days <= 0) return Colors.red;
+    if (days <= 7) return Colors.orange;
+    return Colors.grey;
+  }
+
+  String _harvestLabel(int? days) {
+    if (days == null) return 'Pending';
+    if (days <= 0) return 'Due now';
+    if (days == 1) return '1 day left';
+    return '$days days left';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -174,6 +188,26 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                         backgroundColor: mortalityRate != '0.0'
                                             ? Colors.red.withAlpha(30)
                                             : null,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.event, size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        flock.harvestDateStr != null
+                                            ? 'Harvest: ${flock.harvestDateStr}'
+                                            : 'Harvest: Pending',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Icon(Icons.timer, size: 14, color: _harvestColor(flock.daysToHarvest)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _harvestLabel(flock.daysToHarvest),
+                                        style: TextStyle(fontSize: 12, color: _harvestColor(flock.daysToHarvest)),
                                       ),
                                     ],
                                   ),

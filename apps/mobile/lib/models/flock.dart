@@ -162,6 +162,29 @@ class BroilerFlock {
       chickQualityNotes: chickQualityNotes ?? this.chickQualityNotes,
     );
   }
+
+  /// The date when the flock reaches [targetAge] (default 42) days of age.
+  /// Returns null if chicks haven't been collected yet (no startDate).
+  DateTime? get harvestDate {
+    if (startDate == null) return null;
+    final target = targetAge ?? 42;
+    return DateTime.parse(startDate!).add(Duration(days: target));
+  }
+
+  /// Days remaining until harvest. Returns null if no startDate.
+  /// <= 0 means the flock is due/overdue for harvest.
+  int? get daysToHarvest {
+    if (startDate == null) return null;
+    final target = targetAge ?? 42;
+    return target - (ageDays ?? 0);
+  }
+
+  /// Formatted harvest date string (yyyy-MM-dd), or null if pending.
+  String? get harvestDateStr {
+    final d = harvestDate;
+    if (d == null) return null;
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
 }
 
 class VaccinationSchedule {

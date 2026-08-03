@@ -359,6 +359,19 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 if (flock.expectedCollectionStart != null && flock.expectedCollectionEnd != null)
                   Text('Est. Collection: ${flock.expectedCollectionStart!.split('T').first} – ${flock.expectedCollectionEnd!.split('T').first}'),
                 Text('Age: ${flock.startDate == null ? 'Pending collection' : 'Day ${flock.ageDays ?? 0}'}'),
+                Text('Harvest Date: ${flock.harvestDateStr ?? 'Pending collection'}'),
+                Text(
+                  'Days to Harvest: ${flock.daysToHarvest == null ? 'Pending collection' : (flock.daysToHarvest! <= 0 ? 'Due now' : '${flock.daysToHarvest} day${flock.daysToHarvest == 1 ? '' : 's'}')}',
+                  style: TextStyle(
+                    color: flock.daysToHarvest == null
+                        ? Colors.amber[800]
+                        : flock.daysToHarvest! <= 0
+                            ? Colors.red
+                            : flock.daysToHarvest! <= 7
+                                ? Colors.orange[800]
+                                : null,
+                  ),
+                ),
                 Text('Status: ${flock.status}'),
               ],
             ),
