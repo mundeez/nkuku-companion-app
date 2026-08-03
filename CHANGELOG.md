@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.4.1-alpha — 2026-08-03
+
+### Fixed
+- **Flaky alert generation test.** The `generates alerts including
+  vaccination and task alerts` integration test was failing because the
+  test flock's `collectionDate` was hardcoded to `2026-06-01`, making the
+  flock ~63 days old. The vaccination schedule only has items up to day
+  21, and the alert generation looks for schedule items within a ±2 day
+  window of the flock's current age — so no `vaccination_due` alerts were
+  generated for the old flock.
+- The test now creates a separate flock with a dynamic `collectionDate`
+  of today, guaranteeing the flock is day 0 and the Marek's/Newcastle
+  vaccines (scheduled at age 0) always trigger `vaccination_due` alerts.
+  The flock is cleaned up after the test. This follows the project
+  guideline of creating new flocks for testing rather than modifying
+  existing ones.
+- Test count: 129 (was 127).
+
+### Files Modified
+- `apps/api/tests/integration/broiler-management.test.ts`
+- `package.json` (version bump)
+
+### Test Summary
+- 129 backend tests pass (11 test files, all green, verified across
+  multiple consecutive runs).
+
 ## v1.4.0-alpha — 2026-08-03
 
 ### Added

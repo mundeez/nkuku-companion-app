@@ -405,6 +405,34 @@ describe('Broiler Management API', () => {
   });
 
   describe('Alert Generation', () => {
+    let alertFlockId: string;
+
+    it('creates a flock for alert testing', async () => {
+      // Create a new flock with today's collection date so the flock is
+      // day 0 — this guarantees vaccination_due alerts (Marek's, Newcastle
+      // are scheduled at age 0) regardless of when the test runs.
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Test Flock Alerts',
+          breedId,
+          orderDate: today,
+          initialCount: 100,
+          targetWeight: 2.5,
+          targetAge: 42,
+          feedTransitionDay: 11,
+          chicksCollected: true,
+          collectionDate: today,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.status).toBe('active');
+      alertFlockId = data.id;
+    });
+
     it('generates alerts including vaccination and task alerts', async () => {
       const res = await fetch(`${API_URL}/api/v1/alerts/generate`, {
         method: 'POST',
@@ -415,6 +443,16 @@ describe('Broiler Management API', () => {
       const data = await res.json();
       expect(data.generated).toBeGreaterThan(0);
       expect(data.alerts.some((a: any) => a.alertType === 'vaccination_due')).toBe(true);
+    });
+
+    it('deletes the alert test flock', async () => {
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks/${alertFlockId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.deleted).toBe(true);
     });
   });
 
