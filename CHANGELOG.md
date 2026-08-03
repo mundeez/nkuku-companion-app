@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.5.1-alpha — 2026-08-03
+
+### Fixed
+- **NetworkError on production site.** The `.env` file had
+  `NEXT_PUBLIC_API_URL=http://localhost:30001`, which got embedded in
+  client-side JS. When users visited the production site, their browsers
+  tried to fetch API data from `http://localhost:30001` on their own
+  machines — causing NetworkError and mixed-content blocking (HTTPS page
+  requesting HTTP resource). Fixed by setting `NEXT_PUBLIC_API_URL` to
+  empty so the browser uses same-origin relative URLs (`/api/v1/...`),
+  which ISPConfig nginx proxies to the backend.
+
 ## v1.5.0-alpha — 2026-08-03
 
 ### Added
