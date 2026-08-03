@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.5.2-alpha — 2026-08-03
+
+### Changed
+- **Harvest fields now prominent at top of flock detail page.** The
+  Harvest Date and Days to Harvest cards were previously buried in the
+  Flock Summary card below the fold. Added two prominent stat cards at
+  the top of the page (before Birds/Mortality/Revenue), styled with
+  primary-colored borders and CalendarDays icons.
+- **Switched web container to production build.** The dev server's JS
+  chunks are not content-hashed, so ISPConfig nginx's `expires 365d`
+  caching on `/_next/static` caused browsers to load stale JS after
+  redeploys. Production build uses content-hashed filenames that bust
+  cache correctly.
+
 ## v1.5.1-alpha — 2026-08-03
 
 ### Fixed
