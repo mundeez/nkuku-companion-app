@@ -131,15 +131,13 @@ export default function FinancialsDashboard() {
         <Card>
           <CardHeader><CardTitle>Cost Breakdown by Category</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={320}>
               <PieChart>
                 <Pie
                   data={kpi.categoryBreakdown}
                   cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ category, cost }: any) => `${category}: ZMW ${Number(cost).toFixed(0)}`}
-                  outerRadius={100}
+                  cy="45%"
+                  outerRadius={90}
                   fill="#8884d8"
                   dataKey="cost"
                   nameKey="category"
@@ -148,7 +146,18 @@ export default function FinancialsDashboard() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: any) => `ZMW ${Number(v).toFixed(2)}`} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                  formatter={(v: any) => `ZMW ${Number(v).toFixed(2)}`}
+                />
+                <Legend
+                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                  formatter={(value: string, entry: any) => {
+                    const item = kpi.categoryBreakdown.find((c: any) => c.category === value);
+                    const cost = item ? Number(item.cost).toFixed(0) : "";
+                    return `${value}: ZMW ${cost}`;
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
