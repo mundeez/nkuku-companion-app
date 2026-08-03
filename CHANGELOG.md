@@ -1,5 +1,39 @@
 # Changelog
 
+## v1.4.2-alpha — 2026-08-03
+
+### Fixed
+- **Mobile CRUD gaps.** Filled three missing CRUD functionalities:
+  - Documents: added PATCH endpoint and edit form for document metadata
+    (category, recordType).
+  - Alerts: added DELETE endpoint and delete button with confirmation dialog.
+  - Flock Tasks: added FAB and create dialog for manual task creation
+    (API already supported POST).
+- **ageDays calculation.** The API list (GET /api/v1/broiler-flocks) and
+  detail (GET /api/v1/broiler-flocks/:id) endpoints were not returning
+  ageDays, causing all flocks to show "Day 0" in the mobile app. Both
+  endpoints now compute ageDays from startDate. Flocks without a startDate
+  show "Pending" instead of "Day 0".
+- **Overhead category mapping.** The overhead allocation service was passing
+  OverheadCategory enum values (e.g. 'labour', 'vaccination', 'electricity')
+  directly as FinancialRecord.category, which expects FinancialCategory enum
+  values (e.g. 'labor', 'vaccines', 'utilities'). This caused a 500 error
+  when creating monthly overheads. Added a mapping table.
+- **Cost Breakdown chart truncation.** The "Cost Breakdown by Category" pie
+  chart on /financials used inline labels that overflowed the SVG container
+  by up to 145px, truncating category names and amounts. Replaced with a
+  proper Legend component that wraps within the chart bounds.
+
+### Changed
+- Docker Compose restored to use shared external PostgreSQL and Redis
+  services (shared-net network) instead of local containers.
+- Mobile flock list card shows "Pending" for flocks without a startDate.
+
+### Test Summary
+- 129/129 backend tests pass (11 test files)
+- Flutter analyze: no issues
+- All containers healthy (api, web, nginx, ntfy)
+
 ## v1.4.1-alpha — 2026-08-03
 
 ### Fixed
