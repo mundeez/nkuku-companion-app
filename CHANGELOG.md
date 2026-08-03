@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.5.4-alpha — 2026-08-03
+
+### Added
+- **Harvest Date & Days to Harvest on mobile app.** Mirrors the web
+  app changes on the Flutter mobile app:
+  - Flock list cards now show a harvest date row with calendar icon,
+    formatted date, and color-coded days-remaining label.
+  - Flock detail overview tab shows Harvest Date and Days to Harvest
+    lines (with color coding) between Age and Status.
+  - BroilerFlock model gained `harvestDate`, `daysToHarvest`, and
+    `harvestDateStr` computed getters.
+
 ## v1.5.3-alpha — 2026-08-03
 
 ### Changed
