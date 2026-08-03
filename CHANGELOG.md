@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.5-alpha — 2026-08-03
+
+### Fixed
+- **Cost Breakdown chart — two-line labels now render correctly.** The
+  previous <tspan dy> approach produced lines only 13px apart, making them
+  appear as one line. Switched to two separate <text> elements inside a <g>:
+  category name (bold) at y-8, ZMW amount (muted) at y+8, giving 16px
+  separation — clearly two distinct lines.
+
 ## v1.4.4-alpha — 2026-08-03
 
 ### Fixed
