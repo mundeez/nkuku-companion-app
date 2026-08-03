@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.4.6-alpha — 2026-08-03
+
+### Changed
+- **Cost Breakdown chart — slightly larger.** Increased chart height
+  from 300→360px and outerRadius from 80→82 for a bigger pie. Nudged
+  right-side labels 4px inward to keep all two-line labels within the
+  SVG bounds. Label font size unchanged at 11px — no truncation.
+
 ## v1.4.5-alpha — 2026-08-03
 
 ### Fixed
