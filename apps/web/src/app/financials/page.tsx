@@ -141,11 +141,16 @@ export default function FinancialsDashboard() {
                   label={({ category, cost, x, y, ...props }: any) => {
                     const name = category.replace(/_/g, " ");
                     const amount = `ZMW ${Number(cost).toFixed(0)}`;
+                    const anchor = props.textAnchor || "middle";
                     return (
-                      <text x={x} y={y} textAnchor={props.textAnchor || "middle"} dominantBaseline="central" fontSize={11} fill="hsl(var(--foreground))">
-                        <tspan x={x} dy="-0.6em">{name}</tspan>
-                        <tspan x={x} dy="1.2em">{amount}</tspan>
-                      </text>
+                      <g>
+                        <text x={x} y={y - 8} textAnchor={anchor} dominantBaseline="central" fontSize={11} fontWeight={600} fill="hsl(var(--foreground))">
+                          {name}
+                        </text>
+                        <text x={x} y={y + 8} textAnchor={anchor} dominantBaseline="central" fontSize={11} fill="hsl(var(--muted-foreground))">
+                          {amount}
+                        </text>
+                      </g>
                     );
                   }}
                   outerRadius={80}
