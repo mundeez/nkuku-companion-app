@@ -131,12 +131,23 @@ export default function FinancialsDashboard() {
         <Card>
           <CardHeader><CardTitle>Cost Breakdown by Category</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={380}>
+            <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
                   data={kpi.categoryBreakdown}
                   cx="50%"
-                  cy="35%"
+                  cy="50%"
+                  labelLine
+                  label={({ category, cost, x, y, ...props }: any) => {
+                    const name = category.replace(/_/g, " ");
+                    const amount = `ZMW ${Number(cost).toFixed(0)}`;
+                    return (
+                      <text x={x} y={y} textAnchor={props.textAnchor || "middle"} dominantBaseline="central" fontSize={11} fill="hsl(var(--foreground))">
+                        <tspan x={x} dy="-0.6em">{name}</tspan>
+                        <tspan x={x} dy="1.2em">{amount}</tspan>
+                      </text>
+                    );
+                  }}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="cost"
@@ -146,18 +157,7 @@ export default function FinancialsDashboard() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
-                  formatter={(v: any) => `ZMW ${Number(v).toFixed(2)}`}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                  formatter={(value: string, entry: any) => {
-                    const item = kpi.categoryBreakdown.find((c: any) => c.category === value);
-                    const cost = item ? Number(item.cost).toFixed(0) : "";
-                    return `${value}: ZMW ${cost}`;
-                  }}
-                />
+                <Tooltip formatter={(v: any) => `ZMW ${Number(v).toFixed(2)}`} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
