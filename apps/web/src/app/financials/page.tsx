@@ -131,13 +131,13 @@ export default function FinancialsDashboard() {
         <Card>
           <CardHeader><CardTitle>Cost Breakdown by Category</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={320}>
+            <ResponsiveContainer width="100%" height={380}>
               <PieChart>
                 <Pie
                   data={kpi.categoryBreakdown}
                   cx="50%"
-                  cy="45%"
-                  outerRadius={90}
+                  cy="35%"
+                  outerRadius={80}
                   fill="#8884d8"
                   dataKey="cost"
                   nameKey="category"
