@@ -175,7 +175,20 @@ export default function FlockDetailPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">{flock.name}</h1>
-          <div className="text-muted-foreground">{flock.breed?.name} | {ageDays < 0 ? "Pending collection" : `Day ${ageDays}`} | {getStatusBadge(flock.status, flock.chicksCollected)}</div>
+          <div className="text-muted-foreground">
+            {flock.breed?.name} | {ageDays < 0 ? "Pending collection" : `Day ${ageDays}`} | {getStatusBadge(flock.status, flock.chicksCollected)}
+            {flock.startDate && (() => {
+              const target = flock.targetAge ?? 42;
+              const harvest = new Date(flock.startDate);
+              harvest.setDate(harvest.getDate() + target);
+              const remaining = target - ageDays;
+              return (
+                <span className="ml-2">
+                  | Harvest: {harvest.toLocaleDateString()} ({remaining <= 0 ? "due now" : `${remaining} day${remaining === 1 ? "" : "s"} left`})
+                </span>
+              );
+            })()}
+          </div>
         </div>
       </div>
 
@@ -266,6 +279,13 @@ export default function FlockDetailPage() {
                   <div className="flex justify-between"><span>Est. Collection</span><span className="font-medium text-blue-600">{new Date(flock.expectedCollectionStart).toLocaleDateString()} – {new Date(flock.expectedCollectionEnd).toLocaleDateString()}</span></div>
                 )}
                 <div className="flex justify-between"><span>Start Date</span><span className="font-medium">{flock.startDate ? new Date(flock.startDate).toLocaleDateString() : "Pending collection"}</span></div>
+                <div className="flex justify-between"><span>Harvest Date</span><span className="font-medium">{flock.startDate ? (() => { const h = new Date(flock.startDate); h.setDate(h.getDate() + (flock.targetAge ?? 42)); return h.toLocaleDateString(); })() : "Pending collection"}</span></div>
+                <div className="flex justify-between"><span>Days to Harvest</span><span className={`font-medium ${
+                  !flock.startDate ? "text-amber-600"
+                  : (flock.targetAge ?? 42) - ageDays <= 0 ? "text-red-600"
+                  : (flock.targetAge ?? 42) - ageDays <= 7 ? "text-orange-600"
+                  : ""
+                }`}>{!flock.startDate ? "Pending collection" : (() => { const r = (flock.targetAge ?? 42) - ageDays; return r <= 0 ? "Due now" : `${r} day${r === 1 ? "" : "s"}`; })()}</span></div>
                 <div className="flex justify-between"><span>Total Feed</span><span className="font-medium">{totalFeed.toFixed(1)} kg</span></div>
                 <div className="flex justify-between"><span>Total Water</span><span className="font-medium">{totalWater.toFixed(1)} liters</span></div>
                 <div className="flex justify-between"><span>Total Cost</span><span className="font-medium">ZMW {totalCost.toFixed(2)}</span></div>

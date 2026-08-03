@@ -144,6 +144,22 @@ export default function BroilerFlocksPage() {
     return Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   }
 
+  function getHarvestDate(startDate?: string | null, targetAge?: number): Date | null {
+    if (!startDate) return null;
+    const target = targetAge ?? 42;
+    const harvest = new Date(startDate);
+    harvest.setDate(harvest.getDate() + target);
+    return harvest;
+  }
+
+  function getDaysToHarvest(startDate?: string | null, targetAge?: number): number | null {
+    if (!startDate) return null;
+    const age = getAgeDays(startDate);
+    if (age === null) return null;
+    const target = targetAge ?? 42;
+    return target - age;
+  }
+
   function getStatusBadge(status: string, chicksCollected?: boolean) {
     if (status === "active" && !chicksCollected) {
       return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Pending</Badge>;
@@ -259,6 +275,8 @@ export default function BroilerFlocksPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {flocks.map((flock) => {
           const ageDays = getAgeDays(flock.startDate);
+          const harvestDate = getHarvestDate(flock.startDate, flock.targetAge);
+          const daysToHarvest = getDaysToHarvest(flock.startDate, flock.targetAge);
           const mortality = flock.initialCount > 0
             ? ((flock.initialCount - flock.currentCount) / flock.initialCount * 100).toFixed(1)
             : "0";
@@ -290,6 +308,25 @@ export default function BroilerFlocksPage() {
                     <span className="text-muted-foreground">Age</span>
                     <span className={`font-medium ${ageDays === null ? "text-amber-600" : ""}`}>
                       {ageDays === null ? "Pending collection" : `Day ${ageDays}`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Harvest Date</span>
+                    <span className={`font-medium ${harvestDate === null ? "text-amber-600" : ""}`}>
+                      {harvestDate === null ? "Pending collection" : harvestDate.toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Days to Harvest</span>
+                    <span className={`font-medium ${
+                      daysToHarvest === null ? "text-amber-600"
+                      : daysToHarvest <= 0 ? "text-red-600"
+                      : daysToHarvest <= 7 ? "text-orange-600"
+                      : ""
+                    }`}>
+                      {daysToHarvest === null ? "Pending collection"
+                        : daysToHarvest <= 0 ? "Due now"
+                        : `${daysToHarvest} day${daysToHarvest === 1 ? "" : "s"}`}
                     </span>
                   </div>
                   {flock.orderDate && (
