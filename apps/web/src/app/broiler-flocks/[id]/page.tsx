@@ -194,25 +194,6 @@ export default function FlockDetailPage() {
 
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
-      {/* Harvest info — prominent, always visible at top */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <Card className="border-primary/20"><CardContent className="pt-6">
-          <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /><span className="text-sm font-medium text-muted-foreground">Harvest Date</span></div>
-          <p className="text-2xl font-bold mt-1">{flock.startDate ? (() => { const h = new Date(flock.startDate); h.setDate(h.getDate() + (flock.targetAge ?? 42)); return h.toLocaleDateString(); })() : "Pending"}</p>
-          <p className="text-xs text-muted-foreground">{flock.startDate ? `Day ${flock.targetAge ?? 42} of age` : "Awaiting chick collection"}</p>
-        </CardContent></Card>
-        <Card className="border-primary/20"><CardContent className="pt-6">
-          <div className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /><span className="text-sm font-medium text-muted-foreground">Days to Harvest</span></div>
-          <p className={`text-2xl font-bold mt-1 ${
-            !flock.startDate ? "text-amber-600"
-            : (flock.targetAge ?? 42) - ageDays <= 0 ? "text-red-600"
-            : (flock.targetAge ?? 42) - ageDays <= 7 ? "text-orange-600"
-            : ""
-          }`}>{!flock.startDate ? "Pending" : (() => { const r = (flock.targetAge ?? 42) - ageDays; return r <= 0 ? "Due now" : `${r} day${r === 1 ? "" : "s"}`; })()}</p>
-          <p className="text-xs text-muted-foreground">{flock.startDate ? `Current: Day ${ageDays}` : "Awaiting chick collection"}</p>
-        </CardContent></Card>
-      </div>
-
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <Card><CardContent className="pt-6">
           <div className="flex items-center gap-2"><Scale className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Birds</span></div>
