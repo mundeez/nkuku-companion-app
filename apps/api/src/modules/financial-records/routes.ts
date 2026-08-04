@@ -32,6 +32,30 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     });
   });
 
+  // GET /:id — single financial record with documents
+  app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const authUser = (request as any).authUser;
+
+    const record = await prisma.financialRecord.findFirst({
+      where: { id },
+      include: { flock: true, documents: { orderBy: { createdAt: 'desc' } } },
+    });
+    if (!record || record.flock.createdBy !== authUser.userId) {
+      return reply.status(404).send({ error: 'NOT_FOUND' });
+    }
+
+    // Strip sensitive fields from documents
+    const { flock, documents, ...safe } = record;
+    return {
+      ...safe,
+      documents: documents.map((doc: any) => {
+        const { filePath, storageKey, contentText, ...docSafe } = doc;
+        return { ...docSafe, downloadUrl: `/api/v1/documents/${doc.id}/download` };
+      }),
+    };
+  });
+
   app.get('/summary', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
     const authUser = (request as any).authUser;

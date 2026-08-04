@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/ledger_service.dart';
+import '../../widgets/attachment_section.dart';
 
 class JournalDetailScreen extends StatefulWidget {
   final String id;
@@ -163,6 +164,11 @@ class _JournalDetailScreenState extends State<JournalDetailScreen> {
                               ),
                             ],
                           ),
+                        ),
+                        // Attachments
+                        AttachmentSection(
+                          journalEntryId: widget.id,
+                          title: 'Transaction Attachments',
                         ),
                       ],
                     )

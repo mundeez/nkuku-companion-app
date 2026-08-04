@@ -61,15 +61,27 @@ export async function buildJournalModule(app: FastifyInstance) {
     return entries;
   });
 
-  // GET /:id — single entry with all lines
+  // GET /:id — single entry with all lines + documents
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const entry = await prisma.journalEntry.findUnique({
       where: { id },
-      include: { lines: { include: { account: true } } },
+      include: {
+        lines: { include: { account: true } },
+        documents: { orderBy: { createdAt: 'desc' } },
+      },
     });
     if (!entry) return reply.status(404).send({ error: 'JOURNAL_ENTRY_NOT_FOUND' });
-    return entry;
+
+    // Strip sensitive fields from documents
+    const { documents, ...safe } = entry;
+    return {
+      ...safe,
+      documents: documents.map((doc: any) => {
+        const { filePath, storageKey, contentText, ...docSafe } = doc;
+        return { ...docSafe, downloadUrl: `/api/v1/documents/${doc.id}/download` };
+      }),
+    };
   });
 
   // POST / — post manual entry (owner/manager)

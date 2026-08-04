@@ -283,3 +283,82 @@ docker compose -f docker-compose.prod.yml up --build -d
 - ISPConfig nginx is the only entrypoint from the internet
 - Change `OWNER_PASSWORD` immediately after first login
 - Rotate `JWT_SECRET` periodically
+
+## Document Attachments for Financial Transactions
+
+### Overview
+Documents (receipts, invoices, etc.) can be attached to any financial transaction:
+- **FinancialRecord** (expenses/income)
+- **JournalEntry** (manual journal entries)
+- **SaleRecord** (bird sales)
+- **BroilerFlock** (general flock documents — backward compatible)
+
+### Storage Backend
+- **MinIO/S3** (shared `pom-minio` container on `shared-net` network)
+- Bucket: `nkuku-documents`
+- Dedicated service account: `nkuku-app` (secret in `.env`, never committed)
+- Files stored with key pattern: `<recordType>/<recordId>/<uuid>-<filename>`
+
+### Security Features
+- **Virus scanning**: ClamAV container (`clamav` service in docker-compose)
+  - Synchronous scan on upload via `clamscan` npm package
+  - Fail-closed when `REQUIRE_VIRUS_SCAN=true` (default)
+  - Fail-open when `REQUIRE_VIRUS_SCAN=false` (dev convenience)
+- **MIME type validation**: Only PDF, JPG, PNG, WebP, DOC, DOCX, CSV, XLSX, XLS
+- **File size limit**: 25MB max
+- **Attachment count limit**: Configurable via `MAX_ATTACHMENTS_PER_RECORD` (default 20)
+
+### OCR & Full-Text Search
+- **Text extraction** on upload (async): PDF (pdf-parse), DOCX (mammoth), images (tesseract.js OCR), CSV (plain text)
+- **Full-text search**: PostgreSQL `tsvector` on extracted text
+- Search endpoint: `GET /api/v1/documents/search?q=<query>&financialRecordId=<id>`
+
+### API Endpoints (Documents Module)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/documents` | Upload document (multipart: file + target ID + category) |
+| GET | `/api/v1/documents` | List documents (filter by flockId, financialRecordId, journalEntryId, saleRecordId) |
+| GET | `/api/v1/documents/:id` | Get document metadata |
+| GET | `/api/v1/documents/:id/download` | Download file (attachment) |
+| GET | `/api/v1/documents/:id/view` | View file inline |
+| DELETE | `/api/v1/documents/:id` | Delete document (owner/manager only) |
+| PATCH | `/api/v1/documents/:id` | Update document category |
+| GET | `/api/v1/documents/search` | Full-text search |
+
+### Key File Locations
+- S3 client: `apps/api/src/core/storage/s3-client.ts`
+- Storage service: `apps/api/src/core/storage/storage.service.ts`
+- ClamAV service: `apps/api/src/core/security/clamav.service.ts`
+- Text extraction: `apps/api/src/core/documents/text-extraction.service.ts`
+- Documents API: `apps/api/src/modules/documents/routes.ts`
+- Backfill script: `apps/api/src/db/seeds/migrate-documents-to-s3.ts`
+- Web AttachmentPanel: `apps/web/src/components/attachments/AttachmentPanel.tsx`
+- Mobile AttachmentSection: `apps/mobile/lib/widgets/attachment_section.dart`
+
+### Environment Variables
+```env
+# S3/MinIO
+S3_ENDPOINT=http://pom-minio:9000
+S3_ACCESS_KEY=<set-in-env>
+S3_SECRET_KEY=<set-in-env>
+S3_BUCKET=nkuku-documents
+S3_REGION=us-east-1
+
+# ClamAV
+CLAMAV_HOST=clamav
+CLAMAV_PORT=3310
+REQUIRE_VIRUS_SCAN=true
+
+# Attachment limits
+MAX_ATTACHMENTS_PER_RECORD=20
+```
+
+### Backfill Existing Documents
+```bash
+docker compose exec api npx tsx src/db/seeds/migrate-documents-to-s3.ts
+```
+
+### Test Count (with document attachments)
+- 47 unit tests (6 files) — all passing
+- 115 integration tests (9 files) — 114 passing, 1 pre-existing failure (gaap balance sheet)
+- New tests: storage.service (5), text-extraction.service (6), clamav.service (4), documents-financial-transactions (18)

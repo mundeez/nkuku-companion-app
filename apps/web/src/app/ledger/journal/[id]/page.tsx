@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api/client";
 import type { JournalEntry } from "@/lib/types/ledger";
 import { ArrowLeft, RotateCcw } from "lucide-react";
+import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 
 function fmt(s: string | null): string {
   if (!s) return "—";
@@ -146,6 +147,14 @@ export default function JournalDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Attachments ─────────────────────────── */}
+      <AttachmentPanel
+        journalEntryId={id}
+        title="Transaction Attachments"
+        canManage={user.role === "owner" || user.role === "manager"}
+        canDelete={user.role === "owner" || user.role === "manager"}
+      />
 
       {/* ── Reverse Action ───────────────────────── */}
       {user.role === "owner" && !entry.isReversing && (

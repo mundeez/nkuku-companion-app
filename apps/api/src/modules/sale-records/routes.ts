@@ -148,13 +148,21 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
     const record = await prisma.saleRecord.findFirst({
       where: { id },
-      include: { flock: true },
+      include: { flock: true, documents: { orderBy: { createdAt: 'desc' } } },
     });
     if (!record || record.flock.createdBy !== authUser.userId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    return record;
+    // Strip sensitive fields from documents
+    const { flock, documents, ...safe } = record;
+    return {
+      ...safe,
+      documents: documents.map((doc: any) => {
+        const { filePath, storageKey, contentText, ...docSafe } = doc;
+        return { ...docSafe, downloadUrl: `/api/v1/documents/${doc.id}/download` };
+      }),
+    };
   });
 
   // GET /summary?flockId=...

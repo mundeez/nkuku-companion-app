@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
@@ -18,8 +18,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Trash2, Pencil, DollarSign } from "lucide-react";
+import { ShoppingCart, Trash2, Pencil, DollarSign, Paperclip } from "lucide-react";
 import { FlockSubNav } from "@/components/flock-subnav";
+import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 
 const paymentStatusOptions: PaymentStatus[] = ["pending", "partial", "paid"];
 
@@ -52,6 +53,7 @@ export default function SalesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     saleDate: new Date().toISOString().split("T")[0],
@@ -373,50 +375,68 @@ export default function SalesPage() {
           </TableHeader>
           <TableBody>
             {records.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell>{new Date(r.saleDate).toLocaleDateString()}</TableCell>
-                <TableCell className="font-medium">
-                  {r.customerName || "—"}
-                  {r.customerPhone && (
-                    <div className="text-xs text-muted-foreground">{r.customerPhone}</div>
-                  )}
-                </TableCell>
-                <TableCell>{r.birdCount}</TableCell>
-                <TableCell>{r.avgWeightKg ? `${r.avgWeightKg} kg` : "—"}</TableCell>
-                <TableCell>{fmtZmw(r.pricePerBirdZmw)}</TableCell>
-                <TableCell className="font-semibold">{fmtZmw(r.totalAmountZmw)}</TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-1">
-                    {paymentBadge(r.paymentStatus)}
-                    {r.paymentStatus === "partial" && r.amountPaidZmw != null && (
-                      <span className="text-xs text-muted-foreground">
-                        Paid: {fmtZmw(r.amountPaidZmw)}
-                      </span>
+              <Fragment key={r.id}>
+                <TableRow
+                  className={`cursor-pointer hover:bg-muted/30 ${selectedSaleId === r.id ? "bg-muted/50" : ""}`}
+                  onClick={() => setSelectedSaleId(selectedSaleId === r.id ? null : r.id)}
+                >
+                  <TableCell>{new Date(r.saleDate).toLocaleDateString()}</TableCell>
+                  <TableCell className="font-medium">
+                    {r.customerName || "—"}
+                    {r.customerPhone && (
+                      <div className="text-xs text-muted-foreground">{r.customerPhone}</div>
                     )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  {canManageSales && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => startEdit(r)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {canDeleteSales && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      onClick={() => deleteRecord(r.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
+                  </TableCell>
+                  <TableCell>{r.birdCount}</TableCell>
+                  <TableCell>{r.avgWeightKg ? `${r.avgWeightKg} kg` : "—"}</TableCell>
+                  <TableCell>{fmtZmw(r.pricePerBirdZmw)}</TableCell>
+                  <TableCell className="font-semibold">{fmtZmw(r.totalAmountZmw)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      {paymentBadge(r.paymentStatus)}
+                      {r.paymentStatus === "partial" && r.amountPaidZmw != null && (
+                        <span className="text-xs text-muted-foreground">
+                          Paid: {fmtZmw(r.amountPaidZmw)}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Paperclip className="h-4 w-4 inline text-muted-foreground mr-1" />
+                    {canManageSales && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); startEdit(r); }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canDeleteSales && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={(e) => { e.stopPropagation(); deleteRecord(r.id); }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+                {selectedSaleId === r.id && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="p-0">
+                      <AttachmentPanel
+                        saleRecordId={r.id}
+                        title={`Attachments — ${r.customerName || "Sale"}`}
+                        canManage={canManageSales}
+                        canDelete={canDeleteSales}
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
             ))}
             {records.length === 0 && (
               <TableRow>

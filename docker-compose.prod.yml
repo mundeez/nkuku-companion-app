@@ -56,6 +56,19 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.deeztechnology.solutions}
       NTFY_DEFAULT_TOPIC: ${NTFY_DEFAULT_TOPIC:-nkuku-alerts}
+      # ── S3 / MinIO object storage ──
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://pom-minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET:-nkuku-documents}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      # ── ClamAV virus scanning ──
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      REQUIRE_VIRUS_SCAN: ${REQUIRE_VIRUS_SCAN:-true}
+      # ── Document attachments limits ──
+      MAX_ATTACHMENTS_PER_TX: ${MAX_ATTACHMENTS_PER_TX:-20}
     # Bind to localhost only — ISPConfig nginx proxies in from the outside
     ports:
       - "127.0.0.1:30001:3001"
@@ -64,9 +77,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      clamav:
+        condition: service_started
     networks:
       - nkuku_internal
       - nkuku_public
+      - shared-net
     restart: unless-stopped
     command: ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npx tsx src/main.ts"]
 
@@ -109,11 +125,32 @@ services:
       - nkuku_public
     restart: unless-stopped
 
+  # ─── ClamAV (virus scanning for document uploads) ────────
+  clamav:
+    image: clamav/clamav-debian:latest
+    restart: unless-stopped
+    volumes:
+      - clamav_data:/var/lib/clamav
+    ports:
+      - "127.0.0.1:3310:3310"
+    networks:
+      - nkuku_internal
+      - shared-net
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --version || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
 volumes:
   postgres_data:
   redis_data:
   ntfy_data:
+  clamav_data:
 
 networks:
   nkuku_internal:
   nkuku_public:
+  shared-net:
+    external: true

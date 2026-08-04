@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../models/financial_record.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/broiler_service.dart';
+import '../../../widgets/attachment_section.dart';
 
 class FinancialRecordForm extends StatefulWidget {
   final String flockId;
@@ -170,6 +171,13 @@ class _FinancialRecordFormState extends State<FinancialRecordForm> {
                     : const Icon(Icons.save),
                 label: Text(widget.record == null ? 'Save' : 'Update'),
               ),
+              // Attachments (only for existing records)
+              if (widget.record != null) ...[
+                AttachmentSection(
+                  financialRecordId: widget.record!.id,
+                  title: 'Attachments',
+                ),
+              ],
             ],
           ),
         ),

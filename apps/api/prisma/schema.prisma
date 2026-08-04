@@ -563,6 +563,7 @@ model FinancialRecord {
   updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   flock             BroilerFlock        @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  documents          Document[]
 
   @@index([flockId, recordDate])
   @@index([sourceRecordId])
@@ -884,6 +885,7 @@ enum AuditAction {
   delete
   period_close
   report_generate
+  virus_scan_rejected
 }
 
 // ── SCHEDULED REPORTS ────────────────────
@@ -1039,6 +1041,7 @@ model JournalEntry {
   lines         JournalLine[]
   reversedBy    JournalEntry?       @relation("ReversalOf", fields: [reversesId], references: [id])
   reversals     JournalEntry[]      @relation("ReversalOf")
+  documents     Document[]
 
   @@index([entryDate, periodLabel])
   @@index([sourceType, sourceId])
@@ -1094,26 +1097,43 @@ model LedgerBalance {
   @@map("ledger_balances")
 }
 
-// ── DOCUMENTS (receipts, quotations, invoices) ──
+// ── DOCUMENTS (receipts, quotations, invoices, statements, contracts) ──
 
 model Document {
-  id          String   @id @default(uuid()) @db.Uuid
-  flockId     String?  @map("flock_id") @db.Uuid
-  recordType  String   @map("record_type") @db.VarChar(50)
-  recordId    String?  @map("record_id") @db.Uuid
-  fileName    String   @map("file_name") @db.VarChar(255)
-  filePath    String   @map("file_path") @db.VarChar(500)
-  mimeType    String   @map("mime_type") @db.VarChar(100)
-  fileSizeKb  Int      @map("file_size_kb")
-  category    String   @db.VarChar(50)
-  uploadedBy  String?  @map("uploaded_by") @db.Uuid
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                String   @id @default(uuid()) @db.Uuid
+  flockId           String?  @map("flock_id") @db.Uuid
+  recordType        String   @map("record_type") @db.VarChar(50)
+  recordId          String?  @map("record_id") @db.Uuid
+  fileName          String   @map("file_name") @db.VarChar(255)
+  filePath          String?  @map("file_path") @db.VarChar(500)
+  storageKey        String?  @map("storage_key") @db.VarChar(500)
+  bucket            String?  @db.VarChar(100)
+  mimeType          String   @map("mime_type") @db.VarChar(100)
+  fileSizeKb        Int      @map("file_size_kb")
+  category          String   @db.VarChar(50)
+  contentText       String?  @map("content_text") @db.Text
+  scanStatus        String   @default("pending") @map("scan_status") @db.VarChar(20)
+  scannedAt         DateTime? @map("scanned_at") @db.Timestamptz(6)
+  extractionStatus  String   @default("pending") @map("extraction_status") @db.VarChar(20)
+  uploadedBy        String?  @map("uploaded_by") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  flock       BroilerFlock? @relation(fields: [flockId], references: [id], onDelete: Cascade)
-  uploader    User?         @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id], onDelete: SetNull)
+  // ── Direct FKs to financial transaction entities ──
+  financialRecordId String?  @map("financial_record_id") @db.Uuid
+  journalEntryId    String?  @map("journal_entry_id") @db.Uuid
+  saleRecordId      String?  @map("sale_record_id") @db.Uuid
+
+  flock             BroilerFlock?    @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  uploader          User?            @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id], onDelete: SetNull)
+  financialRecord   FinancialRecord? @relation(fields: [financialRecordId], references: [id], onDelete: Cascade)
+  journalEntry      JournalEntry?    @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  saleRecord        SaleRecord?      @relation(fields: [saleRecordId], references: [id], onDelete: Cascade)
 
   @@index([flockId, recordType])
   @@index([recordType, recordId])
+  @@index([financialRecordId])
+  @@index([journalEntryId])
+  @@index([saleRecordId])
   @@map("documents")
 }
 
@@ -1138,6 +1158,7 @@ model SaleRecord {
 
   flock           BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
   creator         User?        @relation("SaleRecordCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  documents       Document[]
 
   @@index([flockId, saleDate])
   @@index([saleDate])

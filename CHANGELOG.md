@@ -1,5 +1,59 @@
 # Changelog
 
+## v1.6.0-alpha — 2026-08-04
+
+### Added
+- **Document Attachments for Financial Transactions.** Receipts, invoices, and
+  other supporting documents can now be attached to `FinancialRecord`,
+  `JournalEntry`, and `SaleRecord` (backward-compatible `BroilerFlock`
+  documents remain supported).
+  - MinIO/S3 storage backend using the shared `pom-minio` container, a
+    dedicated `nkuku-app` service account, and the `nkuku-documents` bucket.
+  - Generalized documents API module with generic ownership, MinIO
+    upload/download, attachment count limits, full-text search, and virus
+    scanning.
+  - `FinancialRecord`, `JournalEntry`, and `SaleRecord` `GET /:id` endpoints
+    now include associated documents.
+  - ClamAV virus scanning container plus `clamav.service`, fail-closed by
+    default.
+  - OCR and text extraction on upload for PDF, DOCX, images (tesseract.js),
+    and CSV; extracted text is indexed in a PostgreSQL `tsvector` column for
+    fast full-text search.
+  - Web `AttachmentPanel` component embedded in the financial records page,
+    journal detail page, and sales page.
+  - Mobile `AttachmentSection` widget and generalized `DocumentForm` embedded
+    in the journal detail and financial record forms.
+  - Backfill script `apps/api/src/db/seeds/migrate-documents-to-s3.ts` for
+    migrating existing local documents into S3.
+  - 47 unit tests (6 files) and 18 new integration tests for documents on
+    financial transactions.
+
+### Security
+- Ownership filtering on global document search.
+- Role check on journal document access.
+- Path-traversal protection on legacy file endpoints.
+- MinIO secret removed from `AGENTS.md`; the `infra/minio/setup-nkuku-account.sh`
+  setup script now requires `NKUKU_SECRET_KEY` to be supplied via environment
+  (no default secret in version control).
+- `.env` is gitignored — real `S3_SECRET_KEY`, `JWT_SECRET`, and database
+  credentials must stay in `.env` and never be committed.
+
+### Migration Notes
+- Apply Prisma schema changes with `docker compose exec api npx prisma migrate deploy`.
+- Enable the full-text search column/index by running:
+  `docker compose exec api psql "$DATABASE_URL" -f /app/prisma/sql/documents-search.sql`
+- Backfill legacy documents with:
+  `docker compose exec api npx tsx src/db/seeds/migrate-documents-to-s3.ts`
+
+### Test Summary
+- 47 unit tests pass.
+- 115 integration tests; 1 pre-existing `gaap balance sheet` failure remains
+  (not introduced by this phase).
+
+### Notes
+- API package version advanced from `0.1.0-alpha` to `0.2.0-alpha` to mark
+  the new documents backend.
+
 ## v1.5.4-alpha — 2026-08-03
 
 ### Added

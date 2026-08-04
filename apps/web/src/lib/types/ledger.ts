@@ -40,6 +40,7 @@ export interface JournalEntry {
   postedAt: string;
   createdAt: string;
   lines: JournalLine[];
+  documents?: import("@/lib/types").DocumentRecord[];
 }
 
 export interface TrialBalanceLine {

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, DollarSign, TrendingUp, Target, FileText, BarChart3, Wallet } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Target, FileText, BarChart3, Wallet, Paperclip } from "lucide-react";
 import Link from "next/link";
+import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 
 export default function FinancialProjectionPage() {
   const params = useParams();
@@ -19,6 +20,11 @@ export default function FinancialProjectionPage() {
   const [flock, setFlock] = useState<any>(null);
   const [error, setError] = useState("");
   const [projection, setProjection] = useState<any>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+
+  const canManage =
+    user?.role === "owner" || user?.role === "manager";
+  const canDelete = user?.role === "owner";
 
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
@@ -184,18 +190,38 @@ export default function FinancialProjectionPage() {
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b"><th className="text-left py-2">Date</th><th className="text-left py-2">Category</th><th className="text-left py-2">Description</th><th className="text-left py-2">Amount (ZMW)</th><th className="text-left py-2">Type</th></tr></thead>
+                  <thead><tr className="border-b"><th className="text-left py-2">Date</th><th className="text-left py-2">Category</th><th className="text-left py-2">Description</th><th className="text-left py-2">Amount (ZMW)</th><th className="text-left py-2">Type</th><th className="text-left py-2"></th></tr></thead>
                   <tbody>
                     {records.map((r: any) => (
-                      <tr key={r.id} className="border-b">
-                        <td className="py-2">{new Date(r.recordDate).toLocaleDateString()}</td>
-                        <td className="py-2 capitalize">{r.category.replace(/_/g, " ")}</td>
-                        <td className="py-2">{r.description}</td>
-                        <td className={`py-2 font-medium ${r.isIncome ? "text-green-600" : ""}`}>ZMW {Number(r.amountZmw).toFixed(2)}</td>
-                        <td className="py-2">{r.isIncome ? <span className="text-green-600">Income</span> : <span className="text-red-600">Expense</span>}</td>
-                      </tr>
+                          <Fragment key={r.id}>
+                            <tr
+                              className={`border-b cursor-pointer hover:bg-muted/30 ${selectedRecordId === r.id ? "bg-muted/50" : ""}`}
+                              onClick={() => setSelectedRecordId(selectedRecordId === r.id ? null : r.id)}
+                            >
+                              <td className="py-2">{new Date(r.recordDate).toLocaleDateString()}</td>
+                              <td className="py-2 capitalize">{r.category.replace(/_/g, " ")}</td>
+                              <td className="py-2">{r.description}</td>
+                              <td className={`py-2 font-medium ${r.isIncome ? "text-green-600" : ""}`}>ZMW {Number(r.amountZmw).toFixed(2)}</td>
+                              <td className="py-2">{r.isIncome ? <span className="text-green-600">Income</span> : <span className="text-red-600">Expense</span>}</td>
+                              <td className="py-2 text-right">
+                                <Paperclip className="h-4 w-4 inline text-muted-foreground" />
+                              </td>
+                            </tr>
+                            {selectedRecordId === r.id && (
+                              <tr>
+                                <td colSpan={6} className="p-0">
+                                  <AttachmentPanel
+                                    financialRecordId={r.id}
+                                    title={`Attachments — ${r.description}`}
+                                    canManage={canManage}
+                                    canDelete={canDelete}
+                                  />
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
                     ))}
-                    {records.length === 0 && <tr><td colSpan={5} className="py-4 text-muted-foreground text-center">No financial records yet.</td></tr>}
+                    {records.length === 0 && <tr><td colSpan={6} className="py-4 text-muted-foreground text-center">No financial records yet.</td></tr>}
                   </tbody>
                 </table>
               </div>

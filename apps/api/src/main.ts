@@ -37,6 +37,7 @@ import { buildAccountModule } from './modules/accounts/routes.js';
 import { buildJournalModule } from './modules/journal/routes.js';
 import { buildLedgerModule } from './modules/ledger/routes.js';
 import { buildDocumentModule } from './modules/documents/routes.js';
+import { ensureBucket } from './core/storage/storage.service.js';
 import { SchedulerService } from './core/financial-engine/scheduler.service.js';
 import { DailyRecalculationService } from './core/financial-engine/daily-recalculation.service.js';
 import cron from 'node-cron';
@@ -57,7 +58,7 @@ const corsOrigins = process.env.CORS_ORIGINS
 await app.register(cors, { origin: corsOrigins, credentials: true });
 
 await app.register(multipart, {
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
 });
 
 await app.register(swagger, {
@@ -79,6 +80,14 @@ await app.register(swaggerUi, {
 
 // Decorate with shared Prisma instance
 app.decorate('prisma', prisma);
+
+// ── Ensure S3/MinIO bucket exists on boot ──
+try {
+  await ensureBucket();
+  app.log.info('[Storage] Bucket ready');
+} catch (err: any) {
+  app.log.error(`[Storage] Bucket setup failed: ${err.message}`);
+}
 
 // ── Register modules ─────────────────────
 await app.register(buildAuthModule, { prefix: '/api/v1/auth' });

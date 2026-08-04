@@ -536,10 +536,15 @@ export interface DocumentRecord {
   flockId: string | null;
   recordType: string;
   recordId: string | null;
+  financialRecordId: string | null;
+  journalEntryId: string | null;
+  saleRecordId: string | null;
   fileName: string;
   mimeType: string;
   fileSizeKb: number;
   category: string;
+  scanStatus: string;
+  extractionStatus: string;
   uploadedBy: string | null;
   createdAt: string;
   downloadUrl?: string;

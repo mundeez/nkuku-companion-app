@@ -4,11 +4,24 @@ import '../../../models/document.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/broiler_service.dart';
 
+/// Target type for document attachment.
+enum DocumentTargetType { flock, financialRecord, journalEntry, saleRecord }
+
 class DocumentForm extends StatefulWidget {
-  final String flockId;
+  final String? flockId;
+  final String? financialRecordId;
+  final String? journalEntryId;
+  final String? saleRecordId;
   final DocumentRecord? record;
 
-  const DocumentForm({super.key, required this.flockId, this.record});
+  const DocumentForm({
+    super.key,
+    this.flockId,
+    this.financialRecordId,
+    this.journalEntryId,
+    this.saleRecordId,
+    this.record,
+  });
 
   @override
   State<DocumentForm> createState() => _DocumentFormState();
@@ -21,7 +34,10 @@ class _DocumentFormState extends State<DocumentForm> {
   bool _uploading = false;
   String? _error;
 
-  final _categories = ['receipt', 'invoice', 'quotation', 'other'];
+  final _categories = [
+    'receipt', 'invoice', 'quotation', 'other',
+    'bank_statement', 'contract', 'delivery_note',
+  ];
 
   bool get _isEdit => widget.record != null;
 
@@ -36,7 +52,7 @@ class _DocumentFormState extends State<DocumentForm> {
   Future<void> _pickFile() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'png', 'webp', 'doc', 'docx', 'csv'],
+      allowedExtensions: ['pdf', 'jpg', 'png', 'webp', 'doc', 'docx', 'csv', 'xlsx', 'xls'],
     );
     if (result != null && result.files.isNotEmpty) {
       setState(() {
@@ -62,8 +78,11 @@ class _DocumentFormState extends State<DocumentForm> {
           setState(() => _error = 'Please select a file first');
           return;
         }
-        await BroilerService.uploadDocument(
+        await BroilerService.uploadDocumentFor(
           flockId: widget.flockId,
+          financialRecordId: widget.financialRecordId,
+          journalEntryId: widget.journalEntryId,
+          saleRecordId: widget.saleRecordId,
           filePath: _selectedFile!.path!,
           category: _category,
         );
@@ -113,7 +132,7 @@ class _DocumentFormState extends State<DocumentForm> {
                     title: Text(_selectedFile?.name ?? 'No file selected'),
                     subtitle: _selectedFile != null
                         ? Text('${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB')
-                        : const Text('Tap below to choose a file'),
+                        : const Text('Tap below to choose a file (max 25MB)'),
                     trailing: _selectedFile != null
                         ? IconButton(
                             icon: const Icon(Icons.close),
@@ -144,7 +163,10 @@ class _DocumentFormState extends State<DocumentForm> {
                 initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: _categories
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c[0].toUpperCase() + c.substring(1))))
+                    .map((c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c.replaceAll('_', ' ').split(' ').map((w) => w[0].toUpperCase() + w.substring(1)).join(' ')),
+                        ))
                     .toList(),
                 onChanged: (v) => setState(() => _category = v!),
               ),

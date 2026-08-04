@@ -442,6 +442,27 @@ class BroilerService {
     return (res.data as List).map((e) => DocumentRecord.fromJson(e)).toList();
   }
 
+  /// Get documents for a specific financial transaction.
+  /// Pass one of: financialRecordId, journalEntryId, saleRecordId, or flockId.
+  static Future<List<DocumentRecord>> getDocumentsFor({
+    String? flockId,
+    String? financialRecordId,
+    String? journalEntryId,
+    String? saleRecordId,
+  }) async {
+    final params = <String, dynamic>{};
+    if (financialRecordId != null) params['financialRecordId'] = financialRecordId;
+    if (journalEntryId != null) params['journalEntryId'] = journalEntryId;
+    if (saleRecordId != null) params['saleRecordId'] = saleRecordId;
+    if (flockId != null && financialRecordId == null && saleRecordId == null) {
+      params['flockId'] = flockId;
+    }
+    final res = await ApiService.dio.get('/api/v1/documents', queryParameters: params);
+    _assertOk(res);
+    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    return (res.data as List).map((e) => DocumentRecord.fromJson(e)).toList();
+  }
+
   static Future<DocumentRecord> uploadDocument({
     required String flockId,
     required String filePath,
@@ -454,6 +475,32 @@ class BroilerService {
       'recordType': recordType,
       'file': await MultipartFile.fromFile(filePath),
     });
+    final res = await ApiService.dio.post('/api/v1/documents', data: formData);
+    _assertOk(res);
+    return DocumentRecord.fromJson(res.data);
+  }
+
+  /// Upload a document for a specific financial transaction.
+  /// Pass one of: flockId, financialRecordId, journalEntryId, or saleRecordId.
+  static Future<DocumentRecord> uploadDocumentFor({
+    String? flockId,
+    String? financialRecordId,
+    String? journalEntryId,
+    String? saleRecordId,
+    required String filePath,
+    required String category,
+  }) async {
+    final fields = <String, dynamic>{
+      'category': category,
+    };
+    if (financialRecordId != null) fields['financialRecordId'] = financialRecordId;
+    if (journalEntryId != null) fields['journalEntryId'] = journalEntryId;
+    if (saleRecordId != null) fields['saleRecordId'] = saleRecordId;
+    if (flockId != null && financialRecordId == null && saleRecordId == null && journalEntryId == null) {
+      fields['flockId'] = flockId;
+    }
+    fields['file'] = await MultipartFile.fromFile(filePath);
+    final formData = FormData.fromMap(fields);
     final res = await ApiService.dio.post('/api/v1/documents', data: formData);
     _assertOk(res);
     return DocumentRecord.fromJson(res.data);
