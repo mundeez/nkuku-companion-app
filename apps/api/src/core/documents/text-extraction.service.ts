@@ -48,7 +48,7 @@ async function extractFromXlsx(buffer: Buffer): Promise<string> {
   try {
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(buffer as any);
     const lines: string[] = [];
     workbook.eachSheet((sheet) => {
       sheet.eachRow((row) => {

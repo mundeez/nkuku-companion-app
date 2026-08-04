@@ -95,7 +95,7 @@ services:
 
   # ─── ClamAV (virus scanning for document uploads) ────────
   clamav:
-    image: clamav/clamav-debian:latest
+    image: clamav/clamav-debian@sha256:741e6c447241220e0792a901befcaec1d55a755c5097fc9cd88d7fd8be251a5c
     restart: unless-stopped
     volumes:
       - clamav_data:/var/lib/clamav

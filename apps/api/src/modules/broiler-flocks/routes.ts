@@ -343,9 +343,9 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
 
     // Hatchery vaccines (day 1)
-    for (const item of schedule?.items.filter(i => i.ageDays === 0) || []) {
+    for (const item of schedule?.items.filter((i: any) => i.ageDays === 0) || []) {
       const date = new Date(startDate.getTime() + 1 * 24 * 60 * 60 * 1000);
-      const completed = completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - 0) <= 1);
+      const completed = completedVaccines.some((v: any) => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - 0) <= 1);
       events.push({
         ageDays: 1,
         date: date.toISOString().split('T')[0],
@@ -375,9 +375,9 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
 
     // On-farm vaccines (age > 1)
-    for (const item of schedule?.items.filter(i => i.ageDays > 0) || []) {
+    for (const item of schedule?.items.filter((i: any) => i.ageDays > 0) || []) {
       const date = new Date(startDate.getTime() + item.ageDays * 24 * 60 * 60 * 1000);
-      const completed = completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - item.ageDays) <= 1);
+      const completed = completedVaccines.some((v: any) => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - item.ageDays) <= 1);
       events.push({
         ageDays: item.ageDays,
         date: date.toISOString().split('T')[0],
@@ -449,9 +449,9 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const days = [];
     for (let d = 0; d <= targetAge; d++) {
       const date = new Date(startDate.getTime() + d * 24 * 60 * 60 * 1000);
-      const vaccines = (schedule?.items.filter(i => i.ageDays === d) || []).map(item => ({
+      const vaccines = (schedule?.items.filter((i: any) => i.ageDays === d) || []).map((item: any) => ({
         ...item,
-        completed: completedVaccines.some(v => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - d) <= 1),
+        completed: completedVaccines.some((v: any) => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - d) <= 1),
       }));
 
       const feedTransitionDay = flock.feedTransitionDay || 18;

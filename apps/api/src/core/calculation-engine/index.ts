@@ -1,4 +1,4 @@
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 
 export interface FeedStageInput {
   stageName: string;
@@ -137,7 +137,7 @@ export function calculateBatchProjection(
     }
   }
 
-  const totalOverheadCost = overheadCosts.reduce(
+  const totalOverheadCost = overheadCosts.reduce<Decimal>(
     (sum, cost) => sum.plus(cost),
     new Decimal(0),
   );

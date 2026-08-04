@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 
 export interface UnifiedSummaryFilters {
   startDate?: Date;

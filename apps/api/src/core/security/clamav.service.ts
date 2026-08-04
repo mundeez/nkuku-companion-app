@@ -6,15 +6,22 @@ type ClamScan = Awaited<ReturnType<typeof ClamScanModule.prototype.init>>;
 
 let scanner: ClamScan | null = null;
 let initFailed = false;
+let lastFailTime = 0;
+// Retry init after this delay (ms) so ClamAV can recover without an API restart
+const RETRY_INTERVAL_MS = 30_000;
 
 /**
  * Lazily initialise the ClamAV scanner. Returns null if ClamAV is not
  * available (e.g. container still starting up). The caller decides
  * whether to fail-closed or allow based on REQUIRE_VIRUS_SCAN.
+ *
+ * If init previously failed, we retry every RETRY_INTERVAL_MS so the
+ * scanner can recover without an API restart (e.g. ClamAV container
+ * was still booting on the first upload).
  */
 async function getScanner(): Promise<ClamScan | null> {
   if (scanner) return scanner;
-  if (initFailed) return null;
+  if (initFailed && Date.now() - lastFailTime < RETRY_INTERVAL_MS) return null;
 
   try {
     const clamscan = new ClamScanModule();
@@ -27,10 +34,12 @@ async function getScanner(): Promise<ClamScan | null> {
       },
       preference: 'clamdscan',
     });
+    initFailed = false; // reset on success
     return scanner;
   } catch (err: any) {
-    // Don't keep retrying on every upload — mark as failed
+    // Mark as failed but allow retry after RETRY_INTERVAL_MS
     initFailed = true;
+    lastFailTime = Date.now();
     return null;
   }
 }

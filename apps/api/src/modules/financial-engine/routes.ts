@@ -255,7 +255,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       isActive: z.boolean().optional(),
     }).parse(request.body);
 
-    return scheduler.updateSchedule(id, body);
+    return scheduler.updateSchedule(id, { ...body, scopeId: body.scopeId ?? undefined });
   });
 
   app.delete('/scheduled-reports/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {

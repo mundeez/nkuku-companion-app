@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 export async function seedChartOfAccounts(prisma: PrismaClient) {
   console.log('[SEED] Chart of accounts...');
 
-  const accounts = [
+  const accounts: any[] = [
     // ASSETS
     { code: '1000', name: 'ASSETS', accountType: 'asset', normalBalance: 'debit', isSystem: true },
     { code: '1010', name: 'Cash & Bank', accountType: 'asset', normalBalance: 'debit', parentCode: '1000', isSystem: true },

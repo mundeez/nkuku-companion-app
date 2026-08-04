@@ -1,12 +1,12 @@
 import { PrismaClient } from '@prisma/client';
-import { seedBroilerBreeds } from './broiler-breeds';
-import { seedRoss308Performance } from './ross308-performance';
-import { seedCobb500Performance } from './cobb500-performance';
-import { seedDiseases } from './diseases';
-import { seedVaccinationSchedules } from './vaccination-schedules';
-import { seedLightingTemperatureSchedules } from './lighting-temperature-schedules';
-import { seedChartOfAccounts } from './chart-of-accounts';
-import { seedSupplierCategoryTemplates } from './supplier-templates';
+import { seedBroilerBreeds } from './broiler-breeds.js';
+import { seedRoss308Performance } from './ross308-performance.js';
+import { seedCobb500Performance } from './cobb500-performance.js';
+import { seedDiseases } from './diseases.js';
+import { seedVaccinationSchedules } from './vaccination-schedules.js';
+import { seedLightingTemperatureSchedules } from './lighting-temperature-schedules.js';
+import { seedChartOfAccounts } from './chart-of-accounts.js';
+import { seedSupplierCategoryTemplates } from './supplier-templates.js';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -49,7 +49,7 @@ async function main() {
   await seedSupplierCategoryTemplates(prisma);
 
   // ── 3. Seed Suppliers + Feed Stages ─────
-  const suppliersData = [
+  const suppliersData: any[] = [
     {
       name: 'NUTRI FEED',
       description: 'Primary supplier. Baseline pricing structure for initial system seeding.',
@@ -152,7 +152,7 @@ async function main() {
   console.log('[SEED] Exchange rate: USD/ZMW = 17.71');
 
   // ── 5. Seed Equipment Items ────────────
-  const equipmentData = [
+  const equipmentData: any[] = [
     { category: 'raising_equipment', name: 'Abbatoir Set (12,000 BPH)', unitCostUsd: 60000, isCompulsory: true, quantity: 1 },
     { category: 'cold_storage', name: 'Cold Room', unitCostUsd: 0, isCompulsory: true, quantity: 1, notes: 'Pricing TBD' },
     { category: 'other', name: 'Hot Smoker (500Kgs/Batch)', unitCostUsd: 14000, isCompulsory: false, quantity: 1 },

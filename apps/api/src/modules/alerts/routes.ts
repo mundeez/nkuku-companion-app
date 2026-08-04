@@ -175,7 +175,7 @@ export async function buildAlertModule(app: FastifyInstance) {
       });
 
       for (const vaccine of upcomingVaccines) {
-        const alreadyDone = vaccinations.some(v =>
+        const alreadyDone = vaccinations.some((v: any) =>
           v.vaccineName === vaccine.vaccineName &&
           Math.abs(v.ageDays - vaccine.ageDays) <= 2
         );

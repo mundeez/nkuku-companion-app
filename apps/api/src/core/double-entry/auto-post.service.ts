@@ -2,19 +2,19 @@ import { PrismaClient } from '@prisma/client';
 import { JournalEngine, JournalLineInput } from './journal.engine.js';
 
 const CATEGORY_ACCOUNT_MAP: Record<string, { debit: string; credit: string }> = {
-  chick_purchase: { debit: '1030', credit: '2010' },
-  feed:           { debit: '5020', credit: '2010' },
-  vaccines:       { debit: '5030', credit: '2010' },
-  medication:     { debit: '5040', credit: '2010' },
-  labor:          { debit: '6010', credit: '2020' },
-  labour:         { debit: '6010', credit: '2020' },
-  utilities:      { debit: '6020', credit: '2020' },
-  electricity:    { debit: '6020', credit: '2020' },
-  water:          { debit: '6030', credit: '2020' },
-  transport:      { debit: '6040', credit: '2020' },
+  chick_purchase: { debit: '1030', credit: '1010' },
+  feed:           { debit: '5020', credit: '1010' },
+  vaccines:       { debit: '5030', credit: '1010' },
+  medication:     { debit: '5040', credit: '1010' },
+  labor:          { debit: '6010', credit: '1010' },
+  labour:         { debit: '6010', credit: '1010' },
+  utilities:      { debit: '6020', credit: '1010' },
+  electricity:    { debit: '6020', credit: '1010' },
+  water:          { debit: '6030', credit: '1010' },
+  transport:      { debit: '6040', credit: '1010' },
   equipment:      { debit: '1080', credit: '1010' },
   sales:          { debit: '1010', credit: '4010' },
-  other:          { debit: '6080', credit: '2020' },
+  other:          { debit: '6080', credit: '1010' },
 };
 
 const MORTALITY_ENTRY = { debit: '5050', credit: '1040' };

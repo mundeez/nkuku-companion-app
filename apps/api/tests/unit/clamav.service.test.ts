@@ -54,5 +54,27 @@ describe('ClamAVService', () => {
       expect(result.clean).toBe(true);
       expect(result.scannerAvailable).toBe(false);
     });
+
+    it('retries init after failure (auto-recovery without API restart)', async () => {
+      // First call fails
+      mockInit.mockRejectedValueOnce(new Error('connection refused'));
+      const r1 = await scanBuffer(Buffer.from('test'));
+      expect(r1.scannerAvailable).toBe(false);
+      expect(r1.clean).toBe(false); // fail-closed
+
+      // Immediate retry — should still be blocked by retry interval (no mock needed,
+      // getScanner returns null without calling mockInit)
+      const r2 = await scanBuffer(Buffer.from('test'));
+      expect(r2.scannerAvailable).toBe(false);
+
+      // After resetScanner (simulates retry interval elapsing), init succeeds
+      resetScanner();
+      mockInit.mockResolvedValueOnce({
+        scanStream: vi.fn().mockResolvedValue({ isInfected: false, viruses: [], resultString: 'stream: OK' }),
+      });
+      const r3 = await scanBuffer(Buffer.from('clean file'));
+      expect(r3.scannerAvailable).toBe(true);
+      expect(r3.clean).toBe(true);
+    });
   });
 });

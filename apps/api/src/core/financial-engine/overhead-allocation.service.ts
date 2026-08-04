@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 
 export interface MonthlyOverheadInput {
   yearMonth: string;
@@ -108,7 +108,7 @@ export class OverheadAllocationService {
     // Calculate active days for each flock in this month
     let totalActiveDays = 0;
     const flockAllocations = flocks.map((flock) => {
-      const start = flock.startDate > monthStart ? flock.startDate : monthStart;
+      const start = flock.startDate! > monthStart ? flock.startDate! : monthStart;
       const end = flock.soldDate && flock.soldDate < monthEnd
         ? flock.soldDate
         : monthEnd;

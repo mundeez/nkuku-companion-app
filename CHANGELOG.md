@@ -1,5 +1,48 @@
 # Changelog
 
+## v1.6.1-alpha — 2026-08-04
+
+### Fixed
+- **ClamAV auto-recovery.** The `initFailed` flag in `clamav.service.ts` now
+  auto-resets after 30 seconds, allowing the scanner to recover without an
+  API restart. Previously, if ClamAV was not ready on the first upload, all
+  subsequent uploads would fail-closed until the API process restarted.
+- **ClamAV image pinned.** `clamav/clamav-debian:latest` is now pinned to
+  `clamav/clamav-debian@sha256:741e6c447241220e0792a901befcaec1d55a755c5097fc9cd88d7fd8be251a5c`
+  in `docker-compose.yml` and `docker-compose.prod.yml`, eliminating
+  supply-chain risk from a floating tag.
+- **GAAP balance sheet equation (Assets = Liabilities + Equity).**
+  - `auto-post.service.ts` now credits Cash (`1010`) instead of Accounts
+    Payable (`2010`) for expense-category purchases, so liabilities are not
+    overstated.
+  - `gaap-statement.service.ts` now uses `negated()` for equity accounts
+    instead of `abs()`, correctly treating debit balances (accumulated
+    losses) as negative equity.
+  - Added `apps/api/src/db/seeds/settle-ap-to-cash.ts` to settle existing
+    AP/Accrued balances to Owner's Capital on deployments that were affected
+    by the original mapping.
+- **TypeScript errors eliminated.** Reduced from 168 pre-existing errors to 0:
+  - Switched `import Decimal from 'decimal.js'` to named `import { Decimal }`
+    across 9 financial/double-entry files.
+  - Resolved `jsonwebtoken` overload errors with explicit `as any` casts on
+    `expiresIn`.
+  - Added explicit type annotations to remove implicit `any` errors in route
+    handlers.
+  - Fixed tuple destructuring in `gaap-statement.service.ts`.
+  - Added `.js` extensions to relative imports in `seeds/main.ts` for Node16
+    resolution.
+  - Typed seed data arrays as `any[]` to avoid enum string-literal mismatches.
+
+### Changed
+- `AGENTS.md` test count updated to 163 (48 unit + 115 integration) and the
+  new `settle-ap-to-cash.ts` backfill script is documented.
+
+### Test Summary
+- 163 tests pass (48 unit + 115 integration).
+- TypeScript: 0 errors (`tsc --noEmit` clean).
+- Web build: 30/30 pages compiled successfully.
+- API health: healthy.
+
 ## v1.6.0-alpha — 2026-08-04
 
 ### Added

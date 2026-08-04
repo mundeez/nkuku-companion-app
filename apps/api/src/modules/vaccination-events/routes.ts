@@ -75,8 +75,8 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
       include: { items: { orderBy: { sortOrder: 'asc' } } },
     });
 
-    const upcoming = schedule?.items.filter(item => item.ageDays > ageDays) ?? [];
-    const overdue = schedule?.items.filter(item => item.ageDays <= ageDays && !completed.some(c => c.vaccineName === item.vaccineName && Math.abs(c.ageDays - item.ageDays) <= 2)) ?? [];
+    const upcoming = schedule?.items.filter((item: any) => item.ageDays > ageDays) ?? [];
+    const overdue = schedule?.items.filter((item: any) => item.ageDays <= ageDays && !completed.some((c: any) => c.vaccineName === item.vaccineName && Math.abs(c.ageDays - item.ageDays) <= 2)) ?? [];
 
     return {
       completed,

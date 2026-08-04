@@ -80,7 +80,7 @@ export async function buildSupplierModule(app: FastifyInstance) {
     if (!supplier) return reply.status(404).send({ error: 'NOT_FOUND' });
 
     const stage = supplier.feedStages.find(
-      (s) => s.stageName.toLowerCase() === feedType.toLowerCase()
+      (s: any) => s.stageName.toLowerCase() === feedType.toLowerCase()
     );
 
     if (!stage) {
@@ -117,14 +117,14 @@ export async function buildSupplierModule(app: FastifyInstance) {
     });
     if (!supplier) return reply.status(404).send({ error: 'NOT_FOUND' });
 
-    const stageIds = supplier.feedStages.map((s) => s.id);
+    const stageIds = supplier.feedStages.map((s: any) => s.id);
     const history = await prisma.feedStagePriceHistory.findMany({
       where: { feedStageId: { in: stageIds } },
       orderBy: { changedAt: 'desc' },
       include: { feedStage: { select: { stageName: true } } },
     });
 
-    return history.map((h) => ({
+    return history.map((h: any) => ({
       id: h.id,
       feedStageId: h.feedStageId,
       stageName: h.feedStage.stageName,

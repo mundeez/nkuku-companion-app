@@ -1,4 +1,4 @@
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 import { PrismaClient } from '@prisma/client';
 import { JournalEngine, JournalLineInput } from './journal.engine.js';
 

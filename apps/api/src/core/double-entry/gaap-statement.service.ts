@@ -1,4 +1,4 @@
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 import { PrismaClient } from '@prisma/client';
 
 // ── Types ──────────────────────────────────────────────
@@ -113,14 +113,14 @@ export class GaapStatementService {
   }
 
   async generateIncomeStatement(fromDate: Date, toDate: Date): Promise<IncomeStatement> {
-    const [revenueBalances, cogsBalances, opexBalances] = await Promise.all([
+    const [revenueBalances, expenseBalances] = await Promise.all([
       this.getAccountBalances('revenue', toDate, fromDate),
-      this.getAccountBalances('expense', toDate, fromDate), // will filter below
+      this.getAccountBalances('expense', toDate, fromDate),
     ]);
 
     // Split expenses into COGS (5xxx) and Operating Expenses (6xxx)
-    const cogs = cogsBalances.filter((r) => r.account.code.startsWith('5'));
-    const opex = cogsBalances.filter((r) => r.account.code.startsWith('6'));
+    const cogs = expenseBalances.filter((r) => r.account.code.startsWith('5'));
+    const opex = expenseBalances.filter((r) => r.account.code.startsWith('6'));
 
     const toLine = (r: typeof revenueBalances[0]): IncomeStatementLine => ({
       accountCode: r.account.code,
@@ -221,9 +221,10 @@ export class GaapStatementService {
       (sum, r) => sum.plus(r.netBalance.abs()),
       new Decimal(0),
     );
-    // For equity, credit-normal + net income
+    // For equity, credit-normal → negate net balance (credit = positive equity, debit = negative)
+    // This correctly handles accumulated losses (debit RE) as negative equity
     const equityTotal = equityBalances.reduce(
-      (sum, r) => sum.plus(r.netBalance.abs()),
+      (sum, r) => sum.plus(r.netBalance.negated()),
       new Decimal(0),
     );
     const totalEquity = equityTotal.plus(netIncome);

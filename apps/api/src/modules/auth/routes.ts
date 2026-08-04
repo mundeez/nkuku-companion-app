@@ -42,8 +42,8 @@ export async function buildAuthModule(app: FastifyInstance) {
       role: user.role,
     };
 
-    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-    const refreshToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+    const refreshToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
 
     // Store refresh token in Redis (simple blacklist approach)
     const redis = (app as any).redis;
@@ -65,7 +65,7 @@ export async function buildAuthModule(app: FastifyInstance) {
         return reply.status(401).send({ error: 'USER_INVALID' });
       }
       const payload: TokenPayload = { userId: user.id, email: user.email, role: user.role };
-      const newAccessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+      const newAccessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
       return { accessToken: newAccessToken };
     } catch {
       return reply.status(401).send({ error: 'INVALID_REFRESH_TOKEN' });

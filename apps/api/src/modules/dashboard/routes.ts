@@ -102,7 +102,7 @@ export async function buildDashboardModule(app: FastifyInstance) {
           status: f.status,
         };
       })
-      .sort((a, b) => b.profit - a.profit);
+      .sort((a: any, b: any) => b.profit - a.profit);
 
     // ── Alerts by Severity ──────────────────
     const alertsBySeverity = {

@@ -358,7 +358,17 @@ MAX_ATTACHMENTS_PER_RECORD=20
 docker compose exec api npx tsx src/db/seeds/migrate-documents-to-s3.ts
 ```
 
+### Settle AP/Accrued Balances (balance sheet fix)
+If the balance sheet equation (Assets = Liabilities + Equity) is out of balance due to
+the original auto-post mapping crediting AP instead of Cash, run:
+```bash
+docker compose exec api npx tsx src/db/seeds/settle-ap-to-cash.ts
+```
+This creates balancing entries to settle outstanding AP/Accrued to Owner's Capital.
+
 ### Test Count (with document attachments)
-- 47 unit tests (6 files) — all passing
-- 115 integration tests (9 files) — 114 passing, 1 pre-existing failure (gaap balance sheet)
-- New tests: storage.service (5), text-extraction.service (6), clamav.service (4), documents-financial-transactions (18)
+- 48 unit tests (6 files) — all passing
+- 115 integration tests (9 files) — all passing
+- Total: 163 tests — all passing
+- TypeScript: 0 errors (tsc --noEmit passes clean)
+- New tests: storage.service (5), text-extraction.service (6), clamav.service (5), documents-financial-transactions (18)
