@@ -29,16 +29,24 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
   });
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
     const authUser = (request as any).authUser;
 
-    const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
-    });
-    if (!flock) return { error: 'NOT_FOUND' };
+    if (flockId) {
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: flockId, createdBy: authUser.userId },
+      });
+      if (!flock) return { error: 'NOT_FOUND' };
 
+      return prisma.vaccinationEvent.findMany({
+        where: { flockId },
+        orderBy: { adminDate: 'asc' },
+      });
+    }
+
+    // No flockId provided — return all vaccination events for the user's flocks
     return prisma.vaccinationEvent.findMany({
-      where: { flockId },
+      where: { flock: { createdBy: authUser.userId } },
       orderBy: { adminDate: 'asc' },
     });
   });

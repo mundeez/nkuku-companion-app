@@ -16,16 +16,24 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
     const authUser = (request as any).authUser;
 
-    const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
-    });
-    if (!flock) return { error: 'NOT_FOUND' };
+    if (flockId) {
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: flockId, createdBy: authUser.userId },
+      });
+      if (!flock) return { error: 'NOT_FOUND' };
 
+      return prisma.mortalityEvent.findMany({
+        where: { flockId },
+        orderBy: { eventDate: 'asc' },
+      });
+    }
+
+    // No flockId provided — return all mortality events for the user's flocks
     return prisma.mortalityEvent.findMany({
-      where: { flockId },
+      where: { flock: { createdBy: authUser.userId } },
       orderBy: { eventDate: 'asc' },
     });
   });

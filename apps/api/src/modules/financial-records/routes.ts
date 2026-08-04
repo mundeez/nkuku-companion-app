@@ -18,16 +18,24 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
   const audit = new AuditService(prisma);
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
     const authUser = (request as any).authUser;
 
-    const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
-    });
-    if (!flock) return { error: 'NOT_FOUND' };
+    if (flockId) {
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: flockId, createdBy: authUser.userId },
+      });
+      if (!flock) return { error: 'NOT_FOUND' };
 
+      return prisma.financialRecord.findMany({
+        where: { flockId },
+        orderBy: { recordDate: 'desc' },
+      });
+    }
+
+    // No flockId — return all records for the user
     return prisma.financialRecord.findMany({
-      where: { flockId },
+      where: { flock: { createdBy: authUser.userId } },
       orderBy: { recordDate: 'desc' },
     });
   });
@@ -57,42 +65,77 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
   });
 
   app.get('/summary', { preHandler: [authenticate] }, async (request) => {
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
     const authUser = (request as any).authUser;
 
-    const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
-    });
-    if (!flock) return { error: 'NOT_FOUND' };
+    const where = flockId
+      ? { flockId }
+      : { flock: { createdBy: authUser.userId } };
 
+    if (flockId) {
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: flockId, createdBy: authUser.userId },
+      });
+      if (!flock) return { error: 'NOT_FOUND' };
+
+      const costs = await prisma.financialRecord.aggregate({
+        where: { flockId, isIncome: false },
+        _sum: { amountZmw: true },
+      });
+
+      const revenue = await prisma.financialRecord.aggregate({
+        where: { flockId, isIncome: true },
+        _sum: { amountZmw: true },
+      });
+
+      const categoryBreakdown = await prisma.financialRecord.groupBy({
+        by: ['category'],
+        where: { flockId },
+        _sum: { amountZmw: true },
+      });
+
+      const totalCost = costs._sum.amountZmw ?? 0;
+      const totalRevenue = revenue._sum.amountZmw ?? 0;
+      const profit = totalRevenue - totalCost;
+      const profitPerBird = flock.currentCount > 0 ? profit / flock.currentCount : 0;
+
+      return {
+        totalCost,
+        totalRevenue,
+        profit,
+        profitPerBird,
+        categoryBreakdown,
+        currentCount: flock.currentCount,
+      };
+    }
+
+    // No flockId — return global summary
     const costs = await prisma.financialRecord.aggregate({
-      where: { flockId, isIncome: false },
+      where: { ...where, isIncome: false },
       _sum: { amountZmw: true },
     });
 
     const revenue = await prisma.financialRecord.aggregate({
-      where: { flockId, isIncome: true },
+      where: { ...where, isIncome: true },
       _sum: { amountZmw: true },
     });
 
     const categoryBreakdown = await prisma.financialRecord.groupBy({
       by: ['category'],
-      where: { flockId },
+      where,
       _sum: { amountZmw: true },
     });
 
     const totalCost = costs._sum.amountZmw ?? 0;
     const totalRevenue = revenue._sum.amountZmw ?? 0;
-    const profit = totalRevenue - totalCost;
-    const profitPerBird = flock.currentCount > 0 ? profit / flock.currentCount : 0;
 
     return {
       totalCost,
       totalRevenue,
-      profit,
-      profitPerBird,
+      profit: totalRevenue - totalCost,
+      profitPerBird: 0,
       categoryBreakdown,
-      currentCount: flock.currentCount,
+      currentCount: 0,
     };
   });
 

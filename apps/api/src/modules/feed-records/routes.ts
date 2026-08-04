@@ -18,17 +18,26 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({
-      flockId: z.string().uuid(),
+      flockId: z.string().uuid().optional(),
     }).parse(request.query);
     const authUser = (request as any).authUser;
 
-    const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
-    });
-    if (!flock) return { error: 'NOT_FOUND' };
+    if (flockId) {
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: flockId, createdBy: authUser.userId },
+      });
+      if (!flock) return { error: 'NOT_FOUND' };
 
+      return prisma.feedRecord.findMany({
+        where: { flockId },
+        orderBy: { recordDate: 'asc' },
+        include: { supplier: { select: { name: true } } },
+      });
+    }
+
+    // No flockId provided — return all feed records for the user's flocks
     return prisma.feedRecord.findMany({
-      where: { flockId },
+      where: { flock: { createdBy: authUser.userId } },
       orderBy: { recordDate: 'asc' },
       include: { supplier: { select: { name: true } } },
     });

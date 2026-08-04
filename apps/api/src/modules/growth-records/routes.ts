@@ -15,18 +15,26 @@ export async function buildGrowthRecordModule(app: FastifyInstance) {
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({
-      flockId: z.string().uuid(),
+      flockId: z.string().uuid().optional(),
     }).parse(request.query);
     const authUser = (request as any).authUser;
 
-    // Verify flock ownership
-    const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
-    });
-    if (!flock) return { error: 'NOT_FOUND' };
+    if (flockId) {
+      // Verify flock ownership
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: flockId, createdBy: authUser.userId },
+      });
+      if (!flock) return { error: 'NOT_FOUND' };
 
+      return prisma.growthRecord.findMany({
+        where: { flockId },
+        orderBy: { recordDate: 'asc' },
+      });
+    }
+
+    // No flockId provided — return all growth records for the user's flocks
     return prisma.growthRecord.findMany({
-      where: { flockId },
+      where: { flock: { createdBy: authUser.userId } },
       orderBy: { recordDate: 'asc' },
     });
   });

@@ -125,18 +125,27 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     };
   });
 
-  // GET /?flockId=...
+  // GET /?flockId=... (optional — returns all user's sales if no flockId)
   app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
     const authUser = (request as any).authUser;
 
-    const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
-    });
-    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+    if (flockId) {
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: flockId, createdBy: authUser.userId },
+      });
+      if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
+      return prisma.saleRecord.findMany({
+        where: { flockId },
+        orderBy: { saleDate: 'desc' },
+      });
+    }
+
+    // No flockId — return all sales for the user
     return prisma.saleRecord.findMany({
-      where: { flockId },
+      where: { flock: { createdBy: authUser.userId } },
+      include: { flock: { select: { name: true, breed: { select: { name: true } } } } },
       orderBy: { saleDate: 'desc' },
     });
   });
@@ -165,26 +174,32 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     };
   });
 
-  // GET /summary?flockId=...
+  // GET /summary?flockId=... (optional — returns global summary if no flockId)
   app.get('/summary', { preHandler: [authenticate] }, async (request, reply) => {
-    const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
+    const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
     const authUser = (request as any).authUser;
 
-    const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
-    });
-    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+    const where = flockId
+      ? { flockId }
+      : { flock: { createdBy: authUser.userId } };
+
+    if (flockId) {
+      const flock = await prisma.broilerFlock.findFirst({
+        where: { id: flockId, createdBy: authUser.userId },
+      });
+      if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+    }
 
     const birdSum = await prisma.saleRecord.aggregate({
-      where: { flockId },
+      where,
       _sum: { birdCount: true, totalAmountZmw: true, amountPaidZmw: true },
     });
 
-    const salesCount = await prisma.saleRecord.count({ where: { flockId } });
+    const salesCount = await prisma.saleRecord.count({ where });
 
     const paymentBreakdown = await prisma.saleRecord.groupBy({
       by: ['paymentStatus'],
-      where: { flockId },
+      where,
       _count: { _all: true },
       _sum: { totalAmountZmw: true },
     });

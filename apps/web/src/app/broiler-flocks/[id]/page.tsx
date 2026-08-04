@@ -19,8 +19,9 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout, ClipboardList, Thermometer, Pill, CalendarDays, Printer } from "lucide-react";
+import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout, ClipboardList, Thermometer, Pill, CalendarDays, Printer, Paperclip, ChevronDown, ChevronRight } from "lucide-react";
 import { FlockTabChart } from "@/components/flock-tab-chart";
+import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 
 function fmtCollectionDate(date: string | Date | undefined): string {
   if (!date) return "";
@@ -522,6 +523,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
   const [editingRecord, setEditingRecord] = useState<any | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<any | null>(null);
   const [costOverride, setCostOverride] = useState(false);
+  const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
 
   const titles: any = {
     growth: { title: "Growth Records", icon: TrendingUp, endpoint: "/api/v1/growth-records", fields: [
@@ -876,17 +878,41 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       <FlockTabChart type={type} records={records} flockId={flockId} breedId={breedId} startDate={startDate} />
       {records.length === 0 ? <p className="text-muted-foreground">No records yet.</p> : (
         <div className="space-y-2">{records.map((r: any) => (
-          <Card key={r.id}><CardContent className="py-3 flex justify-between items-center">
-            <div><div className="font-medium">{renderRecord(r)}</div><p className="text-sm text-muted-foreground">{new Date(r.recordDate || r.eventDate || r.adminDate).toLocaleDateString()}</p></div>
-            {canEdit && (
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
-                {userRole === "owner" && (
-                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => openDelete(r)}><Trash2 className="h-4 w-4" /></Button>
+          <Card key={r.id}>
+            <CardContent className="py-3 flex justify-between items-center">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {type === "financial" && (
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => setExpandedRecordId(expandedRecordId === r.id ? null : r.id)}>
+                    {expandedRecordId === r.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </Button>
                 )}
+                <div className="min-w-0"><div className="font-medium">{renderRecord(r)}</div><p className="text-sm text-muted-foreground">{new Date(r.recordDate || r.eventDate || r.adminDate).toLocaleDateString()}</p></div>
+              </div>
+              {canEdit && (
+                <div className="flex gap-1 shrink-0">
+                  {type === "financial" && (
+                    <Button variant="ghost" size="sm" onClick={() => setExpandedRecordId(expandedRecordId === r.id ? null : r.id)} title="Attachments">
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                  {userRole === "owner" && (
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => openDelete(r)}><Trash2 className="h-4 w-4" /></Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+            {type === "financial" && expandedRecordId === r.id && (
+              <div className="px-3 pb-3">
+                <AttachmentPanel
+                  financialRecordId={r.id}
+                  title="Receipts & Documents"
+                  canManage={canEdit}
+                  canDelete={userRole === "owner" || userRole === "manager"}
+                />
               </div>
             )}
-          </CardContent></Card>
+          </Card>
         ))}</div>
       )}
 

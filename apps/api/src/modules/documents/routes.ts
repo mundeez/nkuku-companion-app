@@ -216,7 +216,8 @@ export async function buildDocumentModule(app: FastifyInstance) {
       await resolveOwnership(prisma, authUser, query);
     } catch (err: any) {
       if (err.message === 'NO_TARGET_SPECIFIED') {
-        return reply.status(400).send({ error: 'Must specify at least one filter' });
+        // No filter specified — return empty list instead of error
+        return [];
       }
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
@@ -18,7 +18,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil } from "lucide-react";
+import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, Paperclip, ChevronDown, ChevronRight } from "lucide-react";
+import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 
 export default function SalesDashboardPage() {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function SalesDashboardPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<SaleRecord | null>(null);
   const [saving, setSaving] = useState(false);
+  const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [form, setForm] = useState({
     flockId: "",
     saleDate: new Date().toISOString().split("T")[0],
@@ -236,6 +238,7 @@ export default function SalesDashboardPage() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b text-left">
+                    <th className="p-2 w-8"></th>
                     <th className="p-2">Date</th>
                     <th className="p-2">Flock</th>
                     <th className="p-2">Customer</th>
@@ -248,33 +251,60 @@ export default function SalesDashboardPage() {
                 </thead>
                 <tbody>
                   {sales.map((s) => (
-                    <tr key={s.id} className="border-b last:border-0">
-                      <td className="p-2">{new Date(s.saleDate).toLocaleDateString()}</td>
-                      <td className="p-2">{s.flock?.name || "-"}</td>
-                      <td className="p-2">{s.customerName || "Walk-in"}</td>
-                      <td className="p-2">{s.birdCount}</td>
-                      <td className="p-2">ZMW {Number(s.pricePerBirdZmw).toFixed(2)}</td>
-                      <td className="p-2 font-medium">ZMW {Number(s.totalAmountZmw).toFixed(2)}</td>
-                      <td className="p-2">
-                        <Badge variant={s.paymentStatus === "paid" ? "default" : s.paymentStatus === "partial" ? "secondary" : "outline"}>
-                          {s.paymentStatus}
-                        </Badge>
-                      </td>
-                      {canEditSales && (
+                    <Fragment key={s.id}>
+                      <tr className="border-b last:border-0">
                         <td className="p-2">
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(s)}>
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            {user?.role === "owner" && (
-                              <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)}>
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => setExpandedSaleId(expandedSaleId === s.id ? null : s.id)}
+                          >
+                            {expandedSaleId === s.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </Button>
                         </td>
+                        <td className="p-2">{new Date(s.saleDate).toLocaleDateString()}</td>
+                        <td className="p-2">{s.flock?.name || "-"}</td>
+                        <td className="p-2">{s.customerName || "Walk-in"}</td>
+                        <td className="p-2">{s.birdCount}</td>
+                        <td className="p-2">ZMW {Number(s.pricePerBirdZmw).toFixed(2)}</td>
+                        <td className="p-2 font-medium">ZMW {Number(s.totalAmountZmw).toFixed(2)}</td>
+                        <td className="p-2">
+                          <Badge variant={s.paymentStatus === "paid" ? "default" : s.paymentStatus === "partial" ? "secondary" : "outline"}>
+                            {s.paymentStatus}
+                          </Badge>
+                        </td>
+                        {canEditSales && (
+                          <td className="p-2">
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="sm" onClick={() => setExpandedSaleId(expandedSaleId === s.id ? null : s.id)} title="Attachments">
+                                <Paperclip className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => openEdit(s)}>
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              {user?.role === "owner" && (
+                                <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)}>
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                      {expandedSaleId === s.id && (
+                        <tr className="border-b">
+                          <td colSpan={canEditSales ? 9 : 8} className="p-2 bg-muted/30">
+                            <AttachmentPanel
+                              saleRecordId={s.id}
+                              title={`Attachments — ${s.customerName || "Walk-in"} sale`}
+                              canManage={canEditSales}
+                              canDelete={user?.role === "owner" || user?.role === "manager"}
+                            />
+                          </td>
+                        </tr>
                       )}
-                    </tr>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
