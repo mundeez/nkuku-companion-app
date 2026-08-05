@@ -63,12 +63,13 @@ export default function ProjectionsPage() {
   }, [user, isLoading, router]);
 
   // Check which bag sizes are available for the selected supplier
+  // NOTE: API returns unitSizeKg as a string (Prisma Decimal), so use Number()
   const selectedSupplierData = suppliers.find((s) => s.id === selectedSupplier);
   const has25kg = selectedSupplierData?.feedStages.some(
-    (fs) => fs.stageType === "feed" && fs.unitSizeKg === 25
+    (fs) => fs.stageType === "feed" && Number(fs.unitSizeKg) === 25
   );
   const has50kg = selectedSupplierData?.feedStages.some(
-    (fs) => fs.stageType === "feed" && fs.unitSizeKg === 50
+    (fs) => fs.stageType === "feed" && Number(fs.unitSizeKg) === 50
   );
 
   async function calculate() {

@@ -25,9 +25,9 @@ export interface FeedStage {
   stageType: "feed" | "chick" | "medication" | "other";
   dayRangeStart?: number;
   dayRangeEnd?: number;
-  unitSizeKg: number;
-  unitPriceZmw: number;
-  intakePerBirdKg: number;
+  unitSizeKg: number | string;
+  unitPriceZmw: number | string;
+  intakePerBirdKg: number | string;
   sortOrder: number;
 }
 
