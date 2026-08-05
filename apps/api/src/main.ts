@@ -130,12 +130,21 @@ const scheduler = new SchedulerService(prisma);
 scheduler.startCron();
 
 // ── Start daily financial recalc cron ────
+// NOTE: Harvest projection auto-generation disabled — projections are no longer
+// auto-created as financial records. Overhead allocation still runs daily.
 const dailyRecalc = new DailyRecalculationService(prisma);
 const marketPrice = parseFloat(process.env.MARKET_PRICE_PER_KG || '25');
 cron.schedule('0 2 * * *', async () => {
-  app.log.info('[DailyRecalc] Starting daily recalculation...');
+  app.log.info('[DailyRecalc] Starting daily overhead allocation...');
   try {
-    await dailyRecalc.runDailyForAllUsers({ marketPricePerKg: marketPrice });
+    const users = await prisma.user.findMany({ where: { isActive: true }, select: { id: true } });
+    for (const user of users) {
+      try {
+        await dailyRecalc.runDaily(user.id, { marketPricePerKg: marketPrice });
+      } catch (err: any) {
+        app.log.error(`[DailyRecalc] Failed for user ${user.id}:`, err.message);
+      }
+    }
     app.log.info('[DailyRecalc] Completed successfully');
   } catch (err: any) {
     app.log.error('[DailyRecalc] Failed:', err.message);

@@ -22,11 +22,8 @@ export class DailyRecalculationService {
     // 1. Re-allocate overheads for the current month
     await this.overheads.allocateOverheadForMonth(yearMonth, userId);
 
-    // 2. Refresh harvest projections for active flocks
-    await this.projections.refreshProjections({
-      marketPricePerKg: config.marketPricePerKg,
-      userId,
-    });
+    // 2. Harvest projection auto-generation DISABLED
+    // Projections are no longer auto-created as financial records.
   }
 
   async runDailyForAllUsers(config: RecalculationConfig): Promise<void> {

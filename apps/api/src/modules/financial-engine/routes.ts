@@ -310,11 +310,10 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
     return projections.getProjections(authUser.userId);
   });
 
-  app.post('/projections/refresh', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const authUser = (request as any).authUser;
-    const body = z.object({ marketPricePerKg: z.number().positive().optional() }).parse(request.body);
-    const marketPrice = body.marketPricePerKg ?? 25;
-    await projections.refreshProjections({ marketPricePerKg: marketPrice, userId: authUser.userId });
-    return { refreshed: true };
+  app.post('/projections/refresh', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    // Harvest projection auto-generation DISABLED
+    reply.header('Sunset', 'Sun, 01 Jan 2027 00:00:00 GMT');
+    reply.header('Deprecation', 'true');
+    return { error: 'Harvest projection auto-generation has been disabled. Projections are no longer auto-created as financial records.' };
   });
 }
