@@ -80,12 +80,14 @@ export interface Batch {
 
 export interface ProjectionResult {
   supplierName: string;
+  bagSize?: number | null;
   birdCount: number;
   effectiveBirdCount: string;
   mortalityPct: string;
   breakdown: Array<{
     stageName: string;
     stageType: string;
+    unitSizeKg: string;
     itemsRaw: string | null;
     itemsRoundedUp: number | null;
     unitPriceZmw: string;

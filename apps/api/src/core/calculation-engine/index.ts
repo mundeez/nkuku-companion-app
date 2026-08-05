@@ -21,6 +21,7 @@ export interface StageSubtotalResult {
 export interface ProjectionBreakdownItem {
   stageName: string;
   stageType: string;
+  unitSizeKg: string;
   itemsRaw: string | null;
   itemsRoundedUp: number | null;
   unitPriceZmw: string;
@@ -122,6 +123,7 @@ export function calculateBatchProjection(
     breakdown.push({
       stageName: stage.stageName,
       stageType: stage.stageType,
+      unitSizeKg: new Decimal(stage.unitSizeKg).toString(),
       itemsRaw,
       itemsRoundedUp,
       unitPriceZmw: new Decimal(stage.unitPriceZmw).toFixed(2),

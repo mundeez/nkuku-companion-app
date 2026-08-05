@@ -9,6 +9,7 @@ const ProjectionCalculateSchema = z.object({
   salesPricePerBird: z.coerce.number().positive(),
   mortalityPct: z.coerce.number().min(0).max(1).default(0.05),
   overheadCosts: z.array(z.coerce.number()).default([]),
+  bagSize: z.number().positive().optional(),
 });
 
 export async function buildProjectionModule(app: FastifyInstance) {
@@ -16,6 +17,7 @@ export async function buildProjectionModule(app: FastifyInstance) {
 
   // POST /api/v1/projections/calculate
   // Returns a computed projection WITHOUT persisting to DB (what-if analysis)
+  // If bagSize is provided, only feed stages with matching unitSizeKg (or non-feed stages like chicks) are included
   app.post('/calculate', { preHandler: [authenticate] }, async (request) => {
     const body = ProjectionCalculateSchema.parse(request.body);
     const supplier = await prisma.supplier.findUnique({
@@ -24,7 +26,14 @@ export async function buildProjectionModule(app: FastifyInstance) {
     });
     if (!supplier) return { error: 'SUPPLIER_NOT_FOUND' };
 
-    const feedStages: FeedStageInput[] = supplier.feedStages.map((fs: any) => ({
+    // Filter feed stages by bag size if specified (keep chick/medication/other stages regardless)
+    const filteredStages = body.bagSize
+      ? supplier.feedStages.filter((fs: any) =>
+          fs.stageType !== 'feed' || Number(fs.unitSizeKg) === body.bagSize
+        )
+      : supplier.feedStages;
+
+    const feedStages: FeedStageInput[] = filteredStages.map((fs: any) => ({
       stageName: fs.stageName,
       stageType: fs.stageType as any,
       unitSizeKg: fs.unitSizeKg.toString(),
@@ -40,7 +49,7 @@ export async function buildProjectionModule(app: FastifyInstance) {
       body.overheadCosts,
     );
 
-    return { supplierName: supplier.name, ...result };
+    return { supplierName: supplier.name, bagSize: body.bagSize ?? null, ...result };
   });
 
   // POST /api/v1/projections/save
