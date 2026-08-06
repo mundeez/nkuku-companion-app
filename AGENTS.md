@@ -30,6 +30,13 @@ docker compose exec api npx prisma db seed   # only on fresh DB or after schema 
 docker exec nkuku-companion-app-postgres-1 psql -U nkuku_user -d nkuku_db -f /docker-entrypoint-initdb.d/journal-immutability.sql
 # Or from host: docker compose exec api npx tsx -e "..." (see apps/api/prisma/sql/journal-immutability.sql)
 
+# Re-apply the documents full-text search column (after db push)
+# `search_vector` is a GENERATED tsvector column that Prisma cannot represent.
+# ALWAYS re-run this after `prisma db push --accept-data-loss` touches the
+# `documents` table, or the column (and GIN index) will be dropped/missing.
+docker exec nkuku-companion-app-postgres-1 psql -U nkuku_user -d nkuku_db -f /docker-entrypoint-initdb.d/documents-search.sql
+# Or from host: docker exec shared-postgres psql -U nkuku_user -d nkuku_db -f apps/api/prisma/sql/documents-search.sql
+
 # Migrate FinancialRecord → double-entry (idempotent)
 docker compose exec api npx tsx src/db/seeds/migrate-to-double-entry.ts
 
