@@ -1,8 +1,8 @@
 {
   "name": "api",
-  "version": "0.2.0-alpha",
+  "version": "0.2.1-alpha",
   "private": true,
-  "description": "Nkuku Companion API — Fastify + Prisma + PostgreSQL",
+  "description": "Nkuku Companion API \u2014 Fastify + Prisma + PostgreSQL",
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "tsc",

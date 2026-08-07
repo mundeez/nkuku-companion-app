@@ -1,5 +1,50 @@
 # Changelog
 
+## v1.11.0-alpha — 2026-08-07
+
+### Added
+- **Phase 2 — self-serve signup & invitations.**
+  - `POST /api/v1/auth/register` — creates a new Organization + owner User + OrganizationMember in one transaction. Requires explicit `consent: true`; records `consentAcceptedAt`/`consentVersion` on the User (Zambia Data Protection Act No. 3 of 2021 consent tracking).
+  - `POST /api/v1/auth/accept-invite` — joins an existing organization via a time-limited 256-bit invite token; creates the User if the email has no account, or enrolls an existing one. Wrapped in a Prisma transaction to prevent double-accept race conditions.
+  - New `organizations` API module: `GET/PATCH /me` (org settings), `GET /members`, `DELETE /members/:id`, `POST/GET /invites`, `DELETE /invites/:id` — all owner/manager gated and org-scoped.
+  - `Invite` model (token, email, role, expiry, acceptance tracking) and `consentAcceptedAt`/`consentVersion` fields on `User`.
+  - Web `/signup` page — self-serve registration form (name, email, password, org name, country, currency, consent checkbox).
+  - Web `/accept-invite` page — invite acceptance (reads token from URL query string; adapts to new vs. existing accounts).
+  - Web `/users` page — "Invite User" dialog with invite link display + copy button, pending invites table with revoke action.
+  - Web `/login` page — added "Create one" link to `/signup`.
+  - `WEB_BASE_URL` env var for absolute invite links (docker-compose + .env.example).
+
+### Changed
+- **Users module** (`apps/api/src/modules/users/routes.ts`) — fixed a latent bug where it created global `User` rows with no `OrganizationMember`, which would have made new users unable to log in under the multi-tenancy model. Now every user it creates/updates/removes is properly scoped to the caller's organization, and `User.role`/`OrganizationMember.role` are kept in sync.
+
+### Fixed
+- **Security: JWT_SECRET fallback removed** (critical, pre-existing). The auth module previously fell back to `'dev_jwt_secret'` if `JWT_SECRET` was unset, allowing token forgery. The API now refuses to start if `JWT_SECRET` is not set.
+- **Security: authenticate middleware fallback removed** (critical, pre-existing). When a token's `userId` didn't exist or was inactive, the middleware silently authenticated as the first active user (usually the owner). Invalid/inactive/deleted users now correctly get `401 INVALID_TOKEN`.
+- **Security: accept-invite made atomic** (low). The invite lookup, user creation, membership creation, and invite update are now inside a single Prisma `$transaction`, preventing race conditions on concurrent requests with the same token.
+- **Security: refresh token stored in Redis on accept-invite** (low). The `accept-invite` endpoint was not storing its refresh token in Redis, unlike `login` and `register`.
+
+### Infrastructure
+- **Shared Postgres `max_connections` raised 100→200.** `deez_forex` (an unrelated project on the same `shared-postgres` instance) was holding ~83 idle connections with no pooler, exhausting the 100-connection pool and blocking all tenants with "remaining connection slots reserved for roles with the SUPERUSER attribute". Raised via a `command:` override in `shared-services/docker-compose.yml`. The proper long-term fix is a PgBouncer pooler in front of `deez_forex`.
+- `.gitignore` updated to exclude mobile APK/IPA/AAB build artifacts and `.playwright-mcp/` tooling state.
+
+### Known Limitations
+- No email delivery yet — invite links are returned in the API response and shown in the web UI with a copy button for manual sharing. `nodemailer` is already a dependency; wiring email delivery is a follow-up.
+- No rate limiting on public auth endpoints (`/auth/register`, `/auth/login`, `/auth/accept-invite`). Recommended: `@fastify/rate-limit`.
+- Access/refresh tokens stored in `localStorage` (XSS-exposed). Recommended: `HttpOnly` cookies.
+- No email verification on registration.
+- Dependency vulnerabilities identified by `pnpm audit` (Fastify 4.x, Next 14.2.35, nodemailer 6.x, postcss 8.4.31) — major version upgrades requiring compatibility review, deferred to a dedicated dependency-upgrade phase.
+- CORS defaults to `true` (all origins) in development when `CORS_ORIGINS` is unset.
+
+### Test Summary
+- Full unit + integration suite (163 tests) green.
+- `tsc --noEmit` clean (API + web).
+- End-to-end manual flow verified: register → login → invite → accept-invite → member enrolled; double-accept correctly rejected; forged token for non-existent user correctly returns 401.
+
+## v1.10.1-alpha — 2026-08-07 (retroactive tag)
+
+### Notes
+- Retroactive tag for commit `6ffdb76` which closed out Phase 1 (multi-tenancy foundation). Validated post-hoc: full 163-test suite green after rebuild (Postgres connection capacity issue that blocked earlier validation resolved by raising `shared-postgres` `max_connections` 100→200).
+
 ## v1.10.0-alpha — 2026-08-07
 
 ### Added
