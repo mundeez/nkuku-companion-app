@@ -67,7 +67,6 @@ model Organization {
   lightingTemperatureSchedules LightingTemperatureSchedule[]
   saleRecords                  SaleRecord[]
   journalEntries               JournalEntry[]
-  accounts                     Account[]
   subscriptions                Subscription[]
 
   @@map("organizations")
@@ -1085,32 +1084,32 @@ model FlockOverheadAllocation {
   @@map("flock_overhead_allocations")
 }
 
+// NOTE: The chart of accounts is deliberately NOT organization-scoped.
+// Standard account codes (1010 Cash, 4010 Bird Sales, etc.) are a shared
+// reference catalog, the same way Breed/Disease/EquipmentItem are — not
+// something each tenant customizes today. What IS organization-scoped is
+// the transactional data that references these accounts (JournalEntry),
+// which carries its own organizationId. Scoping Account itself per-org
+// would require every core double-entry service (ledger, GAAP statements,
+// period close) to thread organizationId through account lookups, which is
+// a larger, separate effort than Phase 1's data-isolation goal.
 // ── DOUBLE-ENTRY: CHART OF ACCOUNTS ──────
 model Account {
-  id             String        @id @default(uuid()) @db.Uuid
-  organizationId String?       @map("organization_id") @db.Uuid
-  code           String        @db.VarChar(10)
-  name           String        @db.VarChar(100)
-  accountType    AccountType   @map("account_type")
-  normalBalance  NormalBalance @map("normal_balance")
-  parentCode     String?       @map("parent_code") @db.VarChar(10)
-  description    String?       @db.Text
-  isActive       Boolean       @default(true) @map("is_active")
-  isSystem       Boolean       @default(false) @map("is_system")
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id            String        @id @default(uuid()) @db.Uuid
+  code          String        @unique @db.VarChar(10)
+  name          String        @db.VarChar(100)
+  accountType   AccountType   @map("account_type")
+  normalBalance NormalBalance @map("normal_balance")
+  parentCode    String?       @map("parent_code") @db.VarChar(10)
+  description   String?       @db.Text
+  isActive      Boolean       @default(true) @map("is_active")
+  isSystem      Boolean       @default(false) @map("is_system")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   journalLines JournalLine[]
 
-  // NOTE: chart of accounts was global (unique code) in the single-tenant
-  // era. Each Organization now gets its own copy of the standard chart on
-  // creation, so uniqueness is scoped per-organization instead of global.
-  // organizationId is nullable only until the Phase 1 backfill migration
-  // runs; new rows must always set it.
-  @@unique([organizationId, code])
   @@index([accountType])
-  @@index([organizationId])
   @@map("accounts")
 }
 
@@ -1191,42 +1190,44 @@ model JournalLine {
 
 // ── DOUBLE-ENTRY: LEDGER BALANCES ────────
 model LedgerBalance {
-  id            String   @id @default(uuid()) @db.Uuid
-  accountId     String   @map("account_id") @db.Uuid
-  periodLabel   String   @map("period_label") @db.VarChar(20)
-  openingDebit  Decimal  @default(0) @map("opening_debit") @db.Decimal(14, 2)
-  openingCredit Decimal  @default(0) @map("opening_credit") @db.Decimal(14, 2)
-  periodDebit   Decimal  @default(0) @map("period_debit") @db.Decimal(14, 2)
-  periodCredit  Decimal  @default(0) @map("period_credit") @db.Decimal(14, 2)
-  closingDebit  Decimal  @default(0) @map("closing_debit") @db.Decimal(14, 2)
-  closingCredit Decimal  @default(0) @map("closing_credit") @db.Decimal(14, 2)
-  computedAt    DateTime @default(now()) @map("computed_at") @db.Timestamptz(6)
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  accountId      String   @map("account_id") @db.Uuid
+  periodLabel    String   @map("period_label") @db.VarChar(20)
+  openingDebit   Decimal  @default(0) @map("opening_debit") @db.Decimal(14, 2)
+  openingCredit  Decimal  @default(0) @map("opening_credit") @db.Decimal(14, 2)
+  periodDebit    Decimal  @default(0) @map("period_debit") @db.Decimal(14, 2)
+  periodCredit   Decimal  @default(0) @map("period_credit") @db.Decimal(14, 2)
+  closingDebit   Decimal  @default(0) @map("closing_debit") @db.Decimal(14, 2)
+  closingCredit  Decimal  @default(0) @map("closing_credit") @db.Decimal(14, 2)
+  computedAt     DateTime @default(now()) @map("computed_at") @db.Timestamptz(6)
 
-  @@unique([accountId, periodLabel])
+  @@unique([organizationId, accountId, periodLabel])
+  @@index([organizationId])
   @@map("ledger_balances")
 }
 
 // ── DOCUMENTS (receipts, quotations, invoices, statements, contracts) ──
 
 model Document {
-  id               String                   @id @default(uuid()) @db.Uuid
-  organizationId   String?                  @map("organization_id") @db.Uuid
-  flockId          String?                  @map("flock_id") @db.Uuid
-  recordType       String                   @map("record_type") @db.VarChar(50)
-  recordId         String?                  @map("record_id") @db.Uuid
-  fileName         String                   @map("file_name") @db.VarChar(255)
-  filePath         String?                  @map("file_path") @db.VarChar(500)
-  storageKey       String?                  @map("storage_key") @db.VarChar(500)
-  bucket           String?                  @db.VarChar(100)
-  mimeType         String                   @map("mime_type") @db.VarChar(100)
-  fileSizeKb       Int                      @map("file_size_kb")
-  category         String                   @db.VarChar(50)
-  contentText      String?                  @map("content_text") @db.Text
-  scanStatus       String                   @default("pending") @map("scan_status") @db.VarChar(20)
-  scannedAt        DateTime?                @map("scanned_at") @db.Timestamptz(6)
-  extractionStatus String                   @default("pending") @map("extraction_status") @db.VarChar(20)
-  uploadedBy       String?                  @map("uploaded_by") @db.Uuid
-  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String?   @map("organization_id") @db.Uuid
+  flockId          String?   @map("flock_id") @db.Uuid
+  recordType       String    @map("record_type") @db.VarChar(50)
+  recordId         String?   @map("record_id") @db.Uuid
+  fileName         String    @map("file_name") @db.VarChar(255)
+  filePath         String?   @map("file_path") @db.VarChar(500)
+  storageKey       String?   @map("storage_key") @db.VarChar(500)
+  bucket           String?   @db.VarChar(100)
+  mimeType         String    @map("mime_type") @db.VarChar(100)
+  fileSizeKb       Int       @map("file_size_kb")
+  category         String    @db.VarChar(50)
+  contentText      String?   @map("content_text") @db.Text
+  scanStatus       String    @default("pending") @map("scan_status") @db.VarChar(20)
+  scannedAt        DateTime? @map("scanned_at") @db.Timestamptz(6)
+  extractionStatus String    @default("pending") @map("extraction_status") @db.VarChar(20)
+  uploadedBy       String?   @map("uploaded_by") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   // NOTE: `search_vector` (tsvector, GENERATED ALWAYS AS ... STORED) is
   // deliberately NOT declared here. Prisma cannot express a GENERATED
   // column: declaring it as a normal or Unsupported field makes `db push`

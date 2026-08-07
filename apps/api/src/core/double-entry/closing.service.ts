@@ -15,7 +15,7 @@ export class ClosingService {
    * 3. Transfer net income from Income Summary (3030) to Retained Earnings (3020)
    * After closing, all 4xxx, 5xxx, 6xxx accounts should have zero balance.
    */
-  async yearEndClose(year: number, postedBy?: string): Promise<{
+  async yearEndClose(year: number, organizationId: string, postedBy?: string): Promise<{
     closingDate: string;
     revenueClosed: string;
     expenseClosed: string;
@@ -54,7 +54,7 @@ export class ClosingService {
       const agg = await this.prisma.journalLine.aggregate({
         where: {
           accountId: account.id,
-          journal: { entryDate: { lte: closingDate } },
+          journal: { entryDate: { lte: closingDate }, organizationId },
         },
         _sum: { debitZmw: true, creditZmw: true },
       });
@@ -86,7 +86,7 @@ export class ClosingService {
       const agg = await this.prisma.journalLine.aggregate({
         where: {
           accountId: account.id,
-          journal: { entryDate: { lte: closingDate } },
+          journal: { entryDate: { lte: closingDate }, organizationId },
         },
         _sum: { debitZmw: true, creditZmw: true },
       });
@@ -164,6 +164,7 @@ export class ClosingService {
       sourceType: 'period_close',
       lines,
       postedBy,
+      organizationId,
     });
 
     return {

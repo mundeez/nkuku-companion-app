@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 const FeedRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -21,10 +22,11 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
       flockId: z.string().uuid().optional(),
     }).parse(request.query);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     if (flockId) {
       const flock = await prisma.broilerFlock.findFirst({
-        where: { id: flockId, createdBy: authUser.userId },
+        where: { id: flockId, organizationId },
       });
       if (!flock) return { error: 'NOT_FOUND' };
 
@@ -37,7 +39,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
 
     // No flockId provided — return all feed records for the user's flocks
     return prisma.feedRecord.findMany({
-      where: { flock: { createdBy: authUser.userId } },
+      where: { flock: { organizationId } },
       orderBy: { recordDate: 'asc' },
       include: { supplier: { select: { name: true } } },
     });
@@ -48,9 +50,10 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
       flockId: z.string().uuid(),
     }).parse(request.query);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
+      where: { id: flockId, organizationId },
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
@@ -89,9 +92,10 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const { flockId, ...data } = FeedRecordCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
+      where: { id: flockId, organizationId },
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
@@ -138,12 +142,13 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = FeedRecordCreateSchema.partial().parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const record = await prisma.feedRecord.findFirst({
       where: { id },
       include: { flock: true },
     });
-    if (!record || record.flock.createdBy !== authUser.userId) {
+    if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
@@ -198,12 +203,13 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const record = await prisma.feedRecord.findFirst({
       where: { id },
       include: { flock: true },
     });
-    if (!record || record.flock.createdBy !== authUser.userId) {
+    if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 

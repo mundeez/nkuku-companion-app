@@ -20,6 +20,10 @@ export interface JournalEntryInput {
   isReversing?: boolean;
   reversesId?: string;
   postedBy?: string;
+  // Required for multi-tenant isolation — every journal entry belongs to
+  // exactly one organization. Not optional: callers must always resolve it
+  // (e.g. from the flock, or from the authenticated request context).
+  organizationId: string;
 }
 
 export class JournalEngine {
@@ -89,6 +93,7 @@ export class JournalEngine {
           isReversing: input.isReversing ?? false,
           reversesId: input.reversesId,
           postedBy: input.postedBy,
+          organizationId: input.organizationId,
         },
       });
 
@@ -140,6 +145,7 @@ export class JournalEngine {
       isReversing: true,
       reversesId: journalId,
       postedBy,
+      organizationId: original.organizationId as string,
     });
   }
 }

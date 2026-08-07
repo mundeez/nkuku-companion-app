@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 
 function publishNtfy(topic: string, title: string, message: string, priority: 'default' | 'urgent') {
@@ -34,13 +35,14 @@ export async function buildAlertModule(app: FastifyInstance) {
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
     const query = z.object({
       status: z.enum(['open', 'resolved']).optional(),
       severity: z.enum(['info', 'warning', 'critical']).optional(),
     }).parse(request.query);
 
     const where: any = {
-      flock: { createdBy: authUser.userId },
+      flock: { organizationId },
     };
 
     if (query.status === 'open') where.isResolved = false;
@@ -60,9 +62,10 @@ export async function buildAlertModule(app: FastifyInstance) {
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const alert = await prisma.alert.findFirst({
-      where: { id, flock: { createdBy: authUser.userId } },
+      where: { id, flock: { organizationId } },
       include: { flock: { select: { name: true } } },
     });
     if (!alert) return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -72,10 +75,11 @@ export async function buildAlertModule(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const data = AlertCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     // Verify flock ownership
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: data.flockId, createdBy: authUser.userId },
+      where: { id: data.flockId, organizationId },
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
@@ -94,9 +98,10 @@ export async function buildAlertModule(app: FastifyInstance) {
       isResolved: z.boolean().optional(),
     }).parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const alert = await prisma.alert.findFirst({
-      where: { id, flock: { createdBy: authUser.userId } },
+      where: { id, flock: { organizationId } },
     });
     if (!alert) return reply.status(404).send({ error: 'NOT_FOUND' });
 
@@ -110,9 +115,10 @@ export async function buildAlertModule(app: FastifyInstance) {
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const alert = await prisma.alert.findFirst({
-      where: { id, flock: { createdBy: authUser.userId } },
+      where: { id, flock: { organizationId } },
     });
     if (!alert) return reply.status(404).send({ error: 'NOT_FOUND' });
 
@@ -123,11 +129,12 @@ export async function buildAlertModule(app: FastifyInstance) {
   // POST /api/v1/alerts/generate - Generate alerts for active flocks
   app.post('/generate', { preHandler: [authenticate] }, async (request) => {
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
     const flocks = await prisma.broilerFlock.findMany({
-      where: { createdBy: authUser.userId, status: 'active' },
+      where: { organizationId, status: 'active' },
       include: { breed: true },
     });
 

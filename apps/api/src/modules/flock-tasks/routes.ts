@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
@@ -30,9 +31,10 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
       status: z.enum(['pending', 'completed', 'skipped']).optional(),
     }).parse(request.query);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: query.flockId, createdBy: authUser.userId },
+      where: { id: query.flockId, organizationId },
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
@@ -59,9 +61,10 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
   app.post('/generate', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
+      where: { id: flockId, organizationId },
       include: { breed: true },
     });
     if (!flock) return { error: 'NOT_FOUND' };
@@ -280,9 +283,10 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const data = FlockTaskCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: data.flockId, createdBy: authUser.userId },
+      where: { id: data.flockId, organizationId },
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
@@ -298,12 +302,13 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = FlockTaskUpdateSchema.parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const task = await prisma.flockTask.findFirst({
       where: { id },
       include: { flock: true },
     });
-    if (!task || task.flock.createdBy !== authUser.userId) {
+    if (!task || task.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
@@ -326,12 +331,13 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const task = await prisma.flockTask.findFirst({
       where: { id },
       include: { flock: true },
     });
-    if (!task || task.flock.createdBy !== authUser.userId) {
+    if (!task || task.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 

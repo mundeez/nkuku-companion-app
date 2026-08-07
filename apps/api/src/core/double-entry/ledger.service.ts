@@ -40,11 +40,11 @@ export interface TrialBalance {
 export class LedgerService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async generateTrialBalance(asOfDate: Date): Promise<TrialBalance> {
+  async generateTrialBalance(asOfDate: Date, organizationId: string): Promise<TrialBalance> {
     const rows = await this.prisma.journalLine.groupBy({
       by: ['accountId'],
       where: {
-        journal: { entryDate: { lte: asOfDate } },
+        journal: { entryDate: { lte: asOfDate }, organizationId },
       },
       _sum: { debitZmw: true, creditZmw: true },
     });
@@ -100,6 +100,7 @@ export class LedgerService {
     accountCode: string,
     fromDate: Date,
     toDate: Date,
+    organizationId: string,
   ): Promise<AccountLedger> {
     const account = await this.prisma.account.findUnique({
       where: { code: accountCode },
@@ -110,7 +111,7 @@ export class LedgerService {
     const opening = await this.prisma.journalLine.aggregate({
       where: {
         accountId: account.id,
-        journal: { entryDate: { lt: fromDate } },
+        journal: { entryDate: { lt: fromDate }, organizationId },
       },
       _sum: { debitZmw: true, creditZmw: true },
     });
@@ -125,7 +126,7 @@ export class LedgerService {
     const lines = await this.prisma.journalLine.findMany({
       where: {
         accountId: account.id,
-        journal: { entryDate: { gte: fromDate, lte: toDate } },
+        journal: { entryDate: { gte: fromDate, lte: toDate }, organizationId },
       },
       include: { journal: true },
       orderBy: { journal: { entryDate: 'asc' } },
@@ -176,14 +177,14 @@ export class LedgerService {
     };
   }
 
-  async closePeriod(periodLabel: string): Promise<{ accountsProcessed: number }> {
+  async closePeriod(periodLabel: string, organizationId: string): Promise<{ accountsProcessed: number }> {
     const periodDate = new Date(`${periodLabel}-01`);
     const nextPeriod = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 1);
 
     const rows = await this.prisma.journalLine.groupBy({
       by: ['accountId'],
       where: {
-        journal: { entryDate: { gte: periodDate, lt: nextPeriod } },
+        journal: { entryDate: { gte: periodDate, lt: nextPeriod }, organizationId },
       },
       _sum: { debitZmw: true, creditZmw: true },
     });
@@ -197,7 +198,7 @@ export class LedgerService {
       const opening = await this.prisma.journalLine.aggregate({
         where: {
           accountId: row.accountId,
-          journal: { entryDate: { lt: periodDate } },
+          journal: { entryDate: { lt: periodDate }, organizationId },
         },
         _sum: { debitZmw: true, creditZmw: true },
       });
@@ -209,14 +210,14 @@ export class LedgerService {
 
       await this.prisma.ledgerBalance.upsert({
         where: {
-          accountId_periodLabel: { accountId: row.accountId, periodLabel },
+          organizationId_accountId_periodLabel: { organizationId, accountId: row.accountId, periodLabel },
         },
         update: {
           openingDebit, openingCredit, periodDebit, periodCredit,
           closingDebit, closingCredit, computedAt: new Date(),
         },
         create: {
-          accountId: row.accountId, periodLabel,
+          organizationId, accountId: row.accountId, periodLabel,
           openingDebit, openingCredit, periodDebit, periodCredit,
           closingDebit, closingCredit,
         },

@@ -76,6 +76,7 @@ export class GaapStatementService {
   private async getAccountBalances(
     accountType: string,
     asOfDate: Date,
+    organizationId: string,
     fromDate?: Date,
   ): Promise<{ account: any; debitSum: Decimal; creditSum: Decimal; netBalance: Decimal }[]> {
     const accounts = await this.prisma.account.findMany({
@@ -88,7 +89,7 @@ export class GaapStatementService {
     for (const account of accounts) {
       const where: any = {
         accountId: account.id,
-        journal: { entryDate: { lte: asOfDate } },
+        journal: { entryDate: { lte: asOfDate }, organizationId },
       };
       if (fromDate) {
         where.journal.entryDate = { gte: fromDate, lte: asOfDate };
@@ -112,10 +113,10 @@ export class GaapStatementService {
     return results;
   }
 
-  async generateIncomeStatement(fromDate: Date, toDate: Date): Promise<IncomeStatement> {
+  async generateIncomeStatement(fromDate: Date, toDate: Date, organizationId: string): Promise<IncomeStatement> {
     const [revenueBalances, expenseBalances] = await Promise.all([
-      this.getAccountBalances('revenue', toDate, fromDate),
-      this.getAccountBalances('expense', toDate, fromDate),
+      this.getAccountBalances('revenue', toDate, organizationId, fromDate),
+      this.getAccountBalances('expense', toDate, organizationId, fromDate),
     ]);
 
     // Split expenses into COGS (5xxx) and Operating Expenses (6xxx)
@@ -169,18 +170,18 @@ export class GaapStatementService {
     };
   }
 
-  async generateBalanceSheet(asOfDate: Date): Promise<BalanceSheet> {
+  async generateBalanceSheet(asOfDate: Date, organizationId: string): Promise<BalanceSheet> {
     const [assetBalances, liabilityBalances, equityBalances] = await Promise.all([
-      this.getAccountBalances('asset', asOfDate),
-      this.getAccountBalances('liability', asOfDate),
-      this.getAccountBalances('equity', asOfDate),
+      this.getAccountBalances('asset', asOfDate, organizationId),
+      this.getAccountBalances('liability', asOfDate, organizationId),
+      this.getAccountBalances('equity', asOfDate, organizationId),
     ]);
 
     // Compute current period net income (revenue - expenses up to asOfDate)
     // This is needed because before year-end close, net income is not yet in equity accounts
     const [revenueBalances, expenseBalances] = await Promise.all([
-      this.getAccountBalances('revenue', asOfDate),
-      this.getAccountBalances('expense', asOfDate),
+      this.getAccountBalances('revenue', asOfDate, organizationId),
+      this.getAccountBalances('expense', asOfDate, organizationId),
     ]);
     const totalRevenue = revenueBalances.reduce(
       (sum, r) => sum.plus(r.netBalance.abs()),
@@ -246,11 +247,11 @@ export class GaapStatementService {
     };
   }
 
-  async generateCashFlow(fromDate: Date, toDate: Date): Promise<CashFlowStatement> {
+  async generateCashFlow(fromDate: Date, toDate: Date, organizationId: string): Promise<CashFlowStatement> {
     // Indirect method: start from net income, adjust for non-cash items and working capital changes
 
     // 1. Get net income for the period
-    const incomeStmt = await this.generateIncomeStatement(fromDate, toDate);
+    const incomeStmt = await this.generateIncomeStatement(fromDate, toDate, organizationId);
     const netIncome = new Decimal(incomeStmt.netProfit);
 
     // 2. Get balance changes for non-cash accounts
@@ -262,14 +263,14 @@ export class GaapStatementService {
       const openingCash = await this.prisma.journalLine.aggregate({
         where: {
           accountId: cashAccount.id,
-          journal: { entryDate: { lt: fromDate } },
+          journal: { entryDate: { lt: fromDate }, organizationId },
         },
         _sum: { debitZmw: true, creditZmw: true },
       });
       const closingCash = await this.prisma.journalLine.aggregate({
         where: {
           accountId: cashAccount.id,
-          journal: { entryDate: { lte: toDate } },
+          journal: { entryDate: { lte: toDate }, organizationId },
         },
         _sum: { debitZmw: true, creditZmw: true },
       });
@@ -296,14 +297,14 @@ export class GaapStatementService {
       const opening = await this.prisma.journalLine.aggregate({
         where: {
           accountId: account.id,
-          journal: { entryDate: { lt: fromDate } },
+          journal: { entryDate: { lt: fromDate }, organizationId },
         },
         _sum: { debitZmw: true, creditZmw: true },
       });
       const closing = await this.prisma.journalLine.aggregate({
         where: {
           accountId: account.id,
-          journal: { entryDate: { lte: toDate } },
+          journal: { entryDate: { lte: toDate }, organizationId },
         },
         _sum: { debitZmw: true, creditZmw: true },
       });
@@ -344,7 +345,7 @@ export class GaapStatementService {
       const periodAgg = await this.prisma.journalLine.aggregate({
         where: {
           accountId: account.id,
-          journal: { entryDate: { gte: fromDate, lte: toDate } },
+          journal: { entryDate: { gte: fromDate, lte: toDate }, organizationId },
         },
         _sum: { debitZmw: true, creditZmw: true },
       });
@@ -379,7 +380,7 @@ export class GaapStatementService {
       const periodAgg = await this.prisma.journalLine.aggregate({
         where: {
           accountId: account.id,
-          journal: { entryDate: { gte: fromDate, lte: toDate } },
+          journal: { entryDate: { gte: fromDate, lte: toDate }, organizationId },
         },
         _sum: { debitZmw: true, creditZmw: true },
       });

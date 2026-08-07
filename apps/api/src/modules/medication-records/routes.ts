@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -25,9 +26,10 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
+      where: { id: flockId, organizationId },
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
@@ -40,9 +42,10 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const data = MedicationRecordCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: data.flockId, createdBy: authUser.userId },
+      where: { id: data.flockId, organizationId },
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
@@ -85,12 +88,13 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = MedicationRecordCreateSchema.partial().parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const record = await prisma.medicationRecord.findFirst({
       where: { id },
       include: { flock: true },
     });
-    if (!record || record.flock.createdBy !== authUser.userId) {
+    if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
@@ -152,12 +156,13 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const record = await prisma.medicationRecord.findFirst({
       where: { id },
       include: { flock: true },
     });
-    if (!record || record.flock.createdBy !== authUser.userId) {
+    if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 

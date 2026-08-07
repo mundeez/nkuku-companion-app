@@ -99,10 +99,13 @@ DO $$
 DECLARE
   org1_id uuid;
   tbl text;
+  -- NOTE: `accounts` (chart of accounts) is intentionally NOT in this list.
+  -- It's a shared reference catalog like Breed/Disease, not organization-
+  -- scoped — see the comment on the Account model in schema.prisma.
   tables text[] := ARRAY[
     'suppliers', 'production_cycles', 'broiler_flocks', 'documents',
     'monthly_overheads', 'lighting_temperature_schedules', 'sale_records',
-    'accounts', 'journal_entries'
+    'journal_entries'
   ];
 BEGIN
   SELECT id INTO org1_id FROM _org1;
@@ -126,11 +129,7 @@ END $$;
 -- Prisma's @unique implements as a plain UNIQUE INDEX, not a table
 -- CONSTRAINT, so these must be dropped with DROP INDEX, not
 -- ALTER TABLE ... DROP CONSTRAINT.
-DROP INDEX IF EXISTS accounts_code_key;
-DO $$ BEGIN
-  ALTER TABLE accounts ADD CONSTRAINT accounts_organization_id_code_key UNIQUE (organization_id, code);
-EXCEPTION WHEN duplicate_table THEN NULL; END $$;
-
+-- (accounts.code stays globally unique — see NOTE above.)
 DROP INDEX IF EXISTS journal_entries_entry_number_key;
 DO $$ BEGIN
   ALTER TABLE journal_entries ADD CONSTRAINT journal_entries_organization_id_entry_number_key UNIQUE (organization_id, entry_number);

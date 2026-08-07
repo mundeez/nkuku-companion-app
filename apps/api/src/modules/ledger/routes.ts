@@ -5,6 +5,7 @@ import { LedgerService } from '../../core/double-entry/ledger.service.js';
 import { GaapStatementService } from '../../core/double-entry/gaap-statement.service.js';
 import { ClosingService } from '../../core/double-entry/closing.service.js';
 import { JournalEngine } from '../../core/double-entry/journal.engine.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 const TrialBalanceQuerySchema = z.object({
   asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -47,9 +48,10 @@ export async function buildLedgerModule(app: FastifyInstance) {
 
   // GET /trial-balance — trial balance as of date
   app.get('/trial-balance', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { asOf } = TrialBalanceQuerySchema.parse(request.query);
     const asOfDate = asOf ? new Date(asOf) : new Date();
-    const tb = await ledgerService.generateTrialBalance(asOfDate);
+    const tb = await ledgerService.generateTrialBalance(asOfDate, organizationId);
 
     const { format } = z.object({ format: z.string().optional() }).parse(request.query);
     if (format === 'csv') {
@@ -63,11 +65,12 @@ export async function buildLedgerModule(app: FastifyInstance) {
 
   // GET /account/:code — general ledger for one account (date range)
   app.get('/account/:code', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { code } = z.object({ code: z.string() }).parse(request.params);
     const { fromDate, toDate } = AccountLedgerQuerySchema.parse(request.query);
 
     try {
-      const ledger = await ledgerService.getAccountLedger(code, new Date(fromDate), new Date(toDate));
+      const ledger = await ledgerService.getAccountLedger(code, new Date(fromDate), new Date(toDate), organizationId);
       return ledger;
     } catch (err: any) {
       if (err.message.includes('NOT_FOUND')) {
@@ -79,9 +82,10 @@ export async function buildLedgerModule(app: FastifyInstance) {
 
   // GET /export/trial-balance — export trial balance as CSV
   app.get('/export/trial-balance', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { asOf } = TrialBalanceQuerySchema.parse(request.query);
     const asOfDate = asOf ? new Date(asOf) : new Date();
-    const tb = await ledgerService.generateTrialBalance(asOfDate);
+    const tb = await ledgerService.generateTrialBalance(asOfDate, organizationId);
 
     reply.header('Content-Type', 'text/csv');
     reply.header('Content-Disposition', `attachment; filename="trial-balance-${tb.asOfDate}.csv"`);
@@ -90,9 +94,10 @@ export async function buildLedgerModule(app: FastifyInstance) {
 
   // POST /period-close — materialise LedgerBalance rows and close period
   app.post('/period-close', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { periodLabel } = PeriodCloseSchema.parse(request.body);
     try {
-      const result = await ledgerService.closePeriod(periodLabel);
+      const result = await ledgerService.closePeriod(periodLabel, organizationId);
       return reply.status(201).send(result);
     } catch (err: any) {
       return reply.status(400).send({ error: err.message });
@@ -101,12 +106,13 @@ export async function buildLedgerModule(app: FastifyInstance) {
 
   // GET /income-statement — GAAP income statement from account balances
   app.get('/income-statement', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const q = StatementQuerySchema.parse(request.query);
     const toDate = q.toDate ? new Date(q.toDate) : new Date();
     const fromDate = q.fromDate ? new Date(q.fromDate) : new Date(new Date().getFullYear(), 0, 1);
 
     const { format } = z.object({ format: z.string().optional() }).parse(request.query);
-    const stmt = await gaapService.generateIncomeStatement(fromDate, toDate);
+    const stmt = await gaapService.generateIncomeStatement(fromDate, toDate, organizationId);
 
     if (format === 'csv') {
       reply.header('Content-Type', 'text/csv');
@@ -119,11 +125,12 @@ export async function buildLedgerModule(app: FastifyInstance) {
 
   // GET /balance-sheet — GAAP balance sheet from account balances
   app.get('/balance-sheet', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const q = StatementQuerySchema.parse(request.query);
     const asOfDate = q.asOf ? new Date(q.asOf) : new Date();
 
     const { format } = z.object({ format: z.string().optional() }).parse(request.query);
-    const stmt = await gaapService.generateBalanceSheet(asOfDate);
+    const stmt = await gaapService.generateBalanceSheet(asOfDate, organizationId);
 
     if (format === 'csv') {
       reply.header('Content-Type', 'text/csv');
@@ -136,20 +143,22 @@ export async function buildLedgerModule(app: FastifyInstance) {
 
   // GET /cash-flow — cash flow statement (indirect method)
   app.get('/cash-flow', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const q = StatementQuerySchema.parse(request.query);
     const toDate = q.toDate ? new Date(q.toDate) : new Date();
     const fromDate = q.fromDate ? new Date(q.fromDate) : new Date(new Date().getFullYear(), 0, 1);
 
-    const stmt = await gaapService.generateCashFlow(fromDate, toDate);
+    const stmt = await gaapService.generateCashFlow(fromDate, toDate, organizationId);
     return stmt;
   });
 
   // POST /year-end-close — post closing entries, reset income/expense accounts
   app.post('/year-end-close', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { year } = YearEndCloseSchema.parse(request.body);
     const authUser = (request as any).authUser;
     try {
-      const result = await closingService.yearEndClose(year, authUser.userId);
+      const result = await closingService.yearEndClose(year, organizationId, authUser.userId);
       return reply.status(201).send(result);
     } catch (err: any) {
       return reply.status(400).send({ error: err.message });

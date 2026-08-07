@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Decimal } from 'decimal.js';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { AuditService } from '../../core/financial-engine/audit.service.js';
 
 const SaleRecordCreateSchema = z.object({
@@ -34,13 +35,14 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   // GET /all — list all sale records for the user (for sales dashboard)
   app.get('/all', { preHandler: [authenticate] }, async (request) => {
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
     const query = z.object({
       fromDate: z.string().optional(),
       toDate: z.string().optional(),
       paymentStatus: z.enum(['pending', 'partial', 'paid']).optional(),
     }).parse(request.query);
 
-    const where: any = { flock: { createdBy: authUser.userId } };
+    const where: any = { flock: { organizationId } };
     if (query.fromDate) where.saleDate = { gte: new Date(query.fromDate) };
     if (query.toDate) where.saleDate = { ...where.saleDate, lte: new Date(query.toDate) };
     if (query.paymentStatus) where.paymentStatus = query.paymentStatus;
@@ -55,12 +57,13 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   // GET /dashboard — global sales summary for the sales dashboard
   app.get('/dashboard', { preHandler: [authenticate] }, async (request) => {
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
     const query = z.object({
       fromDate: z.string().optional(),
       toDate: z.string().optional(),
     }).parse(request.query);
 
-    const where: any = { flock: { createdBy: authUser.userId } };
+    const where: any = { flock: { organizationId } };
     if (query.fromDate) where.saleDate = { gte: new Date(query.fromDate) };
     if (query.toDate) where.saleDate = { ...where.saleDate, lte: new Date(query.toDate) };
 
@@ -129,10 +132,11 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
     const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     if (flockId) {
       const flock = await prisma.broilerFlock.findFirst({
-        where: { id: flockId, createdBy: authUser.userId },
+        where: { id: flockId, organizationId },
       });
       if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
@@ -144,7 +148,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
     // No flockId — return all sales for the user
     return prisma.saleRecord.findMany({
-      where: { flock: { createdBy: authUser.userId } },
+      where: { flock: { organizationId } },
       include: { flock: { select: { name: true, breed: { select: { name: true } } } } },
       orderBy: { saleDate: 'desc' },
     });
@@ -154,12 +158,13 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const record = await prisma.saleRecord.findFirst({
       where: { id },
       include: { flock: true, documents: { orderBy: { createdAt: 'desc' } } },
     });
-    if (!record || record.flock.createdBy !== authUser.userId) {
+    if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
@@ -178,14 +183,15 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   app.get('/summary', { preHandler: [authenticate] }, async (request, reply) => {
     const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const where = flockId
       ? { flockId }
-      : { flock: { createdBy: authUser.userId } };
+      : { flock: { organizationId } };
 
     if (flockId) {
       const flock = await prisma.broilerFlock.findFirst({
-        where: { id: flockId, createdBy: authUser.userId },
+        where: { id: flockId, organizationId },
       });
       if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
     }
@@ -231,9 +237,10 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager', 'sales_person')] }, async (request, reply) => {
     const { flockId, ...data } = SaleRecordCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
+      where: { id: flockId, organizationId },
     });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
@@ -262,6 +269,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
         amountPaidZmw: data.amountPaidZmw ?? null,
         notes: `${notesPrefix}${originalNotes}`,
         createdBy: authUser.userId,
+        organizationId,
       },
     });
 
@@ -288,12 +296,13 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = SaleRecordUpdateSchema.parse(request.body);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const record = await prisma.saleRecord.findFirst({
       where: { id },
       include: { flock: true },
     });
-    if (!record || record.flock.createdBy !== authUser.userId) {
+    if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
@@ -347,12 +356,13 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
 
     const record = await prisma.saleRecord.findFirst({
       where: { id },
       include: { flock: true },
     });
-    if (!record || record.flock.createdBy !== authUser.userId) {
+    if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 

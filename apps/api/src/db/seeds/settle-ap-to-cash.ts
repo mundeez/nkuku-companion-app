@@ -25,6 +25,11 @@ const engine = new JournalEngine(prisma);
 async function main() {
   console.log('[Settle-AP] Starting AP/Accrued settlement...');
 
+  // This is a one-off historical-data fix predating multi-tenancy; all
+  // affected journal entries belong to the original "Organization #1".
+  const org = await prisma.organization.findFirst({ orderBy: { createdAt: 'asc' } });
+  if (!org) throw new Error('No organization found — cannot attribute settlement entries.');
+
   const asOf = new Date('2026-12-31');
 
   // Step 1: Reverse any incorrect settlement entries (those that credited Cash)
@@ -117,6 +122,7 @@ async function main() {
       description: `Settle ${account.code} balance to Owner's Capital`,
       sourceType: 'migration',
       lines,
+      organizationId: org.id,
     });
     settled++;
   }

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { JournalEngine } from '../../core/double-entry/journal.engine.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 const JournalLineSchema = z.object({
   accountCode: z.string().min(1).max(10),
@@ -33,8 +34,9 @@ export async function buildJournalModule(app: FastifyInstance) {
 
   // GET / — list entries (filter by date, sourceType, accountCode)
   app.get('/', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const q = ListQuerySchema.parse(request.query);
-    const where: any = {};
+    const where: any = { organizationId };
     if (q.fromDate || q.toDate) {
       where.entryDate = {};
       if (q.fromDate) where.entryDate.gte = new Date(q.fromDate);
@@ -63,9 +65,10 @@ export async function buildJournalModule(app: FastifyInstance) {
 
   // GET /:id — single entry with all lines + documents
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const entry = await prisma.journalEntry.findUnique({
-      where: { id },
+    const entry = await prisma.journalEntry.findFirst({
+      where: { id, organizationId },
       include: {
         lines: { include: { account: true } },
         documents: { orderBy: { createdAt: 'desc' } },
@@ -86,6 +89,7 @@ export async function buildJournalModule(app: FastifyInstance) {
 
   // POST / — post manual entry (owner/manager)
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const data = ManualEntrySchema.parse(request.body);
     const authUser = (request as any).authUser;
 
@@ -97,6 +101,7 @@ export async function buildJournalModule(app: FastifyInstance) {
         sourceType: 'manual',
         lines: data.lines,
         postedBy: authUser.userId,
+        organizationId,
       });
       const entry = await prisma.journalEntry.findUnique({
         where: { id },
@@ -110,9 +115,13 @@ export async function buildJournalModule(app: FastifyInstance) {
 
   // POST /:id/reverse — post reversing entry (owner only)
   app.post('/:id/reverse', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const { reason } = z.object({ reason: z.string().optional() }).parse(request.body ?? {});
     const authUser = (request as any).authUser;
+
+    const original = await prisma.journalEntry.findFirst({ where: { id, organizationId } });
+    if (!original) return reply.status(404).send({ error: 'JOURNAL_ENTRY_NOT_FOUND' });
 
     try {
       const reversalId = await engine.reverse(id, authUser.userId, reason);

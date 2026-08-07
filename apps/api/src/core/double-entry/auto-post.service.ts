@@ -26,8 +26,16 @@ export class AutoPostService {
   ) {}
 
   async postFromFinancialRecord(recordId: string, postedBy?: string, sourceType: string = 'manual'): Promise<void> {
-    const record = await this.prisma.financialRecord.findUnique({ where: { id: recordId } });
+    const record = await this.prisma.financialRecord.findUnique({
+      where: { id: recordId },
+      include: { flock: { select: { organizationId: true } } },
+    });
     if (!record) throw new Error(`FinancialRecord not found: ${recordId}`);
+    const organizationId = record.flock?.organizationId;
+    if (!organizationId) {
+      console.warn(`[AutoPost] FinancialRecord ${recordId} has no resolvable organization; skipping journal post.`);
+      return;
+    }
 
     const mapping = record.category === 'other' && record.description?.toLowerCase().includes('mortality')
       ? MORTALITY_ENTRY
@@ -56,6 +64,7 @@ export class AutoPostService {
       sourceId: record.id,
       lines,
       postedBy,
+      organizationId,
     });
   }
 }

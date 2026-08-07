@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 const SupplierCreateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -24,8 +25,10 @@ export async function buildSupplierModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
   // GET /api/v1/suppliers
-  app.get('/', { preHandler: [authenticate] }, async () => {
+  app.get('/', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     return prisma.supplier.findMany({
+      where: { organizationId },
       include: { feedStages: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { name: 'asc' },
     });
@@ -33,9 +36,10 @@ export async function buildSupplierModule(app: FastifyInstance) {
 
   // GET /api/v1/suppliers/:id
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const supplier = await prisma.supplier.findUnique({
-      where: { id },
+    const supplier = await prisma.supplier.findFirst({
+      where: { id, organizationId },
       include: { feedStages: { orderBy: { sortOrder: 'asc' } } },
     });
     if (!supplier) return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -44,18 +48,22 @@ export async function buildSupplierModule(app: FastifyInstance) {
 
   // POST /api/v1/suppliers
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const data = SupplierCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
     return prisma.supplier.create({
-      data: { ...data, createdBy: authUser.userId },
+      data: { ...data, organizationId, createdBy: authUser.userId },
       include: { feedStages: true },
     });
   });
 
   // PATCH /api/v1/suppliers/:id
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = SupplierUpdateSchema.parse(request.body);
+    const existing = await prisma.supplier.findFirst({ where: { id, organizationId } });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
     const supplier = await prisma.supplier.update({
       where: { id },
       data,
@@ -68,13 +76,14 @@ export async function buildSupplierModule(app: FastifyInstance) {
 
   // GET /api/v1/suppliers/:id/feed-price
   app.get('/:id/feed-price', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const { feedType } = z.object({
       feedType: z.string().min(1).max(50),
     }).parse(request.query);
 
     const supplier = await prisma.supplier.findFirst({
-      where: { id },
+      where: { id, organizationId },
       include: { feedStages: true },
     });
     if (!supplier) return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -102,7 +111,10 @@ export async function buildSupplierModule(app: FastifyInstance) {
   });
   // DELETE /api/v1/suppliers/:id
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const existing = await prisma.supplier.findFirst({ where: { id, organizationId } });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
     await prisma.supplier.delete({ where: { id } });
     return { deleted: true };
   });
@@ -110,9 +122,10 @@ export async function buildSupplierModule(app: FastifyInstance) {
   // GET /api/v1/suppliers/:id/price-history
   // Returns price change history for all feed stages of this supplier
   app.get('/:id/price-history', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const supplier = await prisma.supplier.findUnique({
-      where: { id },
+    const supplier = await prisma.supplier.findFirst({
+      where: { id, organizationId },
       select: { id: true, name: true, feedStages: { select: { id: true, stageName: true } } },
     });
     if (!supplier) return reply.status(404).send({ error: 'NOT_FOUND' });
