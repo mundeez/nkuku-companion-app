@@ -38,6 +38,13 @@ services:
       KANNEL_SENDSMS_PASS: ${KANNEL_SENDSMS_PASS:-}
       KANNEL_SENDER: ${KANNEL_SENDER:-Nkuku}
       SMS_DISABLED: ${SMS_DISABLED:-false}
+      # ── Email (SMTP) ──
+      EMAIL_DISABLED: ${EMAIL_DISABLED:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Nkuku Companion <no-reply@nkuku.app>}
       # ── Social OAuth (Google, Facebook, Apple, Microsoft) ──
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}

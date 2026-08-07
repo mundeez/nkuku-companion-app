@@ -218,6 +218,84 @@ export function getUser() {
 
 export type SocialProvider = "google" | "facebook" | "apple" | "microsoft";
 
+// ── Account Management ──
+
+export async function getProfile() {
+  return apiFetch<{
+    id: string;
+    email: string | null;
+    phone: string | null;
+    name: string | null;
+    role: string;
+    phoneVerified: boolean;
+    emailVerified: boolean;
+    socialAccounts: { provider: string; providerEmail: string | null; providerName: string | null }[];
+  }>("/api/v1/account/me");
+}
+
+export async function updateProfile(name: string) {
+  return apiFetch<{ id: string; name: string; email: string; phone: string | null; role: string }>(
+    "/api/v1/account/me",
+    { method: "PATCH", body: JSON.stringify({ name }) },
+  );
+}
+
+export async function linkPhone(phone: string) {
+  return apiFetch<{ success: boolean; message: string; maskedPhone: string }>(
+    "/api/v1/account/me/phone",
+    { method: "POST", body: JSON.stringify({ phone }) },
+  );
+}
+
+export async function verifyPhone(phone: string, otp: string) {
+  return apiFetch<{ success: boolean; message: string }>(
+    "/api/v1/account/me/phone/verify",
+    { method: "POST", body: JSON.stringify({ phone, otp }) },
+  );
+}
+
+export async function unlinkPhone() {
+  return apiFetch<{ success: boolean; message: string }>(
+    "/api/v1/account/me/phone",
+    { method: "DELETE" },
+  );
+}
+
+export async function sendEmailVerification() {
+  return apiFetch<{ success: boolean; message: string; devToken?: string; devUrl?: string }>(
+    "/api/v1/account/me/email/verify",
+    { method: "POST", body: "{}" },
+  );
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  return apiFetch<{ success: boolean; message: string }>(
+    "/api/v1/account/me/password",
+    { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) },
+  );
+}
+
+export async function requestPasswordReset(email: string) {
+  return apiFetch<{ success: boolean; message: string; devToken?: string; devUrl?: string }>(
+    "/api/v1/account/password/reset",
+    { method: "POST", body: JSON.stringify({ email }) },
+  );
+}
+
+export async function confirmPasswordReset(token: string, newPassword: string) {
+  return apiFetch<{ success: boolean; message: string }>(
+    "/api/v1/account/password/reset/confirm",
+    { method: "POST", body: JSON.stringify({ token, newPassword }) },
+  );
+}
+
+export async function unlinkSocialProvider(provider: SocialProvider) {
+  return apiFetch<{ success: boolean; message: string }>(
+    `/api/v1/account/me/social/${provider}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function getSocialProviders() {
   return apiFetch<{
     providers: { provider: SocialProvider; configured: boolean }[];

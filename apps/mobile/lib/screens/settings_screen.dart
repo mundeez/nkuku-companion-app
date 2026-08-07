@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
+import 'account_settings_screen.dart';
 import 'login_screen.dart';
 import 'users_screen.dart';
 
@@ -28,6 +29,16 @@ class SettingsScreen extends StatelessWidget {
             ),
             title: Text(AuthService.user?['email'] ?? 'Unknown user'),
             subtitle: Text('Role: ${AuthService.role ?? 'unknown'}'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.security),
+            title: const Text('Account & Security'),
+            subtitle: const Text('Phone, email, password, social accounts'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
+            ),
           ),
           const Divider(),
 

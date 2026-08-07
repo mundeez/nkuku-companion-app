@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign } from "lucide-react";
+import { AccountSettings } from "@/components/auth/account-settings";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -163,20 +164,14 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
 
-        {/* User Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Account</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span className="font-medium">{user?.name || "-"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span className="font-medium">{user?.email}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Role</span><Badge>{user?.role}</Badge></div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Account & Security */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-4">Account & Security</h2>
+        <div className="max-w-2xl">
+          <AccountSettings />
+        </div>
       </div>
     </div>
   );

@@ -533,6 +533,180 @@ class AuthService {
     }
   }
 
+  // ── Account Management ──
+
+  /// Get the current user's profile + linked accounts.
+  static Future<Map<String, dynamic>?> getProfile() async {
+    _lastError = null;
+    try {
+      final response = await ApiService.dio.get('/api/v1/account/me');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return null;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return null;
+    }
+  }
+
+  /// Update display name.
+  static Future<bool> updateProfile(String name) async {
+    _lastError = null;
+    try {
+      await ApiService.dio.patch('/api/v1/account/me', data: {'name': name});
+      return true;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Initiate phone linking (sends OTP).
+  static Future<Map<String, dynamic>?> linkPhone(String phone) async {
+    _lastError = null;
+    try {
+      final response = await ApiService.dio.post(
+        '/api/v1/account/me/phone',
+        data: {'phone': phone},
+        options: Options(validateStatus: (s) => s! < 500),
+      );
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      } else {
+        final data = response.data;
+        _lastError = (data is Map && data['message'] != null)
+            ? data['message'].toString()
+            : 'Failed to send OTP';
+        return null;
+      }
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return null;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return null;
+    }
+  }
+
+  /// Verify OTP and link phone.
+  static Future<bool> verifyPhone(String phone, String otp) async {
+    _lastError = null;
+    try {
+      final response = await ApiService.dio.post(
+        '/api/v1/account/me/phone/verify',
+        data: {'phone': phone, 'otp': otp},
+        options: Options(validateStatus: (s) => s! < 500),
+      );
+      if (response.statusCode == 200) return true;
+      final data = response.data;
+      _lastError = (data is Map && data['message'] != null)
+          ? data['message'].toString()
+          : 'Verification failed';
+      return false;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Unlink phone.
+  static Future<bool> unlinkPhone() async {
+    _lastError = null;
+    try {
+      await ApiService.dio.delete('/api/v1/account/me/phone');
+      return true;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Send email verification link.
+  static Future<bool> sendEmailVerification() async {
+    _lastError = null;
+    try {
+      await ApiService.dio.post('/api/v1/account/me/email/verify', data: {});
+      return true;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Change password (requires current password).
+  static Future<bool> changePassword(
+      String currentPassword, String newPassword) async {
+    _lastError = null;
+    try {
+      final response = await ApiService.dio.post(
+        '/api/v1/account/me/password',
+        data: {
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        },
+        options: Options(validateStatus: (s) => s! < 500),
+      );
+      if (response.statusCode == 200) return true;
+      final data = response.data;
+      _lastError = (data is Map && data['message'] != null)
+          ? data['message'].toString()
+          : 'Password change failed';
+      return false;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Request password reset (public — no auth needed).
+  static Future<bool> requestPasswordReset(String email) async {
+    _lastError = null;
+    try {
+      await ApiService.dio.post(
+        '/api/v1/account/password/reset',
+        data: {'email': email},
+      );
+      return true;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Unlink a social provider.
+  static Future<bool> unlinkSocialProvider(String provider) async {
+    _lastError = null;
+    try {
+      await ApiService.dio.delete('/api/v1/account/me/social/$provider');
+      return true;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
   static Future<void> logout() async {
     _token = null;
     _user = null;

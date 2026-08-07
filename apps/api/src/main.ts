@@ -17,6 +17,7 @@ import { buildProjectionModule } from './modules/projections/routes.js';
 import { buildExpansionPlanModule } from './modules/expansion-plan/routes.js';
 import { buildOverheadModule } from './modules/overhead/routes.js';
 import { buildUserModule } from './modules/users/routes.js';
+import { buildAccountModule as buildUserAccountModule } from './modules/account/routes.js';
 import { buildOrganizationModule } from './modules/organizations/routes.js';
 import { buildBreedModule } from './modules/breeds/routes.js';
 import { buildBroilerFlockModule } from './modules/broiler-flocks/routes.js';
@@ -116,6 +117,19 @@ try {
   app.log.error(`[Storage] Bucket setup failed: ${err.message}`);
 }
 
+// ── Global error handler — convert Zod errors to 400 ──
+// Must be set BEFORE registering modules so it applies to all routes.
+app.setErrorHandler((err: any, request: any, reply: any) => {
+  if (err?.name === 'ZodError') {
+    return reply.status(400).send({
+      error: 'VALIDATION_ERROR',
+      message: err.errors?.[0]?.message || 'Invalid request',
+    });
+  }
+  // Let Fastify handle other errors (including its own 404 for not-found routes)
+  reply.send(err);
+});
+
 // ── Register modules ─────────────────────
 await app.register(buildAuthModule, { prefix: '/api/v1/auth' });
 await app.register(buildSupplierModule, { prefix: '/api/v1/suppliers' });
@@ -126,6 +140,7 @@ await app.register(buildProjectionModule, { prefix: '/api/v1/projections' });
 await app.register(buildExpansionPlanModule, { prefix: '/api/v1/expansion-plan' });
 await app.register(buildOverheadModule, { prefix: '/api/v1/overhead' });
 await app.register(buildUserModule, { prefix: '/api/v1/users' });
+await app.register(buildUserAccountModule, { prefix: '/api/v1/account' });
 await app.register(buildOrganizationModule, { prefix: '/api/v1/organizations' });
 await app.register(buildBreedModule, { prefix: '/api/v1/breeds' });
 await app.register(buildBroilerFlockModule, { prefix: '/api/v1/broiler-flocks' });
