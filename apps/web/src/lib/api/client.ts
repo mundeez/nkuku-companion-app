@@ -2,11 +2,26 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export type ApiError = { error: string; message?: string };
 
-export function getToken(): string | null {
+// Tokens are now stored in HttpOnly cookies set by the API.
+// We only keep the user object (email/role) in localStorage for UI state.
+function getUserFromStorage() {
   if (typeof window !== "undefined") {
-    return localStorage.getItem("nkuku_access_token");
+    const raw = localStorage.getItem("nkuku_user");
+    return raw ? JSON.parse(raw) : null;
   }
   return null;
+}
+
+function setUserInStorage(user: any) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("nkuku_user", JSON.stringify(user));
+  }
+}
+
+function clearUserFromStorage() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("nkuku_user");
+  }
 }
 
 function handleAuthError(errorCode: string) {
@@ -14,9 +29,7 @@ function handleAuthError(errorCode: string) {
     typeof window !== "undefined" &&
     (errorCode === "INVALID_TOKEN" || errorCode === "MISSING_TOKEN")
   ) {
-    localStorage.removeItem("nkuku_access_token");
-    localStorage.removeItem("nkuku_refresh_token");
-    localStorage.removeItem("nkuku_user");
+    clearUserFromStorage();
     window.location.href = "/login";
   }
 }
@@ -25,17 +38,16 @@ export async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const url = API_URL ? `${API_URL}${path}` : path;
   const res = await fetch(url, {
     ...options,
     headers,
+    credentials: "include", // send HttpOnly cookies
   });
 
   const data = await res.json().catch(() => null);
@@ -51,12 +63,15 @@ export async function apiUpload(
   path: string,
   formData: FormData,
 ): Promise<any> {
-  const token = getToken();
   const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
   // Do NOT set Content-Type — browser sets it with boundary automatically
   const url = API_URL ? `${API_URL}${path}` : path;
-  const res = await fetch(url, { method: "POST", headers, body: formData });
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+    credentials: "include", // send HttpOnly cookies
+  });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const errorCode = data?.error || `HTTP ${res.status}`;
@@ -74,11 +89,8 @@ export async function login(email: string, password: string) {
       body: JSON.stringify({ email, password }),
     }
   );
-  if (typeof window !== "undefined") {
-    localStorage.setItem("nkuku_access_token", data.accessToken);
-    localStorage.setItem("nkuku_refresh_token", data.refreshToken);
-    localStorage.setItem("nkuku_user", JSON.stringify(data.user));
-  }
+  // Tokens are set as HttpOnly cookies by the API; just store user for UI.
+  setUserInStorage(data.user);
   return data;
 }
 
@@ -100,11 +112,7 @@ export async function register(body: {
     method: "POST",
     body: JSON.stringify(body),
   });
-  if (typeof window !== "undefined") {
-    localStorage.setItem("nkuku_access_token", data.accessToken);
-    localStorage.setItem("nkuku_refresh_token", data.refreshToken);
-    localStorage.setItem("nkuku_user", JSON.stringify(data.user));
-  }
+  setUserInStorage(data.user);
   return data;
 }
 
@@ -122,26 +130,19 @@ export async function acceptInvite(body: {
     method: "POST",
     body: JSON.stringify(body),
   });
-  if (typeof window !== "undefined") {
-    localStorage.setItem("nkuku_access_token", data.accessToken);
-    localStorage.setItem("nkuku_refresh_token", data.refreshToken);
-    localStorage.setItem("nkuku_user", JSON.stringify(data.user));
-  }
+  setUserInStorage(data.user);
   return data;
 }
 
-export function logout() {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("nkuku_access_token");
-    localStorage.removeItem("nkuku_refresh_token");
-    localStorage.removeItem("nkuku_user");
+export async function logout() {
+  try {
+    await apiFetch("/api/v1/auth/logout", { method: "POST" });
+  } catch {
+    // Ignore errors — clear local state regardless
   }
+  clearUserFromStorage();
 }
 
 export function getUser() {
-  if (typeof window !== "undefined") {
-    const raw = localStorage.getItem("nkuku_user");
-    return raw ? JSON.parse(raw) : null;
-  }
-  return null;
+  return getUserFromStorage();
 }

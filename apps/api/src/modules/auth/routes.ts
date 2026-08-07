@@ -47,8 +47,38 @@ const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required — refusing to start without it');
 }
+// After the runtime check above, JWT_SECRET is guaranteed non-null.
+// The `!` assertion tells TypeScript what the runtime check already ensures.
+const SECRET: string = JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+
+// Cookie options for HttpOnly auth tokens (web clients).
+// Mobile clients use the Bearer token from the JSON body instead.
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+};
+
+// Helper: set auth cookies on the reply (for web clients).
+function setAuthCookies(reply: any, accessToken: string, refreshToken: string) {
+  reply.setCookie('nkuku_access_token', accessToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: 15 * 60, // 15 minutes
+  });
+  reply.setCookie('nkuku_refresh_token', refreshToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+  });
+}
+
+// Helper: clear auth cookies (for logout).
+function clearAuthCookies(reply: any) {
+  reply.clearCookie('nkuku_access_token', { path: '/' });
+  reply.clearCookie('nkuku_refresh_token', { path: '/' });
+}
 
 // A user's "primary" organization is their earliest membership. Multi-org
 // membership (switching between organizations) is a Phase 2 concern; for
@@ -107,13 +137,15 @@ export async function buildAuthModule(app: FastifyInstance) {
       role: user.role,
       organizationId: organization.id,
     };
-    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
-    const refreshToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+    const accessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+    const refreshToken = jwt.sign({ userId: user.id }, SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
 
     const redis = (app as any).redis;
     if (redis) {
       await redis.setex(`refresh:${user.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
     }
+
+    setAuthCookies(reply, accessToken, refreshToken);
 
     return reply.status(201).send({
       accessToken,
@@ -200,13 +232,15 @@ export async function buildAuthModule(app: FastifyInstance) {
       role: invite.role,
       organizationId: invite.organizationId,
     };
-    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
-    const refreshToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+    const accessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+    const refreshToken = jwt.sign({ userId: user.id }, SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
 
     const redis = (app as any).redis;
     if (redis) {
       await redis.setex(`refresh:${user.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
     }
+
+    setAuthCookies(reply, accessToken, refreshToken);
 
     return reply.status(201).send({
       accessToken,
@@ -242,14 +276,16 @@ export async function buildAuthModule(app: FastifyInstance) {
       organizationId,
     };
 
-    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
-    const refreshToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+    const accessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+    const refreshToken = jwt.sign({ userId: user.id }, SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
 
     // Store refresh token in Redis (simple blacklist approach)
     const redis = (app as any).redis;
     if (redis) {
       await redis.setex(`refresh:${user.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
     }
+
+    setAuthCookies(reply, accessToken, refreshToken);
 
     return {
       accessToken,
@@ -260,9 +296,15 @@ export async function buildAuthModule(app: FastifyInstance) {
 
   // POST /api/v1/auth/refresh
   app.post('/refresh', async (request, reply) => {
-    const body = z.object({ refreshToken: z.string() }).parse(request.body);
+    // Accept refresh token from body (mobile) or cookie (web)
+    const bodyToken = (request.body as any)?.refreshToken;
+    const cookieToken = (request as any).cookies?.nkuku_refresh_token;
+    const refreshTokenValue = bodyToken || cookieToken;
+    if (!refreshTokenValue) {
+      return reply.status(400).send({ error: 'MISSING_REFRESH_TOKEN' });
+    }
     try {
-      const decoded = jwt.verify(body.refreshToken, JWT_SECRET) as any;
+      const decoded = jwt.verify(refreshTokenValue, SECRET) as any;
       const prisma = (app as any).prisma;
       const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
       if (!user || !user.isActive) {
@@ -273,11 +315,22 @@ export async function buildAuthModule(app: FastifyInstance) {
         return reply.status(403).send({ error: 'NO_ORGANIZATION' });
       }
       const payload: TokenPayload = { userId: user.id, email: user.email, role: user.role, organizationId };
-      const newAccessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+      const newAccessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+      // Rotate the access token cookie for web clients
+      reply.setCookie('nkuku_access_token', newAccessToken, {
+        ...COOKIE_OPTIONS,
+        maxAge: 15 * 60,
+      });
       return { accessToken: newAccessToken };
     } catch {
       return reply.status(401).send({ error: 'INVALID_REFRESH_TOKEN' });
     }
+  });
+
+  // POST /api/v1/auth/logout — clears HttpOnly cookies (web clients)
+  app.post('/logout', async (request, reply) => {
+    clearAuthCookies(reply);
+    return { success: true };
   });
 
   // GET /api/v1/auth/me
@@ -291,13 +344,20 @@ export async function buildAuthModule(app: FastifyInstance) {
 
 // ── Auth middleware ────────────────────────
 export async function authenticate(request: any, reply: any) {
+  // Check Bearer header first (mobile clients), then fall back to cookie (web)
   const auth = request.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
+  let token: string | null = null;
+  if (auth && auth.startsWith('Bearer ')) {
+    token = auth.slice(7);
+  } else if (request.cookies?.nkuku_access_token) {
+    token = request.cookies.nkuku_access_token;
+  }
+
+  if (!token) {
     return reply.status(401).send({ error: 'MISSING_TOKEN' });
   }
-  const token = auth.slice(7);
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, SECRET) as any;
     const payload = TokenPayloadSchema.parse(decoded);
 
     // Validate user still exists and is active in DB

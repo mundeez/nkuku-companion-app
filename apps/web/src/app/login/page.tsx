@@ -13,8 +13,8 @@ import { login } from "@/lib/api/client";
 export default function LoginPage() {
   const router = useRouter();
   const { refreshUser } = useAuth();
-  const [email, setEmail] = useState("owner@nkuku.local");
-  const [password, setPassword] = useState("change_me");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 

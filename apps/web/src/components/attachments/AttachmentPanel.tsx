@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { apiFetch, apiUpload, getToken, API_URL } from "@/lib/api/client";
+import { apiFetch, apiUpload, API_URL } from "@/lib/api/client";
 import { DocumentRecord } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,9 +44,8 @@ function fileIcon(mimeType: string) {
 }
 
 async function downloadFile(doc: DocumentRecord) {
-  const token = getToken();
   const res = await fetch(`${API_URL}/api/v1/documents/${doc.id}/download`, {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   });
   if (!res.ok) {
     alert("Failed to download file.");
@@ -62,9 +61,8 @@ async function downloadFile(doc: DocumentRecord) {
 }
 
 async function viewFile(doc: DocumentRecord) {
-  const token = getToken();
   const res = await fetch(`${API_URL}/api/v1/documents/${doc.id}/view`, {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   });
   if (!res.ok) {
     alert("Failed to view file.");

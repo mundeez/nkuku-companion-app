@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 import 'api_service.dart';
 
@@ -7,6 +8,7 @@ class AuthService {
   static String? _token;
   static Map<String, dynamic>? _user;
   static late SharedPreferences _prefs;
+  static late FlutterSecureStorage _secure;
 
   static bool get isLoggedIn => _token != null && _token!.isNotEmpty;
   static String? get token => _token;
@@ -43,7 +45,8 @@ class AuthService {
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
-    _token = _prefs.getString('access_token');
+    _secure = const FlutterSecureStorage();
+    _token = await _secure.read(key: 'access_token');
     // Restore user object from individually stored fields
     final userEmail = _prefs.getString('user_email');
     final userRole = _prefs.getString('user_role');
@@ -55,6 +58,21 @@ class AuthService {
   static String? _lastError;
 
   static String? get lastError => _lastError;
+
+  /// Persist tokens to secure storage (Keystore/Keychain) and user info
+  /// to SharedPreferences (non-sensitive — just email/role for UI).
+  static Future<void> _persistSession({
+    required String accessToken,
+    required String refreshToken,
+    required Map<String, dynamic> user,
+  }) async {
+    _token = accessToken;
+    _user = user;
+    await _secure.write(key: 'access_token', value: accessToken);
+    await _secure.write(key: 'refresh_token', value: refreshToken);
+    await _prefs.setString('user_email', user['email'] ?? '');
+    await _prefs.setString('user_role', user['role'] ?? 'viewer');
+  }
 
   static Future<bool> login(String email, String password) async {
     _lastError = null;
@@ -69,12 +87,11 @@ class AuthService {
         return false;
       }
       final data = res.data;
-      _token = data['accessToken'];
-      _user = data['user'];
-      await _prefs.setString('access_token', _token!);
-      await _prefs.setString('refresh_token', data['refreshToken']);
-      await _prefs.setString('user_email', _user!['email']);
-      await _prefs.setString('user_role', _user!['role'] ?? 'viewer');
+      await _persistSession(
+        accessToken: data['accessToken'],
+        refreshToken: data['refreshToken'],
+        user: data['user'],
+      );
       _notifyAuthStateChanged();
       return true;
     } on DioException catch (e) {
@@ -118,12 +135,11 @@ class AuthService {
         return false;
       }
       final data = res.data;
-      _token = data['accessToken'];
-      _user = data['user'];
-      await _prefs.setString('access_token', _token!);
-      await _prefs.setString('refresh_token', data['refreshToken']);
-      await _prefs.setString('user_email', _user!['email']);
-      await _prefs.setString('user_role', _user!['role'] ?? 'viewer');
+      await _persistSession(
+        accessToken: data['accessToken'],
+        refreshToken: data['refreshToken'],
+        user: data['user'],
+      );
       _notifyAuthStateChanged();
       return true;
     } on DioException catch (e) {
@@ -172,12 +188,11 @@ class AuthService {
         return false;
       }
       final data = res.data;
-      _token = data['accessToken'];
-      _user = data['user'];
-      await _prefs.setString('access_token', _token!);
-      await _prefs.setString('refresh_token', data['refreshToken']);
-      await _prefs.setString('user_email', _user!['email']);
-      await _prefs.setString('user_role', _user!['role'] ?? 'viewer');
+      await _persistSession(
+        accessToken: data['accessToken'],
+        refreshToken: data['refreshToken'],
+        user: data['user'],
+      );
       _notifyAuthStateChanged();
       return true;
     } on DioException catch (e) {
@@ -227,8 +242,8 @@ class AuthService {
   static Future<void> logout() async {
     _token = null;
     _user = null;
-    await _prefs.remove('access_token');
-    await _prefs.remove('refresh_token');
+    await _secure.delete(key: 'access_token');
+    await _secure.delete(key: 'refresh_token');
     await _prefs.remove('user_email');
     await _prefs.remove('user_role');
     _notifyAuthStateChanged();

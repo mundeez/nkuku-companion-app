@@ -6,14 +6,14 @@ import { getUser, logout as doLogout } from "@/lib/api/client";
 interface AuthContextType {
   user: any | null;
   isLoading: boolean;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
-  logout: () => {},
+  logout: async () => {},
   refreshUser: () => {},
 });
 
@@ -30,8 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
-  const logout = () => {
-    doLogout();
+  const logout = async () => {
+    await doLogout();
     setUser(null);
     window.location.href = "/login";
   };

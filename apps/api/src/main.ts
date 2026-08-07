@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -57,6 +58,12 @@ const corsOrigins = process.env.CORS_ORIGINS
   : true;
 
 await app.register(cors, { origin: corsOrigins, credentials: true });
+
+// Cookie support for HttpOnly auth tokens (web clients).
+// Mobile clients continue to use Bearer tokens from the JSON response body.
+await app.register(cookie, {
+  secret: process.env.JWT_SECRET || 'dev_cookie_secret',
+});
 
 await app.register(multipart, {
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB

@@ -46,3 +46,8 @@ app.*.map.json
 
 # Kotlin build daemon artifacts
 /android/.kotlin/
+
+# Release keystore — never commit signing credentials
+/android/key.properties
+*.keystore
+*.jks
