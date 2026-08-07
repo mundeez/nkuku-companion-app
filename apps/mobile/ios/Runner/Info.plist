@@ -66,5 +66,57 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<!-- ── Social Login Configuration ── -->
+
+	<!-- Apple Sign In capability — required for "Sign in with Apple" -->
+	<!-- Also add the "Sign in with Apple" capability in Xcode → Signing & Capabilities -->
+
+	<!-- Facebook SDK -->
+	<key>FacebookAppID</key>
+	<string>000000000000000</string>
+	<key>FacebookClientToken</key>
+	<string>YOUR_CLIENT_TOKEN_HERE</string>
+	<key>FacebookDisplayName</key>
+	<string>Nkuku Companion</string>
+
+	<!-- Facebook URL scheme — must be "fb<AppID>" -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb000000000000000</string>
+			</array>
+		</dict>
+		<!-- Google Sign In URL scheme — replace with your reversed client ID -->
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.YOUR_REVERSED_CLIENT_ID</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- Facebook app events (required by flutter_facebook_auth) -->
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<false/>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<false/>
+
+	<!-- LSApplicationQueriesSchemes — allow Facebook app to open -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fbapi</string>
+		<string>fbapi20130214</string>
+		<string>fbapi20130410</string>
+		<string>fbapi20140116</string>
+		<string>fbapi20140316</string>
+		<string>fbapi20140618</string>
+		<string>fbapi20160328</string>
+		<string>fbauth</string>
+		<string>fbauth2</string>
+		<string>fbshareextension</string>
+	</array>
 </dict>
 </plist>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Facebook SDK configuration.
+      Replace these placeholder values with your actual Facebook App credentials
+      from https://developers.facebook.com/apps/
+
+      1. Create a Facebook app and add the Android platform
+      2. Set facebook_app_id to your App ID (numeric)
+      3. Set facebook_client_token to your Client Token (found in
+         App Settings → Advanced → Security → Client Token)
+      4. Set fb_login_protocol_scheme to "fb<your_app_id>"
+    -->
+    <string name="facebook_app_id">000000000000000</string>
+    <string name="facebook_client_token">YOUR_CLIENT_TOKEN_HERE</string>
+    <string name="fb_login_protocol_scheme">fb000000000000000</string>
+</resources>
