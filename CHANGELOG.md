@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.10.0-alpha — 2026-08-07
+
+### Added
+- **Phase 1c — database-enforced multi-tenancy.**
+  - Set `organization_id` NOT NULL on `suppliers`, `production_cycles`, `broiler_flocks`, `documents`, `monthly_overheads`, `lighting_temperature_schedules`, `sale_records`, `batches`, and `ledger_balances`. All had zero orphaned rows; Prisma relations switched from optional `SetNull` to required `Restrict`.
+- **Phase 1b follow-up — legacy planning module organization scoping.**
+  - `Batch` gained its own `organizationId` column (backfilled into Organization #1; zero orphans verified) since it is tenant-owned execution data. `ProductionCycle` correctly remains shared as a read-only seeded reference catalog (14 cycles).
+  - Org-scoped CRUD and queries: `batches`, `overhead-costs` and `mortality-records` (via batch ownership), projections `/calculate` and `/save` (via supplier + batch ownership), and `feed-stages` (via supplier ownership).
+  - Added `organizationId` to documents at upload time and to the full-text search global-search fallback; added `organizationId` to the web `User` TypeScript type for correctness.
+
+### Changed
+- **Seed script (`db/seeds/main.ts`)** now creates "Organization #1" and enrolls the owner plus disabled test users as members; all seeded suppliers, production cycles, batches, and lighting-temperature defaults are tagged with it. Fresh deployments previously had no organization at all, which would have left the owner unable to log in (login now 403s with `NO_ORGANIZATION`).
+- **Deprecated financial-engine overhead-allocation service** (MonthlyOverhead CRUD and the daily cron re-allocation job) now uses `organizationId` end-to-end. The daily cron now iterates organizations instead of users.
+
+### Fixed
+- **Cross-tenant data leaks.**
+  - `/api/v1/dashboard/summary` was aggregating KPIs (flocks, alerts, financial records) across **all** organizations; it now filters by the authenticated user's organization.
+  - The documents module's central `resolveOwnership` and `checkDocumentOwnership` helpers — used by every document route (`list`/`search`/`get`/`download`/`view`/`patch`/`delete`) — were checking `flock.createdBy` (individual user) instead of organization membership, and the `JournalEntry` branch did not check organization ownership at all. Both now enforce organization membership.
+
+### Known Limitations
+- `journal_entries.organization_id` deliberately stays nullable pending an explicit user decision on 18 pre-existing test-generated entries that have no organization. Fixing them requires temporarily suspending the immutability RULE on `journal_entries`, a financial-integrity control that should not be touched without approval. Documented as an explicit open item in `docs/MONETIZATION_PLAN.md`.
+
+### Test Summary
+- Full unit + integration suite (163 tests) green on two independent clean runs after Phase 1c.
+
 ## v1.9.0-alpha — 2026-08-07
 
 ### Added
