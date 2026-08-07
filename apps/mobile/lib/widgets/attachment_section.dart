@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../models/document.dart';
 import '../../../services/broiler_service.dart';
 import '../../../services/auth_service.dart';
-import 'records/document_form.dart';
+import '../screens/broiler/records/document_form.dart';
 
 /// A reusable widget that displays and manages document attachments
 /// for any financial transaction (FinancialRecord, JournalEntry, SaleRecord, or Flock).
@@ -72,7 +72,9 @@ class _AttachmentSectionState extends State<AttachmentSection> {
         title: const Text('Delete Document'),
         content: const Text('Are you sure you want to delete this document?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
@@ -143,17 +145,23 @@ class _AttachmentSectionState extends State<AttachmentSection> {
             ),
             const Divider(),
             if (_loading)
-              const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+              const Center(
+                  child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator()))
             else if (_error != null)
               Padding(
                 padding: const EdgeInsets.all(8),
-                child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                child: Text(_error!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
               )
             else if (_documents.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Center(
-                  child: Text('No attachments yet', style: TextStyle(color: Colors.grey)),
+                  child: Text('No attachments yet',
+                      style: TextStyle(color: Colors.grey)),
                 ),
               )
             else
@@ -166,8 +174,12 @@ class _AttachmentSectionState extends State<AttachmentSection> {
                   final doc = _documents[index];
                   return ListTile(
                     leading: Icon(
-                      doc.mimeType.startsWith('image/') ? Icons.image : Icons.description,
-                      color: doc.mimeType.contains('pdf') ? Colors.red : Colors.blue,
+                      doc.mimeType.startsWith('image/')
+                          ? Icons.image
+                          : Icons.description,
+                      color: doc.mimeType.contains('pdf')
+                          ? Colors.red
+                          : Colors.blue,
                     ),
                     title: Text(doc.fileName, overflow: TextOverflow.ellipsis),
                     subtitle: Text(
@@ -177,9 +189,11 @@ class _AttachmentSectionState extends State<AttachmentSection> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (doc.scanStatus == 'clean')
-                          const Icon(Icons.verified_user, size: 16, color: Colors.green)
+                          const Icon(Icons.verified_user,
+                              size: 16, color: Colors.green)
                         else if (doc.scanStatus == 'skipped')
-                          const Icon(Icons.warning, size: 16, color: Colors.orange),
+                          const Icon(Icons.warning,
+                              size: 16, color: Colors.orange),
                         if (canManage) ...[
                           IconButton(
                             icon: const Icon(Icons.delete_outline, size: 20),

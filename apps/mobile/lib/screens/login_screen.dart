@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../widgets/bottom_nav.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,18 +17,25 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
 
   Future<void> _login() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     final ok = await AuthService.login(
       _emailController.text,
       _passwordController.text,
     );
-    setState(() { _loading = false; });
+    setState(() {
+      _loading = false;
+    });
     if (ok && mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const BottomNavShell()),
       );
     } else {
-      setState(() { _error = AuthService.lastError ?? 'Invalid credentials'; });
+      setState(() {
+        _error = AuthService.lastError ?? 'Invalid credentials';
+      });
     }
   }
 
@@ -41,7 +49,8 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Image.asset('assets/images/logo.png', height: 96, fit: BoxFit.contain),
+              Image.asset('assets/images/logo.png',
+                  height: 96, fit: BoxFit.contain),
               const SizedBox(height: 16),
               const Text(
                 'Nkuku Companion',
@@ -85,9 +94,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
                     : const Text('Sign In'),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SignupScreen()),
+                  );
+                },
+                child: const Text('Don\'t have an account? Create one'),
               ),
             ],
           ),
@@ -103,4 +122,3 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 }
-
