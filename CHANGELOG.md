@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.11.1-alpha — 2026-08-07
+
+### Mobile — Phase 2 Self-Serve Signup & Invite Acceptance
+
+**New screens:**
+- SignupScreen: self-serve organization creation with country, currency, and consent checkbox (Zambia DPA No. 3 of 2021)
+- AcceptInviteScreen: paste invite token or full URL; handles new-account (name+password required) and existing-account flows
+
+**Auth service:**
+- `AuthService.register()` — POST /api/v1/auth/register with org name, country, currency, consent
+- `AuthService.acceptInvite()` — POST /api/v1/auth/accept-invite with token, optional name/password
+- Shared `_dioError()` and `_httpError()` helpers for consistent error messages
+
+**Bug fixes:**
+- Fix 4xx error handling in login/register/acceptInvite: `validateStatus` allows <500 through without throwing DioException, so 401/409/400 responses were reaching `data['accessToken']` and crashing with a null-check error. Now checks `res.statusCode` before parsing the response body.
+- Fix `attachment_section.dart` import: was referencing an untracked duplicate `records/document_form.dart`; now correctly imports the committed `screens/broiler/records/document_form.dart`
+
+**Login screen:**
+- Added "Don't have an account? Create one" link to SignupScreen
+
+**Validation:**
+- flutter analyze: PASS (no issues)
+- flutter test: PASS (55 tests)
+- flutter build apk --debug: PASS (157 MB)
+- dart format: clean on all touched files
+- Security: 0 dependency vulnerabilities (OSV scan of 135 packages)
+
+**Known pre-existing security findings (out of scope, noted for future remediation):**
+- Hard-coded default owner credentials in login_screen.dart
+- Release builds signed with debug key
+- JWT tokens stored in unencrypted SharedPreferences
+- Android network config trusts user-installed CAs
+
 ## v1.11.0-alpha — 2026-08-07
 
 ### Added
