@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.9.0-alpha — 2026-08-07
+
+### Added
+- **Multi-tenancy schema foundation (Phase 1a).**
+  - New `Organization`, `OrganizationMember`, and `Subscription` models plus supporting enums.
+  - `organizationId` added to all tenant-scoped tables (`suppliers`, `production_cycles`, `broiler_flocks`, `documents`, `monthly_overheads`, `lighting_temperature_schedules`, `sale_records`, `accounts`, `journal_entries`, and flock-child records).
+  - Shared catalog data (`breeds`, `performance targets`, `diseases`, `vaccination schedule templates`, `equipment catalog`) intentionally remains global/unscoped.
+  - Chart-of-accounts and journal entry-number uniqueness re-scoped from global to per-organization.
+  - `apps/api/prisma/sql/multi-tenancy-foundation.sql` backfills all existing production data into "Organization #1" using column DEFAULTs to avoid violating the immutability RULE on `journal_entries`.
+  - New `docs/MONETIZATION_PLAN.md` documents the phased multi-tenancy/monetization roadmap.
+
+### Changed
+- **Org-scoped API layer (Phase 1b).**
+  - JWT payload now carries `organizationId` resolved from `OrganizationMember` at login/refresh; `authenticate()` attaches it to every request.
+  - New `apps/api/src/core/tenancy/scope.ts` provides `getOrganizationId()` and flock-ownership assertion helpers.
+  - All core API modules now create/read/update/delete within the authenticated user's organization: suppliers, broiler flocks, growth/feed/water/mortality/vaccination/medication/environmental records, flock tasks, financial records, alerts, sale records, and documents. Several were previously filtering by `createdBy` (individual user), now corrected to organization-wide sharing for team/farm use.
+  - Double-entry ledger: manual journal entries, auto-posted entries from `FinancialRecord`, reversals, year-end closing, and all financial reports (trial balance, income statement, balance sheet, cash flow, period close) now require and filter by `organizationId`.
+  - `LedgerBalance` now includes `organizationId` so materialized period balances do not mix tenants.
+
+### Fixed
+- **`prisma db push` footgun with `search_vector`.** The PostgreSQL `tsvector` `search_vector` column on `documents` cannot be represented in Prisma, so `prisma db push --accept-data-loss` would silently drop it. The required re-apply step (`documents-search.sql`) is documented in `AGENTS.md`.
+- **Chart-of-accounts uniqueness regression.** A briefly-introduced `@@unique` constraint on `Account` was reverted after it became clear it would require rewriting the entire double-entry service layer for no isolation benefit; the reasoning is captured in a `schema.prisma` comment.
+
+### Known Limitations
+- The legacy Milestone-1 planning module (`production_cycles`, `batches`, `expansion-plan`, `overhead-costs`) is **not yet org-scoped**.
+- The deprecated `financial-engine` v0.8.0 endpoints are **not yet org-scoped**.
+- Both are explicitly deferred in `docs/MONETIZATION_PLAN.md` Phase 1b and must be completed before Phase 2 self-serve signup.
+- `organizationId` columns remain nullable pending Phase 1c, when all write paths (including deferred modules) are confirmed to populate them.
+
+### Test Summary
+- 163 tests pass (48 unit + 115 integration) on two independent clean runs.
+- Zero data loss verified after backfill: all tenant tables show 0 orphaned (`organization_id IS NULL`) rows.
+
 ## v1.6.1-alpha — 2026-08-04
 
 ### Fixed
