@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 const BatchCreateSchema = z.object({
   cycleId: z.string().uuid(),
@@ -23,12 +24,14 @@ export async function buildBatchModule(app: FastifyInstance) {
 
   // GET /api/v1/batches
   app.get('/', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const query = z.object({
       cycleId: z.string().uuid().optional(),
       status: z.enum(['planned', 'active', 'harvested', 'closed']).optional(),
     }).parse(request.query);
     return prisma.batch.findMany({
       where: {
+        organizationId,
         cycleId: query.cycleId,
         status: query.status,
       },
@@ -39,9 +42,10 @@ export async function buildBatchModule(app: FastifyInstance) {
 
   // GET /api/v1/batches/:id
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const batch = await prisma.batch.findUnique({
-      where: { id },
+    const batch = await prisma.batch.findFirst({
+      where: { id, organizationId },
       include: {
         supplier: { include: { feedStages: true } },
         cycle: true,
@@ -57,18 +61,22 @@ export async function buildBatchModule(app: FastifyInstance) {
 
   // POST /api/v1/batches
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const data = BatchCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
     return prisma.batch.create({
-      data: { ...data, createdBy: authUser.userId },
+      data: { ...data, createdBy: authUser.userId, organizationId },
       include: { supplier: true, cycle: true },
     });
   });
 
   // PATCH /api/v1/batches/:id
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = BatchUpdateSchema.parse(request.body);
+    const existing = await prisma.batch.findFirst({ where: { id, organizationId } });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
     return prisma.batch.update({
       where: { id },
       data,
@@ -78,7 +86,10 @@ export async function buildBatchModule(app: FastifyInstance) {
 
   // DELETE /api/v1/batches/:id
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const existing = await prisma.batch.findFirst({ where: { id, organizationId } });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
     await prisma.batch.delete({ where: { id } });
     return { deleted: true };
   });

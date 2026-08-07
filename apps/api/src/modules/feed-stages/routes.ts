@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 const FeedStageCreateSchema = z.object({
   supplierId: z.string().uuid(),
@@ -22,28 +23,33 @@ export async function buildFeedStageModule(app: FastifyInstance) {
 
   // GET /api/v1/feed-stages?supplierId=...
   app.get('/', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const query = z.object({ supplierId: z.string().uuid().optional() }).parse(request.query);
     return prisma.feedStage.findMany({
-      where: query.supplierId ? { supplierId: query.supplierId } : undefined,
+      where: { supplierId: query.supplierId, supplier: { organizationId } },
       orderBy: { sortOrder: 'asc' },
       include: { supplier: true },
     });
   });
 
   // POST /api/v1/feed-stages
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const data = FeedStageCreateSchema.parse(request.body);
+    const supplier = await prisma.supplier.findFirst({ where: { id: data.supplierId, organizationId } });
+    if (!supplier) return reply.status(404).send({ error: 'SUPPLIER_NOT_FOUND' });
     return prisma.feedStage.create({ data, include: { supplier: true } });
   });
 
   // PATCH /api/v1/feed-stages/:id
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = FeedStageUpdateSchema.parse(request.body);
     const authUser = (request as any).authUser;
 
     // Fetch the existing record to compare price/size before updating
-    const existing = await prisma.feedStage.findUnique({ where: { id } });
+    const existing = await prisma.feedStage.findFirst({ where: { id, supplier: { organizationId } } });
     if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
 
     const updated = await prisma.feedStage.update({
@@ -73,7 +79,10 @@ export async function buildFeedStageModule(app: FastifyInstance) {
 
   // GET /api/v1/feed-stages/:id/price-history
   app.get('/:id/price-history', { preHandler: [authenticate] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const stage = await prisma.feedStage.findFirst({ where: { id, supplier: { organizationId } } });
+    if (!stage) return reply.status(404).send({ error: 'NOT_FOUND' });
     return prisma.feedStagePriceHistory.findMany({
       where: { feedStageId: id },
       orderBy: { changedAt: 'desc' },
@@ -82,7 +91,10 @@ export async function buildFeedStageModule(app: FastifyInstance) {
 
   // DELETE /api/v1/feed-stages/:id
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const existing = await prisma.feedStage.findFirst({ where: { id, supplier: { organizationId } } });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
     await prisma.feedStage.delete({ where: { id } });
     return { deleted: true };
   });

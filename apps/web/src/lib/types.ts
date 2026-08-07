@@ -6,6 +6,7 @@ export interface User {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  organizationId?: string;
 }
 
 export interface Supplier {

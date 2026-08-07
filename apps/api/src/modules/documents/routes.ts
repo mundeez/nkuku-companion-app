@@ -85,13 +85,15 @@ async function resolveOwnership(
     saleRecordId?: string;
   },
 ): Promise<{ flockId: string | null; recordType: string }> {
+  const organizationId = authUser.organizationId;
+
   // FinancialRecord — flock-scoped
   if (opts.financialRecordId) {
     const record = await prisma.financialRecord.findFirst({
       where: { id: opts.financialRecordId },
       include: { flock: true },
     });
-    if (!record || record.flock.createdBy !== authUser.userId) {
+    if (!record || record.flock.organizationId !== organizationId) {
       throw new Error('NOT_FOUND');
     }
     return { flockId: record.flockId, recordType: 'FinancialRecord' };
@@ -103,19 +105,19 @@ async function resolveOwnership(
       where: { id: opts.saleRecordId },
       include: { flock: true },
     });
-    if (!record || record.flock.createdBy !== authUser.userId) {
+    if (!record || record.flock.organizationId !== organizationId) {
       throw new Error('NOT_FOUND');
     }
     return { flockId: record.flockId, recordType: 'SaleRecord' };
   }
 
-  // JournalEntry — global ledger, owner/manager only
+  // JournalEntry — org-scoped ledger, owner/manager only
   if (opts.journalEntryId) {
     if (authUser.role !== 'owner' && authUser.role !== 'manager') {
       throw new Error('NOT_FOUND');
     }
-    const entry = await prisma.journalEntry.findUnique({
-      where: { id: opts.journalEntryId },
+    const entry = await prisma.journalEntry.findFirst({
+      where: { id: opts.journalEntryId, organizationId },
     });
     if (!entry) {
       throw new Error('NOT_FOUND');
@@ -126,7 +128,7 @@ async function resolveOwnership(
   // Flock-only document (legacy / general flock docs)
   if (opts.flockId) {
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: opts.flockId, createdBy: authUser.userId },
+      where: { id: opts.flockId, organizationId },
     });
     if (!flock) {
       throw new Error('NOT_FOUND');
@@ -167,13 +169,21 @@ async function countAttachments(
  * Resolves which entity the doc is linked to and verifies access.
  */
 async function checkDocumentOwnership(prisma: any, doc: any, authUser: any): Promise<boolean> {
+  const organizationId = authUser.organizationId;
+
+  // Fast path: the document itself carries organizationId (set at upload
+  // time). If it doesn't match, deny immediately regardless of link type.
+  if (doc.organizationId && doc.organizationId !== organizationId) {
+    return false;
+  }
+
   // Linked to a FinancialRecord
   if (doc.financialRecordId) {
     const record = await prisma.financialRecord.findFirst({
       where: { id: doc.financialRecordId },
       include: { flock: true },
     });
-    return !!record && record.flock.createdBy === authUser.userId;
+    return !!record && record.flock.organizationId === organizationId;
   }
 
   // Linked to a SaleRecord
@@ -182,18 +192,20 @@ async function checkDocumentOwnership(prisma: any, doc: any, authUser: any): Pro
       where: { id: doc.saleRecordId },
       include: { flock: true },
     });
-    return !!record && record.flock.createdBy === authUser.userId;
+    return !!record && record.flock.organizationId === organizationId;
   }
 
-  // Linked to a JournalEntry — owner/manager can access
+  // Linked to a JournalEntry — org-scoped, owner/manager can access
   if (doc.journalEntryId) {
-    return authUser.role === 'owner' || authUser.role === 'manager';
+    if (authUser.role !== 'owner' && authUser.role !== 'manager') return false;
+    const entry = await prisma.journalEntry.findFirst({ where: { id: doc.journalEntryId, organizationId } });
+    return !!entry;
   }
 
   // Linked to a flock (legacy or general flock doc)
   if (doc.flockId) {
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: doc.flockId, createdBy: authUser.userId },
+      where: { id: doc.flockId, organizationId },
     });
     return !!flock;
   }
@@ -222,7 +234,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    const where: any = {};
+    const where: any = { organizationId: authUser.organizationId };
     if (query.financialRecordId) where.financialRecordId = query.financialRecordId;
     if (query.journalEntryId) where.journalEntryId = query.journalEntryId;
     if (query.saleRecordId) where.saleRecordId = query.saleRecordId;
@@ -292,12 +304,10 @@ export async function buildDocumentModule(app: FastifyInstance) {
       filters.push(`record_type = $${paramIdx++}`);
     }
 
-    // For global search (no target), restrict to flocks owned by the user
-    if (isGlobalSearch) {
-      params.push(authUser.userId);
-      filters.push(`flock_id IN (SELECT id FROM broiler_flocks WHERE created_by = $${paramIdx}::uuid)`);
-      paramIdx++;
-    }
+    // For global search (no target), restrict to the caller's organization
+    params.push(authUser.organizationId);
+    filters.push(`organization_id = $${paramIdx}::uuid`);
+    paramIdx++;
 
     if (filters.length > 0) {
       whereClause += ' AND ' + filters.join(' AND ');
@@ -438,6 +448,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     // Persist document metadata
     const created = await prisma.document.create({
       data: {
+        organizationId: authUser.organizationId,
         flockId: ownership.flockId,
         recordType: ownership.recordType,
         recordId: targetOpts.financialRecordId || targetOpts.journalEntryId ||

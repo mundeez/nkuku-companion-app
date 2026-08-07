@@ -105,7 +105,7 @@ DECLARE
   tables text[] := ARRAY[
     'suppliers', 'production_cycles', 'broiler_flocks', 'documents',
     'monthly_overheads', 'lighting_temperature_schedules', 'sale_records',
-    'journal_entries'
+    'journal_entries', 'batches'
   ];
 BEGIN
   SELECT id INTO org1_id FROM _org1;

@@ -1,17 +1,20 @@
 import type { FastifyInstance } from 'fastify';
 import { authenticate } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 export async function buildDashboardModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
   // ── Dashboard Summary ─────────────────────────
-  app.get('/summary', { preHandler: [authenticate] }, async () => {
+  app.get('/summary', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const [
       flocks,
       openAlerts,
       financialRecords,
     ] = await Promise.all([
       prisma.broilerFlock.findMany({
+        where: { organizationId },
         include: {
           breed: true,
           _count: { select: { growthRecords: true, feedRecords: true, mortalityEvents: true } },
@@ -19,11 +22,12 @@ export async function buildDashboardModule(app: FastifyInstance) {
         orderBy: { startDate: 'desc' },
       }),
       prisma.alert.findMany({
-        where: { isResolved: false },
+        where: { isResolved: false, flock: { organizationId } },
         include: { flock: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.financialRecord.findMany({
+        where: { flock: { organizationId } },
         select: {
           category: true,
           amountZmw: true,

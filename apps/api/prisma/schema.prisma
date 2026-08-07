@@ -67,6 +67,7 @@ model Organization {
   lightingTemperatureSchedules LightingTemperatureSchedule[]
   saleRecords                  SaleRecord[]
   journalEntries               JournalEntry[]
+  batches                      Batch[]
   subscriptions                Subscription[]
 
   @@map("organizations")
@@ -266,6 +267,7 @@ enum CycleStatus {
 // ── BATCHES (SHOOTS) ─────────────────────
 model Batch {
   id                  String      @id @default(uuid()) @db.Uuid
+  organizationId      String?     @map("organization_id") @db.Uuid
   cycleId             String      @map("cycle_id") @db.Uuid
   supplierId          String      @map("supplier_id") @db.Uuid
   shootLabel          String      @map("shoot_label") @db.VarChar(20)
@@ -283,6 +285,7 @@ model Batch {
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   cycle            ProductionCycle   @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   supplier         Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   expenses         BatchExpense[]
@@ -292,6 +295,7 @@ model Batch {
   creator          User?             @relation("BatchCreatedBy", fields: [createdBy], references: [id])
 
   @@index([cycleId, shootLabel])
+  @@index([organizationId])
   @@map("batches")
 }
 

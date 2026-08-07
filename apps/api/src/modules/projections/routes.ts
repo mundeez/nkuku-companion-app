@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate } from '../auth/routes.js';
 import { calculateBatchProjection, type FeedStageInput } from '../../core/calculation-engine/index.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 const ProjectionCalculateSchema = z.object({
   birdCount: z.number().int().positive(),
@@ -19,9 +20,10 @@ export async function buildProjectionModule(app: FastifyInstance) {
   // Returns a computed projection WITHOUT persisting to DB (what-if analysis)
   // If bagSize is provided, only feed stages with matching unitSizeKg (or non-feed stages like chicks) are included
   app.post('/calculate', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const body = ProjectionCalculateSchema.parse(request.body);
-    const supplier = await prisma.supplier.findUnique({
-      where: { id: body.supplierId },
+    const supplier = await prisma.supplier.findFirst({
+      where: { id: body.supplierId, organizationId },
       include: { feedStages: { orderBy: { sortOrder: 'asc' } } },
     });
     if (!supplier) return { error: 'SUPPLIER_NOT_FOUND' };
@@ -55,14 +57,18 @@ export async function buildProjectionModule(app: FastifyInstance) {
   // POST /api/v1/projections/save
   // Persists a projection linked to a specific batch
   app.post('/save', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const body = ProjectionCalculateSchema.extend({
       batchId: z.string().uuid(),
     }).parse(request.body);
 
     const { batchId, birdCount, supplierId, salesPricePerBird, mortalityPct, overheadCosts } = body;
 
-    const supplier = await prisma.supplier.findUnique({
-      where: { id: supplierId },
+    const batch = await prisma.batch.findFirst({ where: { id: batchId, organizationId } });
+    if (!batch) return { error: 'BATCH_NOT_FOUND' };
+
+    const supplier = await prisma.supplier.findFirst({
+      where: { id: supplierId, organizationId },
       include: { feedStages: { orderBy: { sortOrder: 'asc' } } },
     });
     if (!supplier) return { error: 'SUPPLIER_NOT_FOUND' };

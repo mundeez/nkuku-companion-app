@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { getOrganizationId } from '../../core/tenancy/scope.js';
 
 const OverheadCreateSchema = z.object({
   batchId: z.string().uuid(),
@@ -28,20 +29,27 @@ export async function buildOverheadModule(app: FastifyInstance) {
 
   // ── Overhead Costs ─────────────────────
   app.get('/costs', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const query = z.object({ batchId: z.string().uuid().optional() }).parse(request.query);
     return prisma.overheadCost.findMany({
-      where: query.batchId ? { batchId: query.batchId } : undefined,
+      where: { batchId: query.batchId, batch: { organizationId } },
       orderBy: { recordedAt: 'desc' },
     });
   });
 
-  app.post('/costs', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/costs', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const data = OverheadCreateSchema.parse(request.body);
+    const batch = await prisma.batch.findFirst({ where: { id: data.batchId, organizationId } });
+    if (!batch) return reply.status(404).send({ error: 'BATCH_NOT_FOUND' });
     return prisma.overheadCost.create({ data });
   });
 
   app.delete('/costs/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const existing = await prisma.overheadCost.findFirst({ where: { id, batch: { organizationId } } });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
     await prisma.overheadCost.delete({ where: { id } });
     return { deleted: true };
   });
@@ -64,15 +72,19 @@ export async function buildOverheadModule(app: FastifyInstance) {
 
   // ── Mortality Records ─────────────────
   app.get('/mortality', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
     const query = z.object({ batchId: z.string().uuid().optional() }).parse(request.query);
     return prisma.mortalityRecord.findMany({
-      where: query.batchId ? { batchId: query.batchId } : undefined,
+      where: { batchId: query.batchId, batch: { organizationId } },
       orderBy: { recordedAt: 'desc' },
     });
   });
 
-  app.post('/mortality', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/mortality', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const data = MortalityCreateSchema.parse(request.body);
+    const batch = await prisma.batch.findFirst({ where: { id: data.batchId, organizationId } });
+    if (!batch) return reply.status(404).send({ error: 'BATCH_NOT_FOUND' });
     const recordedAt = data.recordedAt ? new Date(data.recordedAt) : new Date();
     return prisma.mortalityRecord.create({
       data: { ...data, recordedAt },
@@ -80,7 +92,10 @@ export async function buildOverheadModule(app: FastifyInstance) {
   });
 
   app.delete('/mortality/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const existing = await prisma.mortalityRecord.findFirst({ where: { id, batch: { organizationId } } });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
     await prisma.mortalityRecord.delete({ where: { id } });
     return { deleted: true };
   });
