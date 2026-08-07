@@ -1133,7 +1133,7 @@ enum NormalBalance {
 // ── DOUBLE-ENTRY: JOURNAL ENTRIES ────────
 model JournalEntry {
   id             String            @id @default(uuid()) @db.Uuid
-  organizationId String?           @map("organization_id") @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
   entryNumber    String            @map("entry_number") @db.VarChar(20)
   entryDate      DateTime          @map("entry_date") @db.Date
   description    String            @db.VarChar(300)
@@ -1147,7 +1147,7 @@ model JournalEntry {
   postedAt       DateTime          @default(now()) @map("posted_at") @db.Timestamptz(6)
   createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   lines        JournalLine[]
   reversedBy   JournalEntry?  @relation("ReversalOf", fields: [reversesId], references: [id])
   reversals    JournalEntry[] @relation("ReversalOf")

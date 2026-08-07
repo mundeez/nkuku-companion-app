@@ -144,3 +144,26 @@ EXCEPTION WHEN duplicate_table THEN NULL; END $$;
 DROP TABLE IF EXISTS _org1;
 
 COMMIT;
+
+-- ── FOLLOW-UP: journal_entries.organization_id NOT NULL ──────────────
+-- Applied separately (not part of the idempotent block above) because it
+-- required a one-time supervised cleanup of pre-existing test-generated
+-- journal entries that had no organization, which in turn required
+-- temporarily suspending the immutability RULEs on journal_entries /
+-- journal_lines (see prisma/sql/journal-immutability.sql). That is a
+-- deliberate, explicit, user-approved exception — NOT a pattern to reuse
+-- for routine schema changes. The sequence used was:
+--
+--   1. Identify orphaned rows: SELECT * FROM journal_entries WHERE organization_id IS NULL;
+--   2. BEGIN;
+--   3. ALTER TABLE journal_entries DROP CONSTRAINT journal_entries_reverses_id_fkey;
+--      (its ON DELETE SET NULL action conflicts with the no-UPDATE rule)
+--   4. CREATE OR REPLACE RULE no_delete_journal_entries AS ON DELETE TO journal_entries DO ALSO NOTHING;
+--      CREATE OR REPLACE RULE no_delete_journal_lines AS ON DELETE TO journal_lines DO ALSO NOTHING;
+--   5. DELETE FROM journal_lines WHERE journal_id IN (SELECT id FROM journal_entries WHERE organization_id IS NULL);
+--      DELETE FROM journal_entries WHERE organization_id IS NULL;
+--   6. Restore the FK and rules exactly as they were (see journal-immutability.sql).
+--   7. COMMIT;
+--   8. ALTER TABLE journal_entries ALTER COLUMN organization_id SET NOT NULL;
+--   9. Re-point journal_entries_organization_id_fkey at ON DELETE RESTRICT
+--      (a required column can't use ON DELETE SET NULL).
