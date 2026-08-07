@@ -82,6 +82,54 @@ export async function login(email: string, password: string) {
   return data;
 }
 
+export async function register(body: {
+  email: string;
+  password: string;
+  name: string;
+  organizationName: string;
+  country: string;
+  currency?: string;
+  consent: true;
+}) {
+  const data = await apiFetch<{
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+    organization: any;
+  }>("/api/v1/auth/register", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (typeof window !== "undefined") {
+    localStorage.setItem("nkuku_access_token", data.accessToken);
+    localStorage.setItem("nkuku_refresh_token", data.refreshToken);
+    localStorage.setItem("nkuku_user", JSON.stringify(data.user));
+  }
+  return data;
+}
+
+export async function acceptInvite(body: {
+  token: string;
+  password?: string;
+  name?: string;
+  consent: true;
+}) {
+  const data = await apiFetch<{
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+  }>("/api/v1/auth/accept-invite", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (typeof window !== "undefined") {
+    localStorage.setItem("nkuku_access_token", data.accessToken);
+    localStorage.setItem("nkuku_refresh_token", data.refreshToken);
+    localStorage.setItem("nkuku_user", JSON.stringify(data.user));
+  }
+  return data;
+}
+
 export function logout() {
   if (typeof window !== "undefined") {
     localStorage.removeItem("nkuku_access_token");

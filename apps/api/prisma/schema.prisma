@@ -21,6 +21,11 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  // Zambia Data Protection Act (No. 3 of 2021) consent tracking — captured
+  // at signup/invite-accept time. See docs/MONETIZATION_PLAN.md Phase 2.
+  consentAcceptedAt DateTime? @map("consent_accepted_at") @db.Timestamptz(6)
+  consentVersion    String?   @map("consent_version") @db.VarChar(20)
+
   createdSuppliers                    Supplier[]                    @relation("SupplierCreatedBy")
   createdBatches                      Batch[]                       @relation("BatchCreatedBy")
   createdCycles                       ProductionCycle[]             @relation("CycleCreatedBy")
@@ -30,6 +35,7 @@ model User {
   uploadedDocuments                   Document[]                    @relation("DocumentUploadedBy")
   createdSaleRecords                  SaleRecord[]                  @relation("SaleRecordCreatedBy")
   memberships                         OrganizationMember[]
+  sentInvites                         Invite[]                      @relation("InviteInvitedBy")
 
   @@map("users")
 }
@@ -59,6 +65,7 @@ model Organization {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   members                      OrganizationMember[]
+  invites                      Invite[]
   suppliers                    Supplier[]
   cycles                       ProductionCycle[]
   flocks                       BroilerFlock[]
@@ -86,6 +93,28 @@ model OrganizationMember {
   @@unique([organizationId, userId])
   @@index([userId])
   @@map("organization_members")
+}
+
+// Pending invitation to join an organization. The invited person does not
+// need an existing account — accepting the invite creates their User (or
+// links to their existing one, if the email already has an account).
+model Invite {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  email          String    @db.VarChar(255)
+  role           Role      @default(viewer)
+  token          String    @unique @db.VarChar(64)
+  invitedBy      String    @map("invited_by") @db.Uuid
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt     DateTime? @map("accepted_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User         @relation("InviteInvitedBy", fields: [invitedBy], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invites")
 }
 
 // ── MULTI-TENANCY: BILLING (Phase 3 scaffolding) ─

@@ -81,9 +81,25 @@ Each phase goes through the standard `phase-closeout` routine (rebuild, test, ta
 - [ ] Formally appoint a Data Protection Officer.
 - [ ] Confirm current production hosting location/region for the Postgres database (needed to assess s.70 compliance before onboarding real Zambian customers).
 - [ ] Open a live Flutterwave merchant account under the existing business entity (sandbox can proceed in parallel for engineering).
-- [ ] **Operational risk noticed during Phase 1b, unrelated to this project**: the shared Postgres instance (`shared-postgres`, used by nkuku plus at least two other projects — `deez_forex` and `kannel`) is chronically near its `max_connections` (100) ceiling; `deez_forex` alone holds ~79 idle connections at all times. Nkuku's own usage is modest (~10), but this leaves very little headroom, and nkuku's test suite intermittently fails with "remaining connection slots reserved for roles with the SUPERUSER attribute" as a result. Worth raising with whoever manages that shared host (raise `max_connections`, or give `deez_forex` a connection pooler) before it causes real production outages for any of the tenants on it — not something safely fixable from within this project.
+- [ ] **Operational risk noticed during Phase 1b, unrelated to this project**: the shared Postgres instance (`shared-postgres`, used by nkuku plus at least two other projects — `deez_forex` and `kannel`) was chronically near its `max_connections` (100) ceiling; `deez_forex` alone holds ~83 idle connections at all times. **Resolved this session**: raised `shared-postgres` `max_connections` from 100 to 200 via a `command:` override in `shared-services/docker-compose.yml`. The proper long-term fix remains a connection pooler (PgBouncer) in front of `deez_forex`, but 200 connections gives adequate headroom for now on this host (15GB RAM, 8 vCPU).
 
-## 5. Phase 1b Status (this session)
+## 5. Phase 2 Status (COMPLETE) — Self-serve signup & invitations
+
+- `POST /api/v1/auth/register` — creates a new Organization + owner User + OrganizationMember in one transaction. Requires explicit `consent: true`; records `consentAcceptedAt`/`consentVersion` on the User (Zambia DPA consent tracking).
+- `POST /api/v1/auth/accept-invite` — joins an existing organization via a time-limited invite token; creates the User if the email has no account yet, or just enrolls an existing one. Also requires explicit consent.
+- New `organizations` module: `GET/PATCH /me` (org settings), `GET /members`, `DELETE /members/:id`, `POST/GET /invites`, `DELETE /invites/:id` — all owner/manager gated and org-scoped.
+- Fixed a related latent bug in the pre-existing `users` module: it created global `User` rows with no `OrganizationMember`, which would have made new users unable to log in under the new multi-tenancy model. Now every user it creates/updates/removes is properly scoped to the caller's organization, and `User.role`/`OrganizationMember.role` are kept in sync (a user belongs to exactly one org today).
+- Added `Invite` model (token, email, role, expiry, acceptance tracking) and `consentAcceptedAt`/`consentVersion` fields on `User`.
+- **Web frontend built:**
+  - `/signup` — self-serve registration form (name, email, password, org name, country, currency, consent checkbox). Links to `/login` for existing users.
+  - `/accept-invite` — invite acceptance page (reads token from URL query string). Adapts to new vs. existing accounts.
+  - `/login` — added "Create one" link to `/signup`.
+  - `/users` — added "Invite User" button with dialog (email + role), invite link display with copy button, and pending invites table with revoke action.
+- `WEB_BASE_URL` env var added (docker-compose + .env.example) so invite links are absolute URLs.
+- **No email delivery yet** — invite links are returned directly in the API response and shown in the web UI with a copy button for the inviting owner/manager to share manually. `nodemailer` is already a dependency; wiring actual email delivery is a follow-up, not blocking for an initial pilot with a handful of orgs.
+- **Verification**: full 163-test suite green; `tsc --noEmit` clean (both API and web); end-to-end manual flow verified (register → login → invite → accept-invite → member enrolled); web pages render correctly (200 status, content verified).
+
+## 5b. Phase 1b Status (this session)
 Multi-tenancy is now enforced at the API layer for the core, actively-used feature set:
 - Auth: JWT now carries `organizationId`; every authenticated request resolves to an organization.
 - Fully org-scoped (reads filtered, writes tagged): suppliers, broiler flocks, and every flock-child record (growth/feed/water/mortality/vaccination/medication/environmental records, flock tasks, financial records, alerts, sale records, documents).

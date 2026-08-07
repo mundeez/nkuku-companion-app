@@ -30,6 +30,8 @@ services:
       REQUIRE_VIRUS_SCAN: ${REQUIRE_VIRUS_SCAN:-true}
       # ── Document attachments limits ──
       MAX_ATTACHMENTS_PER_TX: ${MAX_ATTACHMENTS_PER_TX:-20}
+      # ── Web base URL for invite links ──
+      WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:30000}
     volumes:
       - ./apps/api/src:/app/src:ro
       - ./apps/api/prisma:/app/prisma:ro

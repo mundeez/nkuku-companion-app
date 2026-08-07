@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus, Mail, Copy, XCircle } from "lucide-react";
 
 interface UserFormData {
   name: string;
@@ -50,6 +50,21 @@ const emptyForm: UserFormData = {
   isActive: true,
 };
 
+interface Invite {
+  id: string;
+  email: string;
+  role: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+interface InviteForm {
+  email: string;
+  role: "owner" | "manager" | "flock_minder" | "sales_person" | "viewer";
+}
+
+const emptyInviteForm: InviteForm = { email: "", role: "viewer" };
+
 export default function UsersPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -65,10 +80,25 @@ export default function UsersPage() {
   const [form, setForm] = useState<UserFormData>(emptyForm);
   const [formLoading, setFormLoading] = useState(false);
 
+  // Invite state
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState<InviteForm>(emptyInviteForm);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [revokeInviteId, setRevokeInviteId] = useState<string | null>(null);
+
   function loadUsers() {
     apiFetch<User[]>("/api/v1/users")
       .then(setUsers)
       .catch((err) => setError(err.message));
+  }
+
+  function loadInvites() {
+    apiFetch<Invite[]>("/api/v1/organizations/invites")
+      .then(setInvites)
+      .catch(() => {}); // non-fatal — user may not have org access
   }
 
   useEffect(() => {
@@ -82,6 +112,7 @@ export default function UsersPage() {
         return;
       }
       loadUsers();
+      loadInvites();
     }
   }, [user, isLoading, router]);
 
@@ -166,6 +197,48 @@ export default function UsersPage() {
     }
   }
 
+  async function handleCreateInvite() {
+    setInviteLoading(true);
+    try {
+      const res = await apiFetch<{ inviteUrl: string; email: string; role: string }>("/api/v1/organizations/invites", {
+        method: "POST",
+        body: JSON.stringify(inviteForm),
+      });
+      setInviteUrl(res.inviteUrl);
+      setSuccess(`Invite created for ${res.email}. Share the link below.`);
+      setInviteForm(emptyInviteForm);
+      loadInvites();
+    } catch (err: any) {
+      setError(err.message || "Failed to create invite.");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  async function handleRevokeInvite() {
+    if (!revokeInviteId) return;
+    setInviteLoading(true);
+    try {
+      await apiFetch(`/api/v1/organizations/invites/${revokeInviteId}`, { method: "DELETE" });
+      setSuccess("Invite revoked.");
+      setRevokeInviteId(null);
+      loadInvites();
+    } catch (err: any) {
+      setError(err.message || "Failed to revoke invite.");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  function copyInviteUrl() {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(inviteUrl).then(() => {
+        setInviteCopied(true);
+        setTimeout(() => setInviteCopied(false), 2000);
+      });
+    }
+  }
+
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user || user.role !== "owner") return null;
 
@@ -176,10 +249,16 @@ export default function UsersPage() {
           <h1 className="text-3xl font-bold mb-2">User Management</h1>
           <p className="text-muted-foreground">Manage registered users and roles</p>
         </div>
-        <Button onClick={() => { setForm(emptyForm); setCreateOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create User
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setInviteForm(emptyInviteForm); setInviteUrl(""); setInviteOpen(true); }}>
+            <Mail className="h-4 w-4 mr-2" />
+            Invite User
+          </Button>
+          <Button onClick={() => { setForm(emptyForm); setCreateOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create User
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -258,6 +337,51 @@ export default function UsersPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pending Invites */}
+      {invites.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-3">Pending Invites</h2>
+          <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invites.map((inv) => {
+                  const expired = new Date(inv.expiresAt) < new Date();
+                  return (
+                    <TableRow key={inv.id}>
+                      <TableCell className="font-medium">{inv.email}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{inv.role}</Badge>
+                      </TableCell>
+                      <TableCell className={expired ? "text-destructive" : "text-muted-foreground"}>
+                        {expired ? "Expired" : new Date(inv.expiresAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          onClick={() => setRevokeInviteId(inv.id)}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
 
       {/* Create Modal */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -380,6 +504,88 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={formLoading}>
               {formLoading ? "Deactivating..." : "Deactivate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invite Modal */}
+      <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) setInviteUrl(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite User</DialogTitle>
+            <DialogDescription>
+              Send an invitation to join your organization. The invitee sets their own password and accepts the privacy policy.
+            </DialogDescription>
+          </DialogHeader>
+          {inviteUrl ? (
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                Share this link with <strong>{inviteForm.email || "the invitee"}</strong>. It expires in 7 days:
+              </p>
+              <div className="flex gap-2">
+                <Input readOnly value={inviteUrl} className="text-xs" />
+                <Button onClick={copyInviteUrl} variant="outline" size="sm">
+                  {inviteCopied ? "Copied!" : <><Copy className="h-4 w-4 mr-1" /> Copy</>}
+                </Button>
+              </div>
+              <Button variant="outline" className="w-full" onClick={() => { setInviteUrl(""); setInviteForm(emptyInviteForm); }}>
+                Invite another
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="invite-email">Email</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    value={inviteForm.email}
+                    onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                    placeholder="jane@example.com"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="invite-role">Role</Label>
+                  <Select value={inviteForm.role} onValueChange={(v: any) => setInviteForm({ ...inviteForm, role: v })}>
+                    <SelectTrigger id="invite-role">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="owner">Owner</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="flock_minder">Flock Minder</SelectItem>
+                      <SelectItem value="sales_person">Sales Person</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateInvite} disabled={inviteLoading || !inviteForm.email}>
+                  {inviteLoading ? "Creating..." : "Create Invite"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Revoke Invite Confirmation */}
+      <Dialog open={!!revokeInviteId} onOpenChange={(open) => { if (!open) setRevokeInviteId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke Invite</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to revoke this invitation? The link will no longer work.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRevokeInviteId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRevokeInvite} disabled={inviteLoading}>
+              {inviteLoading ? "Revoking..." : "Revoke"}
             </Button>
           </DialogFooter>
         </DialogContent>

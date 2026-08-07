@@ -45,3 +45,11 @@ certs/
 
 # Uploads
 apps/api/uploads/
+
+# Mobile build artifacts
+apps/mobile/*.apk
+apps/mobile/*.ipa
+apps/mobile/*.aab
+
+# Playwright MCP tooling state
+.playwright-mcp/

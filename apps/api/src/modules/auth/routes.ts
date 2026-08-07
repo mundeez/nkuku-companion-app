@@ -8,6 +8,32 @@ const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
+// Version string recorded alongside consent acceptance so future ToS/privacy
+// policy changes can be tracked against which version a user agreed to.
+export const CONSENT_VERSION = process.env.CONSENT_VERSION || 'v1-2026-08';
+
+const RegisterSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(100),
+  name: z.string().min(1).max(100),
+  organizationName: z.string().min(1).max(150),
+  country: z.string().length(2), // ISO 3166-1 alpha-2, e.g. "ZM"
+  currency: z.string().length(3).default('ZMW'),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the privacy policy and terms to create an account' }),
+  }),
+});
+
+const AcceptInviteSchema = z.object({
+  token: z.string().min(1),
+  // Only required if the invited email doesn't already have an account.
+  password: z.string().min(8).max(100).optional(),
+  name: z.string().min(1).max(100).optional(),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the privacy policy and terms to join' }),
+  }),
+});
+
 const TokenPayloadSchema = z.object({
   userId: z.string(),
   email: z.string(),
@@ -17,7 +43,10 @@ const TokenPayloadSchema = z.object({
 
 export type TokenPayload = z.infer<typeof TokenPayloadSchema>;
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required — refusing to start without it');
+}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
@@ -33,6 +62,159 @@ async function getPrimaryOrganizationId(prisma: any, userId: string): Promise<st
 }
 
 export async function buildAuthModule(app: FastifyInstance) {
+  // POST /api/v1/auth/register — self-serve signup: creates a new
+  // Organization and its owner User in one transaction.
+  app.post('/register', async (request, reply) => {
+    const body = RegisterSchema.parse(request.body);
+    const prisma = (app as any).prisma;
+
+    const existing = await prisma.user.findUnique({ where: { email: body.email } });
+    if (existing) {
+      return reply.status(409).send({ error: 'EMAIL_ALREADY_REGISTERED' });
+    }
+
+    const passwordHash = await bcrypt.hash(body.password, 10);
+    const now = new Date();
+
+    const { user, organization } = await prisma.$transaction(async (tx: any) => {
+      const organization = await tx.organization.create({
+        data: {
+          name: body.organizationName,
+          country: body.country.toUpperCase(),
+          currency: body.currency.toUpperCase(),
+          planCode: 'free',
+        },
+      });
+      const user = await tx.user.create({
+        data: {
+          email: body.email,
+          passwordHash,
+          name: body.name,
+          role: 'owner',
+          consentAcceptedAt: now,
+          consentVersion: CONSENT_VERSION,
+        },
+      });
+      await tx.organizationMember.create({
+        data: { organizationId: organization.id, userId: user.id, role: 'owner' },
+      });
+      return { user, organization };
+    });
+
+    const payload: TokenPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      organizationId: organization.id,
+    };
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+    const refreshToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+
+    const redis = (app as any).redis;
+    if (redis) {
+      await redis.setex(`refresh:${user.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
+    }
+
+    return reply.status(201).send({
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, organizationId: organization.id },
+      organization: { id: organization.id, name: organization.name, country: organization.country, currency: organization.currency },
+    });
+  });
+
+  // POST /api/v1/auth/accept-invite — join an existing organization via an
+  // invite token. Works whether or not the invited email already has an
+  // account (new users are created here; existing ones are just enrolled).
+  app.post('/accept-invite', async (request, reply) => {
+    const body = AcceptInviteSchema.parse(request.body);
+    const prisma = (app as any).prisma;
+
+    const invite = await prisma.invite.findUnique({ where: { token: body.token } });
+    if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
+      return reply.status(400).send({ error: 'INVALID_OR_EXPIRED_INVITE' });
+    }
+
+    const now = new Date();
+
+    // Wrap the entire accept flow in a transaction to prevent race
+    // conditions on concurrent requests with the same token.
+    const user = await prisma.$transaction(async (tx: any) => {
+      // Re-lock the invite inside the transaction to prevent double-accept
+      const locked = await tx.invite.findUnique({ where: { token: body.token } });
+      if (!locked || locked.acceptedAt || locked.expiresAt < now) {
+        throw new Error('INVALID_OR_EXPIRED_INVITE');
+      }
+
+      let u = await tx.user.findUnique({ where: { email: invite.email } });
+
+      if (!u) {
+        if (!body.password || !body.name) {
+          throw new Error('NAME_AND_PASSWORD_REQUIRED_FOR_NEW_ACCOUNT');
+        }
+        const passwordHash = await bcrypt.hash(body.password, 10);
+        u = await tx.user.create({
+          data: {
+            email: invite.email,
+            passwordHash,
+            name: body.name,
+            role: invite.role,
+            consentAcceptedAt: now,
+            consentVersion: CONSENT_VERSION,
+          },
+        });
+      } else if (!u.consentAcceptedAt) {
+        await tx.user.update({
+          where: { id: u.id },
+          data: { consentAcceptedAt: now, consentVersion: CONSENT_VERSION },
+        });
+      }
+
+      const existingMembership = await tx.organizationMember.findFirst({
+        where: { organizationId: invite.organizationId, userId: u.id },
+      });
+      if (!existingMembership) {
+        await tx.organizationMember.create({
+          data: { organizationId: invite.organizationId, userId: u.id, role: invite.role },
+        });
+      }
+
+      await tx.invite.update({ where: { id: invite.id }, data: { acceptedAt: now } });
+
+      return u;
+    }).catch((err: any) => {
+      if (err.message === 'INVALID_OR_EXPIRED_INVITE') {
+        return reply.status(400).send({ error: 'INVALID_OR_EXPIRED_INVITE' });
+      }
+      if (err.message === 'NAME_AND_PASSWORD_REQUIRED_FOR_NEW_ACCOUNT') {
+        return reply.status(400).send({ error: 'NAME_AND_PASSWORD_REQUIRED_FOR_NEW_ACCOUNT' });
+      }
+      throw err;
+    });
+
+    if (user && 'send' in user) return; // reply was already sent via .catch
+
+    const payload: TokenPayload = {
+      userId: user.id,
+      email: user.email,
+      role: invite.role,
+      organizationId: invite.organizationId,
+    };
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+    const refreshToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+
+    const redis = (app as any).redis;
+    if (redis) {
+      await redis.setex(`refresh:${user.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
+    }
+
+    return reply.status(201).send({
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email, name: user.name, role: invite.role, organizationId: invite.organizationId },
+    });
+  });
+
   // POST /api/v1/auth/login
   app.post('/login', async (request, reply) => {
     const body = LoginSchema.parse(request.body);
@@ -118,29 +300,12 @@ export async function authenticate(request: any, reply: any) {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     const payload = TokenPayloadSchema.parse(decoded);
 
-    // Validate user still exists in DB (handles DB rebuilds with new UUIDs)
+    // Validate user still exists and is active in DB
     const prisma = (request as any).server?.prisma ?? (reply.server as any)?.prisma;
     if (prisma) {
       const user = await prisma.user.findUnique({ where: { id: payload.userId } });
       if (!user || !user.isActive) {
-        const fallback = await prisma.user.findFirst({
-          where: { isActive: true },
-          orderBy: { createdAt: 'asc' },
-        });
-        if (!fallback) {
-          return reply.status(401).send({ error: 'NO_VALID_USER' });
-        }
-        const organizationId = await getPrimaryOrganizationId(prisma, fallback.id);
-        if (!organizationId) {
-          return reply.status(403).send({ error: 'NO_ORGANIZATION' });
-        }
-        request.authUser = {
-          userId: fallback.id,
-          email: fallback.email,
-          role: fallback.role,
-          organizationId,
-        };
-        return;
+        return reply.status(401).send({ error: 'INVALID_TOKEN' });
       }
     }
 
