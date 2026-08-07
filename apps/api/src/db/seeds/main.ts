@@ -31,16 +31,39 @@ async function main() {
   });
   console.log('[SEED] Owner user:', owner.email);
 
+  // ── 1a. Seed the default organization + owner membership ──
+  // Every user must belong to an organization (multi-tenancy foundation).
+  // This is the same "Organization #1" pattern used by the multi-tenancy
+  // migration for existing deployments — on a fresh DB, seed creates it.
+  const DEFAULT_ORG_NAME = 'Nkuku Companion Farm (Org #1)';
+  let organization = await prisma.organization.findFirst({ where: { name: DEFAULT_ORG_NAME } });
+  if (!organization) {
+    organization = await prisma.organization.create({
+      data: { name: DEFAULT_ORG_NAME, country: 'ZM', currency: 'ZMW', planCode: 'free', isActive: true },
+    });
+  }
+  await prisma.organizationMember.upsert({
+    where: { organizationId_userId: { organizationId: organization.id, userId: owner.id } },
+    update: {},
+    create: { organizationId: organization.id, userId: owner.id, role: 'owner' },
+  });
+  console.log('[SEED] Organization:', organization.name);
+
   // ── 1b. Seed optional role test users (disabled by default) ──
   const testPasswordHash = await bcrypt.hash('test123456', 12);
   for (const { email, name, role } of [
     { email: 'flock_minder@nkuku.local', name: 'Flock Minder', role: 'flock_minder' as const },
     { email: 'sales_person@nkuku.local', name: 'Sales Person', role: 'sales_person' as const },
   ]) {
-    await prisma.user.upsert({
+    const testUser = await prisma.user.upsert({
       where: { email },
       update: {},
       create: { email, name, role, passwordHash: testPasswordHash, isActive: false },
+    });
+    await prisma.organizationMember.upsert({
+      where: { organizationId_userId: { organizationId: organization.id, userId: testUser.id } },
+      update: {},
+      create: { organizationId: organization.id, userId: testUser.id, role },
     });
     console.log(`[SEED] Test user (${role}):`, email, '(disabled)');
   }
@@ -116,7 +139,7 @@ async function main() {
     const supplier = await prisma.supplier.upsert({
       where: { name: supplierCreate.name },
       update: {},
-      create: supplierCreate,
+      create: { ...supplierCreate, organizationId: organization.id },
     });
 
     for (const stage of stages) {
@@ -195,6 +218,7 @@ async function main() {
         label: `Cycle ${row.cycleNumber}`,
         status: 'planned',
         createdBy: owner.id,
+        organizationId: organization.id,
       },
     });
 
@@ -217,6 +241,7 @@ async function main() {
           revenueTargetZmw: row.revenueTargetZmw,
           status: 'planned',
           createdBy: owner.id,
+          organizationId: organization.id,
         },
       });
     }
@@ -229,7 +254,7 @@ async function main() {
   await seedCobb500Performance(prisma);
   await seedDiseases(prisma);
   await seedVaccinationSchedules(prisma);
-  await seedLightingTemperatureSchedules(prisma);
+  await seedLightingTemperatureSchedules(prisma, organization.id);
   await seedChartOfAccounts(prisma);
 
   // ── Financial System Seeds ──

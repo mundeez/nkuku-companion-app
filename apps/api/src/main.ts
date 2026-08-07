@@ -137,14 +137,7 @@ const marketPrice = parseFloat(process.env.MARKET_PRICE_PER_KG || '25');
 cron.schedule('0 2 * * *', async () => {
   app.log.info('[DailyRecalc] Starting daily overhead allocation...');
   try {
-    const users = await prisma.user.findMany({ where: { isActive: true }, select: { id: true } });
-    for (const user of users) {
-      try {
-        await dailyRecalc.runDaily(user.id, { marketPricePerKg: marketPrice });
-      } catch (err: any) {
-        app.log.error(`[DailyRecalc] Failed for user ${user.id}:`, err.message);
-      }
-    }
+    await dailyRecalc.runDailyForAllOrganizations({ marketPricePerKg: marketPrice });
     app.log.info('[DailyRecalc] Completed successfully');
   } catch (err: any) {
     app.log.error('[DailyRecalc] Failed:', err.message);

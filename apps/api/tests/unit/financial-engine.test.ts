@@ -9,6 +9,7 @@ const unified = new UnifiedFinancialService(prisma);
 const statements = new FinancialStatementService(prisma);
 
 const TEST_USER_ID = '00000000-0000-0000-0000-000000000001';
+const TEST_ORG_ID = '00000000-0000-0000-0000-0000000000f1';
 
 async function seedTestData() {
   await prisma.user.upsert({
@@ -22,6 +23,16 @@ async function seedTestData() {
       role: 'owner',
     },
   });
+  await prisma.organization.upsert({
+    where: { id: TEST_ORG_ID },
+    update: {},
+    create: { id: TEST_ORG_ID, name: 'Test Financial Org', country: 'ZM', currency: 'ZMW' },
+  });
+  await prisma.organizationMember.upsert({
+    where: { organizationId_userId: { organizationId: TEST_ORG_ID, userId: TEST_USER_ID } },
+    update: {},
+    create: { organizationId: TEST_ORG_ID, userId: TEST_USER_ID, role: 'owner' },
+  });
   const breed = await prisma.breed.create({
     data: { name: 'Test Breed', supplier: 'Test Supplier' },
   });
@@ -33,6 +44,7 @@ async function seedTestData() {
       initialCount: 100,
       currentCount: 95,
       createdBy: TEST_USER_ID,
+      organizationId: TEST_ORG_ID,
     },
   });
   await prisma.financialRecord.createMany({
@@ -49,6 +61,15 @@ async function cleanup() {
   await prisma.financialRecord.deleteMany({ where: { flock: { createdBy: TEST_USER_ID } } });
   await prisma.broilerFlock.deleteMany({ where: { createdBy: TEST_USER_ID } });
   await prisma.breed.deleteMany({ where: { name: 'Test Breed' } });
+  // NOTE: deliberately NOT deleting the test Organization/OrganizationMember.
+  // journal_entries.organization_id has a FK to organizations, and
+  // journal_entries carries an immutability RULE (no UPDATE/DELETE) that
+  // confuses Postgres's referential-integrity check on the parent DELETE
+  // ("referential integrity query ... gave unexpected result") if any
+  // journal entries ended up linked to this org. Organization deletion
+  // isn't a supported product feature yet, so it's simplest to just leave
+  // the test org row in place (harmless in a dev/test database) rather
+  // than fight that interaction here.
   await prisma.user.deleteMany({ where: { id: TEST_USER_ID } });
 }
 

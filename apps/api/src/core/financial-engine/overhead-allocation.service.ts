@@ -8,6 +8,7 @@ export interface MonthlyOverheadInput {
   amountZmw: number;
   contractType: string;
   createdBy: string;
+  organizationId: string;
 }
 
 // Map OverheadCategory → FinancialCategory (the FinancialRecord.category enum)
@@ -34,13 +35,14 @@ export class OverheadAllocationService {
         amountZmw: new Decimal(input.amountZmw),
         contractType: input.contractType,
         createdBy: input.createdBy,
+        organizationId: input.organizationId,
       },
     });
   }
 
-  async deleteMonthlyOverhead(id: string, userId: string) {
+  async deleteMonthlyOverhead(id: string, organizationId: string) {
     const overhead = await this.prisma.monthlyOverhead.findFirst({
-      where: { id, createdBy: userId },
+      where: { id, organizationId },
     });
     if (!overhead) return null;
 
@@ -63,27 +65,27 @@ export class OverheadAllocationService {
     return this.prisma.monthlyOverhead.delete({ where: { id } });
   }
 
-  async listMonthlyOverheads(userId: string) {
+  async listMonthlyOverheads(organizationId: string) {
     return this.prisma.monthlyOverhead.findMany({
-      where: { createdBy: userId },
+      where: { organizationId },
       orderBy: { yearMonth: 'desc' },
     });
   }
 
-  async allocateOverheadForMonth(yearMonth: string, userId: string) {
+  async allocateOverheadForMonth(yearMonth: string, organizationId: string) {
     const overheads = await this.prisma.monthlyOverhead.findMany({
-      where: { yearMonth, createdBy: userId },
+      where: { yearMonth, organizationId },
     });
 
     const results = [];
     for (const overhead of overheads) {
-      const result = await this.allocateSingleOverhead(overhead, userId);
+      const result = await this.allocateSingleOverhead(overhead, organizationId);
       results.push(result);
     }
     return results;
   }
 
-  private async allocateSingleOverhead(overhead: any, userId: string) {
+  private async allocateSingleOverhead(overhead: any, organizationId: string) {
     const [year, month] = overhead.yearMonth.split('-').map(Number);
     const monthStart = new Date(year, month - 1, 1);
     const monthEnd = new Date(year, month, 0); // last day of month
@@ -92,7 +94,7 @@ export class OverheadAllocationService {
     // Find all flocks that were active during this month
     const flocks = await this.prisma.broilerFlock.findMany({
       where: {
-        createdBy: userId,
+        organizationId,
         startDate: { lte: monthEnd },
         OR: [
           { soldDate: null },

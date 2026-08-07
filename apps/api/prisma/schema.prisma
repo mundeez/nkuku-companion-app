@@ -125,7 +125,7 @@ enum SubscriptionStatus {
 // ── SUPPLIERS ────────────────────────────
 model Supplier {
   id             String   @id @default(uuid()) @db.Uuid
-  organizationId String?  @map("organization_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
   name           String   @unique @db.VarChar(100)
   description    String?  @db.Text
   chickenType    String?  @map("chicken_type") @db.VarChar(50)
@@ -136,7 +136,7 @@ model Supplier {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   feedStages   FeedStage[]
   feedRecords  FeedRecord[]
   flocks       BroilerFlock[]
@@ -241,7 +241,7 @@ model SupplierCategoryTemplateItem {
 // ── PRODUCTION CYCLES ────────────────────
 model ProductionCycle {
   id             String      @id @default(uuid()) @db.Uuid
-  organizationId String?     @map("organization_id") @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
   cycleNumber    Int         @unique @map("cycle_number")
   label          String?     @db.VarChar(50)
   notes          String?     @db.Text
@@ -250,9 +250,9 @@ model ProductionCycle {
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   batches      Batch[]
-  creator      User?         @relation("CycleCreatedBy", fields: [createdBy], references: [id])
+  creator      User?        @relation("CycleCreatedBy", fields: [createdBy], references: [id])
 
   @@index([organizationId])
   @@map("production_cycles")
@@ -267,7 +267,7 @@ enum CycleStatus {
 // ── BATCHES (SHOOTS) ─────────────────────
 model Batch {
   id                  String      @id @default(uuid()) @db.Uuid
-  organizationId      String?     @map("organization_id") @db.Uuid
+  organizationId      String      @map("organization_id") @db.Uuid
   cycleId             String      @map("cycle_id") @db.Uuid
   supplierId          String      @map("supplier_id") @db.Uuid
   shootLabel          String      @map("shoot_label") @db.VarChar(20)
@@ -285,7 +285,7 @@ model Batch {
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   cycle            ProductionCycle   @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   supplier         Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   expenses         BatchExpense[]
@@ -482,7 +482,7 @@ model PerformanceTarget {
 
 model BroilerFlock {
   id                      String      @id @default(uuid()) @db.Uuid
-  organizationId          String?     @map("organization_id") @db.Uuid
+  organizationId          String      @map("organization_id") @db.Uuid
   name                    String      @db.VarChar(100)
   breedId                 String      @map("breed_id") @db.Uuid
   supplierId              String?     @map("supplier_id") @db.Uuid
@@ -508,7 +508,7 @@ model BroilerFlock {
   createdAt               DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization         Organization?         @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   breed                Breed                 @relation(fields: [breedId], references: [id])
   supplier             Supplier?             @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   creator              User?                 @relation("FlockCreatedBy", fields: [createdBy], references: [id])
@@ -769,7 +769,7 @@ model VaccinationScheduleItem {
 
 model LightingTemperatureSchedule {
   id             String      @id @default(uuid()) @db.Uuid
-  organizationId String?     @map("organization_id") @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
   breedId        String?     @map("breed_id") @db.Uuid
   name           String      @db.VarChar(100)
   isDefault      Boolean     @default(false) @map("is_default")
@@ -779,7 +779,7 @@ model LightingTemperatureSchedule {
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization?                     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization Organization                      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   breed        Breed?                            @relation(fields: [breedId], references: [id], onDelete: SetNull)
   creator      User?                             @relation("LightingTemperatureScheduleCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   items        LightingTemperatureScheduleItem[]
@@ -1056,7 +1056,7 @@ enum ExecutionStatus {
 // ── MONTHLY OVERHEADS ────────────────────
 model MonthlyOverhead {
   id             String           @id @default(uuid()) @db.Uuid
-  organizationId String?          @map("organization_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
   yearMonth      String           @map("year_month") @db.VarChar(7)
   category       OverheadCategory @map("category")
   description    String?          @db.VarChar(200)
@@ -1065,8 +1065,8 @@ model MonthlyOverhead {
   recordedAt     DateTime         @default(now()) @map("recorded_at") @db.Timestamptz(6)
   createdBy      String           @map("created_by") @db.Uuid
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  user         User          @relation(fields: [createdBy], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [createdBy], references: [id])
 
   @@unique([organizationId, yearMonth, category, description])
   @@index([organizationId])
@@ -1195,7 +1195,7 @@ model JournalLine {
 // ── DOUBLE-ENTRY: LEDGER BALANCES ────────
 model LedgerBalance {
   id             String   @id @default(uuid()) @db.Uuid
-  organizationId String?  @map("organization_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
   accountId      String   @map("account_id") @db.Uuid
   periodLabel    String   @map("period_label") @db.VarChar(20)
   openingDebit   Decimal  @default(0) @map("opening_debit") @db.Decimal(14, 2)
@@ -1215,7 +1215,7 @@ model LedgerBalance {
 
 model Document {
   id               String    @id @default(uuid()) @db.Uuid
-  organizationId   String?   @map("organization_id") @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
   flockId          String?   @map("flock_id") @db.Uuid
   recordType       String    @map("record_type") @db.VarChar(50)
   recordId         String?   @map("record_id") @db.Uuid
@@ -1245,7 +1245,7 @@ model Document {
   journalEntryId    String? @map("journal_entry_id") @db.Uuid
   saleRecordId      String? @map("sale_record_id") @db.Uuid
 
-  organization    Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   flock           BroilerFlock?    @relation(fields: [flockId], references: [id], onDelete: Cascade)
   uploader        User?            @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id], onDelete: SetNull)
   financialRecord FinancialRecord? @relation(fields: [financialRecordId], references: [id], onDelete: Cascade)
@@ -1265,7 +1265,7 @@ model Document {
 
 model SaleRecord {
   id              String   @id @default(uuid()) @db.Uuid
-  organizationId  String?  @map("organization_id") @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
   flockId         String   @map("flock_id") @db.Uuid
   saleDate        DateTime @map("sale_date") @db.Date
   customerName    String?  @map("customer_name") @db.VarChar(200)
@@ -1281,9 +1281,9 @@ model SaleRecord {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  flock        BroilerFlock  @relation(fields: [flockId], references: [id], onDelete: Cascade)
-  creator      User?         @relation("SaleRecordCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  flock        BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  creator      User?        @relation("SaleRecordCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   documents    Document[]
 
   @@index([flockId, saleDate])

@@ -272,7 +272,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
   // ── MONTHLY OVERHEADS ──────────────────────
   app.get('/overheads', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const authUser = (request as any).authUser;
-    return overheads.listMonthlyOverheads(authUser.userId);
+    return overheads.listMonthlyOverheads(authUser.organizationId);
   });
 
   app.post('/overheads', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
@@ -285,15 +285,15 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       contractType: z.enum(['monthly', 'weekly', 'daily', 'once_off']),
     }).parse(request.body);
 
-    const created = await overheads.createMonthlyOverhead({ ...body, createdBy: authUser.userId });
-    await overheads.allocateOverheadForMonth(body.yearMonth, authUser.userId);
+    const created = await overheads.createMonthlyOverhead({ ...body, createdBy: authUser.userId, organizationId: authUser.organizationId });
+    await overheads.allocateOverheadForMonth(body.yearMonth, authUser.organizationId);
     return created;
   });
 
   app.delete('/overheads/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const authUser = (request as any).authUser;
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const result = await overheads.deleteMonthlyOverhead(id, authUser.userId);
+    const result = await overheads.deleteMonthlyOverhead(id, authUser.organizationId);
     if (!result) return reply.status(404).send({ error: 'NOT_FOUND' });
     reply.status(204).send();
   });
@@ -301,7 +301,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
   app.post('/overheads/allocate/:yearMonth', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const authUser = (request as any).authUser;
     const { yearMonth } = z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) }).parse(request.params);
-    return overheads.allocateOverheadForMonth(yearMonth, authUser.userId);
+    return overheads.allocateOverheadForMonth(yearMonth, authUser.organizationId);
   });
 
   // ── HARVEST PROJECTIONS ────────────────────

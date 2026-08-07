@@ -180,7 +180,7 @@ function generateItems(
   return items;
 }
 
-export async function seedLightingTemperatureSchedules(prisma: PrismaClient) {
+export async function seedLightingTemperatureSchedules(prisma: PrismaClient, organizationId: string) {
   console.log('[SEED] Lighting & temperature schedules...');
 
   const rossBreed = await prisma.breed.findUnique({ where: { name: 'Ross 308' } });
@@ -196,6 +196,7 @@ export async function seedLightingTemperatureSchedules(prisma: PrismaClient) {
     },
     create: {
       name: 'Ross 308 Whole House',
+      organizationId,
       description: 'Ross 308 lighting and temperature schedule for whole-house brooding in Zambia.',
       housingType: 'whole_house',
       breedId: rossBreed?.id ?? null,
@@ -223,6 +224,7 @@ export async function seedLightingTemperatureSchedules(prisma: PrismaClient) {
     },
     create: {
       name: 'Ross 308 Spot Brooding',
+      organizationId,
       description: 'Ross 308 lighting and temperature schedule for spot brooding in Zambia.',
       housingType: 'spot_brooding',
       breedId: rossBreed?.id ?? null,
@@ -249,6 +251,7 @@ export async function seedLightingTemperatureSchedules(prisma: PrismaClient) {
     },
     create: {
       name: 'Generic Broiler Whole House',
+      organizationId,
       description: 'Generic broiler lighting and temperature schedule for whole-house brooding.',
       housingType: 'whole_house',
       breedId: null,
@@ -275,6 +278,7 @@ export async function seedLightingTemperatureSchedules(prisma: PrismaClient) {
     },
     create: {
       name: 'Generic Broiler Spot Brooding',
+      organizationId,
       description: 'Generic broiler lighting and temperature schedule for spot brooding.',
       housingType: 'spot_brooding',
       breedId: null,
