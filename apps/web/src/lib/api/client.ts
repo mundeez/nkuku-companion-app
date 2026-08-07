@@ -213,3 +213,104 @@ export async function logout() {
 export function getUser() {
   return getUserFromStorage();
 }
+
+// ── Social Auth ──
+
+export type SocialProvider = "google" | "facebook" | "apple" | "microsoft";
+
+export async function getSocialProviders() {
+  return apiFetch<{
+    providers: { provider: SocialProvider; configured: boolean }[];
+  }>("/api/v1/auth/social/config");
+}
+
+/**
+ * Get the OAuth authorization URL for a provider (web redirect flow).
+ * The caller should redirect the browser to the returned URL.
+ */
+export async function getSocialAuthUrl(
+  provider: SocialProvider,
+  redirectUri: string,
+) {
+  return apiFetch<{ url: string; state: string }>(
+    `/api/v1/auth/social/auth-url?provider=${provider}&redirectUri=${encodeURIComponent(redirectUri)}`,
+  );
+}
+
+/**
+ * Handle the OAuth callback — exchange the code for tokens and log in.
+ * If the user doesn't exist, returns needsSignup: true with a tempToken.
+ */
+export async function socialCallback(
+  provider: SocialProvider,
+  code: string,
+  state: string,
+  redirectUri: string,
+) {
+  const data = await apiFetch<{
+    accessToken?: string;
+    refreshToken?: string;
+    user?: any;
+    organization?: any;
+    needsSignup?: boolean;
+    tempToken?: string;
+    profile?: { email?: string; name?: string; provider: string };
+  }>("/api/v1/auth/social/callback", {
+    method: "POST",
+    body: JSON.stringify({ provider, code, state, redirectUri }),
+  });
+  if (data.user) {
+    setUserInStorage(data.user);
+  }
+  return data;
+}
+
+/**
+ * Complete signup for a social user who doesn't have an organization yet.
+ * Uses the tempToken from socialCallback or socialLogin.
+ */
+export async function socialCompleteSignup(body: {
+  tempToken: string;
+  organizationName: string;
+  country: string;
+  currency?: string;
+  consent: true;
+}) {
+  const data = await apiFetch<{
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+    organization: any;
+  }>("/api/v1/auth/social/complete-signup", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  setUserInStorage(data.user);
+  return data;
+}
+
+/**
+ * Social login with an ID token (used by mobile SDKs, can also be used on web
+ * with Google Identity Services).
+ */
+export async function socialLogin(
+  provider: SocialProvider,
+  token: string,
+) {
+  const data = await apiFetch<{
+    accessToken?: string;
+    refreshToken?: string;
+    user?: any;
+    organization?: any;
+    needsSignup?: boolean;
+    tempToken?: string;
+    profile?: { email?: string; name?: string; provider: string };
+  }>("/api/v1/auth/social/login", {
+    method: "POST",
+    body: JSON.stringify({ provider, token }),
+  });
+  if (data.user) {
+    setUserInStorage(data.user);
+  }
+  return data;
+}

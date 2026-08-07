@@ -9,6 +9,10 @@ void main() {
     await setupSharedPreferences();
     await AuthService.init();
     await tester.pumpWidget(const NkukuApp());
+    // Pump a few frames to let async initState calls (e.g. social provider
+    // config fetch) settle without waiting for network timeouts.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 }

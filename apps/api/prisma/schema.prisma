@@ -44,8 +44,31 @@ model User {
   sentInvites                         Invite[]                      @relation("InviteInvitedBy")
   otpCodes                            OtpCode[]
   devices                             UserDevice[]
+  socialAccounts                      SocialAccount[]
 
   @@map("users")
+}
+
+// ── SOCIAL ACCOUNTS ──────────────────────
+// Links a User to an external identity provider (Google, Facebook, Apple,
+// Microsoft). A user may have multiple linked providers. The combination
+// of (provider, providerUserId) is unique — one social identity maps to
+// exactly one Nkuku user.
+model SocialAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  provider       String   @db.VarChar(20) // "google" | "facebook" | "apple" | "microsoft"
+  providerUserId String   @map("provider_user_id") @db.VarChar(255) // provider's unique user ID
+  providerEmail  String?  @map("provider_email") @db.VarChar(255) // email from provider (may differ from User.email)
+  providerName   String?  @map("provider_name") @db.VarChar(255) // display name from provider
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("social_accounts")
 }
 
 // ── OTP VERIFICATION ─────────────────────

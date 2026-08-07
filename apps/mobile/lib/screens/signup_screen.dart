@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../widgets/bottom_nav.dart';
+import '../widgets/social_login_buttons.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -378,6 +379,20 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ],
 
+              const SizedBox(height: 12),
+              SocialLoginButtons(
+                onSuccess: () {
+                  if (mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const BottomNavShell()),
+                      (route) => false,
+                    );
+                  }
+                },
+                onError: (err) {
+                  setState(() => _error = err);
+                },
+              ),
               const SizedBox(height: 12),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),

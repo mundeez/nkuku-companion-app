@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../widgets/bottom_nav.dart';
+import '../widgets/social_login_buttons.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -299,7 +300,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
 
                 const SizedBox(height: 12),
-                if (!_isNewDeviceFlow)
+                if (!_isNewDeviceFlow) ...[
+                  SocialLoginButtons(
+                    onSuccess: () {
+                      if (mounted) {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(builder: (_) => const BottomNavShell()),
+                        );
+                      }
+                    },
+                    onError: (err) {
+                      setState(() => _error = err);
+                    },
+                  ),
+                  const SizedBox(height: 12),
                   TextButton(
                     onPressed: () {
                       Navigator.of(context).push(
@@ -308,6 +322,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                     child: const Text('Don\'t have an account? Create one'),
                   ),
+                ],
               ],
             ),
           ),

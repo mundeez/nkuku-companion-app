@@ -2,6 +2,9 @@ import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'api_service.dart';
 
 class AuthService {
@@ -344,6 +347,189 @@ class AuthService {
       return data['message'].toString();
     } else {
       return 'Error $status. Please try again.';
+    }
+  }
+
+  // ── Social Login ──
+
+  /// Result of a social login attempt — either the user is logged in,
+  /// or they need to complete signup (no org yet).
+  static Map<String, dynamic>? _lastSocialResult;
+
+  /// Returns the last social login result if it needs signup completion.
+  static Map<String, dynamic>? get lastSocialResult => _lastSocialResult;
+
+  /// Sign in with Google using the native SDK.
+  /// Returns true if logged in, false if needs signup (check lastSocialResult),
+  /// or false on error (check lastError).
+  static Future<bool> signInWithGoogle() async {
+    _lastError = null;
+    _lastSocialResult = null;
+    try {
+      final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+      final account = await googleSignIn.signIn();
+      if (account == null) {
+        _lastError = 'Google sign-in cancelled';
+        return false;
+      }
+      final auth = await account.authentication;
+      final idToken = auth.idToken;
+      if (idToken == null) {
+        _lastError = 'Failed to get Google ID token';
+        return false;
+      }
+      return await _socialLogin('google', idToken);
+    } catch (e) {
+      _lastError = 'Google sign-in failed: $e';
+      return false;
+    }
+  }
+
+  /// Sign in with Facebook using the native SDK.
+  static Future<bool> signInWithFacebook() async {
+    _lastError = null;
+    _lastSocialResult = null;
+    try {
+      final result = await FacebookAuth.instance.login(
+        permissions: ['email', 'public_profile'],
+      );
+      if (result.status != LoginStatus.success) {
+        _lastError = 'Facebook sign-in cancelled or failed: ${result.status}';
+        return false;
+      }
+      final accessToken = result.accessToken!.token;
+      return await _socialLogin('facebook', accessToken);
+    } catch (e) {
+      _lastError = 'Facebook sign-in failed: $e';
+      return false;
+    }
+  }
+
+  /// Sign in with Apple using the native SDK.
+  static Future<bool> signInWithApple() async {
+    _lastError = null;
+    _lastSocialResult = null;
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+      final idToken = credential.identityToken;
+      if (idToken == null) {
+        _lastError = 'Failed to get Apple ID token';
+        return false;
+      }
+      return await _socialLogin('apple', idToken);
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        _lastError = 'Apple sign-in cancelled';
+      } else {
+        _lastError = 'Apple sign-in failed: ${e.code} ${e.message}';
+      }
+      return false;
+    } catch (e) {
+      _lastError = 'Apple sign-in failed: $e';
+      return false;
+    }
+  }
+
+  /// Internal: send the social token to the API and handle the response.
+  static Future<bool> _socialLogin(String provider, String token) async {
+    try {
+      final response = await ApiService.dio.post(
+        '/api/v1/auth/social/login',
+        data: {'provider': provider, 'token': token},
+        options: Options(validateStatus: (s) => s! < 500),
+      );
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        if (data['needsSignup'] == true) {
+          _lastSocialResult = data;
+          return false;
+        }
+        await _persistSession(
+          accessToken: data['accessToken'],
+          refreshToken: data['refreshToken'],
+          user: data['user'],
+        );
+        _notifyAuthStateChanged();
+        return true;
+      } else {
+        final data = response.data;
+        _lastError = (data is Map && data['message'] != null)
+            ? data['message'].toString()
+            : 'Social login failed (${response.statusCode})';
+        return false;
+      }
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Complete signup for a social user (creates org).
+  static Future<bool> completeSocialSignup({
+    required String tempToken,
+    required String organizationName,
+    required String country,
+    required String currency,
+  }) async {
+    _lastError = null;
+    try {
+      final response = await ApiService.dio.post(
+        '/api/v1/auth/social/complete-signup',
+        data: {
+          'tempToken': tempToken,
+          'organizationName': organizationName,
+          'country': country,
+          'currency': currency,
+          'consent': true,
+        },
+        options: Options(validateStatus: (s) => s! < 500),
+      );
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        await _persistSession(
+          accessToken: data['accessToken'],
+          refreshToken: data['refreshToken'],
+          user: data['user'],
+        );
+        _notifyAuthStateChanged();
+        return true;
+      } else {
+        final data = response.data;
+        _lastError = (data is Map && data['message'] != null)
+            ? data['message'].toString()
+            : 'Signup failed (${response.statusCode})';
+        return false;
+      }
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Get configured social providers from the API.
+  static Future<List<Map<String, dynamic>>> getSocialProviders() async {
+    try {
+      final response = await ApiService.dio.get('/api/v1/auth/social/config');
+      final data = response.data as Map<String, dynamic>;
+      final providers = data['providers'] as List;
+      return providers
+          .map((p) => {'provider': p['provider'], 'configured': p['configured']})
+          .where((p) => p['configured'] == true)
+          .toList()
+          .cast<Map<String, dynamic>>();
+    } catch (e) {
+      return [];
     }
   }
 

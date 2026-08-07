@@ -10,6 +10,13 @@ import {
   normalizePhone,
   maskPhone,
 } from '../../core/security/otp.service.js';
+import {
+  verifySocialToken,
+  exchangeCodeForToken,
+  getAuthorizationUrl,
+  isProviderConfigured,
+  type SocialProvider,
+} from '../../core/security/social-auth.service.js';
 
 const LoginSchema = z.object({
   email: z.string().email().optional(),
@@ -84,6 +91,33 @@ const AcceptInviteSchema = z.object({
   consent: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the privacy policy and terms to join' }),
   }),
+});
+
+// ── Social auth schemas ──
+const SocialLoginSchema = z.object({
+  provider: z.enum(['google', 'facebook', 'apple', 'microsoft']),
+  // ID token (Google, Apple, Microsoft) or access token (Facebook)
+  token: z.string().optional(),
+  // Authorization code (web OAuth redirect flow) — if provided, API exchanges it
+  code: z.string().optional(),
+  redirectUri: z.string().optional(),
+}).refine(
+  (data) => data.token || data.code,
+  { message: 'Either token or code is required' },
+);
+
+const SocialCompleteSignupSchema = z.object({
+  organizationName: z.string().min(1).max(150),
+  country: z.string().length(2),
+  currency: z.string().length(3).default('ZMW'),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the privacy policy and terms to create an account' }),
+  }),
+});
+
+const SocialAuthUrlSchema = z.object({
+  provider: z.enum(['google', 'facebook', 'apple', 'microsoft']),
+  redirectUri: z.string().url(),
 });
 
 const TokenPayloadSchema = z.object({
@@ -788,6 +822,525 @@ export async function buildAuthModule(app: FastifyInstance) {
     const prisma = (app as any).prisma;
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
     return { user: user ? { ...user, organizationId: payload.organizationId } : null };
+  });
+
+  // ── Social Authentication Endpoints ──
+
+  // GET /api/v1/auth/social/config — returns which providers are configured.
+  // Used by web/mobile to show/hide social login buttons.
+  app.get('/social/config', async () => {
+    const providers = ['google', 'facebook', 'apple', 'microsoft'] as SocialProvider[];
+    return {
+      providers: providers.map((p) => ({
+        provider: p,
+        configured: isProviderConfigured(p),
+      })),
+    };
+  });
+
+  // GET /api/v1/auth/social/auth-url — returns the OAuth authorization URL
+  // for the web redirect flow. The client redirects the browser to this URL,
+  // and the provider redirects back to /social/callback after authentication.
+  app.get('/social/auth-url', async (request: any, reply: any) => {
+    const query = request.query || {};
+    const provider = query.provider as SocialProvider;
+    const redirectUri = query.redirectUri as string;
+    if (!provider || !redirectUri) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: 'provider and redirectUri are required' });
+    }
+    if (!['google', 'facebook', 'apple', 'microsoft'].includes(provider)) {
+      return reply.status(400).send({ error: 'INVALID_PROVIDER' });
+    }
+    if (!isProviderConfigured(provider)) {
+      return reply.status(503).send({ error: 'PROVIDER_NOT_CONFIGURED', message: `${provider} OAuth is not configured on the server` });
+    }
+    // state is a random nonce to prevent CSRF; the client must verify it
+    // matches when the callback arrives. We also embed it in a short-lived
+    // Redis key so the server can verify it too.
+    const state = crypto.randomBytes(16).toString('hex');
+    const redis = (app as any).redis;
+    if (redis) {
+      await redis.setex(`oauth:state:${state}`, 600, '1'); // 10 min TTL
+    }
+    const url = getAuthorizationUrl(provider, redirectUri, state);
+    return { url, state };
+  });
+
+  // POST /api/v1/auth/social/callback — handles the OAuth redirect callback.
+  // The web client receives the `code` and `state` from the provider's redirect
+  // and posts them here. The API exchanges the code for tokens, verifies the
+  // identity, and either logs the user in or returns a "needs signup" response.
+  app.post('/social/callback', async (request: any, reply: any) => {
+    let body;
+    try {
+      body = z.object({
+        provider: z.enum(['google', 'facebook', 'apple', 'microsoft']),
+        code: z.string().min(1),
+        state: z.string().min(1),
+        redirectUri: z.string().url(),
+      }).parse(request.body);
+    } catch (err: any) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: err.errors?.[0]?.message || 'Invalid request' });
+    }
+    const prisma = (app as any).prisma;
+
+    // Verify state to prevent CSRF
+    const redis = (app as any).redis;
+    if (redis) {
+      const stateValid = await redis.get(`oauth:state:${body.state}`);
+      if (!stateValid) {
+        return reply.status(400).send({ error: 'INVALID_STATE', message: 'OAuth state mismatch or expired' });
+      }
+      await redis.del(`oauth:state:${body.state}`);
+    }
+
+    // Exchange code for token
+    let token: string;
+    try {
+      token = await exchangeCodeForToken(body.provider, body.code, body.redirectUri);
+    } catch (err: any) {
+      return reply.status(400).send({ error: 'CODE_EXCHANGE_FAILED', message: err.message });
+    }
+
+    // Verify the token and get user info
+    let socialUser;
+    try {
+      socialUser = await verifySocialToken(body.provider, token);
+    } catch (err: any) {
+      return reply.status(401).send({ error: 'TOKEN_VERIFICATION_FAILED', message: err.message });
+    }
+
+    // Look for an existing social account link
+    const existingLink = await prisma.socialAccount.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider: body.provider,
+          providerUserId: socialUser.providerUserId,
+        },
+      },
+      include: { user: true },
+    });
+
+    if (existingLink) {
+      // User exists — log them in
+      const user = existingLink.user;
+      if (!user.isActive) {
+        return reply.status(403).send({ error: 'ACCOUNT_DISABLED' });
+      }
+      const organizationId = await getPrimaryOrganizationId(prisma, user.id);
+      if (!organizationId) {
+        // User has social account but no org yet — needs to complete signup
+        const tempToken = jwt.sign(
+          { socialProvider: body.provider, providerUserId: socialUser.providerUserId, email: socialUser.email, name: socialUser.name, action: 'complete_signup' },
+          SECRET,
+          { expiresIn: '30m' },
+        );
+        return reply.status(200).send({
+          needsSignup: true,
+          tempToken,
+          profile: { email: socialUser.email, name: socialUser.name, provider: body.provider },
+        });
+      }
+
+      // Register device if needed
+      const fingerprint = getDeviceFingerprint(request);
+      const label = getDeviceLabel(request);
+      await registerDevice(prisma, user.id, fingerprint, label);
+
+      const payload: TokenPayload = {
+        userId: user.id,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        organizationId,
+      };
+      const accessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+      const refreshToken = jwt.sign({ userId: user.id }, SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+      if (redis) {
+        await redis.setex(`refresh:${user.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
+      }
+      setAuthCookies(reply, accessToken, refreshToken);
+
+      const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+      return reply.status(200).send({
+        accessToken,
+        refreshToken,
+        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, phoneVerified: !!user.phoneVerifiedAt },
+        organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
+      });
+    }
+
+    // No existing link — check if there's a user with the same email
+    if (socialUser.email) {
+      const existingUser = await prisma.user.findUnique({ where: { email: socialUser.email } });
+      if (existingUser) {
+        // Link the social account to the existing user and log in
+        await prisma.socialAccount.create({
+          data: {
+            userId: existingUser.id,
+            provider: body.provider,
+            providerUserId: socialUser.providerUserId,
+            providerEmail: socialUser.email,
+            providerName: socialUser.name,
+          },
+        });
+        const organizationId = await getPrimaryOrganizationId(prisma, existingUser.id);
+        if (!organizationId) {
+          const tempToken = jwt.sign(
+            { socialProvider: body.provider, providerUserId: socialUser.providerUserId, email: socialUser.email, name: socialUser.name, action: 'complete_signup' },
+            SECRET,
+            { expiresIn: '30m' },
+          );
+          return reply.status(200).send({
+            needsSignup: true,
+            tempToken,
+            profile: { email: socialUser.email, name: socialUser.name, provider: body.provider },
+          });
+        }
+
+        const fingerprint = getDeviceFingerprint(request);
+        const label = getDeviceLabel(request);
+        await registerDevice(prisma, existingUser.id, fingerprint, label);
+
+        const payload: TokenPayload = {
+          userId: existingUser.id,
+          email: existingUser.email,
+          phone: existingUser.phone,
+          role: existingUser.role,
+          organizationId,
+        };
+        const accessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+        const refreshToken = jwt.sign({ userId: existingUser.id }, SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+        if (redis) {
+          await redis.setex(`refresh:${existingUser.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
+        }
+        setAuthCookies(reply, accessToken, refreshToken);
+
+        const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+        return reply.status(200).send({
+          accessToken,
+          refreshToken,
+          user: { id: existingUser.id, email: existingUser.email, phone: existingUser.phone, name: existingUser.name, role: existingUser.role, organizationId, phoneVerified: !!existingUser.phoneVerifiedAt },
+          organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
+        });
+      }
+    }
+
+    // No existing user — return a temp token for completing signup
+    const tempToken = jwt.sign(
+      { socialProvider: body.provider, providerUserId: socialUser.providerUserId, email: socialUser.email, name: socialUser.name, action: 'complete_signup' },
+      SECRET,
+      { expiresIn: '30m' },
+    );
+    return reply.status(200).send({
+      needsSignup: true,
+      tempToken,
+      profile: { email: socialUser.email, name: socialUser.name, provider: body.provider },
+    });
+  });
+
+  // POST /api/v1/auth/social/login — mobile flow: the mobile SDK provides
+  // an ID token (or access token for Facebook) directly. No redirect needed.
+  app.post('/social/login', async (request: any, reply: any) => {
+    let body;
+    try {
+      body = SocialLoginSchema.parse(request.body);
+    } catch (err: any) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: err.errors?.[0]?.message || 'Invalid request' });
+    }
+    const prisma = (app as any).prisma;
+
+    // If a code is provided, exchange it first (web flow used this too)
+    let token = body.token;
+    if (!token && body.code) {
+      if (!body.redirectUri) {
+        return reply.status(400).send({ error: 'VALIDATION_ERROR', message: 'redirectUri is required when using code' });
+      }
+      try {
+        token = await exchangeCodeForToken(body.provider, body.code, body.redirectUri);
+      } catch (err: any) {
+        return reply.status(400).send({ error: 'CODE_EXCHANGE_FAILED', message: err.message });
+      }
+    }
+
+    // Verify the token
+    let socialUser;
+    try {
+      socialUser = await verifySocialToken(body.provider, token!);
+    } catch (err: any) {
+      return reply.status(401).send({ error: 'TOKEN_VERIFICATION_FAILED', message: err.message });
+    }
+
+    // Look for existing social account
+    const existingLink = await prisma.socialAccount.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider: body.provider,
+          providerUserId: socialUser.providerUserId,
+        },
+      },
+      include: { user: true },
+    });
+
+    if (existingLink) {
+      const user = existingLink.user;
+      if (!user.isActive) {
+        return reply.status(403).send({ error: 'ACCOUNT_DISABLED' });
+      }
+      const organizationId = await getPrimaryOrganizationId(prisma, user.id);
+      if (!organizationId) {
+        const tempToken = jwt.sign(
+          { socialProvider: body.provider, providerUserId: socialUser.providerUserId, email: socialUser.email, name: socialUser.name, action: 'complete_signup' },
+          SECRET,
+          { expiresIn: '30m' },
+        );
+        return reply.status(200).send({
+          needsSignup: true,
+          tempToken,
+          profile: { email: socialUser.email, name: socialUser.name, provider: body.provider },
+        });
+      }
+
+      const fingerprint = getDeviceFingerprint(request);
+      const label = getDeviceLabel(request);
+      await registerDevice(prisma, user.id, fingerprint, label);
+
+      const payload: TokenPayload = {
+        userId: user.id,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        organizationId,
+      };
+      const accessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+      const refreshToken = jwt.sign({ userId: user.id }, SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+      const redis = (app as any).redis;
+      if (redis) {
+        await redis.setex(`refresh:${user.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
+      }
+      setAuthCookies(reply, accessToken, refreshToken);
+
+      const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+      return reply.status(200).send({
+        accessToken,
+        refreshToken,
+        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, phoneVerified: !!user.phoneVerifiedAt },
+        organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
+      });
+    }
+
+    // Check for existing user with same email
+    if (socialUser.email) {
+      const existingUser = await prisma.user.findUnique({ where: { email: socialUser.email } });
+      if (existingUser) {
+        await prisma.socialAccount.create({
+          data: {
+            userId: existingUser.id,
+            provider: body.provider,
+            providerUserId: socialUser.providerUserId,
+            providerEmail: socialUser.email,
+            providerName: socialUser.name,
+          },
+        });
+        const organizationId = await getPrimaryOrganizationId(prisma, existingUser.id);
+        if (!organizationId) {
+          const tempToken = jwt.sign(
+            { socialProvider: body.provider, providerUserId: socialUser.providerUserId, email: socialUser.email, name: socialUser.name, action: 'complete_signup' },
+            SECRET,
+            { expiresIn: '30m' },
+          );
+          return reply.status(200).send({
+            needsSignup: true,
+            tempToken,
+            profile: { email: socialUser.email, name: socialUser.name, provider: body.provider },
+          });
+        }
+
+        const fingerprint = getDeviceFingerprint(request);
+        const label = getDeviceLabel(request);
+        await registerDevice(prisma, existingUser.id, fingerprint, label);
+
+        const payload: TokenPayload = {
+          userId: existingUser.id,
+          email: existingUser.email,
+          phone: existingUser.phone,
+          role: existingUser.role,
+          organizationId,
+        };
+        const accessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+        const refreshToken = jwt.sign({ userId: existingUser.id }, SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+        const redis = (app as any).redis;
+        if (redis) {
+          await redis.setex(`refresh:${existingUser.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
+        }
+        setAuthCookies(reply, accessToken, refreshToken);
+
+        const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+        return reply.status(200).send({
+          accessToken,
+          refreshToken,
+          user: { id: existingUser.id, email: existingUser.email, phone: existingUser.phone, name: existingUser.name, role: existingUser.role, organizationId, phoneVerified: !!existingUser.phoneVerifiedAt },
+          organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
+        });
+      }
+    }
+
+    // New user — return temp token for completing signup
+    const tempToken = jwt.sign(
+      { socialProvider: body.provider, providerUserId: socialUser.providerUserId, email: socialUser.email, name: socialUser.name, action: 'complete_signup' },
+      SECRET,
+      { expiresIn: '30m' },
+    );
+    return reply.status(200).send({
+      needsSignup: true,
+      tempToken,
+      profile: { email: socialUser.email, name: socialUser.name, provider: body.provider },
+    });
+  });
+
+  // POST /api/v1/auth/social/complete-signup — creates the user account and
+  // organization after a social login that returned needsSignup: true.
+  // The tempToken from the social login response is used to verify the
+  // social identity without re-verifying the provider token.
+  app.post('/social/complete-signup', async (request: any, reply: any) => {
+    let body;
+    try {
+      body = z.object({
+        tempToken: z.string().min(1),
+        organizationName: z.string().min(1).max(150),
+        country: z.string().length(2),
+        currency: z.string().length(3).default('ZMW'),
+        consent: z.literal(true, {
+          errorMap: () => ({ message: 'You must accept the privacy policy and terms to create an account' }),
+        }),
+      }).parse(request.body);
+    } catch (err: any) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: err.errors?.[0]?.message || 'Invalid request' });
+    }
+    const prisma = (app as any).prisma;
+
+    // Verify the temp token
+    let tempPayload: any;
+    try {
+      tempPayload = jwt.verify(body.tempToken, SECRET);
+    } catch {
+      return reply.status(401).send({ error: 'INVALID_OR_EXPIRED_TEMP_TOKEN' });
+    }
+    if (tempPayload.action !== 'complete_signup') {
+      return reply.status(400).send({ error: 'INVALID_TEMP_TOKEN', message: 'Token is not for signup completion' });
+    }
+
+    const { socialProvider, providerUserId, email, name } = tempPayload;
+
+    // Double-check this social identity isn't already linked
+    const existingLink = await prisma.socialAccount.findUnique({
+      where: { provider_providerUserId: { provider: socialProvider, providerUserId } },
+      include: { user: true },
+    });
+    if (existingLink) {
+      // Already linked — just log them in
+      const user = existingLink.user;
+      const organizationId = await getPrimaryOrganizationId(prisma, user.id);
+      if (organizationId) {
+        const payload: TokenPayload = {
+          userId: user.id, email: user.email, phone: user.phone, role: user.role, organizationId,
+        };
+        const accessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+        const refreshToken = jwt.sign({ userId: user.id }, SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+        const redis = (app as any).redis;
+        if (redis) {
+          await redis.setex(`refresh:${user.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
+        }
+        setAuthCookies(reply, accessToken, refreshToken);
+        const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+        return reply.status(200).send({
+          accessToken, refreshToken,
+          user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, phoneVerified: !!user.phoneVerifiedAt },
+          organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
+        });
+      }
+    }
+
+    // Check for existing user with same email (to avoid unique constraint)
+    let user = null;
+    if (email) {
+      user = await prisma.user.findUnique({ where: { email } });
+    }
+
+    const result = await prisma.$transaction(async (tx: any) => {
+      // Create user if doesn't exist
+      if (!user) {
+        user = await tx.user.create({
+          data: {
+            email: email || null,
+            passwordHash: '', // social users don't have a password
+            name: name || null,
+            role: 'owner',
+            consentAcceptedAt: new Date(),
+            consentVersion: '1.0',
+            emailVerifiedAt: email ? new Date() : null, // provider-verified email
+          },
+        });
+      }
+
+      // Create social account link
+      await tx.socialAccount.create({
+        data: {
+          userId: user.id,
+          provider: socialProvider,
+          providerUserId,
+          providerEmail: email || null,
+          providerName: name || null,
+        },
+      });
+
+      // Create organization
+      const org = await tx.organization.create({
+        data: {
+          name: body.organizationName,
+          country: body.country,
+          currency: body.currency,
+        },
+      });
+
+      // Create membership
+      await tx.organizationMember.create({
+        data: {
+          userId: user.id,
+          organizationId: org.id,
+          role: 'owner',
+        },
+      });
+
+      return { user, org };
+    });
+
+    // Register device
+    const fingerprint = getDeviceFingerprint(request);
+    const label = getDeviceLabel(request);
+    await registerDevice(prisma, result.user.id, fingerprint, label);
+
+    const payload: TokenPayload = {
+      userId: result.user.id,
+      email: result.user.email,
+      phone: result.user.phone,
+      role: result.user.role,
+      organizationId: result.org.id,
+    };
+    const accessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
+    const refreshToken = jwt.sign({ userId: result.user.id }, SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN as any });
+    const redis = (app as any).redis;
+    if (redis) {
+      await redis.setex(`refresh:${result.user.id}:${refreshToken}`, 7 * 24 * 60 * 60, '1');
+    }
+    setAuthCookies(reply, accessToken, refreshToken);
+
+    return reply.status(201).send({
+      accessToken,
+      refreshToken,
+      user: { id: result.user.id, email: result.user.email, phone: result.user.phone, name: result.user.name, role: result.user.role, organizationId: result.org.id, phoneVerified: false },
+      organization: { id: result.org.id, name: result.org.name, country: result.org.country, currency: result.org.currency },
+    });
   });
 
   // GET /api/v1/auth/dev/last-otp — DEV ONLY: returns the last OTP code

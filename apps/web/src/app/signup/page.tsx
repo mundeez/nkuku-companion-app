@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { register, sendOtp, verifyOtp } from "@/lib/api/client";
+import { SocialLoginButtons } from "@/components/auth/social-login-buttons";
+import { SocialSignupForm } from "@/components/auth/social-signup-form";
 
 const COUNTRIES = [
   { code: "ZM", name: "Zambia" },
@@ -52,6 +54,10 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
+  const [socialSignup, setSocialSignup] = useState<{
+    tempToken: string;
+    profile: { email?: string; name?: string; provider: string };
+  } | null>(null);
 
   // Email signup (no OTP needed — password-based auth)
   async function handleEmailSignup(e: React.FormEvent) {
@@ -154,6 +160,14 @@ export default function SignupPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {socialSignup ? (
+            <SocialSignupForm
+              tempToken={socialSignup.tempToken}
+              profile={socialSignup.profile}
+              onCancel={() => setSocialSignup(null)}
+            />
+          ) : (
+            <>
           {/* Mode toggle */}
           <div className="flex gap-2 mb-4">
             <Button
@@ -338,6 +352,16 @@ export default function SignupPage() {
               </>
             )}
 
+            <SocialLoginButtons
+              onSuccess={() => {
+                refreshUser();
+                router.push("/");
+                router.refresh();
+              }}
+              onNeedsSignup={(data) => setSocialSignup(data)}
+              onError={(err) => setError(err)}
+            />
+
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
               <Link href="/login" className="text-primary underline-offset-4 hover:underline">
@@ -345,6 +369,8 @@ export default function SignupPage() {
               </Link>
             </p>
           </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

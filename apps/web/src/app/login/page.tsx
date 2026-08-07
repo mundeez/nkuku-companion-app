@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { login, loginWithOtp, sendOtp, verifyOtp } from "@/lib/api/client";
+import { SocialLoginButtons } from "@/components/auth/social-login-buttons";
+import { SocialSignupForm } from "@/components/auth/social-signup-form";
 
 type Mode = "email" | "phone";
 
@@ -25,6 +27,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState("");
+  const [socialSignup, setSocialSignup] = useState<{
+    tempToken: string;
+    profile: { email?: string; name?: string; provider: string };
+  } | null>(null);
 
   // Email + password login (with new-device OTP challenge)
   async function handleEmailLogin(e: React.FormEvent) {
@@ -118,131 +124,152 @@ export default function LoginPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Mode toggle */}
-          <div className="flex gap-2 mb-4">
-            <Button
-              variant={mode === "email" ? "default" : "outline"}
-              size="sm"
-              className="flex-1"
-              onClick={() => { setMode("email"); setOtpSent(false); setError(""); setInfo(""); }}
-            >
-              Email + Password
-            </Button>
-            <Button
-              variant={mode === "phone" ? "default" : "outline"}
-              size="sm"
-              className="flex-1"
-              onClick={() => { setMode("phone"); setError(""); setInfo(""); }}
-            >
-              Phone + OTP
-            </Button>
-          </div>
-
-          {/* Email + Password form */}
-          {mode === "email" && !otpSent && (
-            <form onSubmit={handleEmailLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+          {socialSignup ? (
+            <SocialSignupForm
+              tempToken={socialSignup.tempToken}
+              profile={socialSignup.profile}
+              onCancel={() => setSocialSignup(null)}
+            />
+          ) : (
+            <>
+              {/* Mode toggle */}
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={mode === "email" ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => { setMode("email"); setOtpSent(false); setError(""); setInfo(""); }}
+                >
+                  Email + Password
+                </Button>
+                <Button
+                  variant={mode === "phone" ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => { setMode("phone"); setError(""); setInfo(""); }}
+                >
+                  Phone + OTP
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-          )}
 
-          {/* Phone OTP form (login or new device) */}
-          {mode === "phone" && !otpSent && (
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              {info && <p className="text-sm text-blue-600">{info}</p>}
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="e.g. 260970000000 or 0970000000"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  Enter your phone number with country code (260 for Zambia)
-                </p>
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Sending..." : "Send OTP"}
-              </Button>
-            </form>
-          )}
-
-          {mode === "phone" && otpSent && (
-            <form onSubmit={maskedPhone ? handleNewDeviceVerify : handleVerifyOtp} className="space-y-4">
-              {info && <p className="text-sm text-blue-600">{info}</p>}
-              {!maskedPhone && (
-                <div className="space-y-2">
-                  <Label htmlFor="phone-verify">Phone Number</Label>
-                  <Input
-                    id="phone-verify"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
+              {/* Email + Password form */}
+              {mode === "email" && !otpSent && (
+                <form onSubmit={handleEmailLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  {info && <p className="text-sm text-blue-600">{info}</p>}
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Signing in..." : "Sign In"}
+                  </Button>
+                </form>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="otp">Verification Code</Label>
-                <Input
-                  id="otp"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="6-digit code"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  required
-                />
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Verifying..." : "Verify & Sign In"}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="w-full"
-                onClick={() => { setOtpSent(false); setOtp(""); setError(""); }}
-              >
-                Back
-              </Button>
-            </form>
-          )}
 
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-primary underline-offset-4 hover:underline">
-              Create one
-            </Link>
-          </p>
+              {/* Phone OTP form (login or new device) */}
+              {mode === "phone" && !otpSent && (
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  {info && <p className="text-sm text-blue-600">{info}</p>}
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="e.g. 260970000000 or 0970000000"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter your phone number with country code (260 for Zambia)
+                    </p>
+                  </div>
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Sending..." : "Send OTP"}
+                  </Button>
+                </form>
+              )}
+
+              {mode === "phone" && otpSent && (
+                <form onSubmit={maskedPhone ? handleNewDeviceVerify : handleVerifyOtp} className="space-y-4">
+                  {info && <p className="text-sm text-blue-600">{info}</p>}
+                  {!maskedPhone && (
+                    <div className="space-y-2">
+                      <Label htmlFor="phone-verify">Phone Number</Label>
+                      <Input
+                        id="phone-verify"
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="otp">Verification Code</Label>
+                    <Input
+                      id="otp"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="6-digit code"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      required
+                    />
+                  </div>
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Verifying..." : "Verify & Sign In"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => { setOtpSent(false); setOtp(""); setError(""); }}
+                  >
+                    Back
+                  </Button>
+                </form>
+              )}
+
+              <SocialLoginButtons
+                onSuccess={() => {
+                  refreshUser();
+                  router.push("/");
+                  router.refresh();
+                }}
+                onNeedsSignup={(data) => setSocialSignup(data)}
+                onError={(err) => setError(err)}
+              />
+
+              <p className="text-center text-sm text-muted-foreground mt-4">
+                Don&apos;t have an account?{" "}
+                <Link href="/signup" className="text-primary underline-offset-4 hover:underline">
+                  Create one
+                </Link>
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
