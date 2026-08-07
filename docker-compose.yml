@@ -32,6 +32,12 @@ services:
       MAX_ATTACHMENTS_PER_TX: ${MAX_ATTACHMENTS_PER_TX:-20}
       # ── Web base URL for invite links ──
       WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:30000}
+      # ── Kannel SMS gateway (deez-kannel) ──
+      KANNEL_SEND_URL: ${KANNEL_SEND_URL:-http://deez-kannel:13013/cgi-bin/sendsms}
+      KANNEL_SENDSMS_USER: ${KANNEL_SENDSMS_USER:-admin}
+      KANNEL_SENDSMS_PASS: ${KANNEL_SENDSMS_PASS:-}
+      KANNEL_SENDER: ${KANNEL_SENDER:-Nkuku}
+      SMS_DISABLED: ${SMS_DISABLED:-false}
     volumes:
       - ./apps/api/src:/app/src:ro
       - ./apps/api/prisma:/app/prisma:ro

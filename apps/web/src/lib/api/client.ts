@@ -82,21 +82,88 @@ export async function apiUpload(
 }
 
 export async function login(email: string, password: string) {
-  const data = await apiFetch<{ accessToken: string; refreshToken: string; user: any }>(
+  const data = await apiFetch<{ accessToken: string; refreshToken: string; user: any; requiresDeviceVerification?: boolean; phone?: string; message?: string }>(
     "/api/v1/auth/login",
     {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }
   );
+  // New device detected — requires OTP verification
+  if (data.requiresDeviceVerification) {
+    return data;
+  }
   // Tokens are set as HttpOnly cookies by the API; just store user for UI.
   setUserInStorage(data.user);
   return data;
 }
 
+/**
+ * Login with phone + OTP (passwordless).
+ * The OTP must have been sent via sendOtp() first.
+ */
+export async function loginWithOtp(phone: string, otp: string) {
+  const data = await apiFetch<{ accessToken: string; refreshToken: string; user: any }>(
+    "/api/v1/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify({ phone, otp }),
+    }
+  );
+  setUserInStorage(data.user);
+  return data;
+}
+
+/**
+ * Send an OTP code to a phone number.
+ * @param phone Phone number (E.164 or local format)
+ * @param purpose "signup" | "login" | "new_device"
+ */
+export async function sendOtp(phone: string, purpose: "signup" | "login" | "new_device") {
+  return apiFetch<{ success: boolean; message: string }>(
+    "/api/v1/auth/send-otp",
+    {
+      method: "POST",
+      body: JSON.stringify({ phone, purpose }),
+    }
+  );
+}
+
+/**
+ * Verify an OTP code. For signup, creates the account. For login/new_device,
+ * logs the user in.
+ */
+export async function verifyOtp(
+  phone: string,
+  otp: string,
+  purpose: "signup" | "login" | "new_device",
+  signupData?: {
+    email?: string;
+    password?: string;
+    name: string;
+    organizationName: string;
+    country: string;
+    currency?: string;
+    consent: true;
+  },
+) {
+  const data = await apiFetch<{ accessToken: string; refreshToken: string; user: any; organization?: any }>(
+    "/api/v1/auth/verify-otp",
+    {
+      method: "POST",
+      body: JSON.stringify({ phone, otp, purpose, signupData }),
+    }
+  );
+  if (data.user) {
+    setUserInStorage(data.user);
+  }
+  return data;
+}
+
 export async function register(body: {
-  email: string;
-  password: string;
+  email?: string;
+  phone?: string;
+  password?: string;
   name: string;
   organizationName: string;
   country: string;

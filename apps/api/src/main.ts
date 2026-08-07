@@ -7,6 +7,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 
 import { PrismaClient } from '@prisma/client';
+import { Redis } from 'ioredis';
 import { buildAuthModule } from './modules/auth/routes.js';
 import { buildSupplierModule } from './modules/suppliers/routes.js';
 import { buildFeedStageModule } from './modules/feed-stages/routes.js';
@@ -88,6 +89,24 @@ await app.register(swaggerUi, {
 
 // Decorate with shared Prisma instance
 app.decorate('prisma', prisma);
+
+// ── Redis (for refresh token tracking, OTP dev endpoint, rate limiting) ──
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+let redis: any = null;
+try {
+  redis = new Redis(redisUrl, { maxRetriesPerRequest: 1, retryStrategy: (times: number) => Math.min(times * 500, 2000) });
+  redis.on('connect', () => app.log.info('[Redis] Connected'));
+  redis.on('error', (err: Error) => app.log.warn(`[Redis] Error: ${err.message}`));
+  // Wait briefly for connection
+  await new Promise<void>((resolve) => {
+    if (redis.status === 'ready') return resolve();
+    const timer = setTimeout(() => resolve(), 3000);
+    redis.once('ready', () => { clearTimeout(timer); resolve(); });
+  });
+} catch (err: any) {
+  app.log.warn(`[Redis] Connection failed: ${err.message}`);
+}
+if (redis) app.decorate('redis', redis);
 
 // ── Ensure S3/MinIO bucket exists on boot ──
 try {

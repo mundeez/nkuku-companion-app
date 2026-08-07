@@ -87,6 +87,11 @@ class AuthService {
         return false;
       }
       final data = res.data;
+      // Check if new-device verification is required
+      if (data['requiresDeviceVerification'] == true) {
+        _lastError = 'NEW_DEVICE_VERIFICATION_REQUIRED:${data['phone'] ?? ''}:${data['message'] ?? 'New device detected. An OTP has been sent to your phone.'}';
+        return false;
+      }
       await _persistSession(
         accessToken: data['accessToken'],
         refreshToken: data['refreshToken'],
@@ -103,11 +108,105 @@ class AuthService {
     }
   }
 
-  /// Self-serve signup: creates a new Organization + owner User.
+  /// Send an OTP code to a phone number.
+  /// [purpose] must be "signup", "login", or "new_device".
+  /// Returns the masked phone message on success, or null on failure.
+  static Future<String?> sendOtp(String phone, String purpose) async {
+    _lastError = null;
+    try {
+      final res = await ApiService.dio.post('/api/v1/auth/send-otp', data: {
+        'phone': phone,
+        'purpose': purpose,
+      });
+      if (res.statusCode != null && res.statusCode! >= 400) {
+        _lastError = _httpError(res.statusCode!, res.data);
+        return null;
+      }
+      return res.data['message'] as String?;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return null;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return null;
+    }
+  }
+
+  /// Verify an OTP code. For login/new_device, logs the user in.
+  /// For signup, creates the account (requires signupData).
+  /// Returns true on success (user is logged in), false on failure.
+  static Future<bool> verifyOtp({
+    required String phone,
+    required String otp,
+    required String purpose,
+    Map<String, dynamic>? signupData,
+  }) async {
+    _lastError = null;
+    try {
+      final res = await ApiService.dio.post('/api/v1/auth/verify-otp', data: {
+        'phone': phone,
+        'otp': otp,
+        'purpose': purpose,
+        if (signupData != null) 'signupData': signupData,
+      });
+      if (res.statusCode != null && res.statusCode! >= 400) {
+        _lastError = _httpError(res.statusCode!, res.data);
+        return false;
+      }
+      final data = res.data;
+      await _persistSession(
+        accessToken: data['accessToken'],
+        refreshToken: data['refreshToken'],
+        user: data['user'],
+      );
+      _notifyAuthStateChanged();
+      return true;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Login with phone + OTP (passwordless).
+  /// The OTP must have been sent via [sendOtp] first.
+  static Future<bool> loginWithOtp(String phone, String otp) async {
+    _lastError = null;
+    try {
+      final res = await ApiService.dio.post('/api/v1/auth/login', data: {
+        'phone': phone,
+        'otp': otp,
+      });
+      if (res.statusCode != null && res.statusCode! >= 400) {
+        _lastError = _httpError(res.statusCode!, res.data);
+        return false;
+      }
+      final data = res.data;
+      await _persistSession(
+        accessToken: data['accessToken'],
+        refreshToken: data['refreshToken'],
+        user: data['user'],
+      );
+      _notifyAuthStateChanged();
+      return true;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Self-serve signup with email (no OTP needed).
+  /// For phone-only signup, use [sendOtp] + [verifyOtp] instead.
   /// Returns true on success (user is logged in), false on failure.
   static Future<bool> register({
-    required String email,
-    required String password,
+    String? email,
+    String? phone,
+    String? password,
     required String name,
     required String organizationName,
     required String country,
@@ -116,8 +215,9 @@ class AuthService {
     _lastError = null;
     try {
       final res = await ApiService.dio.post('/api/v1/auth/register', data: {
-        'email': email,
-        'password': password,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (password != null && password.isNotEmpty) 'password': password,
         'name': name,
         'organizationName': organizationName,
         'country': country,
@@ -127,8 +227,16 @@ class AuthService {
       // validateStatus allows <500 through without throwing, so check 4xx here
       if (res.statusCode != null && res.statusCode! >= 400) {
         if (res.statusCode == 409) {
-          _lastError =
-              'An account with this email already exists. Try signing in instead.';
+          final errCode = res.data?['error'] ?? '';
+          if (errCode == 'EMAIL_ALREADY_REGISTERED') {
+            _lastError =
+                'An account with this email already exists. Try signing in instead.';
+          } else if (errCode == 'PHONE_ALREADY_REGISTERED') {
+            _lastError =
+                'An account with this phone number already exists. Try signing in instead.';
+          } else {
+            _lastError = _httpError(res.statusCode!, res.data);
+          }
         } else {
           _lastError = _httpError(res.statusCode!, res.data);
         }

@@ -13,13 +13,19 @@ datasource db {
 // ── AUTH / RBAC ──────────────────────────
 model User {
   id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  passwordHash String   @map("password_hash")
+  email        String?  @unique // nullable — phone-only users may not have email
+  phone        String?  @unique @db.VarChar(20) // E.164 format, e.g. "260970000000"
+  passwordHash String   @map("password_hash") // may be empty for OTP-only users
   role         Role     @default(viewer)
   name         String?
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Phone verification timestamp — set when phone OTP is verified.
+  phoneVerifiedAt DateTime? @map("phone_verified_at") @db.Timestamptz(6)
+  // Email verification timestamp — for future email verification flow.
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
 
   // Zambia Data Protection Act (No. 3 of 2021) consent tracking — captured
   // at signup/invite-accept time. See docs/MONETIZATION_PLAN.md Phase 2.
@@ -36,8 +42,47 @@ model User {
   createdSaleRecords                  SaleRecord[]                  @relation("SaleRecordCreatedBy")
   memberships                         OrganizationMember[]
   sentInvites                         Invite[]                      @relation("InviteInvitedBy")
+  otpCodes                            OtpCode[]
+  devices                             UserDevice[]
 
   @@map("users")
+}
+
+// ── OTP VERIFICATION ─────────────────────
+// Stores OTP codes for phone verification (signup, login, new device).
+// Codes are hashed (SHA-256) so a DB compromise doesn't reveal live codes.
+model OtpCode {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid // null for signup OTPs (user not yet created)
+  phone     String   @db.VarChar(20) // E.164 format
+  codeHash  String   @map("code_hash") @db.VarChar(64) // SHA-256 hex
+  purpose   String   @db.VarChar(20) // "signup" | "login" | "new_device"
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([phone, purpose])
+  @@map("otp_codes")
+}
+
+// ── DEVICE TRACKING ──────────────────────
+// Tracks recognized devices per user for new-device OTP re-verification.
+// A device fingerprint is derived from user-agent + IP hash (web) or
+// a generated device ID (mobile).
+model UserDevice {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  deviceFingerprint String @map("device_fingerprint") @db.VarChar(64)
+  deviceLabel   String?  @map("device_label") @db.VarChar(200) // e.g. "Chrome on Windows"
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceFingerprint])
+  @@map("user_devices")
 }
 
 enum Role {
