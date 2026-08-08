@@ -39,7 +39,16 @@ async function main() {
   let organization = await prisma.organization.findFirst({ where: { name: DEFAULT_ORG_NAME } });
   if (!organization) {
     organization = await prisma.organization.create({
-      data: { name: DEFAULT_ORG_NAME, country: 'ZM', currency: 'ZMW', planCode: 'free', isActive: true },
+      // The seed/dev org gets the Business plan so integration tests
+      // aren't blocked by feature gates. New self-serve signups default
+      // to 'free' via the register endpoint.
+      data: { name: DEFAULT_ORG_NAME, country: 'ZM', currency: 'ZMW', planCode: 'business', isActive: true },
+    });
+  } else if (organization.planCode === 'free') {
+    // Upgrade existing seed org to business if it was created before billing
+    organization = await prisma.organization.update({
+      where: { id: organization.id },
+      data: { planCode: 'business' },
     });
   }
   await prisma.organizationMember.upsert({
@@ -47,7 +56,36 @@ async function main() {
     update: {},
     create: { organizationId: organization.id, userId: owner.id, role: 'owner' },
   });
-  console.log('[SEED] Organization:', organization.name);
+
+  // Ensure the seed org has an active business subscription
+  const existingSub = await prisma.subscription.findFirst({
+    where: { organizationId: organization.id, status: { in: ['active', 'trialing'] } },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!existingSub) {
+    await prisma.subscription.create({
+      data: {
+        organizationId: organization.id,
+        planCode: 'business',
+        billingCycle: 'monthly',
+        status: 'active',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+      },
+    });
+  } else if (existingSub.planCode !== 'business') {
+    // Upgrade existing subscription to business (for dev/test)
+    await prisma.subscription.update({
+      where: { id: existingSub.id },
+      data: {
+        planCode: 'business',
+        status: 'active',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+  console.log('[SEED] Organization:', organization.name, '(plan: business)');
 
   // ── 1b. Seed optional role test users (disabled by default) ──
   const testPasswordHash = await bcrypt.hash('test123456', 12);

@@ -392,3 +392,72 @@ export async function socialLogin(
   }
   return data;
 }
+
+// ── Billing ──
+
+export async function getBillingPlans() {
+  return apiFetch<{
+    plans: {
+      code: string;
+      name: string;
+      description: string;
+      pricing: {
+        monthly: Record<string, number>;
+        cycle_3mo: Record<string, number>;
+        annual: Record<string, number>;
+      };
+      limits: {
+        maxActiveFlocks: number;
+        maxUsers: number;
+        maxCyclesHistory: number;
+        maxDocumentsPerRecord: number;
+        features: string[];
+      };
+      isSelfServe: boolean;
+    }[];
+  }>("/api/v1/billing/plans");
+}
+
+export async function getSubscription() {
+  return apiFetch<{
+    planCode: string;
+    planName: string;
+    billingCycle: string;
+    status: string;
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
+    trialEndsAt: string | null;
+    canceledAt: string | null;
+    limits: any;
+    usage: { activeFlocks: number; users: number };
+  }>("/api/v1/billing/subscription");
+}
+
+export async function subscribeToPlan(planCode: string, billingCycle: string = "monthly") {
+  return apiFetch<{
+    subscription: any;
+    invoice: any;
+    checkout: { success: boolean; paymentLink?: string; txRef: string; message?: string } | null;
+  }>("/api/v1/billing/subscribe", {
+    method: "POST",
+    body: JSON.stringify({ planCode, billingCycle }),
+  });
+}
+
+export async function cancelSubscriptionApi() {
+  return apiFetch<{ success: boolean; message: string }>("/api/v1/billing/cancel", {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+export async function getInvoices() {
+  return apiFetch<any[]>("/api/v1/billing/invoices");
+}
+
+export async function verifyPayment(txRef: string) {
+  return apiFetch<{ success: boolean; message: string }>("/api/v1/billing/verify-payment", {
+    method: "POST",
+    body: JSON.stringify({ txRef }),
+  });
+}

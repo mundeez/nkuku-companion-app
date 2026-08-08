@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign } from "lucide-react";
+import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign, CreditCard } from "lucide-react";
 import { AccountSettings } from "@/components/auth/account-settings";
 
 export default function SettingsPage() {
@@ -172,6 +172,27 @@ export default function SettingsPage() {
         <div className="max-w-2xl">
           <AccountSettings />
         </div>
+      </div>
+
+      {/* Billing & Subscription */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-4">Billing & Subscription</h2>
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CreditCard className="h-5 w-5" />
+              Manage Your Plan
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              View your current plan, upgrade or downgrade, manage invoices, and update payment methods.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => router.push("/billing")}>
+              Go to Billing
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

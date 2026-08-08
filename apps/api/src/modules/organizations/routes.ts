@@ -3,6 +3,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { checkUserLimit } from '../../core/billing/feature-gate.js';
 
 const OrgUpdateSchema = z.object({
   name: z.string().min(1).max(150).optional(),
@@ -77,7 +78,7 @@ export async function buildOrganizationModule(app: FastifyInstance) {
   });
 
   // POST /api/v1/organizations/invites — invite a user to the current org (owner/manager)
-  app.post('/invites', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/invites', { preHandler: [authenticate, requireRole('owner', 'manager'), checkUserLimit] }, async (request) => {
     const organizationId = getOrganizationId(request);
     const authUser = (request as any).authUser;
     const data = InviteCreateSchema.parse(request.body);

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useAuth } from "./auth-provider";
 import { useTheme } from "./theme-provider";
 import { Button } from "./ui/button";
-import { LogOut, Menu, X, Bell, Sun, Moon, Settings } from "lucide-react";
+import { LogOut, Menu, X, Bell, Sun, Moon, Settings, CreditCard } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
@@ -69,6 +69,11 @@ export function Navbar() {
                 <Settings className="h-4 w-4" />
               </Button>
             </Link>
+            <Link href="/billing" className="hidden sm:block">
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <CreditCard className="h-4 w-4" />
+              </Button>
+            </Link>
             <span className="hidden md:inline text-sm text-muted-foreground">
               {user.name || user.email}
             </span>
@@ -99,6 +104,9 @@ export function Navbar() {
           ))}
           <Link href="/settings" className="block py-2 text-sm font-medium text-muted-foreground hover:text-foreground" onClick={() => setMobileOpen(false)}>
             Settings
+          </Link>
+          <Link href="/billing" className="block py-2 text-sm font-medium text-muted-foreground hover:text-foreground" onClick={() => setMobileOpen(false)}>
+            Billing & Plans
           </Link>
         </div>
       )}

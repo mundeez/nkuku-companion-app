@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { checkFlockLimit } from '../../core/billing/feature-gate.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -108,7 +109,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     return { ...flock, ageDays };
   });
 
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), checkFlockLimit] }, async (request) => {
     const data = FlockCreateSchema.parse(request.body);
     const authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);

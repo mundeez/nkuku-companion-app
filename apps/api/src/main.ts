@@ -19,6 +19,7 @@ import { buildOverheadModule } from './modules/overhead/routes.js';
 import { buildUserModule } from './modules/users/routes.js';
 import { buildAccountModule as buildUserAccountModule } from './modules/account/routes.js';
 import { buildOrganizationModule } from './modules/organizations/routes.js';
+import { buildBillingModule } from './modules/billing/routes.js';
 import { buildBreedModule } from './modules/breeds/routes.js';
 import { buildBroilerFlockModule } from './modules/broiler-flocks/routes.js';
 import { buildGrowthRecordModule } from './modules/growth-records/routes.js';
@@ -142,6 +143,7 @@ await app.register(buildOverheadModule, { prefix: '/api/v1/overhead' });
 await app.register(buildUserModule, { prefix: '/api/v1/users' });
 await app.register(buildUserAccountModule, { prefix: '/api/v1/account' });
 await app.register(buildOrganizationModule, { prefix: '/api/v1/organizations' });
+await app.register(buildBillingModule, { prefix: '/api/v1/billing' });
 await app.register(buildBreedModule, { prefix: '/api/v1/breeds' });
 await app.register(buildBroilerFlockModule, { prefix: '/api/v1/broiler-flocks' });
 await app.register(buildGrowthRecordModule, { prefix: '/api/v1/growth-records' });
@@ -184,6 +186,20 @@ cron.schedule('0 2 * * *', async () => {
     app.log.info('[DailyRecalc] Completed successfully');
   } catch (err: any) {
     app.log.error('[DailyRecalc] Failed:', err.message);
+  }
+});
+
+// ── Start daily billing cron ─────────────
+// Runs at 1:00 AM daily — generates recurring invoices, expires trials,
+// and suspends past-due subscriptions past the grace period.
+import { runDailyBillingCron } from './core/billing/billing.service.js';
+cron.schedule('0 1 * * *', async () => {
+  app.log.info('[BillingCron] Starting daily billing run...');
+  try {
+    const result = await runDailyBillingCron(prisma);
+    app.log.info(`[BillingCron] Done: ${result.invoicesGenerated} invoices, ${result.trialsExpired} trials expired, ${result.subscriptionsSuspended} suspended`);
+  } catch (err: any) {
+    app.log.error('[BillingCron] Failed:', err.message);
   }
 });
 
