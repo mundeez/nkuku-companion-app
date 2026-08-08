@@ -79,6 +79,17 @@ export async function buildBillingModule(app: FastifyInstance) {
 
     const redirectUrl = body.redirectUrl || `${process.env.WEB_BASE_URL || 'http://localhost:30000'}/billing/callback`;
 
+    // Validate redirectUrl is same-origin or from an allowed origin to prevent open redirect
+    const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/$/, ''));
+    const webBaseUrl = (process.env.WEB_BASE_URL || 'http://localhost:30000').replace(/\/$/, '');
+    const allowedRedirects = [webBaseUrl, ...allowedOrigins].filter(Boolean);
+    if (body.redirectUrl) {
+      const isAllowed = allowedRedirects.some((origin) => body.redirectUrl!.startsWith(origin + '/') || body.redirectUrl === origin);
+      if (!isAllowed) {
+        return reply.status(400).send({ error: 'INVALID_REDIRECT_URL', message: 'Redirect URL must be same-origin or from an allowed domain' });
+      }
+    }
+
     try {
       const result = await subscribeToPlan(prisma, {
         organizationId,
@@ -164,8 +175,9 @@ export async function buildBillingModule(app: FastifyInstance) {
 
   // ── POST /verify-payment — verify a payment after redirect ──
   app.post('/verify-payment', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
     const body = VerifyPaymentSchema.parse(request.body);
-    const result = await verifyPaymentRedirect(prisma, body);
+    const result = await verifyPaymentRedirect(prisma, { ...body, organizationId });
     return reply.status(result.success ? 200 : 400).send(result);
   });
 
@@ -184,6 +196,11 @@ export async function buildBillingModule(app: FastifyInstance) {
       return reply.status(400).send({ error: 'INVALID_WEBHOOK' });
     }
 
+    // Only process charge completion events
+    if (body.event !== 'charge.completed') {
+      return reply.status(200).send({ success: true, message: `Ignored event: ${body.event}` });
+    }
+
     // Flutterwave webhook payload structure:
     // { event: "charge.completed", data: { tx_ref, id, amount, currency, status, ... } }
     const data = body.data || {};
@@ -193,7 +210,7 @@ export async function buildBillingModule(app: FastifyInstance) {
       return reply.status(400).send({ error: 'NO_TX_REF' });
     }
 
-    // Process the payment event
+    // Process the payment event (webhook is not org-scoped — it comes from Flutterwave)
     const result = await processPaymentEvent(prisma, {
       txRef,
       txnId: data.id?.toString(),
@@ -215,7 +232,8 @@ export async function buildBillingModule(app: FastifyInstance) {
     const { txRef } = request.query as any;
     if (!txRef) return reply.status(400).send({ error: 'MISSING_TX_REF' });
 
-    const result = await processPaymentEvent(prisma, { txRef });
+    // Org-scoped to prevent IDOR — can only mock-pay invoices for your own org
+    const result = await processPaymentEvent(prisma, { txRef, organizationId });
     return reply.status(result.success ? 200 : 400).send(result);
   });
 }

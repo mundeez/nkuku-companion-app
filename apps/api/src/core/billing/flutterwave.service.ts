@@ -162,13 +162,24 @@ export async function verifyTransaction(txRef: string, txnId?: string): Promise<
  * Verify the webhook signature from Flutterwave.
  * Flutterwave sends a header `verif-hash` which must match the secret hash
  * configured in the dashboard.
+ *
+ * In mock mode (no SECRET_KEY), webhooks are accepted without a hash since
+ * the dev mock-pay endpoint is the primary payment path. In production mode,
+ * a valid WEBHOOK_HASH is REQUIRED — if it's not configured, all webhooks
+ * are rejected to prevent unauthorized payment manipulation.
  */
 export function verifyWebhookSignature(signature: string): boolean {
-  if (!WEBHOOK_HASH) {
-    // In dev mode with no hash configured, accept all webhooks
+  if (IS_MOCK) {
+    // Dev/mock mode — accept all webhooks (no real payments to protect)
     return true;
   }
-  return signature === WEBHOOK_HASH;
+  if (!WEBHOOK_HASH) {
+    // Production mode but no hash configured — fail closed
+    return false;
+  }
+  // Constant-time comparison to prevent timing leaks
+  if (signature.length !== WEBHOOK_HASH.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(WEBHOOK_HASH));
 }
 
 /**

@@ -196,12 +196,18 @@ export async function subscribeToPlan(prisma: PrismaClient, params: {
 
 /**
  * Cancel a subscription (downgrade to free at end of current period).
+ * Voids any open invoices to prevent re-activation via stale payment links.
  */
 export async function cancelSubscription(prisma: PrismaClient, organizationId: string): Promise<any> {
   const sub = await getOrCreateSubscription(prisma, organizationId);
   const updated = await prisma.subscription.update({
     where: { id: sub.id },
     data: { canceledAt: new Date(), status: 'cancelled' },
+  });
+  // Void any open invoices for this subscription to prevent re-activation
+  await prisma.invoice.updateMany({
+    where: { subscriptionId: sub.id, status: 'open' },
+    data: { status: 'void' },
   });
   // Downgrade org to free
   await prisma.organization.update({ where: { id: organizationId }, data: { planCode: 'free' } });
@@ -223,13 +229,21 @@ export async function cancelSubscription(prisma: PrismaClient, organizationId: s
  * Process a payment webhook/event.
  * Verifies the transaction with Flutterwave, records the payment event,
  * and updates the invoice + subscription status.
+ *
+ * Security checks:
+ * - The verified tx_ref must match the invoice's providerRef
+ * - The verified amount and currency must match the invoice
+ * - Idempotency: if the invoice is already paid, returns success without
+ *   creating a duplicate payment event or re-activating the subscription
+ * - Optional organizationId check prevents IDOR (cross-org payment manipulation)
  */
 export async function processPaymentEvent(prisma: PrismaClient, params: {
   txRef: string;
   txnId?: string;
   rawPayload?: any;
+  organizationId?: string; // when provided, verifies the invoice belongs to this org
 }): Promise<{ success: boolean; invoice?: any; message: string }> {
-  const { txRef, txnId, rawPayload } = params;
+  const { txRef, txnId, rawPayload, organizationId } = params;
 
   // Find the invoice by providerRef
   const invoice = await prisma.invoice.findFirst({
@@ -240,8 +254,23 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
     return { success: false, message: 'Invoice not found for tx_ref' };
   }
 
+  // IDOR protection: if organizationId is provided, verify ownership
+  if (organizationId && invoice.organizationId !== organizationId) {
+    return { success: false, message: 'Invoice does not belong to this organization' };
+  }
+
+  // Idempotency: if invoice is already paid, don't process again
+  if (invoice.status === 'paid') {
+    return { success: true, invoice, message: 'Invoice already paid' };
+  }
+
   // Verify with Flutterwave
   const verification = await verifyTransaction(txRef, txnId);
+
+  // Cross-check: the verified tx_ref must match the invoice's providerRef
+  if (verification.txRef && verification.txRef !== txRef) {
+    return { success: false, invoice, message: 'Transaction reference mismatch' };
+  }
 
   // Record the payment event
   await prisma.paymentEvent.create({
@@ -258,6 +287,17 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
   });
 
   if (verification.success) {
+    // Verify the payment amount matches the invoice amount (unless mock mode, where amount is 0)
+    if (!isMockMode && verification.amount > 0) {
+      const invoiceAmount = Number(invoice.amountDue);
+      if (Math.abs(verification.amount - invoiceAmount) > 0.01) {
+        return { success: false, invoice, message: `Amount mismatch: expected ${invoiceAmount}, got ${verification.amount}` };
+      }
+      if (verification.currency && verification.currency !== invoice.currency) {
+        return { success: false, invoice, message: `Currency mismatch: expected ${invoice.currency}, got ${verification.currency}` };
+      }
+    }
+
     // Payment successful — mark invoice as paid
     await prisma.invoice.update({
       where: { id: invoice.id },
@@ -268,9 +308,9 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
       },
     });
 
-    // Activate the subscription
+    // Activate the subscription (only if it belongs to the same org and is not cancelled)
     const sub = await prisma.subscription.findUnique({ where: { id: invoice.subscriptionId } });
-    if (sub) {
+    if (sub && sub.status !== 'cancelled') {
       await prisma.subscription.update({
         where: { id: sub.id },
         data: {
@@ -310,6 +350,7 @@ export async function verifyPaymentRedirect(prisma: PrismaClient, params: {
   txRef: string;
   txnId?: string;
   status?: string; // query param from Flutterwave redirect
+  organizationId?: string; // org-scoping for IDOR protection
 }): Promise<{ success: boolean; invoice?: any; message: string }> {
   // If status is "cancelled" from the redirect, don't verify
   if (params.status === 'cancelled') {

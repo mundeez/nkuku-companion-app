@@ -240,7 +240,7 @@ model Invoice {
   periodEnd        DateTime      @map("period_end") @db.Timestamptz(6)
   dueDate          DateTime      @map("due_date") @db.Timestamptz(6)
   paidAt           DateTime?     @map("paid_at") @db.Timestamptz(6)
-  providerRef      String?       @map("provider_ref") @db.VarChar(100) // Flutterwave tx ref
+  providerRef      String?       @unique @map("provider_ref") @db.VarChar(100) // Flutterwave tx ref
   paymentLink      String?       @map("payment_link") @db.Text // Flutterwave checkout URL
   createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)

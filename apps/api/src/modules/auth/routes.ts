@@ -1262,7 +1262,7 @@ export async function buildAuthModule(app: FastifyInstance) {
     }
 
     // Check for existing user with same email (to avoid unique constraint)
-    let user = null;
+    let user: Awaited<ReturnType<typeof prisma.user.findUnique>> = null;
     if (email) {
       user = await prisma.user.findUnique({ where: { email } });
     }
