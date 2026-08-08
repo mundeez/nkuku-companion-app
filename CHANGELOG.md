@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.14.0-alpha — 2026-08-08
+
+### Added
+- **Billing module with subscription plans, invoices & Flutterwave payment integration.**
+  - Subscription plan catalog (Basic/Pro/Enterprise) with plan limits and feature gating.
+  - Invoice lifecycle (draft → open → paid → void/cancel) with line items and due dates.
+  - Flutterwave payment initiation and card/Mobile Money/bank redirect flows.
+  - Payment events table for idempotent, traceable transaction recording.
+  - Webhook handling for `charge.completed`, `subscription.cancelled` and related events.
+  - Subscription lifecycle management (active, cancelled, expired, past-due, paused) with billing-period tracking and org-scoped queries.
+
+### Fixed (Security)
+- **All CRITICAL/HIGH/MEDIUM findings from the security audit have been remediated:**
+  - **CRITICAL:** `docker-compose.prod.yml` missing Flutterwave environment variables — production would have run in mock mode; now `FLW_PUBLIC_KEY`, `FLW_SECRET_KEY`, `FLW_ENCRYPTION_KEY`, `FLW_WEBHOOK_SECRET` and `FLW_WEBHOOK_HASH` are required.
+  - **CRITICAL:** Webhook signature verification fail-open when hash is unset; now uses `crypto.timingSafeEqual` and returns `401` when the secret/hash is missing or invalid.
+  - **HIGH:** Payment amount and currency are now verified against the invoice before marking paid.
+  - **HIGH:** `tx_ref` is cross-checked against the invoice `providerRef`.
+  - **HIGH:** Idempotency is enforced on already-paid invoices to prevent duplicate credits.
+  - **HIGH:** IDOR on `verify-payment` and `mock-pay` endpoints is closed by org-scoping all lookups.
+  - **HIGH:** Webhook event type is validated against an allowlist before processing.
+  - **HIGH:** Cancelled subscriptions can no longer be re-activated through invoice payment.
+  - **MEDIUM:** Open redirect on `/subscribe?redirectUrl=...` is closed by validating the URL against a configured allowlist.
+  - **MEDIUM:** Open invoices are automatically voided when a subscription is cancelled.
+  - **MEDIUM:** `@unique` constraint added to `Invoice.providerRef` to prevent duplicate provider references.
+
+### Test Summary
+- 220 tests pass (48 unit + 172 integration).
+- `tsc --noEmit` clean across API and web.
+- API health endpoint returns `200 OK`.
+
+### Known Limitations
+- 47 pre-existing dependency advisories remain (Next.js 14.2.35, Fastify 4.x, nodemailer 6.x, postcss 8.4.31). Major version upgrades requiring compatibility review are deferred to a dedicated dependency-upgrade phase.
+- Minor webhook header handling bug: when the `verif-hash` header is missing the API returns `500` instead of `401`. Low severity, tracked for a follow-up fix.
+- Flutterwave mock mode is a fallback when `SECRET_KEY` is unset; production deployments must set all Flutterwave environment variables to avoid processing test transactions.
+
 ## v1.11.1-alpha — 2026-08-07
 
 ### Mobile — Phase 2 Self-Serve Signup & Invite Acceptance
