@@ -53,3 +53,6 @@ apps/mobile/*.aab
 
 # Playwright MCP tooling state
 .playwright-mcp/
+key.properties
+release.keystore
+*.jks

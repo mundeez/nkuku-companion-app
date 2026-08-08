@@ -19,7 +19,7 @@ if (keystoreFile.exists()) {
 
 android {
     namespace = "com.nkuku.nkuku_mobile"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37  // flutter_secure_storage requires SDK 37+
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
