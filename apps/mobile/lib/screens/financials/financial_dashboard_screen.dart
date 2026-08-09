@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import 'income_statement_screen.dart';
@@ -145,48 +146,19 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OverheadsScreen())),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Monthly Trend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Monthly Revenue vs Cost', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   if (_trend.isEmpty)
                     const Center(child: Text('No data yet', style: TextStyle(color: Colors.grey)))
                   else
-                    SizedBox(
-                      height: 200,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _trend.length,
-                        itemBuilder: (context, index) {
-                          final item = _trend[index];
-                          final rev = (item['revenue'] ?? 0).toDouble();
-                          final cst = (item['cost'] ?? 0).toDouble();
-                          final prf = (item['profit'] ?? 0).toDouble();
-                          return Container(
-                            width: 80,
-                            margin: const EdgeInsets.only(right: 8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text('${prf.toStringAsFixed(0)}', style: TextStyle(fontSize: 10, color: prf >= 0 ? Colors.green : Colors.red)),
-                                const SizedBox(height: 4),
-                                Container(
-                                  height: (rev.abs() / 100).clamp(10, 120),
-                                  width: 24,
-                                  decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(4)),
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  height: (cst.abs() / 100).clamp(10, 120),
-                                  width: 24,
-                                  decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(item['label'] ?? '', style: const TextStyle(fontSize: 10)),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                    _MonthlyRevenueCostChart(trend: _trend),
+                  const SizedBox(height: 24),
+                  const Text('Monthly Profit Trend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  if (_trend.isEmpty)
+                    const Center(child: Text('No data yet', style: TextStyle(color: Colors.grey)))
+                  else
+                    _MonthlyProfitChart(trend: _trend),
                 ],
               ),
       ),
@@ -237,6 +209,157 @@ class _StatementTile extends StatelessWidget {
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
+      ),
+    );
+  }
+}
+
+// ── Monthly Revenue vs Cost Bar Chart ──────────────
+
+class _MonthlyRevenueCostChart extends StatelessWidget {
+  final List<dynamic> trend;
+
+  const _MonthlyRevenueCostChart({required this.trend});
+
+  @override
+  Widget build(BuildContext context) {
+    final maxY = trend.fold<double>(0, (max, item) {
+      final rev = (item['revenue'] ?? 0).toDouble();
+      final cst = (item['cost'] ?? 0).toDouble();
+      final bigger = rev > cst ? rev : cst;
+      return bigger > max ? bigger : max;
+    });
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SizedBox(
+          height: 220,
+          child: BarChart(
+            BarChartData(
+              maxY: maxY * 1.2,
+              gridData: const FlGridData(show: true, drawVerticalLine: false),
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    getTitlesWidget: (v, _) {
+                      final idx = v.toInt();
+                      if (idx < 0 || idx >= trend.length) return const SizedBox.shrink();
+                      final label = (trend[idx]['label'] ?? '') as String;
+                      return Text(label, style: const TextStyle(fontSize: 9));
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 44,
+                    getTitlesWidget: (v, _) => Text('ZMW${v.toInt()}', style: const TextStyle(fontSize: 8)),
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: trend.asMap().entries.map((e) {
+                final rev = (e.value['revenue'] ?? 0).toDouble();
+                final cst = (e.value['cost'] ?? 0).toDouble();
+                return BarChartGroupData(
+                  x: e.key,
+                  barRods: [
+                    BarChartRodData(toY: rev, color: const Color(0xFF1B5E20), width: 6, borderRadius: BorderRadius.circular(2)),
+                    BarChartRodData(toY: cst, color: const Color(0xFFD32F2F), width: 6, borderRadius: BorderRadius.circular(2)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Monthly Profit Trend Line Chart ────────────────
+
+class _MonthlyProfitChart extends StatelessWidget {
+  final List<dynamic> trend;
+
+  const _MonthlyProfitChart({required this.trend});
+
+  @override
+  Widget build(BuildContext context) {
+    final spots = <FlSpot>[];
+    double maxAbs = 0;
+
+    for (int i = 0; i < trend.length; i++) {
+      final profit = (trend[i]['profit'] ?? 0).toDouble();
+      spots.add(FlSpot(i.toDouble(), profit));
+      if (profit.abs() > maxAbs) maxAbs = profit.abs();
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SizedBox(
+          height: 200,
+          child: LineChart(
+            LineChartData(
+              minY: -maxAbs * 1.2,
+              maxY: maxAbs * 1.2,
+              gridData: const FlGridData(show: true, drawVerticalLine: false),
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    getTitlesWidget: (v, _) {
+                      final idx = v.toInt();
+                      if (idx < 0 || idx >= trend.length) return const SizedBox.shrink();
+                      final label = (trend[idx]['label'] ?? '') as String;
+                      return Text(label, style: const TextStyle(fontSize: 9));
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 44,
+                    getTitlesWidget: (v, _) => Text('ZMW${v.toInt()}', style: const TextStyle(fontSize: 8)),
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  color: const Color(0xFF1B5E20),
+                  barWidth: 2,
+                  dotData: const FlDotData(show: true),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: const Color(0xFF1B5E20).withValues(alpha: 0.15),
+                  ),
+                ),
+              ],
+              extraLinesData: ExtraLinesData(
+                horizontalLines: [
+                  HorizontalLine(
+                    y: 0,
+                    color: Colors.grey,
+                    strokeWidth: 1,
+                    dashArray: [3, 3],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

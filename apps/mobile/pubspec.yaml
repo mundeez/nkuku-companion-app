@@ -1,7 +1,7 @@
 name: nkuku_mobile
 description: Nkuku Companion — broiler chicken production management
 publish_to: 'none'
-version: 1.14.0-alpha
+version: 1.15.0-alpha
 
 # Note: drift / sqlite3_flutter_libs are pinned for future M3-7 Offline Sync.
 # Do not upgrade without testing offline sync migrations.

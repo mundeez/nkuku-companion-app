@@ -112,9 +112,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 24),
         _SectionTitle(title: 'Flock Profitability'),
         const SizedBox(height: 12),
-        if (s.flockProfitability.isNotEmpty)
+        if (s.flockProfitability.isNotEmpty) ...[
+          _FlockProfitabilityChart(items: s.flockProfitability),
+          const SizedBox(height: 12),
           _FlockProfitabilityList(items: s.flockProfitability)
-        else
+        ] else
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
@@ -122,6 +124,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         const SizedBox(height: 24),
+        if (k.openAlerts > 0) ...[
+          _SectionTitle(title: 'Alerts by Severity'),
+          const SizedBox(height: 12),
+          _AlertsSeverityChart(severity: s.alertsBySeverity),
+          const SizedBox(height: 24),
+        ],
         _SectionTitle(
           title: 'Recent Alerts',
           action: Text('${k.openAlerts} open', style: TextStyle(color: k.openAlerts > 0 ? theme.colorScheme.error : Colors.grey)),
@@ -436,4 +444,162 @@ String _timeAgo(DateTime date) {
   if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
   if (diff.inHours < 24) return '${diff.inHours}h ago';
   return '${diff.inDays}d ago';
+}
+
+// ── Flock Profitability Bar Chart ──────────────────
+
+class _FlockProfitabilityChart extends StatelessWidget {
+  final List<FlockProfitabilityItem> items;
+
+  const _FlockProfitabilityChart({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final maxAbs = items.fold<double>(0, (max, f) => f.profit.abs() > max ? f.profit.abs() : max);
+    if (maxAbs == 0) return const SizedBox.shrink();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Net Profit per Flock', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 180,
+              child: BarChart(
+                BarChartData(
+                  maxY: maxAbs * 1.2,
+                  minY: -maxAbs * 1.2,
+                  gridData: const FlGridData(show: true, drawVerticalLine: false),
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (v, _) {
+                          final idx = v.toInt();
+                          if (idx < 0 || idx >= items.length) return const SizedBox.shrink();
+                          final name = items[idx].flockName;
+                          return Text(name.length > 10 ? name.substring(0, 8) : name, style: const TextStyle(fontSize: 8), maxLines: 2, overflow: TextOverflow.ellipsis);
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 44,
+                        getTitlesWidget: (v, _) => Text('ZMW${v.toInt()}', style: const TextStyle(fontSize: 8)),
+                      ),
+                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: items.asMap().entries.map((e) {
+                    final profit = e.value.profit;
+                    return BarChartGroupData(
+                      x: e.key,
+                      barRods: [
+                        BarChartRodData(
+                          toY: profit,
+                          color: profit >= 0 ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                          width: 16,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Alerts Severity Pie Chart ──────────────────────
+
+class _AlertsSeverityChart extends StatelessWidget {
+  final AlertsBySeverity severity;
+
+  const _AlertsSeverityChart({required this.severity});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = severity.critical + severity.warning + severity.info;
+    if (total == 0) return const SizedBox.shrink();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Alerts by Severity', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 160,
+              child: PieChart(
+                PieChartData(
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 32,
+                  sections: [
+                    if (severity.critical > 0)
+                      PieChartSectionData(
+                        value: severity.critical.toDouble(),
+                        title: '${severity.critical}',
+                        color: const Color(0xFFEF4444),
+                        radius: 48,
+                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    if (severity.warning > 0)
+                      PieChartSectionData(
+                        value: severity.warning.toDouble(),
+                        title: '${severity.warning}',
+                        color: const Color(0xFFF59E0B),
+                        radius: 48,
+                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    if (severity.info > 0)
+                      PieChartSectionData(
+                        value: severity.info.toDouble(),
+                        title: '${severity.info}',
+                        color: const Color(0xFF3B82F6),
+                        radius: 48,
+                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
+              children: [
+                _legendItem(const Color(0xFFEF4444), 'Critical: ${severity.critical}'),
+                _legendItem(const Color(0xFFF59E0B), 'Warning: ${severity.warning}'),
+                _legendItem(const Color(0xFF3B82F6), 'Info: ${severity.info}'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 11)),
+      ],
+    );
+  }
 }

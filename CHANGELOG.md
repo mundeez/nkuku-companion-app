@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.15.0-alpha — 2026-08-09
+
+### Added
+- **Mobile charts (fl_chart):** Visual data visualization for the Flutter app, mirroring the web app's charts.
+  - 8 reusable chart widgets in `apps/mobile/lib/widgets/flock_charts.dart`:
+    - `GrowthChart` — weight vs breed target line chart (flock detail Growth tab)
+    - `FcrChart` — FCR vs breed target with current-FCR marker (flock detail Growth tab)
+    - `FeedChart` — daily feed consumption by stage (flock detail Feed tab)
+    - `WaterChart` — water consumption & pH (flock detail Water tab)
+    - `MortalityChart` — cumulative mortality line (flock detail Mortality tab)
+    - `VaccinationChart` — scheduled vs completed vaccinations (flock detail Vaccination tab)
+    - `FinancialChart` — revenue vs cost by category (flock detail Financial tab)
+    - `EnvironmentChart` — temperature & humidity (flock detail Environment tab)
+  - Dashboard: `_FlockProfitabilityChart` (net profit per flock bar chart) and `_AlertsSeverityChart` (alerts by severity).
+  - Financial dashboard: replaced hand-rolled horizontal ListView "Monthly Trend" with a proper fl_chart revenue-vs-cost chart.
+  - Flock detail now fetches breed performance targets (GET /api/v1/breeds/:id) for growth/FCR target overlays.
+
+### Changed
+- Mobile version bump: 1.14.0-alpha → 1.15.0-alpha.
+
 ## v1.14.0-alpha — 2026-08-08
 
 ### Added

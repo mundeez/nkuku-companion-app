@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../models/breed.dart';
 import '../../models/document.dart';
 import '../../models/environmental_record.dart';
 import '../../models/financial_record.dart';
@@ -14,6 +15,7 @@ import '../../models/water_record.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
+import '../../widgets/flock_charts.dart';
 import 'calendar_screen.dart';
 import 'medication_screen.dart';
 import 'records/document_form.dart';
@@ -72,6 +74,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   List<SaleRecord> _saleRecords = [];
   Map<String, dynamic>? _saleSummary;
   List<DocumentRecord> _documents = [];
+  List<PerformanceTarget> _breedTargets = [];
 
   @override
   void initState() {
@@ -93,6 +96,15 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     });
     try {
       final flock = await BroilerService.getFlock(widget.flockId);
+
+      // Fetch breed performance targets for growth chart
+      List<PerformanceTarget> breedTargets = [];
+      try {
+        final breedRes = await ApiService.dio.get('/api/v1/breeds/${flock.breedId}');
+        final breed = Breed.fromJson(breedRes.data);
+        breedTargets = breed.performanceTargets;
+      } catch (_) {}
+
       List<CalendarDay> days = [];
       try {
         final calRes = await ApiService.dio.get('/api/v1/broiler-flocks/${widget.flockId}/summary');
@@ -158,6 +170,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         _saleRecords = sales;
         _saleSummary = saleSummary;
         _documents = documents;
+        _breedTargets = breedTargets;
         _loading = false;
       });
     } catch (e) {
@@ -440,6 +453,10 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               _SummaryRow('FCR', analysis.fcr?.toStringAsFixed(2) ?? '-'),
             ]),
           const SizedBox(height: 12),
+          if (_growthRecords.isNotEmpty) ...[
+            GrowthChart(records: _growthRecords, targets: _breedTargets, startDate: _flock?.startDate),
+            FcrChart(records: _growthRecords, targets: _breedTargets, currentFcr: analysis?.fcr, startDate: _flock?.startDate),
+          ],
           if (_growthRecords.isEmpty)
             const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No growth records yet.')))
           else
@@ -478,6 +495,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               _SummaryRow('Cost/bird', 'ZMW ${summary.costPerBird.toStringAsFixed(2)}'),
             ]),
           const SizedBox(height: 12),
+          if (_feedRecords.isNotEmpty)
+            FeedChart(records: _feedRecords),
           if (_feedRecords.isEmpty)
             const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No feed records yet.')))
           else
@@ -523,6 +542,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               _SummaryRow('Water:feed', ratio.waterToFeedRatio ?? '-'),
             ]),
           const SizedBox(height: 12),
+          if (_waterRecords.isNotEmpty)
+            WaterChart(records: _waterRecords),
           if (_waterRecords.isEmpty)
             const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No water records yet.')))
           else
@@ -561,6 +582,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               _SummaryRow('Current count', '${summary.currentCount}'),
             ]),
           const SizedBox(height: 12),
+          if (_mortalityEvents.isNotEmpty)
+            MortalityChart(records: _mortalityEvents),
           if (_mortalityEvents.isEmpty)
             const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No mortality events yet.')))
           else
@@ -607,6 +630,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               ...upcoming.map((i) => _SummaryRow(i.vaccineName, 'Day ${i.ageDays}')),
             ]),
           const SizedBox(height: 12),
+          if (completed.isNotEmpty)
+            VaccinationChart(records: completed),
           if (completed.isEmpty)
             const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No vaccination records yet.')))
           else
@@ -646,6 +671,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               _SummaryRow('Profit/bird', 'ZMW ${summary.profitPerBird.toStringAsFixed(2)}'),
             ]),
           const SizedBox(height: 12),
+          if (_financialRecords.isNotEmpty)
+            FinancialChart(records: _financialRecords),
           if (_financialRecords.isEmpty)
             const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No financial records yet.')))
           else
@@ -677,14 +704,17 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     final envDays = _calendarDays.where((d) => d.lightingTemperature != null).toList();
     final docsUrl = '${ApiService.baseUrl}/docs/environment/Ross308_Zambia_Lighting_Temperature_Guide.md';
 
-    // Combine header + logged records section + target schedule items
-    // Sections: [0] docs link, [1] "Logged Records" header, [2..n] logged records,
-    //           [n+1] "Targets" header, [n+2..] target days
+    // Combine header + chart + logged records section + target schedule items
+    // Sections: [0] chart (if records exist), [1] docs link, [2] "Logged Records" header,
+    //           [3..n+2] logged records, [n+3] "Targets" header, [n+4..] target days
+    final hasChart = _environmentalRecords.any((r) => r.temperatureC != null);
     final loggedCount = _environmentalRecords.length;
     final targetCount = envDays.length;
-    // indices: 0=docs, 1=loggedHeader, 2..loggedCount+1=logged,
-    //          loggedCount+2=targetsHeader, loggedCount+3..end=targets
-    final totalItems = 1 + 1 + loggedCount + 1 + targetCount;
+    final chartOffset = hasChart ? 1 : 0;
+    // indices: 0=chart(if hasChart), 0+chartOffset=docs, 1+chartOffset=loggedHeader,
+    //          2+chartOffset..loggedCount+1+chartOffset=logged,
+    //          loggedCount+2+chartOffset=targetsHeader, loggedCount+3+chartOffset..end=targets
+    final totalItems = chartOffset + 1 + 1 + loggedCount + 1 + targetCount;
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -692,7 +722,11 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         padding: const EdgeInsets.all(16),
         itemCount: totalItems,
         itemBuilder: (context, index) {
-          if (index == 0) {
+          if (hasChart && index == 0) {
+            return EnvironmentChart(records: _environmentalRecords);
+          }
+          final adjustedIndex = index - chartOffset;
+          if (adjustedIndex == 0) {
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
@@ -711,7 +745,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           }
 
           // Logged records section header
-          if (index == 1) {
+          if (adjustedIndex == 1) {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
@@ -727,8 +761,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           }
 
           // Logged records
-          if (index >= 2 && index <= loggedCount + 1) {
-            final r = _environmentalRecords[index - 2];
+          if (adjustedIndex >= 2 && adjustedIndex <= loggedCount + 1) {
+            final r = _environmentalRecords[adjustedIndex - 2];
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
@@ -775,7 +809,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           }
 
           // Target schedule header
-          if (index == loggedCount + 2) {
+          if (adjustedIndex == loggedCount + 2) {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
@@ -789,7 +823,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           if (envDays.isEmpty) {
             return const Center(child: Padding(padding: EdgeInsets.all(16), child: Text('No environment targets scheduled')));
           }
-          final dayIndex = index - (loggedCount + 3);
+          final dayIndex = adjustedIndex - (loggedCount + 3);
           if (dayIndex < 0 || dayIndex >= envDays.length) return const SizedBox.shrink();
           final day = envDays[dayIndex];
           final env = day.lightingTemperature!;
