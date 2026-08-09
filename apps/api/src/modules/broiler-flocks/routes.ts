@@ -45,6 +45,7 @@ const FlockUpdateSchema = z.object({
   status: z.enum(['active', 'sold', 'completed', 'cancelled']).optional(),
   salePriceZmw: z.number().nonnegative().optional().nullable(),
   soldDate: dateOrIso.nullable().optional(),
+  initialCount: z.number().int().min(0).optional(),
   currentCount: z.number().int().min(0).optional(),
 });
 
