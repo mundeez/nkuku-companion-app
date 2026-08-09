@@ -73,6 +73,14 @@ services:
       FLUTTERWAVE_SECRET_KEY: ${FLUTTERWAVE_SECRET_KEY}
       FLUTTERWAVE_PUBLIC_KEY: ${FLUTTERWAVE_PUBLIC_KEY}
       FLUTTERWAVE_WEBHOOK_HASH: ${FLUTTERWAVE_WEBHOOK_HASH}
+      # ── Email (SMTP) ──
+      EMAIL_DISABLED: ${EMAIL_DISABLED:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Nkuku Companion <no-reply@nkuku.app>}
+      WEB_BASE_URL: ${WEB_BASE_URL:-http://localhost:30000}
     # Bind to localhost only — ISPConfig nginx proxies in from the outside
     ports:
       - "127.0.0.1:30001:3001"
