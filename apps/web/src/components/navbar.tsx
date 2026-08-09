@@ -35,7 +35,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2">
-              <img src="/logo.png" alt="Nkuku" className="h-10 w-auto" />
+              <img src="/logo.png" alt="Nkuku" className="h-10 w-auto max-w-none shrink-0" />
             </Link>
             <div className="hidden md:flex gap-4">
               {navLinks.map((link) => (
