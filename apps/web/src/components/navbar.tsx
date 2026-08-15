@@ -1,115 +1,150 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { useAuth } from "./auth-provider";
-import { useTheme } from "./theme-provider";
-import { Button } from "./ui/button";
-import { LogOut, Menu, X, Bell, Sun, Moon, Settings, CreditCard } from "lucide-react";
-import { useState } from "react";
+import { NavLink } from "./navbar/nav-link";
+import { NavGroup } from "./navbar/nav-group";
+import { UserNav } from "./navbar/user-nav";
+import { MobileNav } from "./navbar/mobile-nav";
+import { NotificationBell } from "./navbar/notification-bell";
+import { CommandPalette } from "./navbar/command-palette";
+import { cn } from "@/lib/utils";
 
 export function Navbar() {
-  const { user, logout } = useAuth();
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const navLinks = [
-    { href: "/", label: "Dashboard" },
-    { href: "/broiler-flocks", label: "Broiler Flocks" },
-    ...(user?.role === "owner" || user?.role === "manager" || user?.role === "sales_person" ? [{ href: "/sales", label: "Sales" }] : []),
-    { href: "/diseases", label: "Diseases" },
-    { href: "/alerts", label: "Alerts" },
-    { href: "/vaccine-inventory", label: "Vaccine Inventory" },
-    { href: "/suppliers", label: "Suppliers" },
-    { href: "/projections", label: "Projections" },
-    { href: "/expansion-plan", label: "Expansion Plan" },
-    ...(user?.role === "owner" || user?.role === "manager" || user?.role === "viewer" ? [{ href: "/financials", label: "Financials" }] : []),
-    ...(user?.role === "owner" || user?.role === "manager" || user?.role === "viewer" ? [{ href: "/ledger", label: "Ledger" }] : []),
-    ...(user?.role === "owner" ? [{ href: "/users", label: "Users" }] : []),
-  ];
+  const { user } = useAuth();
 
   if (!user) return null;
 
+  const role = user.role;
+
+  const navSections = React.useMemo(
+    () => [
+      {
+        title: "Production",
+        items: [
+          { href: "/", label: "Dashboard" },
+          { href: "/broiler-flocks", label: "Broiler Flocks" },
+          ...(role === "owner" || role === "manager" || role === "sales_person"
+            ? [{ href: "/sales", label: "Sales" }]
+            : []),
+        ],
+      },
+      {
+        title: "Operations",
+        items: [
+          { href: "/diseases", label: "Diseases" },
+          { href: "/alerts", label: "Alerts" },
+          { href: "/vaccine-inventory", label: "Vaccine Inventory" },
+          { href: "/suppliers", label: "Suppliers" },
+        ],
+      },
+      {
+        title: "Finances",
+        items: [
+          ...(role === "owner" || role === "manager" || role === "viewer"
+            ? [{ href: "/financials", label: "Financials" }]
+            : []),
+          ...(role === "owner" || role === "manager" || role === "viewer"
+            ? [{ href: "/ledger", label: "Ledger" }]
+            : []),
+          { href: "/billing", label: "Billing" },
+        ],
+      },
+      {
+        title: "Planning",
+        items: [
+          { href: "/projections", label: "Projections" },
+          { href: "/expansion-plan", label: "Expansion Plan" },
+        ],
+      },
+      ...(role === "owner"
+        ? [
+            {
+              title: "Admin",
+              items: [{ href: "/users", label: "Users" }],
+            },
+          ]
+        : []),
+    ],
+    [role]
+  );
+
+  // Flat command palette list with all visible links
+  const commandItems = React.useMemo(
+    () =>
+      navSections.flatMap((section) =>
+        section.items.map((item) => ({
+          ...item,
+          group: section.title,
+        }))
+      ),
+    [navSections]
+  );
+
+  // Single top-level items and grouped items for desktop nav
+  const topLevelItems: { href: string; label: string }[] = [
+    { href: "/", label: "Dashboard" },
+    { href: "/broiler-flocks", label: "Broiler Flocks" },
+  ];
+
+  const groupsForDesktop = navSections
+    .filter((s) => s.title !== "Production")
+    .map((s) => ({ label: s.title, items: s.items }));
+
   return (
-    <nav className="border-b bg-background">
+    <nav className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2">
-              <img src="/logo.png" alt="Nkuku" className="h-10 w-auto max-w-none shrink-0" />
+        <div className="flex h-16 items-center justify-between gap-4">
+          {/* Logo + desktop nav */}
+          <div className="flex items-center gap-4 lg:gap-8">
+            <Link
+              href="/"
+              className="flex items-center gap-2 shrink-0"
+              aria-label="Nkuku Home"
+            >
+              <img
+                src="/logo.png"
+                alt="Nkuku"
+                className="h-10 w-auto max-w-none"
+              />
+              <span className="hidden sm:inline text-xl font-bold tracking-tight text-foreground">
+                Nkuku
+              </span>
             </Link>
-            <div className="hidden md:flex gap-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {link.label}
-                </Link>
+
+            <div className="hidden md:flex items-center gap-1">
+              {topLevelItems.map((item) => (
+                <NavLink
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  exact={item.href === "/"}
+                />
+              ))}
+              {groupsForDesktop.map((group) => (
+                <NavGroup
+                  key={group.label}
+                  label={group.label}
+                  items={group.items}
+                />
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="hidden sm:flex h-9 w-9"
-              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-              title="Toggle theme"
-            >
-              {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <Link href="/alerts" className="hidden sm:block">
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Bell className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/settings" className="hidden sm:block">
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Settings className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/billing" className="hidden sm:block">
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <CreditCard className="h-4 w-4" />
-              </Button>
-            </Link>
-            <span className="hidden md:inline text-sm text-muted-foreground">
-              {user.name || user.email}
-            </span>
-            <Button variant="ghost" size="sm" onClick={logout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-            <button
-              className="md:hidden"
-              onClick={() => setMobileOpen(!mobileOpen)}
-            >
-              {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
+
+          {/* Right actions */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            <CommandPalette items={commandItems} />
+            <div className="hidden sm:block">
+              <NotificationBell />
+            </div>
+            <div className="hidden md:block">
+              <UserNav />
+            </div>
+            <MobileNav sections={navSections} />
           </div>
         </div>
       </div>
-      {mobileOpen && (
-        <div className="md:hidden border-t px-4 py-2 space-y-1">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="block py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-              onClick={() => setMobileOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <Link href="/settings" className="block py-2 text-sm font-medium text-muted-foreground hover:text-foreground" onClick={() => setMobileOpen(false)}>
-            Settings
-          </Link>
-          <Link href="/billing" className="block py-2 text-sm font-medium text-muted-foreground hover:text-foreground" onClick={() => setMobileOpen(false)}>
-            Billing & Plans
-          </Link>
-        </div>
-      )}
     </nav>
   );
 }
