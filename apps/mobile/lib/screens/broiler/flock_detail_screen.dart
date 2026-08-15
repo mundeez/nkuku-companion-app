@@ -346,10 +346,11 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
 
   Widget _buildOverviewTab() {
     final flock = _flock!;
-    final mortality = flock.initialCount - flock.currentCount;
-    final mortalityRate = flock.initialCount > 0
-        ? ((mortality / flock.initialCount) * 100).toStringAsFixed(1)
-        : '0.0';
+    final mortalityRate = _mortalitySummary?.mortalityRate != null
+        ? (double.tryParse(_mortalitySummary!.mortalityRate)?.toStringAsFixed(1) ?? '0.0')
+        : (flock.initialCount > 0
+            ? (((flock.totalMortality ?? 0) / flock.initialCount) * 100).toStringAsFixed(1)
+            : '0.0');
     final feedTransition = flock.feedTransitionDay ?? 18;
     final finisherDay = flock.finisherDay ?? 29;
 

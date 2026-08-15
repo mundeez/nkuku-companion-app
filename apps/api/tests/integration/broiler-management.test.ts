@@ -184,6 +184,17 @@ describe('Broiler Management API', () => {
       expect(data.totalDeaths).toBeGreaterThan(0);
       expect(data.mortalityRate).toBeDefined();
     });
+
+    it('reflects mortality on flock detail without using current count', async () => {
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks/${flockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.totalMortality).toBe(5);
+      expect(data.mortalityRate).toBe(1);
+      expect(data.currentCount).toBe(495);
+    });
   });
 
   describe('Financial Records', () => {

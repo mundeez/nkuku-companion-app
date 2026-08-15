@@ -145,6 +145,8 @@ export interface BroilerFlock {
   startDate?: string | null;
   initialCount: number;
   currentCount: number;
+  totalMortality?: number;
+  mortalityRate?: number;
   targetWeight?: number;
   targetAge?: number;
   feedTransitionDay?: number;

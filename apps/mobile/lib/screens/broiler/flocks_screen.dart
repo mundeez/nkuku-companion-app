@@ -147,10 +147,7 @@ class _FlocksScreenState extends State<FlocksScreen> {
                         itemCount: _flocks.length,
                         itemBuilder: (context, index) {
                           final flock = _flocks[index];
-                          final mortality = flock.initialCount - flock.currentCount;
-                          final mortalityRate = flock.initialCount > 0
-                              ? ((mortality / flock.initialCount) * 100).toStringAsFixed(1)
-                              : '0.0';
+                          final mortalityRate = flock.mortalityRate?.toStringAsFixed(1) ?? '0.0';
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             child: ListTile(

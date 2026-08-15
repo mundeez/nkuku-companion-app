@@ -75,10 +75,20 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
 
     const today = new Date();
+    const flockIds = flocks.map((f: any) => f.id);
+    const mortalitySums = await prisma.mortalityEvent.groupBy({
+      by: ['flockId'],
+      where: { flockId: { in: flockIds } },
+      _sum: { count: true },
+    });
+    const mortalityByFlock = new Map(mortalitySums.map((m: any) => [m.flockId, m._sum.count ?? 0]));
+
     return flocks.map((f: any) => {
       const start = f.startDate ? new Date(f.startDate) : null;
       const ageDays = start ? Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
-      return { ...f, ageDays };
+      const totalMortality = Number(mortalityByFlock.get(f.id) ?? 0);
+      const mortalityRate = f.initialCount > 0 ? (totalMortality / f.initialCount) * 100 : 0;
+      return { ...f, ageDays, totalMortality, mortalityRate };
     });
   });
 
@@ -107,7 +117,15 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const today = new Date();
     const start = flock.startDate ? new Date(flock.startDate) : null;
     const ageDays = start ? Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
-    return { ...flock, ageDays };
+
+    const totalMortality = await prisma.mortalityEvent.aggregate({
+      where: { flockId: id },
+      _sum: { count: true },
+    });
+    const deaths = totalMortality._sum.count ?? 0;
+    const mortalityRate = flock.initialCount > 0 ? (deaths / flock.initialCount) * 100 : 0;
+
+    return { ...flock, ageDays, totalMortality: deaths, mortalityRate };
   });
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), checkFlockLimit] }, async (request) => {

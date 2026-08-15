@@ -11,6 +11,8 @@ class BroilerFlock {
   final String? expectedCollectionEnd;
   final int initialCount;
   final int currentCount;
+  final int? totalMortality;
+  final double? mortalityRate;
   final double? targetWeight;
   final int? targetAge;
   final int? feedTransitionDay;
@@ -37,6 +39,8 @@ class BroilerFlock {
     this.expectedCollectionEnd,
     required this.initialCount,
     required this.currentCount,
+    this.totalMortality,
+    this.mortalityRate,
     this.targetWeight,
     this.targetAge,
     this.feedTransitionDay,
@@ -65,6 +69,10 @@ class BroilerFlock {
       expectedCollectionEnd: json['expectedCollectionEnd'] ?? json['expected_collection_end'],
       initialCount: json['initialCount'] ?? json['initial_count'] ?? 0,
       currentCount: json['currentCount'] ?? json['current_count'] ?? 0,
+      totalMortality: json['totalMortality'] ?? json['total_mortality'],
+      mortalityRate: json['mortalityRate'] != null
+          ? double.tryParse(json['mortalityRate'].toString())
+          : (json['mortality_rate'] != null ? double.tryParse(json['mortality_rate'].toString()) : null),
       targetWeight: json['targetWeight'] != null
           ? double.tryParse(json['targetWeight'].toString())
           : (json['target_weight'] != null ? double.tryParse(json['target_weight'].toString()) : null),
@@ -122,6 +130,8 @@ class BroilerFlock {
     String? expectedCollectionEnd,
     int? initialCount,
     int? currentCount,
+    int? totalMortality,
+    double? mortalityRate,
     double? targetWeight,
     int? targetAge,
     int? feedTransitionDay,
@@ -148,6 +158,8 @@ class BroilerFlock {
       expectedCollectionEnd: expectedCollectionEnd ?? this.expectedCollectionEnd,
       initialCount: initialCount ?? this.initialCount,
       currentCount: currentCount ?? this.currentCount,
+      totalMortality: totalMortality ?? this.totalMortality,
+      mortalityRate: mortalityRate ?? this.mortalityRate,
       targetWeight: targetWeight ?? this.targetWeight,
       targetAge: targetAge ?? this.targetAge,
       feedTransitionDay: feedTransitionDay ?? this.feedTransitionDay,

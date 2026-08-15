@@ -277,9 +277,7 @@ export default function BroilerFlocksPage() {
           const ageDays = getAgeDays(flock.startDate);
           const harvestDate = getHarvestDate(flock.startDate, flock.targetAge);
           const daysToHarvest = getDaysToHarvest(flock.startDate, flock.targetAge);
-          const mortality = flock.initialCount > 0
-            ? ((flock.initialCount - flock.currentCount) / flock.initialCount * 100).toFixed(1)
-            : "0";
+          const mortality = flock.mortalityRate != null ? flock.mortalityRate.toFixed(1) : "0";
           const salePrice = flock.salePriceZmw != null ? Number(flock.salePriceZmw) : 0;
           const projectedRevenue = salePrice * flock.currentCount;
           const finRecs = flock.financialRecords || [];

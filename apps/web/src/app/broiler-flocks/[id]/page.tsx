@@ -206,7 +206,7 @@ export default function FlockDetailPage() {
         </CardContent></Card>
         <Card><CardContent className="pt-6">
           <div className="flex items-center gap-2"><Skull className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Mortality</span></div>
-          <p className="text-2xl font-bold mt-1">{flock.initialCount > 0 ? ((flock.initialCount - flock.currentCount) / flock.initialCount * 100).toFixed(1) : "0"}%</p><p className="text-xs text-muted-foreground">{totalMortality} birds</p>
+          <p className="text-2xl font-bold mt-1">{flock.initialCount > 0 ? (totalMortality / flock.initialCount * 100).toFixed(1) : "0"}%</p><p className="text-xs text-muted-foreground">{totalMortality} birds</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6">
           <div className="flex items-center gap-2"><DollarSign className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Projected Revenue (ZMW)</span></div>

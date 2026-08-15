@@ -43,7 +43,17 @@ export async function buildDashboardModule(app: FastifyInstance) {
     const pendingFlocks = flocks.filter((f: any) => f.status === 'active' && !f.chicksCollected);
     const totalBirds = activeFlocks.reduce((s: number, f: any) => s + f.currentCount, 0);
     const totalInitial = activeFlocks.reduce((s: number, f: any) => s + f.initialCount, 0);
-    const mortalityRate = totalInitial > 0 ? Number(((totalInitial - totalBirds) / totalInitial * 100).toFixed(1)) : 0;
+
+    const flockIds = flocks.map((f: any) => f.id);
+    const mortalitySums = await prisma.mortalityEvent.groupBy({
+      by: ['flockId'],
+      where: { flockId: { in: flockIds } },
+      _sum: { count: true },
+    });
+    const mortalityByFlock = new Map(mortalitySums.map((m: any) => [m.flockId, m._sum.count ?? 0]));
+
+    const totalDeaths = activeFlocks.reduce((s: number, f: any) => s + Number(mortalityByFlock.get(f.id) ?? 0), 0);
+    const mortalityRate = totalInitial > 0 ? Number(((totalDeaths / totalInitial) * 100).toFixed(1)) : 0;
 
     const totalRevenue = financialRecords
       .filter((r: any) => r.isIncome)
@@ -91,7 +101,8 @@ export async function buildDashboardModule(app: FastifyInstance) {
         const cost = flockFin.filter((r: any) => !r.isIncome).reduce((s: number, r: any) => s + Number(r.amountZmw), 0);
         const initial = f.initialCount || 0;
         const current = f.currentCount || 0;
-        const mortRate = initial > 0 ? Number(((initial - current) / initial * 100).toFixed(1)) : 0;
+        const deaths = Number(mortalityByFlock.get(f.id) ?? 0);
+        const mortRate = initial > 0 ? Number(((deaths / initial) * 100).toFixed(1)) : 0;
         const ageDays = f.startDate ? Math.floor((now.getTime() - new Date(f.startDate).getTime()) / 86400000) : null;
         return {
           flockId: f.id,
@@ -99,6 +110,7 @@ export async function buildDashboardModule(app: FastifyInstance) {
           breedName: f.breed?.name || 'Unknown',
           ageDays,
           currentCount: current,
+          totalMortality: deaths,
           mortalityRate: mortRate,
           profit: Number((rev - cost).toFixed(2)),
           revenue: Number(rev.toFixed(2)),
