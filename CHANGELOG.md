@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.15.4-alpha — 2026-08-15
+
+### Added
+- **Modern global navbar and flock subnav redesign for the web dashboard.**
+  - New grouped desktop navigation with primary underline active state.
+  - Sticky frosted-glass navbar with logo image and "Nkuku" wordmark.
+  - Command palette (`Cmd`/`Ctrl`+`K`) for quick page search across grouped navigation links (`apps/web/src/components/navbar/command-palette.tsx`).
+  - Consolidated user dropdown with avatar, name/role display, settings, billing, theme toggle, and logout.
+  - Live unread alert count badge on the notification bell.
+  - Mobile slide-over navigation with grouped sections and user actions.
+  - New shadcn-style UI components: `Sheet`, `Avatar`, and `DropdownMenu`.
+  - Updated flock subnav with primary underline active state and horizontal scroll on narrow viewports.
+  - `no-scrollbar` utility added to `apps/web/src/app/globals.css`.
+
+### Changed
+- Patch version bumps for the release:
+  - `apps/api/package.json`: `1.14.3-alpha` → `1.14.4-alpha`
+  - `apps/web/package.json`: `0.2.3-alpha` → `0.2.4-alpha`
+  - `apps/mobile/pubspec.yaml`: `1.15.3-alpha` → `1.15.4-alpha`
+
 ## v1.15.3-alpha — 2026-08-15
 
 ### Fixed
