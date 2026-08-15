@@ -88,7 +88,19 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const ageDays = start ? Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
       const totalMortality = Number(mortalityByFlock.get(f.id) ?? 0);
       const mortalityRate = f.initialCount > 0 ? (totalMortality / f.initialCount) * 100 : 0;
-      return { ...f, ageDays, totalMortality, mortalityRate };
+
+      const finRecs = f.financialRecords || [];
+      const finCost = finRecs.filter((r: any) => !r.isIncome).reduce((sum: number, r: any) => sum + Number(r.amountZmw), 0);
+      const hasChickFin = finRecs.some((r: any) => r.category === 'chick_purchase' && !r.isIncome);
+      const chickCost = !hasChickFin && f.chickPriceZmw ? Number(f.chickPriceZmw) * f.initialCount : 0;
+      const totalCost = finCost + chickCost;
+      const totalRevenue = finRecs.filter((r: any) => r.isIncome).reduce((sum: number, r: any) => sum + Number(r.amountZmw), 0);
+      const salePrice = Number(f.salePriceZmw ?? 0);
+      const survivors = Math.max(0, f.initialCount - totalMortality);
+      const projectedRevenue = salePrice * survivors;
+      const projectedProfit = projectedRevenue - totalCost;
+
+      return { ...f, ageDays, totalMortality, mortalityRate, totalCost, totalRevenue, projectedRevenue, projectedProfit };
     });
   });
 

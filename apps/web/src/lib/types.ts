@@ -153,6 +153,10 @@ export interface BroilerFlock {
   finisherDay?: number;
   chickPriceZmw?: number;
   salePriceZmw?: number | null;
+  totalCost?: number;
+  totalRevenue?: number;
+  projectedRevenue?: number;
+  projectedProfit?: number;
   housingType: "whole_house" | "spot_brooding";
   chicksCollected: boolean;
   collectionDate?: string;
@@ -243,6 +247,21 @@ export type FinancialCategory =
   | "equipment"
   | "sales"
   | "other";
+
+export interface FinancialRecordSummary {
+  totalCost: number;
+  totalRevenue: number;
+  profit: number;
+  profitPerBird: number;
+  categoryBreakdown: Array<{ category: string; _sum: { amountZmw: number } }>;
+  currentCount: number;
+  initialCount: number;
+  salePriceZmw: number | null;
+  totalMortality: number;
+  projectedRevenue: number;
+  projectedProfit: number;
+  projectedProfitPerBird: number;
+}
 
 export interface Alert {
   id: string;

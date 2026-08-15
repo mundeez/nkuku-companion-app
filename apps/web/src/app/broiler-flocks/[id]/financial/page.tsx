@@ -45,12 +45,13 @@ export default function FinancialProjectionPage() {
     if (!flock || !summary) return;
     const currentCost = summary.totalCost || 0;
     const currentRevenue = summary.totalRevenue || 0;
-    const birds = flock.currentCount || 1;
+    const totalMortality = flock.totalMortality ?? 0;
+    const survivors = Math.max(0, flock.initialCount - totalMortality) || 1;
     const targetWeight = flock.targetWeight || 2.5;
-    const pricePerKg = 25; // Approximate ZMW per kg
-    const projectedRevenue = birds * targetWeight * pricePerKg;
+    const salePricePerBird = flock.salePriceZmw || 0;
+    const projectedRevenue = survivors * salePricePerBird;
     const projectedProfit = projectedRevenue - currentCost;
-    const breakEvenPrice = currentCost / (birds * targetWeight);
+    const breakEvenPrice = currentCost / (survivors * targetWeight);
 
     setProjection({
       currentCost,
@@ -58,7 +59,7 @@ export default function FinancialProjectionPage() {
       projectedRevenue,
       projectedProfit,
       breakEvenPrice,
-      profitPerBird: projectedProfit / birds,
+      profitPerBird: projectedProfit / survivors,
       roi: currentCost > 0 ? ((projectedRevenue - currentCost) / currentCost * 100) : 0,
     });
   }
@@ -141,12 +142,12 @@ export default function FinancialProjectionPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm text-muted-foreground">Current Birds</label>
-                      <p className="font-medium">{flock?.currentCount || "-"}</p>
+                      <label className="text-sm text-muted-foreground">Expected Survivors</label>
+                      <p className="font-medium">{Math.max(0, (flock?.initialCount ?? 0) - (flock?.totalMortality ?? 0)) || "-"}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-muted-foreground">Target Weight</label>
-                      <p className="font-medium">{flock?.targetWeight || "-"} kg</p>
+                      <label className="text-sm text-muted-foreground">Sale Price / Bird</label>
+                      <p className="font-medium">{flock?.salePriceZmw != null ? `ZMW ${Number(flock.salePriceZmw).toFixed(2)}` : "-"}</p>
                     </div>
                   </div>
                   <Button onClick={calculateProjection} className="w-full">Calculate Projection</Button>

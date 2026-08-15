@@ -103,6 +103,17 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
       const profit = totalRevenue - totalCost;
       const profitPerBird = flock.currentCount > 0 ? profit / flock.currentCount : 0;
 
+      const mortality = await prisma.mortalityEvent.aggregate({
+        where: { flockId },
+        _sum: { count: true },
+      });
+      const totalMortality = Number(mortality._sum.count ?? 0);
+      const survivors = Math.max(0, flock.initialCount - totalMortality);
+      const salePricePerBird = Number(flock.salePriceZmw ?? 0);
+      const projectedRevenue = salePricePerBird * survivors;
+      const projectedProfit = projectedRevenue - totalCost;
+      const projectedProfitPerBird = survivors > 0 ? projectedProfit / survivors : 0;
+
       return {
         totalCost,
         totalRevenue,
@@ -110,6 +121,12 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
         profitPerBird,
         categoryBreakdown,
         currentCount: flock.currentCount,
+        initialCount: flock.initialCount,
+        salePriceZmw: flock.salePriceZmw,
+        totalMortality,
+        projectedRevenue,
+        projectedProfit,
+        projectedProfitPerBird,
       };
     }
 

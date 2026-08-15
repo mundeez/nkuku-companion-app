@@ -278,16 +278,11 @@ export default function BroilerFlocksPage() {
           const harvestDate = getHarvestDate(flock.startDate, flock.targetAge);
           const daysToHarvest = getDaysToHarvest(flock.startDate, flock.targetAge);
           const mortality = flock.mortalityRate != null ? flock.mortalityRate.toFixed(1) : "0";
-          const salePrice = flock.salePriceZmw != null ? Number(flock.salePriceZmw) : 0;
-          const projectedRevenue = salePrice * flock.currentCount;
-          const finRecs = flock.financialRecords || [];
-          const finCost = finRecs.filter((r) => !r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
-          const hasChickFin = finRecs.some((r) => r.category === "chick_purchase" && !r.isIncome);
-          const chickCost = !hasChickFin && flock.chickPriceZmw ? Number(flock.chickPriceZmw) * flock.initialCount : 0;
-          const totalCost = finCost + chickCost;
-          const totalRevenue = finRecs.filter((r) => r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
+          const totalCost = flock.totalCost ?? 0;
+          const totalRevenue = flock.totalRevenue ?? 0;
           const actualProfit = totalRevenue - totalCost;
-          const projectedProfit = projectedRevenue - totalCost;
+          const projectedRevenue = flock.projectedRevenue ?? 0;
+          const projectedProfit = flock.projectedProfit ?? 0;
 
           return (
             <Card key={flock.id} className="hover:shadow-md transition-shadow">
@@ -345,7 +340,7 @@ export default function BroilerFlocksPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Sale Price/Bird</span>
-                    <span className="font-medium">{salePrice > 0 ? `ZMW ${salePrice.toFixed(2)}` : "-"}</span>
+                    <span className="font-medium">{flock.salePriceZmw != null && Number(flock.salePriceZmw) > 0 ? `ZMW ${Number(flock.salePriceZmw).toFixed(2)}` : "-"}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Projected Revenue</span>
