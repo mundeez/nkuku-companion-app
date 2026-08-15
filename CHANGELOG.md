@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.15.5-alpha — 2026-08-15
+
+### Added
+- **Current day/age highlighting on flock calendar and environment pages.**
+  - Calendar page reads `ageDays` from the flock summary API, shows a "Current: Day X" indicator next to the hatch date, and highlights the matching day card with a primary ring and "Today" badge, scrolling it into view.
+  - Environment page highlights the full lighting/temperature schedule row whose `ageDays` matches the flock's current age, adds a primary dot indicator on the current day cell, and smooth-scrolls the current row into view.
+
+### Changed
+- Patch version bumps for the release:
+  - `apps/api/package.json`: `1.14.4-alpha` → `1.14.5-alpha`
+  - `apps/web/package.json`: `0.2.4-alpha` → `0.2.5-alpha`
+  - `apps/mobile/pubspec.yaml`: `1.15.4-alpha` → `1.15.5-alpha`
+
 ## v1.15.4-alpha — 2026-08-15
 
 ### Added
