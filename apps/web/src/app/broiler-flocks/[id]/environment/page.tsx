@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
 import { BroilerFlock, EnvironmentalRecord, LightingTemperatureScheduleItemData } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ export default function EnvironmentPage() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const currentRowRef = useRef<HTMLTableRowElement | null>(null);
 
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
 
@@ -113,6 +115,12 @@ export default function EnvironmentPage() {
     if (!isLoading && !user) { router.push("/login"); return; }
     if (user && flockId) loadAll();
   }, [user, isLoading, flockId, router]);
+
+  useEffect(() => {
+    if (currentRowRef.current) {
+      currentRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [fullSchedule, current?.ageDays]);
 
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
@@ -213,9 +221,21 @@ export default function EnvironmentPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {fullSchedule.map((item, idx) => (
-                    <tr key={idx} className="border-b last:border-0">
-                      <td className="p-2 font-medium">{item.ageDays}</td>
+                  {fullSchedule.map((item, idx) => {
+                    const isCurrent = item.ageDays === current?.ageDays;
+                    return (
+                    <tr
+                      key={idx}
+                      ref={isCurrent ? currentRowRef : undefined}
+                      className={cn(
+                        "border-b last:border-0",
+                        isCurrent && "bg-primary/10 font-semibold"
+                      )}
+                    >
+                      <td className="p-2 font-medium">
+                        {item.ageDays}
+                        {isCurrent && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-primary align-middle" title="Current age" />}
+                      </td>
                       <td className="p-2">{item.lightHours}h</td>
                       <td className="p-2">{item.darkHours}h</td>
                       <td className="p-2">{item.lightIntensityLux}</td>
@@ -223,7 +243,8 @@ export default function EnvironmentPage() {
                       <td className="p-2">{item.targetRhMinPct}-{item.targetRhMaxPct}</td>
                       <td className="p-2 hidden md:table-cell max-w-xs truncate">{item.notes}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

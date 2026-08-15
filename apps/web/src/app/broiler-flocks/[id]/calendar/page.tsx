@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
 import { BroilerFlock, FlockCalendarDay } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,24 +20,33 @@ export default function CalendarPage() {
 
   const [flock, setFlock] = useState<BroilerFlock | null>(null);
   const [days, setDays] = useState<FlockCalendarDay[]>([]);
+  const [currentDay, setCurrentDay] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const currentCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
     if (user && flockId) {
       Promise.all([
         apiFetch<BroilerFlock>(`/api/v1/broiler-flocks/${flockId}`),
-        apiFetch<{ days: FlockCalendarDay[] }>(`/api/v1/broiler-flocks/${flockId}/summary`),
+        apiFetch<{ days: FlockCalendarDay[]; ageDays: number | null }>(`/api/v1/broiler-flocks/${flockId}/summary`),
       ])
         .then(([f, s]) => {
           setFlock(f);
           setDays(s.days || []);
+          setCurrentDay(s.ageDays ?? null);
         })
         .catch((err) => setError(err.message))
         .finally(() => setLoading(false));
     }
   }, [user, isLoading, flockId, router]);
+
+  useEffect(() => {
+    if (currentCardRef.current) {
+      currentCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [days, currentDay]);
 
   if (isLoading || loading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
@@ -47,7 +57,10 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Management Calendar</h1>
-          <div className="text-muted-foreground">{flock?.name} · Hatch: {flock?.startDate ? new Date(flock.startDate).toLocaleDateString() : "-"}</div>
+          <div className="text-muted-foreground">
+            {flock?.name} · Hatch: {flock?.startDate ? new Date(flock.startDate).toLocaleDateString() : "-"}
+            {currentDay !== null && ` · Current: Day ${currentDay}`}
+          </div>
         </div>
         <Button variant="outline" onClick={() => router.push(`/broiler-flocks/${flockId}/calendar/print`)}>
           <Printer className="h-4 w-4 mr-1" /> Print
@@ -57,11 +70,22 @@ export default function CalendarPage() {
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
       <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 print:grid-cols-3">
-        {days.map((day) => (
-          <Card key={day.day} className={`overflow-hidden ${day.vaccines.length > 0 ? "border-green-300" : ""}`}>
+        {days.map((day) => {
+          const isCurrent = currentDay !== null && day.day === currentDay;
+          return (
+          <Card
+            key={day.day}
+            ref={isCurrent ? currentCardRef : undefined}
+            className={cn(
+              "overflow-hidden",
+              day.vaccines.length > 0 && "border-green-300",
+              isCurrent && "ring-2 ring-primary border-primary shadow-md"
+            )}
+          >
             <CardContent className="p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="font-bold">{day.age}</div>
+                {isCurrent && <Badge variant="default" className="text-[10px]">Today</Badge>}
                 <div className="text-xs text-muted-foreground">{new Date(day.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
               </div>
 
@@ -110,7 +134,8 @@ export default function CalendarPage() {
               )}
             </CardContent>
           </Card>
-        ))}
+        );
+      })}
       </div>
     </div>
   );
