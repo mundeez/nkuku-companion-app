@@ -82,26 +82,24 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NODE_ENV: production
+      HOSTNAME: 0.0.0.0
     depends_on:
       - api
     ports:
       - "30000:3000"
     networks:
       - nkuku_public
+      - shared-net
     restart: unless-stopped
 
-  nginx:
-    image: nginx:1.25-alpine
-    volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "30080:80"
-    depends_on:
-      - api
-      - web
-    networks:
-      - nkuku_public
-    restart: unless-stopped
+  # ─── nginx ─────────────────────────────────────────────────
+  # REMOVED: The dedicated nkuku nginx container has been removed to save
+  # memory. The nkuku reverse proxy is now handled by the shared-nginx
+  # container in /home/mundeez/DevWorkz/shared-services (port 30080).
+  # DO NOT re-add this service unless you also remove the nkuku server
+  # block from shared-services/nginx/nginx.conf — both cannot bind 30080.
+  # See: shared-services/docker-compose.yml → nginx service
+  # ───────────────────────────────────────────────────────────
 
   ntfy:
     image: binwiederhier/ntfy:v2.11.0
