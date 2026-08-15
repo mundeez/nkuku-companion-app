@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.15.2-alpha — 2026-08-15
+
+### Changed
+- style(mobile): applied `dart format` to the mobile mortality calculation files; no functional changes.
+- Patch version bumps for the formatting release:
+  - `apps/api/package.json`: `1.14.1-alpha` → `1.14.2-alpha`
+  - `apps/web/package.json`: `0.2.1-alpha` → `0.2.2-alpha`
+  - `apps/mobile/pubspec.yaml`: `1.15.1-alpha` → `1.15.2-alpha`
+
 ## v1.15.1-alpha — 2026-08-15
 
 ### Fixed
