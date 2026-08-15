@@ -65,10 +65,15 @@ class _FlocksScreenState extends State<FlocksScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete flock?'),
-        content: Text('This will permanently delete "${flock.name}" and all its records.'),
+        content: Text(
+            'This will permanently delete "${flock.name}" and all its records.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -78,7 +83,8 @@ class _FlocksScreenState extends State<FlocksScreen> {
       if (mounted) _loadFlocks();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Delete failed: $e')));
       }
     }
   }
@@ -134,29 +140,37 @@ class _FlocksScreenState extends State<FlocksScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_error!, style: const TextStyle(color: Colors.red)),
+                        Text(_error!,
+                            style: const TextStyle(color: Colors.red)),
                         const SizedBox(height: 16),
-                        ElevatedButton(onPressed: _loadFlocks, child: const Text('Retry')),
+                        ElevatedButton(
+                            onPressed: _loadFlocks, child: const Text('Retry')),
                       ],
                     ),
                   )
                 : _flocks.isEmpty
-                    ? const Center(child: Text('No flocks yet. Tap + to create one.'))
+                    ? const Center(
+                        child: Text('No flocks yet. Tap + to create one.'))
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
                         itemCount: _flocks.length,
                         itemBuilder: (context, index) {
                           final flock = _flocks[index];
-                          final mortalityRate = flock.mortalityRate?.toStringAsFixed(1) ?? '0.0';
+                          final mortalityRate =
+                              flock.mortalityRate?.toStringAsFixed(1) ?? '0.0';
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             child: ListTile(
                               contentPadding: const EdgeInsets.all(16),
                               leading: CircleAvatar(
-                                backgroundColor: _statusColor(flock.status).withAlpha(30),
-                                child: Icon(Icons.egg_alt, color: _statusColor(flock.status)),
+                                backgroundColor:
+                                    _statusColor(flock.status).withAlpha(30),
+                                child: Icon(Icons.egg_alt,
+                                    color: _statusColor(flock.status)),
                               ),
-                              title: Text(flock.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              title: Text(flock.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -166,7 +180,8 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                   Row(
                                     children: [
                                       Chip(
-                                        label: Text('${flock.currentCount} birds'),
+                                        label:
+                                            Text('${flock.currentCount} birds'),
                                         visualDensity: VisualDensity.compact,
                                       ),
                                       const SizedBox(width: 8),
@@ -180,7 +195,8 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                       ),
                                       const SizedBox(width: 8),
                                       Chip(
-                                        label: Text('$mortalityRate% mortality'),
+                                        label:
+                                            Text('$mortalityRate% mortality'),
                                         visualDensity: VisualDensity.compact,
                                         backgroundColor: mortalityRate != '0.0'
                                             ? Colors.red.withAlpha(30)
@@ -191,20 +207,29 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      Icon(Icons.event, size: 14, color: Colors.grey[600]),
+                                      Icon(Icons.event,
+                                          size: 14, color: Colors.grey[600]),
                                       const SizedBox(width: 4),
                                       Text(
                                         flock.harvestDateStr != null
                                             ? 'Harvest: ${flock.harvestDateStr}'
                                             : 'Harvest: Pending',
-                                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[700]),
                                       ),
                                       const SizedBox(width: 12),
-                                      Icon(Icons.timer, size: 14, color: _harvestColor(flock.daysToHarvest)),
+                                      Icon(Icons.timer,
+                                          size: 14,
+                                          color: _harvestColor(
+                                              flock.daysToHarvest)),
                                       const SizedBox(width: 4),
                                       Text(
                                         _harvestLabel(flock.daysToHarvest),
-                                        style: TextStyle(fontSize: 12, color: _harvestColor(flock.daysToHarvest)),
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: _harvestColor(
+                                                flock.daysToHarvest)),
                                       ),
                                     ],
                                   ),
@@ -220,17 +245,24 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                 },
                                 itemBuilder: (context) => [
                                   if (AuthService.canEdit)
-                                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                    const PopupMenuItem(
+                                        value: 'edit', child: Text('Edit')),
                                   if (AuthService.canDelete)
-                                    const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                                  if (!AuthService.canEdit && !AuthService.canDelete)
-                                    const PopupMenuItem(value: 'noop', enabled: false, child: Text('No actions')),
+                                    const PopupMenuItem(
+                                        value: 'delete', child: Text('Delete')),
+                                  if (!AuthService.canEdit &&
+                                      !AuthService.canDelete)
+                                    const PopupMenuItem(
+                                        value: 'noop',
+                                        enabled: false,
+                                        child: Text('No actions')),
                                 ],
                               ),
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => FlockDetailScreen(flockId: flock.id, flockName: flock.name),
+                                  builder: (_) => FlockDetailScreen(
+                                      flockId: flock.id, flockName: flock.name),
                                 ),
                               ).then((_) => _loadFlocks()),
                             ),

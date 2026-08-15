@@ -65,32 +65,44 @@ class BroilerFlock {
       supplierName: json['supplier']?['name'],
       orderDate: json['orderDate'] ?? json['order_date'],
       startDate: json['startDate'] ?? json['start_date'],
-      expectedCollectionStart: json['expectedCollectionStart'] ?? json['expected_collection_start'],
-      expectedCollectionEnd: json['expectedCollectionEnd'] ?? json['expected_collection_end'],
+      expectedCollectionStart:
+          json['expectedCollectionStart'] ?? json['expected_collection_start'],
+      expectedCollectionEnd:
+          json['expectedCollectionEnd'] ?? json['expected_collection_end'],
       initialCount: json['initialCount'] ?? json['initial_count'] ?? 0,
       currentCount: json['currentCount'] ?? json['current_count'] ?? 0,
       totalMortality: json['totalMortality'] ?? json['total_mortality'],
       mortalityRate: json['mortalityRate'] != null
           ? double.tryParse(json['mortalityRate'].toString())
-          : (json['mortality_rate'] != null ? double.tryParse(json['mortality_rate'].toString()) : null),
+          : (json['mortality_rate'] != null
+              ? double.tryParse(json['mortality_rate'].toString())
+              : null),
       targetWeight: json['targetWeight'] != null
           ? double.tryParse(json['targetWeight'].toString())
-          : (json['target_weight'] != null ? double.tryParse(json['target_weight'].toString()) : null),
+          : (json['target_weight'] != null
+              ? double.tryParse(json['target_weight'].toString())
+              : null),
       targetAge: json['targetAge'] ?? json['target_age'],
-      feedTransitionDay: json['feedTransitionDay'] ?? json['feed_transition_day'],
+      feedTransitionDay:
+          json['feedTransitionDay'] ?? json['feed_transition_day'],
       finisherDay: json['finisherDay'] ?? json['finisher_day'],
       chickPriceZmw: json['chickPriceZmw'] != null
           ? double.tryParse(json['chickPriceZmw'].toString())
-          : (json['chick_price_zmw'] != null ? double.tryParse(json['chick_price_zmw'].toString()) : null),
+          : (json['chick_price_zmw'] != null
+              ? double.tryParse(json['chick_price_zmw'].toString())
+              : null),
       salePriceZmw: json['salePriceZmw'] != null
           ? double.tryParse(json['salePriceZmw'].toString())
-          : (json['sale_price_zmw'] != null ? double.tryParse(json['sale_price_zmw'].toString()) : null),
+          : (json['sale_price_zmw'] != null
+              ? double.tryParse(json['sale_price_zmw'].toString())
+              : null),
       housingType: json['housingType'] ?? json['housing_type'] ?? 'whole_house',
       status: json['status'] ?? 'active',
       ageDays: json['ageDays'] ?? json['age_days'],
       chicksCollected: json['chicksCollected'] ?? json['chicks_collected'],
       collectionDate: json['collectionDate'] ?? json['collection_date'],
-      chickQualityNotes: json['chickQualityNotes'] ?? json['chick_quality_notes'],
+      chickQualityNotes:
+          json['chickQualityNotes'] ?? json['chick_quality_notes'],
     );
   }
 
@@ -100,8 +112,10 @@ class BroilerFlock {
       'breedId': breedId,
       if (startDate != null) 'startDate': startDate!.split('T').first,
       if (orderDate != null) 'orderDate': orderDate!.split('T').first,
-      if (expectedCollectionStart != null) 'expectedCollectionStart': expectedCollectionStart!.split('T').first,
-      if (expectedCollectionEnd != null) 'expectedCollectionEnd': expectedCollectionEnd!.split('T').first,
+      if (expectedCollectionStart != null)
+        'expectedCollectionStart': expectedCollectionStart!.split('T').first,
+      if (expectedCollectionEnd != null)
+        'expectedCollectionEnd': expectedCollectionEnd!.split('T').first,
       'initialCount': initialCount,
       if (supplierId != null) 'supplierId': supplierId,
       if (targetWeight != null) 'targetWeight': targetWeight,
@@ -154,8 +168,10 @@ class BroilerFlock {
       supplierName: supplierName ?? this.supplierName,
       startDate: startDate ?? this.startDate,
       orderDate: orderDate ?? this.orderDate,
-      expectedCollectionStart: expectedCollectionStart ?? this.expectedCollectionStart,
-      expectedCollectionEnd: expectedCollectionEnd ?? this.expectedCollectionEnd,
+      expectedCollectionStart:
+          expectedCollectionStart ?? this.expectedCollectionStart,
+      expectedCollectionEnd:
+          expectedCollectionEnd ?? this.expectedCollectionEnd,
       initialCount: initialCount ?? this.initialCount,
       currentCount: currentCount ?? this.currentCount,
       totalMortality: totalMortality ?? this.totalMortality,
@@ -220,7 +236,10 @@ class VaccinationSchedule {
       name: json['name'],
       isDefault: json['isDefault'] ?? false,
       description: json['description'] ?? '',
-      items: (json['items'] as List?)?.map((e) => VaccinationScheduleItem.fromJson(e)).toList() ?? [],
+      items: (json['items'] as List?)
+              ?.map((e) => VaccinationScheduleItem.fromJson(e))
+              .toList() ??
+          [],
     );
   }
 }
@@ -287,7 +306,8 @@ class Disease {
       symptoms: json['symptoms'] ?? '',
       prevention: json['prevention'] ?? '',
       treatment: json['treatment'] ?? '',
-      organicTreatments: json['organicTreatments'] ?? json['organic_treatments'] ?? '',
+      organicTreatments:
+          json['organicTreatments'] ?? json['organic_treatments'] ?? '',
     );
   }
 }
@@ -316,7 +336,10 @@ class LightingTemperatureSchedule {
       description: json['description'] ?? '',
       housingType: json['housingType'] ?? json['housing_type'] ?? 'whole_house',
       isDefault: json['isDefault'] ?? json['is_default'] ?? false,
-      items: (json['items'] as List?)?.map((e) => LightingTemperatureScheduleItem.fromJson(e)).toList() ?? [],
+      items: (json['items'] as List?)
+              ?.map((e) => LightingTemperatureScheduleItem.fromJson(e))
+              .toList() ??
+          [],
     );
   }
 }
@@ -357,13 +380,24 @@ class LightingTemperatureScheduleItem {
       id: json['id'] ?? '',
       scheduleId: json['scheduleId'] ?? json['schedule_id'] ?? '',
       ageDays: json['ageDays'] ?? json['age_days'] ?? 0,
-      lightHours: json['lightHours'] != null ? double.tryParse(json['lightHours'].toString()) : null,
-      darkHours: json['darkHours'] != null ? double.tryParse(json['darkHours'].toString()) : null,
-      lightIntensityLux: json['lightIntensityLux'] ?? json['light_intensity_lux'],
+      lightHours: json['lightHours'] != null
+          ? double.tryParse(json['lightHours'].toString())
+          : null,
+      darkHours: json['darkHours'] != null
+          ? double.tryParse(json['darkHours'].toString())
+          : null,
+      lightIntensityLux:
+          json['lightIntensityLux'] ?? json['light_intensity_lux'],
       darkIntensityLux: json['darkIntensityLux'] ?? json['dark_intensity_lux'],
-      targetTempC: json['targetTempC'] != null ? double.tryParse(json['targetTempC'].toString()) : null,
-      targetTempMinC: json['targetTempMinC'] != null ? double.tryParse(json['targetTempMinC'].toString()) : null,
-      targetTempMaxC: json['targetTempMaxC'] != null ? double.tryParse(json['targetTempMaxC'].toString()) : null,
+      targetTempC: json['targetTempC'] != null
+          ? double.tryParse(json['targetTempC'].toString())
+          : null,
+      targetTempMinC: json['targetTempMinC'] != null
+          ? double.tryParse(json['targetTempMinC'].toString())
+          : null,
+      targetTempMaxC: json['targetTempMaxC'] != null
+          ? double.tryParse(json['targetTempMaxC'].toString())
+          : null,
       targetRhMinPct: json['targetRhMinPct'] ?? json['target_rh_min_pct'],
       targetRhMaxPct: json['targetRhMaxPct'] ?? json['target_rh_max_pct'],
       notes: json['notes'],
@@ -395,11 +429,16 @@ class CalendarDay {
       day: json['day'] ?? 0,
       date: json['date'] ?? '',
       feedPhase: json['feedPhase'] ?? json['feed_phase'] ?? '',
-      vaccines: (json['vaccines'] as List?)?.map((e) => VaccinationScheduleItem.fromJson(e)).toList() ?? [],
+      vaccines: (json['vaccines'] as List?)
+              ?.map((e) => VaccinationScheduleItem.fromJson(e))
+              .toList() ??
+          [],
       lightingTemperature: json['lightingTemperature'] != null
-          ? LightingTemperatureScheduleItem.fromJson(json['lightingTemperature'])
+          ? LightingTemperatureScheduleItem.fromJson(
+              json['lightingTemperature'])
           : null,
-      managementTasks: List<String>.from(json['managementTasks'] ?? json['management_tasks'] ?? []),
+      managementTasks: List<String>.from(
+          json['managementTasks'] ?? json['management_tasks'] ?? []),
       healthSupport: json['healthSupport'] ?? json['health_support'] ?? '',
     );
   }
