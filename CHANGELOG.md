@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.15.3-alpha — 2026-08-15
+
+### Fixed
+- **Projected profit and revenue now use expected survivors instead of current flock count.**
+  - `currentCount` is reduced by sales, culls, and other non-mortality events, which was inflating the projected loss and misrepresenting what the flock could earn if the remaining birds are sold.
+  - API `/broiler-flocks` list now returns `projectedRevenue` and `projectedProfit` computed as `(initialCount - totalMortality) × salePriceZmw` (with target weight for per-kg break-even where applicable).
+  - API `/financial-records/summary` now returns `projectedRevenue`, `projectedProfit`, and `projectedProfitPerBird` based on survivors.
+  - Web flock list, flock detail, and financial projection page use the new API-provided fields or compute `(initialCount - totalMortality) × salePriceZmw`.
+  - Actual profit (`totalRevenue - totalCost`) remains unchanged.
+
+### Changed
+- **Docker web container now binds to all interfaces.**
+  - Set `HOSTNAME=0.0.0.0` for the web service in `docker-compose.yml` so the Next.js standalone server accepts connections on all container interfaces; previously it could bind to a single container IP and become unreachable from the host/nginx in multi-network setups.
+- Patch version bumps for the bug-fix release:
+  - `apps/api/package.json`: `1.14.2-alpha` → `1.14.3-alpha`
+  - `apps/web/package.json`: `0.2.2-alpha` → `0.2.3-alpha`
+  - `apps/mobile/pubspec.yaml`: `1.15.2-alpha` → `1.15.3-alpha`
+
 ## v1.15.2-alpha — 2026-08-15
 
 ### Changed
