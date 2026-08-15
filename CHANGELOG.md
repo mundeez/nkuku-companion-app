@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.15.1-alpha — 2026-08-15
+
+### Fixed
+- **Mortality rate now reflects actual deaths vs. the starting flock count.**
+  - Previously the rate was derived from `initialCount - currentCount`, which incorrectly included birds sold or culled and skewed the percentage.
+  - API `/broiler-flocks` list and detail, `/dashboard` summary, and flock profitability now compute `totalMortality` and `mortalityRate` from recorded `MortalityEvent` aggregates.
+  - Web flock list and detail consume the new `totalMortality` / `mortalityRate` backend fields.
+  - Mobile `BroilerFlock` model and screens consume the new backend fields.
+  - Added integration test coverage in `apps/api/tests/integration/broiler-management.test.ts`.
+
+### Changed
+- Patch version bumps for the bug-fix release:
+  - `apps/api/package.json`: `1.14.0-alpha` → `1.14.1-alpha`
+  - `apps/web/package.json`: `0.2.0-alpha` → `0.2.1-alpha`
+  - `apps/mobile/pubspec.yaml`: `1.15.0-alpha` → `1.15.1-alpha`
+
 ## v1.15.0-alpha — 2026-08-09
 
 ### Added
