@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.15.9-alpha — 2026-08-16
+
+### Fixed
+- **Email test failures resolved.** Set `EMAIL_DISABLED=true` in local `.env` (was `false`, causing SMTP 500 errors in dev mode). All 4 previously-failing account-management integration tests now pass. Full suite: 238/238 green.
+- **ESLint installed and configured for both API and web.** API uses ESLint 9 with `typescript-eslint` flat config; web uses ESLint 8 with `eslint-config-next`. Fixed 9 lint errors: `@ts-ignore` → `@ts-expect-error` (3 files), `let` → `const` for non-reassigned variables (statements.service.ts), empty catch blocks (test cleanup), React Hooks order violation (navbar.tsx — moved early return after `useMemo` calls). Both `pnpm run lint` and `next lint` now pass with 0 errors.
+- **Flock card per-stage mortality adjustment.** The flock list endpoint now applies the same mortality-by-stage logic as the full projection endpoint: `birdsAlive = initialCount − mortality events on/before the stage's dayRangeStart`. Batch-loaded mortality events per flock to avoid N+1 queries.
+
+### Changed
+- `apps/api` version: `1.15.8-alpha` → `1.15.9-alpha`
+- `apps/api` devDependencies: added `eslint`, `@eslint/js`, `typescript-eslint`
+- `apps/web` devDependencies: added `eslint@8`, `eslint-config-next`
+- `apps/api/src/core/financial-engine/statements.service.ts`: `let` → `const` for `loans`, `invIn`, `finIn` (not reassigned); kept `let` for `invOut`, `finOut` (reassigned in loop)
+- `apps/web/src/components/navbar.tsx`: moved `if (!user) return null` after all `useMemo` calls to fix Rules of Hooks violation
+
+### Test Results
+- 238/238 tests pass (was 234/238)
+- API lint: 0 errors, 119 warnings (pre-existing unused vars)
+- Web lint: 0 errors, warnings only (`<img>` vs `<Image />` — pre-existing)
+- Web build: 36 pages, all compiled successfully
+
 ## v1.15.8-alpha — 2026-08-16
 
 ### Added

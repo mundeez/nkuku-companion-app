@@ -13,10 +13,7 @@ import { cn } from "@/lib/utils";
 
 export function Navbar() {
   const { user } = useAuth();
-
-  if (!user) return null;
-
-  const role = user.role;
+  const role = user?.role ?? "";
 
   const navSections = React.useMemo(
     () => [
@@ -81,6 +78,8 @@ export function Navbar() {
       ),
     [navSections]
   );
+
+  if (!user) return null;
 
   // Single top-level items and grouped items for desktop nav
   const topLevelItems: { href: string; label: string }[] = [

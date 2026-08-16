@@ -13,7 +13,7 @@ import type { PrismaClient } from '@prisma/client';
 // Lazy-load heavy deps only when needed
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
-    // @ts-ignore — pdf-parse has no type declarations
+    // @ts-expect-error — pdf-parse has no type declarations
     const pdfParse = (await import('pdf-parse')).default;
     const data = await pdfParse(buffer);
     return data.text || '';

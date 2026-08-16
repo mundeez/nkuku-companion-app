@@ -65,7 +65,7 @@ export async function getObject(key: string): Promise<Buffer> {
 
   const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   const chunks: Uint8Array[] = [];
-  // @ts-ignore — Body is a Readable stream
+  // @ts-expect-error — Body is a Readable stream
   for await (const chunk of response.Body) {
     chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
   }

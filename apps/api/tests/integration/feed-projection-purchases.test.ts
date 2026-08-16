@@ -22,7 +22,6 @@ async function api(path: string, token: string, options: RequestInit = {}) {
 describe('Feed Projection & Purchases API', () => {
   let token: string;
   let supplierId: string;
-  let feedStageId: string;
   let flockId: string;
   let purchaseId: string;
 
@@ -37,7 +36,6 @@ describe('Feed Projection & Purchases API', () => {
     );
     expect(supplierWithFeed).toBeDefined();
     supplierId = supplierWithFeed.id;
-    feedStageId = supplierWithFeed.feedStages.find((fs: any) => fs.stageType === 'feed').id;
 
     // Create a test flock linked to this supplier
     const breedsRes = await api('/api/v1/breeds', token);

@@ -1,4 +1,4 @@
-// @ts-ignore — clamscan has no type declarations
+// @ts-expect-error — clamscan has no type declarations
 import ClamScanModule from 'clamscan';
 import { Readable } from 'stream';
 

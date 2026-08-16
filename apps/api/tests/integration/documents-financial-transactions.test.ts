@@ -110,15 +110,15 @@ describe('Document Attachments for Financial Transactions', () => {
     // Delete sale record (restores flock bird count)
     try {
       await fetch(`${API_URL}/api/v1/sale-records/${saleRecordId}`, { method: 'DELETE', headers });
-    } catch {}
+    } catch { /* cleanup */ }
     // Delete financial record
     try {
       await fetch(`${API_URL}/api/v1/financial-records/${financialRecordId}`, { method: 'DELETE', headers });
-    } catch {}
+    } catch { /* cleanup */ }
     // Delete flock
     try {
       await fetch(`${API_URL}/api/v1/broiler-flocks/${flockId}`, { method: 'DELETE', headers });
-    } catch {}
+    } catch { /* cleanup */ }
   });
 
   // ── FinancialRecord attachments ──────────────────────

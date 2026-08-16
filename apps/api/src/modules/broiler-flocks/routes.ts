@@ -85,6 +85,18 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
     const mortalityByFlock = new Map(mortalitySums.map((m: any) => [m.flockId, m._sum.count ?? 0]));
 
+    // Batch-load mortality events with age/date for per-stage mortality adjustment
+    const mortalityEvents = await prisma.mortalityEvent.findMany({
+      where: { flockId: { in: flockIds } },
+      select: { flockId: true, eventDate: true, count: true, ageDays: true },
+    });
+    const mortalityEventsByFlock = new Map<string, any[]>();
+    for (const m of mortalityEvents) {
+      const arr = mortalityEventsByFlock.get(m.flockId) ?? [];
+      arr.push(m);
+      mortalityEventsByFlock.set(m.flockId, arr);
+    }
+
     // Batch-load feed purchases grouped by (flockId, feedStageId) for the flock card mini-list
     const feedPurchases = await prisma.feedPurchase.findMany({
       where: { flockId: { in: flockIds } },
@@ -115,11 +127,25 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const projectedProfit = projectedRevenue - totalCost;
 
       // Compact per-stage feed projection for the flock card mini-list.
-      // Uses initialCount (no per-stage mortality adjustment here — the full
-      // projection endpoint handles that; the card just needs a quick summary).
+      // Applies per-stage mortality adjustment: birdsAlive = initialCount −
+      // mortality events on/before the stage's dayRangeStart.
+      const flockMortalityEvents = mortalityEventsByFlock.get(f.id) ?? [];
       const feedStages = (f.supplier?.feedStages || []).filter((fs: any) => fs.stageType === 'feed');
       const feedProjection = feedStages.map((fs: any) => {
-        const { itemsRoundedUp } = calculateItemsRequired(f.initialCount, fs.intakePerBirdKg, fs.unitSizeKg);
+        let birdsAlive = f.initialCount;
+        if (fs.dayRangeStart != null && start) {
+          const stageStartDay = fs.dayRangeStart;
+          const mortalityBeforeStage = flockMortalityEvents.reduce((sum: number, m: any) => {
+            const mAge = m.ageDays != null
+              ? m.ageDays
+              : start
+                ? Math.floor((new Date(m.eventDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                : null;
+            return mAge != null && mAge <= stageStartDay ? sum + m.count : sum;
+          }, 0);
+          birdsAlive = Math.max(0, f.initialCount - mortalityBeforeStage);
+        }
+        const { itemsRoundedUp } = calculateItemsRequired(birdsAlive, fs.intakePerBirdKg, fs.unitSizeKg);
         const bagsRequired = itemsRoundedUp ?? 0;
         const bagsPurchased = purchasesByFlockStage.get(`${f.id}:${fs.id}`) ?? 0;
         const bagsRemaining = bagsRequired - bagsPurchased;

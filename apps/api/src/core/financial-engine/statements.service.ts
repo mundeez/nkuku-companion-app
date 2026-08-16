@@ -144,7 +144,7 @@ export class FinancialStatementService {
     let inventory = new Decimal(0);
     let equipment = new Decimal(0);
     let payables = new Decimal(0);
-    let loans = new Decimal(0);
+    const loans = new Decimal(0);
     let retainedEarnings = new Decimal(0);
 
     for (const r of records) {
@@ -214,8 +214,10 @@ export class FinancialStatementService {
     });
 
     let opIn = new Decimal(0), opOut = new Decimal(0);
-    let invIn = new Decimal(0), invOut = new Decimal(0);
-    let finIn = new Decimal(0), finOut = new Decimal(0);
+    const invIn = new Decimal(0);
+    let invOut = new Decimal(0);
+    const finIn = new Decimal(0);
+    let finOut = new Decimal(0);
 
     for (const r of records) {
       const amount = new Decimal(r.amountZmw.toString());
