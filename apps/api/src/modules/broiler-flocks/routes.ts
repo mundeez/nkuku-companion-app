@@ -109,6 +109,21 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       purchasesByFlockStage.set(key, (purchasesByFlockStage.get(key) ?? 0) + p.bagsPurchased);
     }
 
+    // Also batch-load existing FeedRecord entries (the old feed tracking system)
+    // and convert them to purchased bags by matching feedType → stageName.
+    // This ensures feed recorded before the FeedPurchase system shows up in
+    // the procurement mini-list.
+    const feedRecords = await prisma.feedRecord.findMany({
+      where: { flockId: { in: flockIds } },
+      select: { flockId: true, feedType: true, quantityKg: true },
+    });
+    const feedRecordsByFlock = new Map<string, any[]>();
+    for (const fr of feedRecords) {
+      const arr = feedRecordsByFlock.get(fr.flockId) ?? [];
+      arr.push(fr);
+      feedRecordsByFlock.set(fr.flockId, arr);
+    }
+
     return flocks.map((f: any) => {
       const start = f.startDate ? new Date(f.startDate) : null;
       const ageDays = start ? Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
@@ -129,7 +144,11 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       // Compact per-stage feed projection for the flock card mini-list.
       // Applies per-stage mortality adjustment: birdsAlive = initialCount −
       // mortality events on/before the stage's dayRangeStart.
+      // Bags purchased aggregates both FeedPurchase records AND existing
+      // FeedRecord entries (converted from kg to bags using the stage's
+      // unit_size_kg, matched by feedType → stageName).
       const flockMortalityEvents = mortalityEventsByFlock.get(f.id) ?? [];
+      const flockFeedRecords = feedRecordsByFlock.get(f.id) ?? [];
       const feedStages = (f.supplier?.feedStages || []).filter((fs: any) => fs.stageType === 'feed');
       const feedProjection = feedStages.map((fs: any) => {
         let birdsAlive = f.initialCount;
@@ -147,7 +166,35 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         }
         const { itemsRoundedUp } = calculateItemsRequired(birdsAlive, fs.intakePerBirdKg, fs.unitSizeKg);
         const bagsRequired = itemsRoundedUp ?? 0;
-        const bagsPurchased = purchasesByFlockStage.get(`${f.id}:${fs.id}`) ?? 0;
+
+        // Start with FeedPurchase bags
+        let bagsPurchased = purchasesByFlockStage.get(`${f.id}:${fs.id}`) ?? 0;
+
+        // Add bags from FeedRecord entries that match this stage by name.
+        // Match by case-insensitive exact name, or feedType startsWith stageName
+        // (e.g., "Starter" matches "Starter" and "Starter (25kg)").
+        // For stages with "(25kg)" suffix, only match if the feedType also
+        // contains "25" to avoid double-counting across 50kg and 25kg variants.
+        const stageLower = fs.stageName.toLowerCase();
+        const is25kgVariant = stageLower.includes('25');
+        for (const fr of flockFeedRecords) {
+          const ftLower = (fr.feedType || '').toLowerCase();
+          if (!ftLower) continue;
+          // Match: exact name, or stageName starts with feedType
+          const nameMatches = ftLower === stageLower
+            || stageLower.startsWith(ftLower + ' ')
+            || stageLower.startsWith(ftLower + '(');
+          if (!nameMatches) continue;
+          // For 25kg variant stages, only match if feedType mentions 25
+          if (is25kgVariant && !ftLower.includes('25')) continue;
+          // For non-25kg stages, skip if feedType mentions 25 (it belongs to the 25kg variant)
+          if (!is25kgVariant && ftLower.includes('25')) continue;
+          const unitSize = Number(fs.unitSizeKg);
+          if (unitSize > 0) {
+            bagsPurchased += Math.ceil(Number(fr.quantityKg) / unitSize);
+          }
+        }
+
         const bagsRemaining = bagsRequired - bagsPurchased;
         let status: 'complete' | 'partial' | 'not_started';
         if (bagsPurchased >= bagsRequired && bagsRequired > 0) status = 'complete';
@@ -413,6 +460,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         supplier: { include: { feedStages: { orderBy: { sortOrder: 'asc' } } } },
         mortalityEvents: { select: { eventDate: true, count: true, ageDays: true } },
         feedPurchases: { select: { feedStageId: true, bagsPurchased: true, totalCostZmw: true } },
+        feedRecords: { select: { feedType: true, quantityKg: true, costZmw: true } },
       },
     });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -441,6 +489,32 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       cur.bags += p.bagsPurchased;
       cur.cost += Number(p.totalCostZmw);
       purchasesByStage.set(p.feedStageId, cur);
+    }
+
+    // Also aggregate existing FeedRecord entries (old feed tracking system)
+    // as purchased bags, matching feedType → stageName and converting kg → bags.
+    const feedRecordBagsByStage = new Map<string, number>();
+    for (const fs of feedStages) {
+      const stageLower = fs.stageName.toLowerCase();
+      const is25kgVariant = stageLower.includes('25');
+      let bagsFromRecords = 0;
+      for (const fr of flock.feedRecords) {
+        const ftLower = (fr.feedType || '').toLowerCase();
+        if (!ftLower) continue;
+        const nameMatches = ftLower === stageLower
+          || stageLower.startsWith(ftLower + ' ')
+          || stageLower.startsWith(ftLower + '(');
+        if (!nameMatches) continue;
+        if (is25kgVariant && !ftLower.includes('25')) continue;
+        if (!is25kgVariant && ftLower.includes('25')) continue;
+        const unitSize = Number(fs.unitSizeKg);
+        if (unitSize > 0) {
+          bagsFromRecords += Math.ceil(Number(fr.quantityKg) / unitSize);
+        }
+      }
+      if (bagsFromRecords > 0) {
+        feedRecordBagsByStage.set(fs.id, bagsFromRecords);
+      }
     }
 
     const stages: any[] = [];
@@ -475,7 +549,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
       const bagsRequired = itemsRoundedUp ?? 0;
       const purchased = purchasesByStage.get(fs.id) ?? { bags: 0, cost: 0 };
-      const bagsPurchased = purchased.bags;
+      // Combine FeedPurchase bags with FeedRecord-derived bags
+      const bagsPurchased = purchased.bags + (feedRecordBagsByStage.get(fs.id) ?? 0);
       const bagsRemaining = bagsRequired - bagsPurchased;
       const projectedCostZmw = bagsRequired > 0
         ? new Decimal(bagsRequired).mul(fs.unitPriceZmw).toNumber()

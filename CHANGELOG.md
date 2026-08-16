@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.15.10-alpha — 2026-08-16
+
+### Fixed
+- **Feed procurement showing 0 purchased bags despite feed having been purchased.** The flock card mini-list and feed-projection endpoint only counted `FeedPurchase` records (the new structured purchase system), ignoring existing `FeedRecord` entries that users had been recording all along. Both endpoints now aggregate `FeedRecord` entries as purchased bags, matching `feedType` → `stageName` (case-insensitive, with 25kg variant disambiguation) and converting `quantityKg` → bags using the stage's `unitSizeKg`. Batch-loaded in the list endpoint to avoid N+1 queries.
+
 ## v1.15.9-alpha — 2026-08-16
 
 ### Fixed
