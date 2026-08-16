@@ -54,10 +54,15 @@ class _ExpansionPlanScreenState extends State<ExpansionPlanScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              cycle.label ?? 'Cycle ${cycle.cycleNumber}',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            Expanded(
+                              child: Text(
+                                cycle.label ?? 'Cycle ${cycle.cycleNumber}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             Chip(
                               label: Text(cycle.status, style: const TextStyle(fontSize: 12)),
                               backgroundColor: cycle.status == 'active'

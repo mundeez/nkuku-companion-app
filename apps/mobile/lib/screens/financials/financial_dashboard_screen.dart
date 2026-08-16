@@ -112,8 +112,13 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
                             const SizedBox(height: 8),
                             ..._projections.map((p) => ListTile(
                               dense: true,
-                              title: Text(p['flock']?['name'] ?? 'Flock'),
-                              trailing: Text('ZMW ${(p['amountZmw'] as num).toDouble().toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                              title: Text(p['flock']?['name'] ?? 'Flock',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                              trailing: Text(
+                                  'ZMW ${(p['amountZmw'] as num).toDouble().toStringAsFixed(2)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
                             )),
                           ],
                         ),

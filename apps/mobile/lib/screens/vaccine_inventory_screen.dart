@@ -254,10 +254,14 @@ class _VaccineInventoryScreenState extends State<VaccineInventoryScreen> {
               ),
               title: Text(
                 vaccine.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle: Text(
                 'Batch: ${vaccine.batchNumber} · ${vaccine.quantityDoses} doses · Expires: ${_formatDate(vaccine.expiryDate)}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,

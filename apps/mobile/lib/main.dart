@@ -5,6 +5,7 @@ import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'providers/theme_provider.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,14 +77,8 @@ class _NkukuAppState extends State<NkukuApp> {
         title: 'Nkuku Companion',
         debugShowCheckedModeBanner: false,
         themeMode: _themeProvider.flutterThemeMode,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green, brightness: Brightness.light),
-          useMaterial3: true,
-        ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green, brightness: Brightness.dark),
-          useMaterial3: true,
-        ),
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
         home: _isLoggedIn ? const BottomNavShell() : const LoginScreen(),
       ),
     );

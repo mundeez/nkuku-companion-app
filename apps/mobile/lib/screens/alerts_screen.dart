@@ -214,6 +214,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
         ),
         title: Text(
           alert.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontWeight: alert.isRead ? FontWeight.normal : FontWeight.bold,
           ),

@@ -49,12 +49,16 @@ class MedicationScreen extends StatelessWidget {
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: ListTile(
-              title: Text(r.productName),
+              title: Text(r.productName,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${r.category} · ${r.recordDate.toIso8601String().split('T').first}'),
-                  if (r.dose != null) Text('Dose: ${r.dose}'),
+                  Text('${r.category} · ${r.recordDate.toIso8601String().split('T').first}',
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  if (r.dose != null)
+                    Text('Dose: ${r.dose}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                   if (r.withdrawalDays != null) Text('Withdrawal: ${r.withdrawalDays} days'),
                   if (r.costZmw != null) Text('Cost: ZMW ${r.costZmw!.toStringAsFixed(2)}'),
                 ],

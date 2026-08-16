@@ -16,6 +16,9 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
 import '../../widgets/flock_charts.dart';
+import '../../widgets/record_card.dart';
+import '../../widgets/stat_card.dart';
+import '../../widgets/summary_card.dart';
 import 'calendar_screen.dart';
 import 'medication_screen.dart';
 import 'records/document_form.dart';
@@ -520,19 +523,19 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         Row(
           children: [
             Expanded(
-                child: _StatCard(
+                child: StatCard(
                     label: 'Birds',
                     value: '${flock.currentCount}',
                     color: Colors.green)),
             const SizedBox(width: 8),
             Expanded(
-                child: _StatCard(
+                child: StatCard(
                     label: 'Initial',
                     value: '${flock.initialCount}',
                     color: Colors.blue)),
             const SizedBox(width: 8),
             Expanded(
-                child: _StatCard(
+                child: StatCard(
                     label: 'Mortality',
                     value: '$mortalityRate%',
                     color: Colors.red)),
@@ -549,15 +552,15 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     style:
                         TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                _FeedPhaseRow(
+                FeedPhaseRow(
                     phase: 'Starter',
                     dayRange: 'Day 1 - $feedTransition',
                     color: Colors.orange),
-                _FeedPhaseRow(
+                FeedPhaseRow(
                     phase: 'Grower',
                     dayRange: 'Day ${feedTransition + 1} - $finisherDay',
                     color: Colors.teal),
-                _FeedPhaseRow(
+                FeedPhaseRow(
                     phase: 'Finisher',
                     dayRange: 'Day ${finisherDay + 1}+',
                     color: Colors.brown),
@@ -602,10 +605,10 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         padding: const EdgeInsets.all(16),
         children: [
           if (analysis != null)
-            _SummaryCard(children: [
-              _SummaryRow('Current age', 'Day ${analysis.ageDays}'),
-              _SummaryRow('Records', '${analysis.records.length}'),
-              _SummaryRow('FCR', analysis.fcr?.toStringAsFixed(2) ?? '-'),
+            SummaryCard(children: [
+              SummaryRow('Current age', 'Day ${analysis.ageDays}'),
+              SummaryRow('Records', '${analysis.records.length}'),
+              SummaryRow('FCR', analysis.fcr?.toStringAsFixed(2) ?? '-'),
             ]),
           const SizedBox(height: 12),
           if (_growthRecords.isNotEmpty) ...[
@@ -625,7 +628,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     padding: EdgeInsets.all(24),
                     child: Text('No growth records yet.')))
           else
-            ..._growthRecords.reversed.map((r) => _RecordCard(
+            ..._growthRecords.reversed.map((r) => RecordCard(
                   title:
                       'Day ${r.recordDate.difference(DateTime.parse(_flock!.startDate ?? r.recordDate.toIso8601String())).inDays}',
                   subtitle: '${r.avgWeight} kg avg · ${r.sampleSize} sampled',
@@ -659,12 +662,12 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         padding: const EdgeInsets.all(16),
         children: [
           if (summary != null)
-            _SummaryCard(children: [
-              _SummaryRow(
+            SummaryCard(children: [
+              SummaryRow(
                   'Total feed', '${summary.totalFeedKg.toStringAsFixed(1)} kg'),
-              _SummaryRow('Total cost',
+              SummaryRow('Total cost',
                   'ZMW ${summary.totalCostZmw.toStringAsFixed(2)}'),
-              _SummaryRow(
+              SummaryRow(
                   'Cost/bird', 'ZMW ${summary.costPerBird.toStringAsFixed(2)}'),
             ]),
           const SizedBox(height: 12),
@@ -675,7 +678,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     padding: EdgeInsets.all(24),
                     child: Text('No feed records yet.')))
           else
-            ..._feedRecords.reversed.map((r) => _RecordCard(
+            ..._feedRecords.reversed.map((r) => RecordCard(
                   title:
                       '${r.feedType} · ${r.quantityKg.toStringAsFixed(1)} kg',
                   subtitle: r.supplierName != null
@@ -720,12 +723,12 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         padding: const EdgeInsets.all(16),
         children: [
           if (ratio != null)
-            _SummaryCard(children: [
-              _SummaryRow('Total water',
+            SummaryCard(children: [
+              SummaryRow('Total water',
                   '${ratio.totalWaterLiters.toStringAsFixed(1)} L'),
-              _SummaryRow(
+              SummaryRow(
                   'Total feed', '${ratio.totalFeedKg.toStringAsFixed(1)} kg'),
-              _SummaryRow('Water:feed', ratio.waterToFeedRatio ?? '-'),
+              SummaryRow('Water:feed', ratio.waterToFeedRatio ?? '-'),
             ]),
           const SizedBox(height: 12),
           if (_waterRecords.isNotEmpty) WaterChart(records: _waterRecords),
@@ -735,7 +738,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     padding: EdgeInsets.all(24),
                     child: Text('No water records yet.')))
           else
-            ..._waterRecords.reversed.map((r) => _RecordCard(
+            ..._waterRecords.reversed.map((r) => RecordCard(
                   title: '${r.quantityLiters.toStringAsFixed(1)} L',
                   subtitle:
                       'pH ${r.ph?.toStringAsFixed(1) ?? '-'} · ${r.temperature?.toStringAsFixed(1) ?? '-'}°C',
@@ -769,10 +772,10 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         padding: const EdgeInsets.all(16),
         children: [
           if (summary != null)
-            _SummaryCard(children: [
-              _SummaryRow('Total deaths', '${summary.totalDeaths}'),
-              _SummaryRow('Mortality rate', '${summary.mortalityRate}%'),
-              _SummaryRow('Current count', '${summary.currentCount}'),
+            SummaryCard(children: [
+              SummaryRow('Total deaths', '${summary.totalDeaths}'),
+              SummaryRow('Mortality rate', '${summary.mortalityRate}%'),
+              SummaryRow('Current count', '${summary.currentCount}'),
             ]),
           const SizedBox(height: 12),
           if (_mortalityEvents.isNotEmpty)
@@ -783,7 +786,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     padding: EdgeInsets.all(24),
                     child: Text('No mortality events yet.')))
           else
-            ..._mortalityEvents.reversed.map((r) => _RecordCard(
+            ..._mortalityEvents.reversed.map((r) => RecordCard(
                   title: '${r.count} birds · ${r.cause ?? 'Unknown cause'}',
                   subtitle: r.ageDays != null ? 'Age day ${r.ageDays}' : null,
                   trailing:
@@ -820,20 +823,20 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         padding: const EdgeInsets.all(16),
         children: [
           if (overdue.isNotEmpty)
-            _SummaryCard(children: [
+            SummaryCard(children: [
               const Text('Overdue',
                   style: TextStyle(
                       color: Colors.red, fontWeight: FontWeight.bold)),
               ...overdue
-                  .map((i) => _SummaryRow(i.vaccineName, 'Day ${i.ageDays}')),
+                  .map((i) => SummaryRow(i.vaccineName, 'Day ${i.ageDays}')),
             ]),
           if (upcoming.isNotEmpty)
-            _SummaryCard(children: [
+            SummaryCard(children: [
               const Text('Upcoming',
                   style: TextStyle(
                       color: Colors.green, fontWeight: FontWeight.bold)),
               ...upcoming
-                  .map((i) => _SummaryRow(i.vaccineName, 'Day ${i.ageDays}')),
+                  .map((i) => SummaryRow(i.vaccineName, 'Day ${i.ageDays}')),
             ]),
           const SizedBox(height: 12),
           if (completed.isNotEmpty) VaccinationChart(records: completed),
@@ -843,7 +846,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     padding: EdgeInsets.all(24),
                     child: Text('No vaccination records yet.')))
           else
-            ...completed.reversed.map((r) => _RecordCard(
+            ...completed.reversed.map((r) => RecordCard(
                   title: r.vaccineName,
                   subtitle:
                       '${r.adminMethod} · Day ${r.ageDays}${r.batchNumber != null ? ' · Batch ${r.batchNumber}' : ''}',
@@ -876,13 +879,13 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         padding: const EdgeInsets.all(16),
         children: [
           if (summary != null)
-            _SummaryCard(children: [
-              _SummaryRow(
+            SummaryCard(children: [
+              SummaryRow(
                   'Revenue', 'ZMW ${summary.totalRevenue.toStringAsFixed(2)}'),
-              _SummaryRow(
+              SummaryRow(
                   'Costs', 'ZMW ${summary.totalCost.toStringAsFixed(2)}'),
-              _SummaryRow('Profit', 'ZMW ${summary.profit.toStringAsFixed(2)}'),
-              _SummaryRow('Profit/bird',
+              SummaryRow('Profit', 'ZMW ${summary.profit.toStringAsFixed(2)}'),
+              SummaryRow('Profit/bird',
                   'ZMW ${summary.profitPerBird.toStringAsFixed(2)}'),
             ]),
           const SizedBox(height: 12),
@@ -894,7 +897,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     padding: EdgeInsets.all(24),
                     child: Text('No financial records yet.')))
           else
-            ..._financialRecords.map((r) => _RecordCard(
+            ..._financialRecords.map((r) => RecordCard(
                   title: '${r.category} · ${r.description}',
                   subtitle: r.isSystemGenerated ? 'System-generated' : null,
                   trailing: Text(
@@ -1183,14 +1186,14 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           Row(
             children: [
               Expanded(
-                child: _StatCard(
+                child: StatCard(
                     label: 'Birds sold',
                     value: '$totalBirdsSold',
                     color: Colors.green),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _StatCard(
+                child: StatCard(
                   label: 'Total revenue',
                   value: 'ZMW ${totalRevenue.toStringAsFixed(2)}',
                   color: Colors.teal,
@@ -1363,135 +1366,5 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   Widget _buildCalendarTab() {
     if (_flock == null) return const Center(child: CircularProgressIndicator());
     return CalendarScreen(flock: _flock!, days: _calendarDays);
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StatCard(
-      {required this.label, required this.value, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Text(value,
-                style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-            Text(label,
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FeedPhaseRow extends StatelessWidget {
-  final String phase;
-  final String dayRange;
-  final Color color;
-
-  const _FeedPhaseRow(
-      {required this.phase, required this.dayRange, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          Container(width: 12, height: 12, color: color),
-          const SizedBox(width: 8),
-          Text('$phase: ', style: const TextStyle(fontWeight: FontWeight.w600)),
-          Text(dayRange),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  final List<Widget> children;
-
-  const _SummaryCard({required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _SummaryRow(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-}
-
-class _RecordCard extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final Widget trailing;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
-
-  const _RecordCard({
-    required this.title,
-    this.subtitle,
-    required this.trailing,
-    this.onEdit,
-    this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        title: Text(title),
-        subtitle: subtitle != null ? Text(subtitle!) : null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            trailing,
-            if (onEdit != null)
-              IconButton(icon: const Icon(Icons.edit), onPressed: onEdit),
-            if (onDelete != null)
-              IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: onDelete),
-          ],
-        ),
-      ),
-    );
   }
 }

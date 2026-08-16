@@ -385,10 +385,16 @@ class _FlockProfitabilityList extends StatelessWidget {
         children: items.map((f) {
           return ListTile(
             dense: true,
-            title: Text('${f.flockName} (${f.breedName})'),
-            subtitle: Text('Age ${f.ageDays}d · ${f.currentCount} birds · mortality ${f.mortalityRate.toStringAsFixed(1)}%'),
+            title: Text('${f.flockName} (${f.breedName})',
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text(
+                'Age ${f.ageDays}d · ${f.currentCount} birds · mortality ${f.mortalityRate.toStringAsFixed(1)}%',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
             trailing: Text(
               'ZMW ${_fmt(f.profit)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: f.profit < 0 ? Colors.red : Colors.green,

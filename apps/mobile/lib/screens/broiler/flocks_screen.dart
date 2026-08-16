@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/flock.dart';
 import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
+import '../../widgets/empty_state.dart';
 import 'flock_detail_screen.dart';
 import 'flock_form_screen.dart';
 
@@ -150,7 +151,11 @@ class _FlocksScreenState extends State<FlocksScreen> {
                   )
                 : _flocks.isEmpty
                     ? const Center(
-                        child: Text('No flocks yet. Tap + to create one.'))
+                        child: EmptyState(
+                          icon: Icons.egg_alt_outlined,
+                          message: 'No flocks yet. Tap + to create one.',
+                        ),
+                      )
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
                         itemCount: _flocks.length,
@@ -168,23 +173,35 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                 child: Icon(Icons.egg_alt,
                                     color: _statusColor(flock.status)),
                               ),
-                              title: Text(flock.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold)),
+                              title: Text(
+                                flock.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const SizedBox(height: 4),
-                                  Text(flock.breedName ?? 'Unknown breed'),
+                                  Text(
+                                    flock.breedName ?? 'Unknown breed',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                   const SizedBox(height: 4),
-                                  Row(
+                                  // Wrap (not Row) so chips flow to a second
+                                  // line on narrow screens instead of
+                                  // overflowing.
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 4,
                                     children: [
                                       Chip(
                                         label:
                                             Text('${flock.currentCount} birds'),
                                         visualDensity: VisualDensity.compact,
                                       ),
-                                      const SizedBox(width: 8),
                                       Chip(
                                         label: Text(
                                           flock.startDate == null
@@ -193,7 +210,6 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                         ),
                                         visualDensity: VisualDensity.compact,
                                       ),
-                                      const SizedBox(width: 8),
                                       Chip(
                                         label:
                                             Text('$mortalityRate% mortality'),
@@ -205,31 +221,48 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 4),
-                                  Row(
+                                  // Same rationale: Wrap lets the harvest
+                                  // countdown drop to its own line instead
+                                  // of overflowing on narrow screens.
+                                  Wrap(
+                                    spacing: 12,
+                                    runSpacing: 2,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
                                     children: [
-                                      Icon(Icons.event,
-                                          size: 14, color: Colors.grey[600]),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        flock.harvestDateStr != null
-                                            ? 'Harvest: ${flock.harvestDateStr}'
-                                            : 'Harvest: Pending',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[700]),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.event,
+                                              size: 14,
+                                              color: Colors.grey[600]),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            flock.harvestDateStr != null
+                                                ? 'Harvest: ${flock.harvestDateStr}'
+                                                : 'Harvest: Pending',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[700]),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(width: 12),
-                                      Icon(Icons.timer,
-                                          size: 14,
-                                          color: _harvestColor(
-                                              flock.daysToHarvest)),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _harvestLabel(flock.daysToHarvest),
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: _harvestColor(
-                                                flock.daysToHarvest)),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.timer,
+                                              size: 14,
+                                              color: _harvestColor(
+                                                  flock.daysToHarvest)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _harvestLabel(flock.daysToHarvest),
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: _harvestColor(
+                                                    flock.daysToHarvest)),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),

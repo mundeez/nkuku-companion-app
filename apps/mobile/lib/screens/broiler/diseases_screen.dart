@@ -138,8 +138,12 @@ class _DiseasesScreenState extends State<DiseasesScreen> {
                                 margin: const EdgeInsets.only(bottom: 8),
                                 child: ExpansionTile(
                                   leading: Icon(_categoryIcon(disease.category), color: Colors.red),
-                                  title: Text(disease.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  subtitle: Text(disease.category),
+                                  title: Text(disease.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  subtitle: Text(disease.category,
+                                      maxLines: 1, overflow: TextOverflow.ellipsis),
                                   children: [
                                     Padding(
                                       padding: const EdgeInsets.all(16),

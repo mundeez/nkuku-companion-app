@@ -338,7 +338,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(phone),
+                        Expanded(
+                          child: Text(phone,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
                         Chip(
                           label: Text(phoneVerified ? 'Verified' : 'Unverified'),
                           backgroundColor: phoneVerified ? Colors.green.shade100 : Colors.orange.shade100,
@@ -445,7 +448,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     return ListTile(
                       leading: const Icon(Icons.link),
                       title: Text(_providerLabel(provider)),
-                      subtitle: providerEmail != null ? Text(providerEmail) : null,
+                      subtitle: providerEmail != null
+                          ? Text(providerEmail,
+                              maxLines: 1, overflow: TextOverflow.ellipsis)
+                          : null,
                       trailing: IconButton(
                         icon: const Icon(Icons.link_off, color: Colors.red),
                         onPressed: () => _unlinkSocial(provider),

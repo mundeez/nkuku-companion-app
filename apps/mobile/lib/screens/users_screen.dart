@@ -166,10 +166,22 @@ class _UsersScreenState extends State<UsersScreen> {
                                   style: TextStyle(color: _roleColor(role), fontWeight: FontWeight.bold),
                                 ),
                               ),
-                              title: Text(name != null && name.isNotEmpty ? name : (email ?? 'Unknown')),
+                              title: Text(
+                                name != null && name.isNotEmpty ? name : (email ?? 'Unknown'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               subtitle: Row(
                                 children: [
-                                  if (email != null) Text(email, style: const TextStyle(fontSize: 12)),
+                                  if (email != null)
+                                    Expanded(
+                                      child: Text(
+                                        email,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
                                   if (email != null) const SizedBox(width: 8),
                                   Chip(
                                     label: Text(

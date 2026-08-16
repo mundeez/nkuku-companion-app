@@ -39,6 +39,7 @@ dev_dependencies:
   drift_dev: 2.21.0
   build_runner: ^2.4.13
   flutter_launcher_icons: ^0.14.0
+  flutter_native_splash: ^2.4.6
 
 flutter:
   uses-material-design: true
@@ -56,3 +57,18 @@ flutter_launcher_icons:
     image_path: "assets/app_icon_1024.png"
     background_color: "#1B5E20"
     theme_color: "#1B5E20"
+
+# Native splash screen, matching the brand seed color used in
+# lib/theme/app_theme.dart and the launcher icon background above.
+# Regenerate after changing: `dart run flutter_native_splash:create`
+flutter_native_splash:
+  color: "#1B5E20"
+  color_dark: "#0D3813"
+  image: "assets/app_icon_1024.png"
+  android_12:
+    color: "#1B5E20"
+    color_dark: "#0D3813"
+    image: "assets/app_icon_1024.png"
+  android: true
+  ios: true
+  web: false

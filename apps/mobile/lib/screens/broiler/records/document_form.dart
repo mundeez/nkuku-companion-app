@@ -129,7 +129,11 @@ class _DocumentFormState extends State<DocumentForm> {
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.attach_file, size: 40),
-                    title: Text(_selectedFile?.name ?? 'No file selected'),
+                    title: Text(
+                      _selectedFile?.name ?? 'No file selected',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     subtitle: _selectedFile != null
                         ? Text('${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB')
                         : const Text('Tap below to choose a file (max 25MB)'),
@@ -152,7 +156,11 @@ class _DocumentFormState extends State<DocumentForm> {
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.attach_file, size: 40),
-                    title: Text(widget.record!.fileName),
+                    title: Text(
+                      widget.record!.fileName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     subtitle: Text('${widget.record!.fileSizeKb} KB · ${widget.record!.mimeType}'),
                   ),
                 ),

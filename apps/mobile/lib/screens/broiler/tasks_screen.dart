@@ -159,8 +159,12 @@ class _TasksScreenState extends State<TasksScreen> {
                         margin: const EdgeInsets.only(top: 12),
                         child: ListTile(
                           leading: CircleAvatar(child: Text('D${task.ageDays}')),
-                          title: Text(task.title),
-                          subtitle: Text('${task.category} · ${task.taskDate.toIso8601String().split('T').first}\n${task.description ?? ''}'),
+                          title: Text(task.title,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(
+                              '${task.category} · ${task.taskDate.toIso8601String().split('T').first}\n${task.description ?? ''}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis),
                           isThreeLine: true,
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,

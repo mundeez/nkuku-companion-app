@@ -98,17 +98,20 @@ class _AccountLedgerScreenState extends State<AccountLedgerScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
-                      // Date range chip row
+                      // Date range chip row — Wrap (not Row) so the chips
+                      // flow to a second line on narrow screens instead of
+                      // overflowing.
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
                           children: [
                             Chip(
                               label: Text('From: $_fromDate',
                                   style: const TextStyle(fontSize: 12)),
                               visualDensity: VisualDensity.compact,
                             ),
-                            const SizedBox(width: 8),
                             Chip(
                               label: Text('To: $_toDate',
                                   style: const TextStyle(fontSize: 12)),

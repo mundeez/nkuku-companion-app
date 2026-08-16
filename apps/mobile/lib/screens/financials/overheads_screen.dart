@@ -166,8 +166,10 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
                             const SizedBox(height: 8),
                             ...grouped[month]!.map((o) => ListTile(
                               dense: true,
-                              title: Text(o['category'].toString().replaceAll('_', ' ')),
-                              subtitle: Text(o['description'] ?? ''),
+                              title: Text(o['category'].toString().replaceAll('_', ' '),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: Text(o['description'] ?? '',
+                                  maxLines: 2, overflow: TextOverflow.ellipsis),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [

@@ -284,7 +284,7 @@ class _SupplierTile extends StatelessWidget {
             ),
         ],
       ),
-      subtitle: Text(_subtitle()),
+      subtitle: Text(_subtitle(), maxLines: 2, overflow: TextOverflow.ellipsis),
       trailing: canEdit || canDelete
           ? Row(
               mainAxisSize: MainAxisSize.min,
@@ -330,6 +330,8 @@ class _SupplierTile extends StatelessWidget {
             ),
             subtitle: Text(
               '${stage.unitSizeKg}kg bag @ ZMW ${stage.unitPriceZmw.toStringAsFixed(2)} • ${stage.intakePerBirdKg}kg/bird$dayRange',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             trailing: canEdit || canDelete
                 ? Row(

@@ -84,7 +84,10 @@ class _ChartOfAccountsScreenState extends State<ChartOfAccountsScreen> {
                           children: accounts.map((a) => ListTile(
                             dense: true,
                             leading: Text(a['code'], style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                            title: Text(a['name'], style: const TextStyle(fontSize: 14)),
+                            title: Text(a['name'],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 14)),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [

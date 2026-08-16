@@ -139,6 +139,7 @@ class _JournalListScreenState extends State<JournalListScreen> {
                               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                               child: ListTile(
                                 title: Text(entry['entryNumber'] ?? '',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,11 +148,16 @@ class _JournalListScreenState extends State<JournalListScreen> {
                                       maxLines: 1, overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(fontSize: 13)),
                                     const SizedBox(height: 4),
-                                    Row(
+                                    // Wrap (not Row) so the source/reversing
+                                    // chips flow to a second line on narrow
+                                    // screens instead of overflowing.
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
                                       children: [
                                         Text((entry['entryDate'] ?? '').substring(0, 10),
                                           style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                        const SizedBox(width: 8),
                                         Chip(
                                           label: Text(
                                             _sourceLabels[entry['sourceType']] ?? entry['sourceType'] ?? '',
@@ -160,15 +166,13 @@ class _JournalListScreenState extends State<JournalListScreen> {
                                           visualDensity: VisualDensity.compact,
                                           padding: EdgeInsets.zero,
                                         ),
-                                        if (entry['isReversing'] == true) ...[
-                                          const SizedBox(width: 4),
+                                        if (entry['isReversing'] == true)
                                           Chip(
                                             label: const Text('Reversing', style: TextStyle(fontSize: 10, color: Colors.orange)),
                                             visualDensity: VisualDensity.compact,
                                             padding: EdgeInsets.zero,
                                             backgroundColor: Colors.orange.withAlpha(20),
                                           ),
-                                        ],
                                       ],
                                     ),
                                   ],

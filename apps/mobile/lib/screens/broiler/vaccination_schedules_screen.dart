@@ -74,7 +74,10 @@ class _VaccinationSchedulesScreenState extends State<VaccinationSchedulesScreen>
                             schedule.isDefault ? Icons.star : Icons.schedule,
                             color: schedule.isDefault ? Colors.amber : Colors.green,
                           ),
-                          title: Text(schedule.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          title: Text(schedule.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Text('${schedule.items.length} vaccinations'),
                           children: [
                             Padding(
@@ -89,11 +92,16 @@ class _VaccinationSchedulesScreenState extends State<VaccinationSchedulesScreen>
                                     child: Text('D${item.ageDays}',
                                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                   ),
-                                  title: Text(item.vaccineName, style: const TextStyle(fontSize: 14)),
+                                  title: Text(item.vaccineName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 14)),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text('${item.vaccineType} - ${item.adminMethod}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(fontSize: 12)),
                                       if (item.notes != null && item.notes!.isNotEmpty)
                                         Padding(

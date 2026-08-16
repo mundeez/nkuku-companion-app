@@ -10,6 +10,7 @@ import 'suppliers_screen.dart';
 import 'vaccine_inventory_screen.dart';
 import 'broiler/diseases_screen.dart';
 import 'broiler/vaccination_schedules_screen.dart';
+import '../widgets/section_header.dart';
 
 /// Grouped hub for everything that doesn't fit in the primary bottom
 /// navigation bar. Mirrors the Production / Operations / Planning / Admin
@@ -27,7 +28,7 @@ class MoreScreen extends StatelessWidget {
       body: ListView(
         children: [
           // Account section
-          _SectionHeader(title: 'Account'),
+          SectionHeader(title: 'Account'),
           ListTile(
             leading: CircleAvatar(
               backgroundColor: theme.colorScheme.primaryContainer,
@@ -55,7 +56,7 @@ class MoreScreen extends StatelessWidget {
           const Divider(),
 
           // Production section
-          _SectionHeader(title: 'Production'),
+          SectionHeader(title: 'Production'),
           ListTile(
             leading: const Icon(Icons.vaccines_outlined),
             title: const Text('Vaccine Inventory'),
@@ -89,7 +90,7 @@ class MoreScreen extends StatelessWidget {
           const Divider(),
 
           // Operations section
-          _SectionHeader(title: 'Operations'),
+          SectionHeader(title: 'Operations'),
           ListTile(
             leading: const Icon(Icons.event_note_outlined),
             title: const Text('Vaccination Schedules'),
@@ -104,7 +105,7 @@ class MoreScreen extends StatelessWidget {
           const Divider(),
 
           // Planning section
-          _SectionHeader(title: 'Planning'),
+          SectionHeader(title: 'Planning'),
           ListTile(
             leading: const Icon(Icons.calculate_outlined),
             title: const Text('Projections'),
@@ -128,7 +129,7 @@ class MoreScreen extends StatelessWidget {
           const Divider(),
 
           // Appearance section
-          _SectionHeader(title: 'Appearance'),
+          SectionHeader(title: 'Appearance'),
           ListTile(
             leading: const Icon(Icons.brightness_6),
             title: const Text('Theme'),
@@ -150,7 +151,7 @@ class MoreScreen extends StatelessWidget {
           const Divider(),
 
           // Preferences section
-          _SectionHeader(title: 'Preferences'),
+          SectionHeader(title: 'Preferences'),
           ListTile(
             leading: const Icon(Icons.trending_up),
             title: const Text('Primary Breed'),
@@ -186,7 +187,7 @@ class MoreScreen extends StatelessWidget {
 
           // Admin section (owner only)
           if (AuthService.isOwner) ...[
-            _SectionHeader(title: 'Admin'),
+            SectionHeader(title: 'Admin'),
             ListTile(
               leading: const Icon(Icons.people, color: Colors.green),
               title: const Text('User Management'),
@@ -201,7 +202,7 @@ class MoreScreen extends StatelessWidget {
           ],
 
           // About section
-          _SectionHeader(title: 'About'),
+          SectionHeader(title: 'About'),
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('Nkuku Companion'),
@@ -239,25 +240,5 @@ class MoreScreen extends StatelessWidget {
       case AppThemeMode.system:
         return 'System';
     }
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-      ),
-    );
   }
 }
