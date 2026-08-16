@@ -167,6 +167,64 @@ export interface BroilerFlock {
   createdAt: string;
   updatedAt: string;
   financialRecords?: { amountZmw: number; isIncome: boolean; category: FinancialCategory }[];
+  feedProjection?: FeedProjectionStageSummary[];
+}
+
+export interface FeedProjectionStageSummary {
+  feedStageId: string;
+  stageName: string;
+  bagsRequired: number;
+  bagsPurchased: number;
+  bagsRemaining: number;
+  status: "complete" | "partial" | "not_started";
+}
+
+export interface FeedProjectionStage extends FeedProjectionStageSummary {
+  dayRangeStart: number | null;
+  dayRangeEnd: number | null;
+  bagSizeKg: number;
+  intakePerBirdKg: number;
+  birdsAliveAtStageStart: number;
+  bagsRaw: string | null;
+  unitPriceZmw: number;
+  projectedCostZmw: number;
+  purchasedCostZmw: number;
+}
+
+export interface FeedProjectionResult {
+  flockId: string;
+  flockName: string;
+  initialCount: number;
+  currentCount: number;
+  supplierName: string | null;
+  stages: FeedProjectionStage[];
+  totals: {
+    bagsRequired: number;
+    bagsPurchased: number;
+    bagsRemaining: number;
+    projectedCostZmw: number;
+    purchasedCostZmw: number;
+  };
+}
+
+export interface FeedPurchase {
+  id: string;
+  organizationId: string;
+  flockId: string;
+  feedStageId?: string | null;
+  supplierId?: string | null;
+  purchaseDate: string;
+  stageName: string;
+  bagSizeKg: number;
+  bagsPurchased: number;
+  unitPriceZmw: number;
+  totalCostZmw: number;
+  notes?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  feedStage?: { stageName: string; unitSizeKg: number } | null;
+  supplier?: { name: string } | null;
 }
 
 export interface GrowthRecord {

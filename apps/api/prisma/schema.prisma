@@ -40,6 +40,7 @@ model User {
   createdLightingTemperatureSchedules LightingTemperatureSchedule[] @relation("LightingTemperatureScheduleCreatedBy")
   uploadedDocuments                   Document[]                    @relation("DocumentUploadedBy")
   createdSaleRecords                  SaleRecord[]                  @relation("SaleRecordCreatedBy")
+  createdFeedPurchases                FeedPurchase[]                @relation("FeedPurchaseCreatedBy")
   memberships                         OrganizationMember[]
   sentInvites                         Invite[]                      @relation("InviteInvitedBy")
   otpCodes                            OtpCode[]
@@ -145,6 +146,7 @@ model Organization {
   batches                      Batch[]
   subscriptions                Subscription[]
   invoices                     Invoice[]
+  feedPurchases                FeedPurchase[]
 
   @@map("organizations")
 }
@@ -300,6 +302,7 @@ model Supplier {
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   feedStages   FeedStage[]
   feedRecords  FeedRecord[]
+  feedPurchases FeedPurchase[]
   flocks       BroilerFlock[]
   batches      Batch[]
   projections  Projection[]
@@ -328,6 +331,7 @@ model FeedStage {
   supplier      Supplier                @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   batchExpenses BatchExpense[]
   priceHistory  FeedStagePriceHistory[]
+  feedPurchases FeedPurchase[]
 
   @@unique([supplierId, stageName])
   @@index([supplierId, sortOrder])
@@ -685,6 +689,7 @@ model BroilerFlock {
   alerts               Alert[]
   documents            Document[]
   saleRecords          SaleRecord[]
+  feedPurchases        FeedPurchase[]
 
   @@index([breedId, status])
   @@index([supplierId])
@@ -738,6 +743,41 @@ model FeedRecord {
 
   @@index([flockId, recordDate])
   @@map("feed_records")
+}
+
+// ── FEED PURCHASES (procurement tracking) ───────────────
+// Tracks bags of feed purchased for a flock, linked to a feed stage so that
+// "bags required" (from the projection) can be compared against "bags
+// purchased" to compute "bags remaining". Each purchase auto-creates a
+// FinancialRecord (category: feed) and auto-posts a double-entry journal
+// entry (debit 5020 Feed COGS, credit 1010 Cash).
+model FeedPurchase {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  flockId         String   @map("flock_id") @db.Uuid
+  feedStageId     String?  @map("feed_stage_id") @db.Uuid
+  supplierId      String?  @map("supplier_id") @db.Uuid
+  purchaseDate    DateTime @map("purchase_date") @db.Date
+  stageName       String   @map("stage_name") @db.VarChar(50)
+  bagSizeKg       Decimal  @map("bag_size_kg") @db.Decimal(10, 3)
+  bagsPurchased   Int      @map("bags_purchased")
+  unitPriceZmw    Decimal  @map("unit_price_zmw") @db.Decimal(12, 2)
+  totalCostZmw    Decimal  @map("total_cost_zmw") @db.Decimal(14, 2)
+  notes           String?  @db.Text
+  createdBy       String?  @map("created_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  flock        BroilerFlock  @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  feedStage    FeedStage?    @relation(fields: [feedStageId], references: [id], onDelete: SetNull)
+  supplier     Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  creator      User?         @relation("FeedPurchaseCreatedBy", fields: [createdBy], references: [id])
+
+  @@index([flockId, purchaseDate])
+  @@index([organizationId])
+  @@index([feedStageId])
+  @@map("feed_purchases")
 }
 
 model WaterRecord {

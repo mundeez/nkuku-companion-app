@@ -21,6 +21,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Eye, TrendingUp, AlertTriangle, DollarSign } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface FlockFormData {
   name: string;
@@ -239,7 +240,24 @@ export default function BroilerFlocksPage() {
     }
   }
 
-  if (isLoading) return <div className="p-8">Loading...</div>;
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-48" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (!user) return null;
 
   const primaryBreed = breeds.find((b) => b.isPrimary);
@@ -370,6 +388,28 @@ export default function BroilerFlocksPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Feed Transition</span>
                       <span className="font-medium">Day {flock.feedTransitionDay}</span>
+                    </div>
+                  )}
+                  {flock.feedProjection && flock.feedProjection.length > 0 && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground mb-1.5">Feed Procurement</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {flock.feedProjection.map((fp) => {
+                          const colorClass =
+                            fp.status === "complete" ? "bg-green-100 text-green-800"
+                            : fp.status === "partial" ? "bg-amber-100 text-amber-800"
+                            : "bg-red-100 text-red-800";
+                          return (
+                            <span
+                              key={fp.feedStageId}
+                              className={`text-xs px-2 py-0.5 rounded ${colorClass}`}
+                              title={`${fp.stageName}: ${fp.bagsPurchased}/${fp.bagsRequired} bags purchased (${fp.bagsRemaining} remaining)`}
+                            >
+                              {fp.stageName}: {fp.bagsPurchased}/{fp.bagsRequired}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                   {flock.supplier && (

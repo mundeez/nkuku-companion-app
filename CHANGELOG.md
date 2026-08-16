@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.15.0-alpha — 2026-08-16
+
+### Added
+- **Sales dashboard nav fix.** The Sales page existed but was invisible on the desktop taskbar because the "Production" nav section was filtered out of `groupsForDesktop`. Sales now appears in the "Finances" dropdown, visible to owner/manager/sales_person roles.
+- **Feed bag projections & purchase tracking.**
+  - New `FeedPurchase` database table tracking bags of feed purchased per flock, linked to feed stages and suppliers, with organization tenancy.
+  - New `feed-purchases` API module (`/api/v1/feed-purchases`) with CRUD endpoints. Each purchase auto-creates a `FinancialRecord` (category: feed) and auto-posts a double-entry journal entry (debit 5020 Feed COGS, credit 1010 Cash). Delete reverses the journal entry.
+  - New `feed-projection` endpoint (`GET /api/v1/broiler-flocks/:id/feed-projection`) computing per-stage bags required (based on initialCount minus actual mortality up to the stage's dayRangeStart), bags purchased, and bags remaining, with complete/partial/not-started status.
+  - Flock list endpoint (`GET /api/v1/broiler-flocks`) now includes a compact `feedProjection` array per flock for the card mini-list.
+  - Flock feed tab (`/broiler-flocks/[id]/feed`) rewritten with a "Feed Projection & Procurement" card on top: per-stage table (required, purchased, remaining, projected cost, status), add/edit/delete purchase dialog, and purchase history table. Existing feed calculator and summary remain below.
+  - Flock cards on `/broiler-flocks` now show a per-stage feed procurement mini-list with color-coded badges (green=complete, amber=partial, red=not started).
+  - Cross-tenant ownership validation on `feedStageId` and `supplierId` in feed-purchases create/update to prevent information leakage.
+- 17 new tests: 8 unit (feed projection calculation logic) + 9 integration (feed-projection endpoint, feed-purchases CRUD, auto-posted FinancialRecord, journal reversal on delete).
+
+### Changed
+- `apps/api` version: `1.14.5-alpha` → `1.15.0-alpha`
+- `apps/web` version: `0.2.5-alpha` → `0.3.0-alpha`
+
+### Security
+- Fixed MEDIUM cross-tenant issue: `feedStageId`/`supplierId` in feed-purchases create/update now validated against the caller's organization.
+- Pre-existing dependency vulnerabilities (vitest, fastify, nodemailer, etc.) noted but not addressed in this phase — separate remediation needed.
+
 ## v1.15.7-alpha — 2026-08-16
 
 ### Added

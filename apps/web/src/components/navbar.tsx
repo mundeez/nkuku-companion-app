@@ -25,9 +25,6 @@ export function Navbar() {
         items: [
           { href: "/", label: "Dashboard" },
           { href: "/broiler-flocks", label: "Broiler Flocks" },
-          ...(role === "owner" || role === "manager" || role === "sales_person"
-            ? [{ href: "/sales", label: "Sales" }]
-            : []),
         ],
       },
       {
@@ -42,6 +39,9 @@ export function Navbar() {
       {
         title: "Finances",
         items: [
+          ...(role === "owner" || role === "manager" || role === "sales_person"
+            ? [{ href: "/sales", label: "Sales" }]
+            : []),
           ...(role === "owner" || role === "manager" || role === "viewer"
             ? [{ href: "/financials", label: "Financials" }]
             : []),

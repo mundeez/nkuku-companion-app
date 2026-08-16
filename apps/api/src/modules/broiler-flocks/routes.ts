@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { Decimal } from 'decimal.js';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { checkFlockLimit } from '../../core/billing/feature-gate.js';
+import { calculateItemsRequired } from '../../core/calculation-engine/index.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -83,6 +85,18 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
     const mortalityByFlock = new Map(mortalitySums.map((m: any) => [m.flockId, m._sum.count ?? 0]));
 
+    // Batch-load feed purchases grouped by (flockId, feedStageId) for the flock card mini-list
+    const feedPurchases = await prisma.feedPurchase.findMany({
+      where: { flockId: { in: flockIds } },
+      select: { flockId: true, feedStageId: true, bagsPurchased: true },
+    });
+    const purchasesByFlockStage = new Map<string, number>();
+    for (const p of feedPurchases) {
+      if (!p.feedStageId) continue;
+      const key = `${p.flockId}:${p.feedStageId}`;
+      purchasesByFlockStage.set(key, (purchasesByFlockStage.get(key) ?? 0) + p.bagsPurchased);
+    }
+
     return flocks.map((f: any) => {
       const start = f.startDate ? new Date(f.startDate) : null;
       const ageDays = start ? Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
@@ -100,7 +114,30 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const projectedRevenue = salePrice * survivors;
       const projectedProfit = projectedRevenue - totalCost;
 
-      return { ...f, ageDays, totalMortality, mortalityRate, totalCost, totalRevenue, projectedRevenue, projectedProfit };
+      // Compact per-stage feed projection for the flock card mini-list.
+      // Uses initialCount (no per-stage mortality adjustment here — the full
+      // projection endpoint handles that; the card just needs a quick summary).
+      const feedStages = (f.supplier?.feedStages || []).filter((fs: any) => fs.stageType === 'feed');
+      const feedProjection = feedStages.map((fs: any) => {
+        const { itemsRoundedUp } = calculateItemsRequired(f.initialCount, fs.intakePerBirdKg, fs.unitSizeKg);
+        const bagsRequired = itemsRoundedUp ?? 0;
+        const bagsPurchased = purchasesByFlockStage.get(`${f.id}:${fs.id}`) ?? 0;
+        const bagsRemaining = bagsRequired - bagsPurchased;
+        let status: 'complete' | 'partial' | 'not_started';
+        if (bagsPurchased >= bagsRequired && bagsRequired > 0) status = 'complete';
+        else if (bagsPurchased > 0) status = 'partial';
+        else status = 'not_started';
+        return {
+          feedStageId: fs.id,
+          stageName: fs.stageName,
+          bagsRequired,
+          bagsPurchased,
+          bagsRemaining,
+          status,
+        };
+      });
+
+      return { ...f, ageDays, totalMortality, mortalityRate, totalCost, totalRevenue, projectedRevenue, projectedProfit, feedProjection };
     });
   });
 
@@ -337,6 +374,133 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     };
   });
 
+  // GET /api/v1/broiler-flocks/:id/feed-projection
+  // Per-stage feed bag projection: bags required (based on startingCount minus
+  // actual mortality up to the stage's dayRangeStart), bags purchased, remaining.
+  app.get('/:id/feed-projection', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const organizationId = getOrganizationId(request);
+
+    const flock = await prisma.broilerFlock.findFirst({
+      where: { id, organizationId },
+      include: {
+        supplier: { include: { feedStages: { orderBy: { sortOrder: 'asc' } } } },
+        mortalityEvents: { select: { eventDate: true, count: true, ageDays: true } },
+        feedPurchases: { select: { feedStageId: true, bagsPurchased: true, totalCostZmw: true } },
+      },
+    });
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    // No supplier or feed stages → empty projection
+    if (!flock.supplier || !flock.supplier.feedStages || flock.supplier.feedStages.length === 0) {
+      return {
+        flockId: id,
+        flockName: flock.name,
+        initialCount: flock.initialCount,
+        currentCount: flock.currentCount,
+        supplierName: flock.supplier?.name ?? null,
+        stages: [],
+        totals: { bagsRequired: 0, bagsPurchased: 0, bagsRemaining: 0, projectedCostZmw: 0, purchasedCostZmw: 0 },
+      };
+    }
+
+    const startDate = flock.startDate ? new Date(flock.startDate) : null;
+    const feedStages = flock.supplier.feedStages.filter((fs: any) => fs.stageType === 'feed');
+
+    // Aggregate purchases by feedStageId
+    const purchasesByStage = new Map<string, { bags: number; cost: number }>();
+    for (const p of flock.feedPurchases) {
+      if (!p.feedStageId) continue;
+      const cur = purchasesByStage.get(p.feedStageId) ?? { bags: 0, cost: 0 };
+      cur.bags += p.bagsPurchased;
+      cur.cost += Number(p.totalCostZmw);
+      purchasesByStage.set(p.feedStageId, cur);
+    }
+
+    const stages: any[] = [];
+    let totalBagsRequired = 0;
+    let totalBagsPurchased = 0;
+    let totalProjectedCost = 0;
+    let totalPurchasedCost = 0;
+
+    for (const fs of feedStages) {
+      // Birds alive at the stage's dayRangeStart = initialCount − mortality on/before that day.
+      // If dayRangeStart is null, use initialCount (no mortality adjustment).
+      let birdsAlive = flock.initialCount;
+      if (fs.dayRangeStart != null && startDate) {
+        const stageStartDay = fs.dayRangeStart;
+        // Mortality events with ageDays <= stageStartDay, or eventDate <= startDate + stageStartDay
+        const mortalityBeforeStage = flock.mortalityEvents.reduce((sum: number, m: any) => {
+          const mAge = m.ageDays != null
+            ? m.ageDays
+            : startDate
+              ? Math.floor((new Date(m.eventDate).getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+              : null;
+          return mAge != null && mAge <= stageStartDay ? sum + m.count : sum;
+        }, 0);
+        birdsAlive = Math.max(0, flock.initialCount - mortalityBeforeStage);
+      }
+
+      const { itemsRoundedUp, itemsRaw } = calculateItemsRequired(
+        birdsAlive,
+        fs.intakePerBirdKg,
+        fs.unitSizeKg,
+      );
+
+      const bagsRequired = itemsRoundedUp ?? 0;
+      const purchased = purchasesByStage.get(fs.id) ?? { bags: 0, cost: 0 };
+      const bagsPurchased = purchased.bags;
+      const bagsRemaining = bagsRequired - bagsPurchased;
+      const projectedCostZmw = bagsRequired > 0
+        ? new Decimal(bagsRequired).mul(fs.unitPriceZmw).toNumber()
+        : 0;
+
+      totalBagsRequired += bagsRequired;
+      totalBagsPurchased += bagsPurchased;
+      totalProjectedCost += projectedCostZmw;
+      totalPurchasedCost += purchased.cost;
+
+      let status: 'complete' | 'partial' | 'not_started';
+      if (bagsPurchased >= bagsRequired && bagsRequired > 0) status = 'complete';
+      else if (bagsPurchased > 0) status = 'partial';
+      else status = 'not_started';
+
+      stages.push({
+        feedStageId: fs.id,
+        stageName: fs.stageName,
+        dayRangeStart: fs.dayRangeStart,
+        dayRangeEnd: fs.dayRangeEnd,
+        bagSizeKg: Number(fs.unitSizeKg),
+        intakePerBirdKg: Number(fs.intakePerBirdKg),
+        birdsAliveAtStageStart: birdsAlive,
+        bagsRequired,
+        bagsRaw: itemsRaw,
+        bagsPurchased,
+        bagsRemaining,
+        unitPriceZmw: Number(fs.unitPriceZmw),
+        projectedCostZmw,
+        purchasedCostZmw: purchased.cost,
+        status,
+      });
+    }
+
+    return {
+      flockId: id,
+      flockName: flock.name,
+      initialCount: flock.initialCount,
+      currentCount: flock.currentCount,
+      supplierName: flock.supplier.name,
+      stages,
+      totals: {
+        bagsRequired: totalBagsRequired,
+        bagsPurchased: totalBagsPurchased,
+        bagsRemaining: totalBagsRequired - totalBagsPurchased,
+        projectedCostZmw: totalProjectedCost,
+        purchasedCostZmw: totalPurchasedCost,
+      },
+    };
+  });
+
   // GET /api/v1/broiler-flocks/:id/timeline - Hatch-to-market event timeline
   app.get('/:id/timeline', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
@@ -476,17 +640,20 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Comprehensive Schedule' : 'Standard Broiler Schedule';
-    const schedule = await prisma.vaccinationSchedule.findFirst({
-      where: { name: scheduleName },
-      include: { items: { orderBy: { sortOrder: 'asc' } } },
-    });
 
-    const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, authUser.userId);
-
-    const completedVaccines = await prisma.vaccinationEvent.findMany({
-      where: { flockId: id },
-      orderBy: { adminDate: 'asc' },
-    });
+    // The three post-flock queries are independent of each other — run them
+    // concurrently to cut sequential round-trip latency from 3 awaits to 1.
+    const [schedule, envSchedule, completedVaccines] = await Promise.all([
+      prisma.vaccinationSchedule.findFirst({
+        where: { name: scheduleName },
+        include: { items: { orderBy: { sortOrder: 'asc' } } },
+      }),
+      getLightingTemperatureScheduleForFlock(prisma, flock, authUser.userId),
+      prisma.vaccinationEvent.findMany({
+        where: { flockId: id },
+        orderBy: { adminDate: 'asc' },
+      }),
+    ]);
 
     const days = [];
     for (let d = 0; d <= targetAge; d++) {
