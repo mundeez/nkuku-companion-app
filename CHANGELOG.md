@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.15.0-alpha — 2026-08-16
+## v1.15.8-alpha — 2026-08-16
 
 ### Added
 - **Sales dashboard nav fix.** The Sales page existed but was invisible on the desktop taskbar because the "Production" nav section was filtered out of `groupsForDesktop`. Sales now appears in the "Finances" dropdown, visible to owner/manager/sales_person roles.
@@ -15,7 +15,7 @@
 - 17 new tests: 8 unit (feed projection calculation logic) + 9 integration (feed-projection endpoint, feed-purchases CRUD, auto-posted FinancialRecord, journal reversal on delete).
 
 ### Changed
-- `apps/api` version: `1.14.5-alpha` → `1.15.0-alpha`
+- `apps/api` version: `1.14.5-alpha` → `1.15.8-alpha`
 - `apps/web` version: `0.2.5-alpha` → `0.3.0-alpha`
 
 ### Security
