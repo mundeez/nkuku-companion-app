@@ -986,8 +986,17 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           }
           final day = envDays[dayIndex];
           final env = day.lightingTemperature!;
+          final isCurrent = _flock?.ageDays != null && day.day == _flock!.ageDays;
+          final primary = Theme.of(context).colorScheme.primary;
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: isCurrent
+                  ? BorderSide(color: primary, width: 2)
+                  : BorderSide.none,
+            ),
+            color: isCurrent ? primary.withAlpha(15) : null,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -996,7 +1005,9 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   Row(
                     children: [
                       CircleAvatar(
-                        backgroundColor: Colors.orange.withAlpha(30),
+                        backgroundColor: isCurrent
+                            ? primary.withAlpha(60)
+                            : Colors.orange.withAlpha(30),
                         child: Text('${day.day}'),
                       ),
                       const SizedBox(width: 12),
@@ -1005,6 +1016,21 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                             style: const TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
+                      if (isCurrent)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text('Today',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold)),
+                        ),
                       Text(day.date.split('T').first,
                           style: const TextStyle(color: Colors.grey)),
                     ],
