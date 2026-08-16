@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.15.6-alpha — 2026-08-16
+
+### Added
+- **Phase 1 of the mobile modernization plan — Information Architecture & Navigation.**
+  - New bottom navigation trimmed from 7 to 5 core destinations (Dashboard, Flocks, Alerts, Finance, More) to stop label crowding and truncation on smaller phones.
+  - New `MoreScreen` replaces `SettingsScreen`, with grouped sections (Production, Operations, Planning, Admin, Appearance/Preferences, Account) and wiring for five previously orphaned screens: Projections, Expansion Plan, Suppliers, Disease Database, and Vaccination Schedules.
+  - New `FinanceHubScreen` merges the Financial Dashboard and Ledger behind a single "Finance" bottom-nav entry via a segmented switcher, each screen keeping its own state and `AppBar`.
+  - `FlockDetailScreen` consolidated from 13 flat tabs into 6 top-level groups — Overview, Growth (Growth/Feed/Water/Environment), Health (Mortality/Vaccination/Medication), Finance (Financial/Sales), Planning (Tasks/Calendar), Docs — using `SegmentedButton` sub-navigation inside multi-section groups instead of nested tab bars. FAB / add-record routing remapped to the new group + sub-section index.
+
+### Changed
+- Mobile-only patch version bump: `apps/mobile/pubspec.yaml` `1.15.5-alpha` → `1.15.6-alpha`.
+- `apps/api` and `apps/web` versions unchanged in this phase.
+
+### Notes
+- This is **Phase 1 of 5** of the mobile modernization plan documented in `.devin/plans/mobile-modernization-plan.md`. Later phases (visual modernization, performance, offline sync, QA) will follow in subsequent sessions.
+
 ## v1.15.5-alpha — 2026-08-15
 
 ### Added
