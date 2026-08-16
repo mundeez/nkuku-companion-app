@@ -981,8 +981,9 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     child: Text('No environment targets scheduled')));
           }
           final dayIndex = adjustedIndex - (loggedCount + 3);
-          if (dayIndex < 0 || dayIndex >= envDays.length)
+          if (dayIndex < 0 || dayIndex >= envDays.length) {
             return const SizedBox.shrink();
+          }
           final day = envDays[dayIndex];
           final env = day.lightingTemperature!;
           return Card(
@@ -1215,10 +1216,12 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   IconData _documentIcon(String mimeType) {
     if (mimeType.contains('pdf')) return Icons.picture_as_pdf;
     if (mimeType.contains('image')) return Icons.image;
-    if (mimeType.contains('word') || mimeType.contains('document'))
+    if (mimeType.contains('word') || mimeType.contains('document')) {
       return Icons.description;
-    if (mimeType.contains('csv') || mimeType.contains('sheet'))
+    }
+    if (mimeType.contains('csv') || mimeType.contains('sheet')) {
       return Icons.table_chart;
+    }
     return Icons.attach_file;
   }
 
