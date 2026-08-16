@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.15.7-alpha — 2026-08-16
+
+### Added
+- **Phase 2 of the mobile modernization plan — Visual Modernization & Overflow Audit.**
+  - New centralized Material 3 theme seeded from the brand green (`#1B5E20`) in `lib/theme/app_theme.dart`, with updated color scheme, typography scale, and component defaults.
+  - Native splash screen configured via `flutter_native_splash` and refreshed launcher icons via `flutter_launcher_icons`, using the brand green background and the updated app icon asset.
+  - Five new shared widgets in `lib/widgets/` to reduce duplication and enforce consistent visual treatment across screens.
+  - App-wide overflow and truncation audit covering approximately 20 files, adding `Expanded`, `Wrap`, `FittedBox`, and `TextOverflow.ellipsis` handling to prevent `RenderFlex` overflow on small phones.
+
+### Changed
+- Mobile-only patch version bump: `apps/mobile/pubspec.yaml` `1.15.6-alpha` → `1.15.7-alpha`.
+- `apps/api` and `apps/web` versions unchanged in this phase.
+
+### Notes
+- This is **Phase 2 of 5** of the mobile modernization plan documented in `.devin/plans/mobile-modernization-plan.md`. Phases 3–5 (performance, offline sync, QA) will follow in later sessions.
+
 ## v1.15.6-alpha — 2026-08-16
 
 ### Added
