@@ -4,9 +4,18 @@ import '../services/auth_service.dart';
 import 'account_settings_screen.dart';
 import 'login_screen.dart';
 import 'users_screen.dart';
+import 'projections_screen.dart';
+import 'expansion_plan_screen.dart';
+import 'suppliers_screen.dart';
+import 'vaccine_inventory_screen.dart';
+import 'broiler/diseases_screen.dart';
+import 'broiler/vaccination_schedules_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+/// Grouped hub for everything that doesn't fit in the primary bottom
+/// navigation bar. Mirrors the Production / Operations / Planning / Admin
+/// grouping used on web, plus the existing account/appearance settings.
+class MoreScreen extends StatelessWidget {
+  const MoreScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +23,7 @@ class SettingsScreen extends StatelessWidget {
     final themeProvider = ThemeProvider.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: const Text('More')),
       body: ListView(
         children: [
           // Account section
@@ -27,7 +36,10 @@ class SettingsScreen extends StatelessWidget {
                 style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
               ),
             ),
-            title: Text(AuthService.user?['email'] ?? 'Unknown user'),
+            title: Text(
+              AuthService.user?['email'] ?? 'Unknown user',
+              overflow: TextOverflow.ellipsis,
+            ),
             subtitle: Text('Role: ${AuthService.role ?? 'unknown'}'),
           ),
           ListTile(
@@ -38,6 +50,79 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
+            ),
+          ),
+          const Divider(),
+
+          // Production section
+          _SectionHeader(title: 'Production'),
+          ListTile(
+            leading: const Icon(Icons.vaccines_outlined),
+            title: const Text('Vaccine Inventory'),
+            subtitle: const Text('Stock levels and expiry tracking'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VaccineInventoryScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.local_shipping_outlined),
+            title: const Text('Suppliers'),
+            subtitle: const Text('Feed suppliers and pricing'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SuppliersScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.local_hospital_outlined),
+            title: const Text('Disease Database'),
+            subtitle: const Text('Symptoms, prevention, organic treatments'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DiseasesScreen()),
+            ),
+          ),
+          const Divider(),
+
+          // Operations section
+          _SectionHeader(title: 'Operations'),
+          ListTile(
+            leading: const Icon(Icons.event_note_outlined),
+            title: const Text('Vaccination Schedules'),
+            subtitle: const Text('Standard Broiler + Ross 308 Comprehensive'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const VaccinationSchedulesScreen()),
+            ),
+          ),
+          const Divider(),
+
+          // Planning section
+          _SectionHeader(title: 'Planning'),
+          ListTile(
+            leading: const Icon(Icons.calculate_outlined),
+            title: const Text('Projections'),
+            subtitle: const Text('Feed cost, revenue, and profit calculator'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProjectionsScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.timeline_outlined),
+            title: const Text('Expansion Plan'),
+            subtitle: const Text('Production cycle roadmap'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ExpansionPlanScreen()),
             ),
           ),
           const Divider(),
@@ -62,11 +147,6 @@ class SettingsScreen extends StatelessWidget {
               }).toList(),
             ),
           ),
-          ListTile(
-            leading: Icon(themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            title: Text(themeProvider.isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'),
-            onTap: themeProvider.toggle,
-          ),
           const Divider(),
 
           // Preferences section
@@ -78,7 +158,8 @@ class SettingsScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Breed selection is configured per flock')),
+                const SnackBar(
+                    content: Text('Breed selection is configured per flock')),
               );
             },
           ),
@@ -95,7 +176,9 @@ class SettingsScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications are enabled. Alerts are pushed from the API.')),
+                const SnackBar(
+                    content: Text(
+                        'Notifications are enabled. Alerts are pushed from the API.')),
               );
             },
           ),
@@ -103,7 +186,7 @@ class SettingsScreen extends StatelessWidget {
 
           // Admin section (owner only)
           if (AuthService.isOwner) ...[
-            _SectionHeader(title: 'Administration'),
+            _SectionHeader(title: 'Admin'),
             ListTile(
               leading: const Icon(Icons.people, color: Colors.green),
               title: const Text('User Management'),
@@ -119,28 +202,18 @@ class SettingsScreen extends StatelessWidget {
 
           // About section
           _SectionHeader(title: 'About'),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('Nkuku Companion'),
-            subtitle: const Text('Broiler chicken production management\nv1.0.0'),
-            isThreeLine: true,
-          ),
-          ListTile(
-            leading: const Icon(Icons.vaccines_outlined),
-            title: const Text('Vaccination Schedules'),
-            subtitle: const Text('Standard Broiler + Ross 308 Comprehensive'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.local_hospital_outlined),
-            title: const Text('Disease Database'),
-            subtitle: const Text('10 diseases with organic treatments'),
+          const ListTile(
+            leading: Icon(Icons.info_outline),
+            title: Text('Nkuku Companion'),
+            subtitle: Text('Broiler chicken production management'),
           ),
           const Divider(),
 
           // Logout
           ListTile(
             leading: Icon(Icons.logout, color: theme.colorScheme.error),
-            title: Text('Logout', style: TextStyle(color: theme.colorScheme.error)),
+            title:
+                Text('Logout', style: TextStyle(color: theme.colorScheme.error)),
             onTap: () async {
               await AuthService.logout();
               if (context.mounted) {
@@ -151,6 +224,7 @@ class SettingsScreen extends StatelessWidget {
               }
             },
           ),
+          const SizedBox(height: 16),
         ],
       ),
     );

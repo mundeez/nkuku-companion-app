@@ -50,9 +50,32 @@ class FlockDetailScreen extends StatefulWidget {
   State<FlockDetailScreen> createState() => _FlockDetailScreenState();
 }
 
+/// A single sub-section within a top-level tab group. `flatIndex` maps back
+/// to the legacy per-record-type index used by [_FlockDetailScreenState._onAddRecord]
+/// (`-1` means the section has no "add record" action, e.g. Overview/Tasks/Calendar).
+class _TabDef {
+  final String title;
+  final IconData icon;
+  final Widget Function() builder;
+  final int flatIndex;
+  const _TabDef(this.title, this.icon, this.builder, this.flatIndex);
+}
+
+/// A top-level tab group. Groups with a single [_TabDef] render that section
+/// directly; groups with multiple render a `SegmentedButton` sub-nav above an
+/// `IndexedStack` of the sections (kept flat/non-nested-TabBar per the
+/// modernization plan, to avoid re-creating the original crowding problem).
+class _GroupDef {
+  final String title;
+  final IconData icon;
+  final List<_TabDef> tabs;
+  const _GroupDef(this.title, this.icon, this.tabs);
+}
+
 class _FlockDetailScreenState extends State<FlockDetailScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  late TabController _groupController;
+  final List<int> _subIndex = [0, 0, 0, 0, 0, 0];
   BroilerFlock? _flock;
   List<CalendarDay> _calendarDays = [];
   bool _loading = true;
@@ -77,16 +100,52 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   List<DocumentRecord> _documents = [];
   List<PerformanceTarget> _breedTargets = [];
 
+  /// Top-level tab groups (13 legacy flat tabs consolidated into 6 groups —
+  /// see the mobile modernization plan). Declared `late` since the builder
+  /// tear-offs (`_buildOverviewTab` etc.) reference instance methods.
+  late final List<_GroupDef> _groups = [
+    _GroupDef('Overview', Icons.info_outline, [
+      _TabDef('Overview', Icons.info_outline, _buildOverviewTab, -1),
+    ]),
+    _GroupDef('Growth', Icons.trending_up, [
+      _TabDef('Growth', Icons.trending_up, _buildGrowthTab, 1),
+      _TabDef('Feed', Icons.grass, _buildFeedTab, 2),
+      _TabDef('Water', Icons.water_drop, _buildWaterTab, 3),
+      _TabDef('Environment', Icons.thermostat, _buildEnvironmentTab, 7),
+    ]),
+    _GroupDef('Health', Icons.health_and_safety_outlined, [
+      _TabDef('Mortality', Icons.warning_amber_outlined, _buildMortalityTab, 4),
+      _TabDef('Vaccination', Icons.vaccines_outlined, _buildVaccinationTab, 5),
+      _TabDef('Medication', Icons.medication_outlined, _buildMedicationTab, 8),
+    ]),
+    _GroupDef('Finance', Icons.attach_money, [
+      _TabDef('Financial', Icons.attach_money, _buildFinancialTab, 6),
+      _TabDef('Sales', Icons.point_of_sale_outlined, _buildSalesTab, 11),
+    ]),
+    _GroupDef('Planning', Icons.event_note_outlined, [
+      _TabDef('Tasks', Icons.task_alt, _buildTasksTab, -1),
+      _TabDef('Calendar', Icons.calendar_month_outlined, _buildCalendarTab, -1),
+    ]),
+    _GroupDef('Docs', Icons.attach_file, [
+      _TabDef('Docs', Icons.attach_file, _buildDocumentsTab, 12),
+    ]),
+  ];
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 13, vsync: this);
+    _groupController = TabController(length: _groups.length, vsync: this);
+    // The FAB depends on the selected group; TabController changes don't
+    // otherwise trigger a Scaffold rebuild on their own.
+    _groupController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadData();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _groupController.dispose();
     super.dispose();
   }
 
@@ -210,10 +269,18 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     if (result == true && mounted) _loadData();
   }
 
+  /// The legacy flat tab index (0-12) for whichever group/sub-tab is
+  /// currently selected, or `-1` if that section has no "add record" action.
+  int get _currentFlatIndex {
+    final group = _groups[_groupController.index];
+    final sub = group.tabs.length == 1 ? 0 : _subIndex[_groupController.index];
+    return group.tabs[sub].flatIndex;
+  }
+
   void _onAddRecord() {
     if (_flock == null) return;
     final flock = _flock!;
-    switch (_tabController.index) {
+    switch (_currentFlatIndex) {
       case 1:
         if (!AuthService.canEdit) return;
         _navigateToForm(GrowthRecordForm(flockId: flock.id));
@@ -260,12 +327,12 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   }
 
   Widget? get _floatingActionButton {
-    final index = _tabController.index;
-    // No FAB on Overview (0), Tasks (9), or Calendar (10)
-    if (index == 0 || index == 9 || index == 10) return null;
-    if (index == 11) {
+    final flatIndex = _currentFlatIndex;
+    // -1 = no "add record" action for this section (Overview, Tasks, Calendar)
+    if (flatIndex == -1) return null;
+    if (flatIndex == 11) {
       if (!AuthService.canManageSales) return null;
-    } else if (index == 12) {
+    } else if (flatIndex == 12) {
       if (!AuthService.canManageDocuments) return null;
     } else {
       if (!AuthService.canEdit) return null;
@@ -318,22 +385,11 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
         ],
         bottom: TabBar(
-          controller: _tabController,
+          controller: _groupController,
           isScrollable: true,
-          tabs: const [
-            Tab(icon: Icon(Icons.info), text: 'Overview'),
-            Tab(icon: Icon(Icons.trending_up), text: 'Growth'),
-            Tab(icon: Icon(Icons.grass), text: 'Feed'),
-            Tab(icon: Icon(Icons.water_drop), text: 'Water'),
-            Tab(icon: Icon(Icons.warning), text: 'Mortality'),
-            Tab(icon: Icon(Icons.vaccines), text: 'Vaccination'),
-            Tab(icon: Icon(Icons.attach_money), text: 'Financial'),
-            Tab(icon: Icon(Icons.thermostat), text: 'Environment'),
-            Tab(icon: Icon(Icons.medication), text: 'Medication'),
-            Tab(icon: Icon(Icons.task_alt), text: 'Tasks'),
-            Tab(icon: Icon(Icons.calendar_month), text: 'Calendar'),
-            Tab(icon: Icon(Icons.point_of_sale), text: 'Sales'),
-            Tab(icon: Icon(Icons.attach_file), text: 'Docs'),
+          tabs: [
+            for (final group in _groups)
+              Tab(icon: Icon(group.icon), text: group.title),
           ],
         ),
       ),
@@ -353,23 +409,52 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   ),
                 )
               : TabBarView(
-                  controller: _tabController,
+                  controller: _groupController,
                   children: [
-                    _buildOverviewTab(),
-                    _buildGrowthTab(),
-                    _buildFeedTab(),
-                    _buildWaterTab(),
-                    _buildMortalityTab(),
-                    _buildVaccinationTab(),
-                    _buildFinancialTab(),
-                    _buildEnvironmentTab(),
-                    _buildMedicationTab(),
-                    _buildTasksTab(),
-                    _buildCalendarTab(),
-                    _buildSalesTab(),
-                    _buildDocumentsTab(),
+                    for (var gi = 0; gi < _groups.length; gi++)
+                      _buildGroupBody(_groups[gi], gi),
                   ],
                 ),
+    );
+  }
+
+  /// Renders a single tab group. Groups with one section render it directly;
+  /// groups with multiple sections show a horizontally-scrollable
+  /// `SegmentedButton` sub-nav above an `IndexedStack` of the sections (all
+  /// sections stay built/alive, matching the previous `TabBarView` behavior).
+  Widget _buildGroupBody(_GroupDef group, int groupIndex) {
+    if (group.tabs.length == 1) return group.tabs.first.builder();
+
+    final selected = _subIndex[groupIndex];
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<int>(
+              showSelectedIcon: false,
+              segments: [
+                for (var i = 0; i < group.tabs.length; i++)
+                  ButtonSegment(
+                    value: i,
+                    label: Text(group.tabs[i].title),
+                    icon: Icon(group.tabs[i].icon, size: 18),
+                  ),
+              ],
+              selected: {selected},
+              onSelectionChanged: (s) =>
+                  setState(() => _subIndex[groupIndex] = s.first),
+            ),
+          ),
+        ),
+        Expanded(
+          child: IndexedStack(
+            index: selected,
+            children: [for (final tab in group.tabs) tab.builder()],
+          ),
+        ),
+      ],
     );
   }
 
