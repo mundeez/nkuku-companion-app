@@ -12,7 +12,8 @@ import {
   getOrCreateSubscription,
 } from '../../core/billing/billing.service.js';
 import { verifyWebhookSignature, isMockMode } from '../../core/billing/flutterwave.service.js';
-import { getPlanLimitsForOrg } from '../../core/billing/feature-gate.js';
+import { getPlanLimitsForOrg, shouldShowAds } from '../../core/billing/feature-gate.js';
+import { ADDONS, hasActiveAddon, subscribeToAddon, cancelAddon, type AddonCode } from '../../core/billing/addons.js';
 
 const SubscribeSchema = z.object({
   planCode: z.enum(['free', 'grower', 'business']),
@@ -25,6 +26,20 @@ const VerifyPaymentSchema = z.object({
   txnId: z.string().optional(),
   status: z.string().optional(),
 });
+
+// Validates a caller-supplied redirectUrl is same-origin or from an
+// explicitly allowed origin, to prevent the post-checkout redirect from
+// being used as an open redirect (Flutterwave sends the user back to this
+// URL with invoice/tx details in the query string). Shared by both plan
+// and add-on checkout flows. Returns an error message if invalid, or null.
+function validateRedirectUrl(redirectUrl: string | undefined): string | null {
+  if (!redirectUrl) return null;
+  const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/$/, ''));
+  const webBaseUrl = (process.env.WEB_BASE_URL || 'http://localhost:30000').replace(/\/$/, '');
+  const allowedRedirects = [webBaseUrl, ...allowedOrigins].filter(Boolean);
+  const isAllowed = allowedRedirects.some((origin) => redirectUrl.startsWith(origin + '/') || redirectUrl === origin);
+  return isAllowed ? null : 'Redirect URL must be same-origin or from an allowed domain';
+}
 
 export async function buildBillingModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -46,11 +61,67 @@ export async function buildBillingModule(app: FastifyInstance) {
   // ── GET /subscription — current subscription + plan limits + usage ──
   app.get('/subscription', { preHandler: [authenticate] }, async (request) => {
     const organizationId = getOrganizationId(request);
-    const [info, limits] = await Promise.all([
+    const [info, limits, adsShown, adsRemoved] = await Promise.all([
       getSubscriptionInfo(prisma, organizationId),
       getPlanLimitsForOrg(prisma, organizationId),
+      shouldShowAds(prisma, organizationId),
+      hasActiveAddon(prisma, organizationId, 'remove_ads_addon'),
     ]);
-    return { ...info, ...limits };
+    return { ...info, ...limits, adsShown, addons: { remove_ads_addon: adsRemoved } };
+  });
+
+  // ── GET /addons — list available add-ons ──
+  app.get('/addons', async () => {
+    return { addons: Object.values(ADDONS) };
+  });
+
+  // ── POST /addons/:code/subscribe — purchase an add-on ──
+  app.post('/addons/:code/subscribe', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
+    const authUser = (request as any).authUser;
+    const { code } = z.object({ code: z.enum(['remove_ads_addon']) }).parse(request.params);
+    const { redirectUrl } = z.object({ redirectUrl: z.string().url().optional() }).parse(request.body ?? {});
+
+    const user = await prisma.user.findUnique({ where: { id: authUser.userId } });
+    if (!user) return reply.status(404).send({ error: 'USER_NOT_FOUND' });
+
+    const redirectError = validateRedirectUrl(redirectUrl);
+    if (redirectError) {
+      return reply.status(400).send({ error: 'INVALID_REDIRECT_URL', message: redirectError });
+    }
+    const resolvedRedirect = redirectUrl || `${process.env.WEB_BASE_URL || 'http://localhost:30000'}/billing/callback`;
+
+    try {
+      const result = await subscribeToAddon(prisma, {
+        organizationId,
+        addonCode: code as AddonCode,
+        customerEmail: user.email || '',
+        customerName: user.name || undefined,
+        customerPhone: user.phone || undefined,
+        redirectUrl: resolvedRedirect,
+      });
+      return reply.status(200).send({
+        subscription: result.subscription,
+        invoice: result.invoice,
+        checkout: result.checkout
+          ? { success: result.checkout.success, paymentLink: result.checkout.paymentLink, txRef: result.checkout.txRef, message: result.checkout.message }
+          : null,
+      });
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message || 'ADDON_SUBSCRIBE_FAILED' });
+    }
+  });
+
+  // ── POST /addons/:code/cancel — cancel an add-on ──
+  app.post('/addons/:code/cancel', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
+    const { code } = z.object({ code: z.enum(['remove_ads_addon']) }).parse(request.params);
+    try {
+      const result = await cancelAddon(prisma, organizationId, code as AddonCode);
+      return { success: true, subscription: result };
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message || 'ADDON_CANCEL_FAILED' });
+    }
   });
 
   // ── POST /subscribe — subscribe to a plan (or change plans) ──
@@ -79,15 +150,9 @@ export async function buildBillingModule(app: FastifyInstance) {
 
     const redirectUrl = body.redirectUrl || `${process.env.WEB_BASE_URL || 'http://localhost:30000'}/billing/callback`;
 
-    // Validate redirectUrl is same-origin or from an allowed origin to prevent open redirect
-    const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim().replace(/\/$/, ''));
-    const webBaseUrl = (process.env.WEB_BASE_URL || 'http://localhost:30000').replace(/\/$/, '');
-    const allowedRedirects = [webBaseUrl, ...allowedOrigins].filter(Boolean);
-    if (body.redirectUrl) {
-      const isAllowed = allowedRedirects.some((origin) => body.redirectUrl!.startsWith(origin + '/') || body.redirectUrl === origin);
-      if (!isAllowed) {
-        return reply.status(400).send({ error: 'INVALID_REDIRECT_URL', message: 'Redirect URL must be same-origin or from an allowed domain' });
-      }
+    const redirectError = validateRedirectUrl(body.redirectUrl);
+    if (redirectError) {
+      return reply.status(400).send({ error: 'INVALID_REDIRECT_URL', message: redirectError });
     }
 
     try {

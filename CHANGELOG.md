@@ -1,5 +1,58 @@
 # Changelog
 
+## v1.16.0-alpha — 2026-08-18
+
+### Added
+- **Phase 4 — Pricing page & upgrade UX.**
+  - Public marketing `/pricing` page showing Free / Grower / Business tiers, ZMW/BWP/USD monthly pricing, and an Enterprise "Talk to us" call-to-action.
+  - App-wide `UpgradePromptProvider` in the web root layout; dispatches a consistent "Upgrade your plan" dialog whenever the API returns `402 PLAN_LIMIT_REACHED`.
+- **Phase 4b — Advertising & house ad campaigns.**
+  - Prisma: new `AdCampaign`, `AdEvent`, `AdPricingModel`/`AdCampaignStatus`/`AdPlacement`/`AdPage`/`AdEventType` enums; new `User.isPlatformAdmin` boolean flag; `Organization` ↔ `AdEvent` relation.
+  - Backend `core/ads/ad-serving.service.ts`: weighted-random house ad selection, country targeting, CPM/CPC spend metering, budget-cap auto-pause, and `shouldShowAds` (Free tier + no `remove_ads_addon`).
+  - Backend `modules/ads/routes.ts`: `GET /api/v1/ads/serve`, `POST /api/v1/ads/:id/impression`, `GET /api/v1/ads/:id/click` (server-side redirect to `targetUrl`).
+  - Backend `modules/ad-campaigns/routes.ts`: platform-admin CRUD + stats under `requirePlatformAdmin` (`GET /`, `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id`, `GET /:id/stats`).
+  - Backend `core/billing/addons.ts`: stackable `remove_ads_addon` subscription (ZMW 40 / BWP 15 / USD 2 / month) that runs alongside the org's real plan.
+  - Web `AdSlot` and `AdNativeCard` components with viewability-gated impression tracking and a persistent "Sponsored" disclosure label.
+  - Web ad placements: dashboard banner, projections banner, `AttachmentPanel` native card every 5th document search result, flock detail Overview tab banner.
+  - Mobile `AdService` + `AdSlot` widget; placements on dashboard and projections screens (house ads + inert network placeholder).
+  - Web platform-admin surface at `/admin/ads` (list, create, edit, stats) linked from the user nav when `isPlatformAdmin` is true.
+  - "Remove Ads" add-on card in the web billing settings page, wired to the existing Flutterwave checkout/cancel flow.
+
+### Changed
+- Version bumps for the cross-app monetization release:
+  - `apps/api/package.json`: `1.15.10-alpha` → `1.16.0-alpha`
+  - `apps/web/package.json`: `0.3.0-alpha` → `0.4.0-alpha`
+  - `apps/mobile/pubspec.yaml`: `1.15.7-alpha` → `1.16.0-alpha`
+  - `package.json` (root): `1.10.0-alpha` → `1.16.0-alpha`
+
+### Security
+- Click-fraud / budget-drain fix: `recordAdEvent` re-validates campaign eligibility (status, date window, page, country, org ad-eligibility) before counting any impression or click.
+- Open-redirect fix: campaign `targetUrl` and `creativeImageUrl` restricted to `http(s)` schemes; no `javascript:`, `data:`, or `file:` URLs accepted.
+- Add-on trial-expiry fix: `subscribeToAddon` now sets `trialEndsAt` so the daily billing cron sweeps unpaid add-ons to `past_due`/`suspended` instead of granting ad-free access indefinitely.
+- Add-on checkout `redirectUrl` now uses the same same-origin/allowed-origin validation as plan checkout.
+- `PATCH /ad-campaigns/:id` now re-validates the merged record for date ordering and pricing-model/rate consistency.
+- `isPlatformAdmin` is now included in all login/register/OTP/social-auth response payloads so the admin UI client-side gating works.
+- Country-targeting fail-closed: an org with no `country` no longer matches a targeted campaign.
+
+### Fixed
+- Billing plan-shadowing regression: `getOrCreateSubscription` and `updateSubscription` now scope queries to real plan codes, so a `remove_ads_addon` subscription can no longer masquerade as the org's tier.
+- `processPaymentEvent` and `runDailyBillingCron` only update `Organization.planCode` for real plans, never add-ons.
+- Daily billing cron now bills both plan and add-on active subscriptions, using `getPlan`/`getAddon` pricing.
+
+### Also bundled (pre-existing uncommitted work)
+- API cache-control headers on global reference routes (`breeds`, `diseases`, `vaccination-events/schedules`) to reduce repeat round-trips.
+- Mobile: lightweight in-memory session cache (`ApiCache`) with invalidation on logout and after flock mutations; pull-to-refresh and refresh buttons bypass the cache via `forceRefresh`.
+- Mobile: new `Skeleton` / `SkeletonListCard` / `SkeletonList` shimmer loading placeholders across dashboard, flocks, diseases, vaccination schedules, projections, flock detail, and alerts screens.
+- Web: new `Skeleton` UI component and `loading.tsx` placeholders for root, `/broiler-flocks`, `/broiler-flocks/[id]`, and `/financials`.
+- Mobile service fixes: `AuthService.logout` clears `ApiCache`; `DashboardService` and `BroilerService` use `ApiCache` with 30 s TTL for flocks and dashboard summary.
+
+### Test Results
+- Integration test run: `196/198` passing.
+- New `tests/integration/ads.test.ts`: 16 tests passing (platform-admin gating, campaign CRUD + URL-scheme rejection, serve/targeting, paid-tier suppression, impression/click metering, paused-campaign re-validation, remove-ads add-on purchase/cancel, plan-shadowing regression).
+- Two failures are pre-existing / unrelated to this phase:
+  - `lighting-temperature.test.ts` — `returns current schedule item for a flock` (`expected null not to be null`); a known pre-existing failure.
+  - `broiler-management.test.ts > Flock Tasks > generates daily checklist tasks` — 5 s timeout; passes in isolation and is unrelated to ads/billing changes.
+
 ## v1.15.10-alpha — 2026-08-16
 
 ### Fixed

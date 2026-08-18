@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { AdSlot } from "@/components/ads/AdSlot";
 import {
   Table,
   TableBody,
@@ -228,6 +229,10 @@ export default function ProjectionsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <div className="mb-8">
+        <AdSlot page="projections" />
+      </div>
 
       {(projection25 || projection50) && (
         <>

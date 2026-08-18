@@ -43,6 +43,8 @@ import { buildAccountModule } from './modules/accounts/routes.js';
 import { buildJournalModule } from './modules/journal/routes.js';
 import { buildLedgerModule } from './modules/ledger/routes.js';
 import { buildDocumentModule } from './modules/documents/routes.js';
+import { buildAdModule } from './modules/ads/routes.js';
+import { buildAdCampaignModule } from './modules/ad-campaigns/routes.js';
 import { ensureBucket } from './core/storage/storage.service.js';
 import { SchedulerService } from './core/financial-engine/scheduler.service.js';
 import { DailyRecalculationService } from './core/financial-engine/daily-recalculation.service.js';
@@ -168,6 +170,8 @@ await app.register(buildAccountModule, { prefix: '/api/v1/accounts' });
 await app.register(buildJournalModule, { prefix: '/api/v1/journal' });
 await app.register(buildLedgerModule, { prefix: '/api/v1/ledger' });
 await app.register(buildDocumentModule, { prefix: '/api/v1/documents' });
+await app.register(buildAdModule, { prefix: '/api/v1/ads' });
+await app.register(buildAdCampaignModule, { prefix: '/api/v1/ad-campaigns' });
 
 // ── Health check ─────────────────────────
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

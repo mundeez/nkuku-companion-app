@@ -2,6 +2,22 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export type ApiError = { error: string; message?: string };
 
+export class ApiRequestError extends Error {
+  status: number;
+  body: any;
+  constructor(status: number, body: any) {
+    super(body?.error || `HTTP ${status}`);
+    this.status = status;
+    this.body = body;
+  }
+}
+
+function notifyIfPlanLimit(status: number, body: any) {
+  if (typeof window !== "undefined" && status === 402 && body?.error === "PLAN_LIMIT_REACHED") {
+    window.dispatchEvent(new CustomEvent("nkuku:plan-limit", { detail: body }));
+  }
+}
+
 // Tokens are now stored in HttpOnly cookies set by the API.
 // We only keep the user object (email/role) in localStorage for UI state.
 function getUserFromStorage() {
@@ -54,7 +70,8 @@ export async function apiFetch<T = any>(
   if (!res.ok) {
     const errorCode = data?.error || `HTTP ${res.status}`;
     handleAuthError(errorCode);
-    throw new Error(errorCode);
+    notifyIfPlanLimit(res.status, data);
+    throw new ApiRequestError(res.status, data);
   }
   return data as T;
 }
@@ -76,7 +93,8 @@ export async function apiUpload(
   if (!res.ok) {
     const errorCode = data?.error || `HTTP ${res.status}`;
     handleAuthError(errorCode);
-    throw new Error(errorCode);
+    notifyIfPlanLimit(res.status, data);
+    throw new ApiRequestError(res.status, data);
   }
   return data;
 }
@@ -455,9 +473,81 @@ export async function getInvoices() {
   return apiFetch<any[]>("/api/v1/billing/invoices");
 }
 
+export async function getAddons() {
+  return apiFetch<{ addons: { code: string; name: string; description: string; pricing: { monthly: Record<string, number> }; eligiblePlans: string[] }[] }>(
+    "/api/v1/billing/addons"
+  );
+}
+
+export async function subscribeToAddon(code: string) {
+  return apiFetch<{ checkout: { success: boolean; paymentLink?: string } | null }>(
+    `/api/v1/billing/addons/${code}/subscribe`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+}
+
+export async function cancelAddonApi(code: string) {
+  return apiFetch<{ success: boolean }>(`/api/v1/billing/addons/${code}/cancel`, {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+export type AdPage = "dashboard" | "projections" | "document_search" | "flock_detail";
+export type AdPlacement = "banner" | "native";
+
+export interface AdServeResponse {
+  source: "none" | "house" | "network";
+  campaign?: {
+    id: string;
+    advertiserName: string;
+    creativeImageUrl: string;
+    targetUrl: string;
+    altText: string;
+    placement: AdPlacement;
+  };
+}
+
+export async function getAdServe(page: AdPage, placement: AdPlacement) {
+  return apiFetch<AdServeResponse>(`/api/v1/ads/serve?page=${page}&placement=${placement}`);
+}
+
+export async function recordAdImpression(campaignId: string, page: AdPage) {
+  return apiFetch<void>(`/api/v1/ads/${campaignId}/impression?page=${page}`, { method: "POST", body: "{}" });
+}
+
+export function adClickUrl(campaignId: string, page: AdPage) {
+  return `${API_URL}/api/v1/ads/${campaignId}/click?page=${page}`;
+}
+
 export async function verifyPayment(txRef: string) {
   return apiFetch<{ success: boolean; message: string }>("/api/v1/billing/verify-payment", {
     method: "POST",
     body: JSON.stringify({ txRef }),
   });
+}
+
+// ── Ad campaign admin (platform-admin only) ──
+export async function getAdCampaigns(status?: string) {
+  return apiFetch<any[]>(`/api/v1/ad-campaigns${status ? `?status=${status}` : ""}`);
+}
+
+export async function getAdCampaign(id: string) {
+  return apiFetch<any>(`/api/v1/ad-campaigns/${id}`);
+}
+
+export async function getAdCampaignStats(id: string) {
+  return apiFetch<any>(`/api/v1/ad-campaigns/${id}/stats`);
+}
+
+export async function createAdCampaign(data: any) {
+  return apiFetch<any>("/api/v1/ad-campaigns", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateAdCampaign(id: string, data: any) {
+  return apiFetch<any>(`/api/v1/ad-campaigns/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deleteAdCampaign(id: string) {
+  return apiFetch<void>(`/api/v1/ad-campaigns/${id}`, { method: "DELETE" });
 }

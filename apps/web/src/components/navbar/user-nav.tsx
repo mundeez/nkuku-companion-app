@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { LogOut, Moon, Settings, Sun, CreditCard } from "lucide-react";
+import { LogOut, Moon, Settings, Sun, CreditCard, Megaphone } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { useTheme } from "@/components/theme-provider";
 import { Avatar } from "@/components/ui/avatar";
@@ -71,6 +71,17 @@ export function UserNav() {
               Billing & Plans
             </Link>
           </DropdownMenuItem>
+          {user.isPlatformAdmin && (
+            <DropdownMenuItem asChild>
+              <Link
+                href="/admin/ads"
+                className="cursor-pointer w-full items-center"
+              >
+                <Megaphone className="mr-2 h-4 w-4" />
+                Ad Campaigns
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={() => setTheme(nextTheme)}
             className="cursor-pointer"

@@ -17,7 +17,10 @@ const BreedUpdateSchema = z.object({
 export async function buildBreedModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
-  app.get('/', { preHandler: [authenticate] }, async () => {
+  app.get('/', { preHandler: [authenticate] }, async (_request, reply) => {
+    // Breeds + performance targets are global reference data (not org-scoped),
+    // so a short private browser cache is safe and cuts repeat round-trips.
+    reply.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
     return prisma.breed.findMany({
       include: { performanceTargets: { orderBy: { ageDays: 'asc' } } },
       orderBy: { name: 'asc' },
@@ -26,6 +29,7 @@ export async function buildBreedModule(app: FastifyInstance) {
 
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    reply.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
     const breed = await prisma.breed.findUnique({
       where: { id },
       include: { performanceTargets: { orderBy: { ageDays: 'asc' } } },

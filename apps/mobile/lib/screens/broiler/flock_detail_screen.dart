@@ -17,6 +17,7 @@ import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
 import '../../widgets/flock_charts.dart';
 import '../../widgets/record_card.dart';
+import '../../widgets/skeleton.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/summary_card.dart';
 import 'calendar_screen.dart';
@@ -158,29 +159,23 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       _error = null;
     });
     try {
-      final flock = await BroilerService.getFlock(widget.flockId);
+      // Kick off every request that doesn't depend on another response
+      // immediately, instead of awaiting them one at a time. Only the breed
+      // performance targets genuinely depend on the flock (its breedId), so
+      // that's the sole sequential step; everything else — including the
+      // flock fetch itself — now runs concurrently, cutting the critical
+      // path from ~17 sequential/partially-parallel round-trips down to a
+      // handful of concurrent batches.
+      final flockFuture = BroilerService.getFlock(widget.flockId);
 
-      // Fetch breed performance targets for growth chart
-      List<PerformanceTarget> breedTargets = [];
-      try {
-        final breedRes =
-            await ApiService.dio.get('/api/v1/breeds/${flock.breedId}');
-        final breed = Breed.fromJson(breedRes.data);
-        breedTargets = breed.performanceTargets;
-      } catch (_) {}
+      final calendarFuture = ApiService.dio
+          .get('/api/v1/broiler-flocks/${widget.flockId}/summary')
+          .then((res) => (res.data['days'] as List)
+              .map((e) => CalendarDay.fromJson(e))
+              .toList())
+          .catchError((_) => <CalendarDay>[]);
 
-      List<CalendarDay> days = [];
-      try {
-        final calRes = await ApiService.dio
-            .get('/api/v1/broiler-flocks/${widget.flockId}/summary');
-        days = (calRes.data['days'] as List)
-            .map((e) => CalendarDay.fromJson(e))
-            .toList();
-      } catch (_) {
-        // Calendar is optional — continue without it
-      }
-
-      final results = await Future.wait([
+      final recordsFuture = Future.wait([
         BroilerService.getGrowthRecords(widget.flockId)
             .catchError((_) => <GrowthRecord>[]),
         BroilerService.getFeedRecords(widget.flockId)
@@ -203,6 +198,36 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             .catchError((_) => <DocumentRecord>[]),
       ]);
 
+      final summariesFuture = Future.wait([
+        _safeCall(BroilerService.getGrowthAnalysis(widget.flockId)),
+        _safeCall(BroilerService.getFeedSummary(widget.flockId)),
+        _safeCall(BroilerService.getWaterRatio(widget.flockId)),
+        _safeCall(BroilerService.getMortalitySummary(widget.flockId)),
+        _safeCall(BroilerService.getVaccinationScheduleStatus(widget.flockId)),
+        _safeCall(BroilerService.getFinancialSummary(widget.flockId)),
+      ]);
+
+      final saleSummaryFuture =
+          _safeCall(BroilerService.getSaleRecordSummary(widget.flockId));
+
+      final flock = await flockFuture;
+
+      // Fetch breed performance targets for growth chart — the only truly
+      // sequential dependency (needs flock.breedId) — while everything else
+      // above continues resolving concurrently in the background.
+      List<PerformanceTarget> breedTargets = [];
+      try {
+        final breedRes =
+            await ApiService.dio.get('/api/v1/breeds/${flock.breedId}');
+        final breed = Breed.fromJson(breedRes.data);
+        breedTargets = breed.performanceTargets;
+      } catch (_) {}
+
+      final days = await calendarFuture;
+      final results = await recordsFuture;
+      final summaries = await summariesFuture;
+      final saleSummary = await saleSummaryFuture;
+
       final growth = results[0] as List<GrowthRecord>;
       final feed = results[1] as List<FeedRecord>;
       final water = results[2] as List<WaterRecord>;
@@ -214,24 +239,12 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       final sales = results[8] as List<SaleRecord>;
       final documents = results[9] as List<DocumentRecord>;
 
-      final analysis =
-          await _safeCall(BroilerService.getGrowthAnalysis(widget.flockId));
-      final feedSummary =
-          await _safeCall(BroilerService.getFeedSummary(widget.flockId));
-      final waterRatio =
-          await _safeCall(BroilerService.getWaterRatio(widget.flockId));
-      final mortalitySummary =
-          await _safeCall(BroilerService.getMortalitySummary(widget.flockId));
-      final vaccinationStatus = await _safeCall(
-          BroilerService.getVaccinationScheduleStatus(widget.flockId));
-      final financialSummary =
-          await _safeCall(BroilerService.getFinancialSummary(widget.flockId));
-      Map<String, dynamic>? saleSummary;
-      try {
-        saleSummary = await BroilerService.getSaleRecordSummary(widget.flockId);
-      } catch (_) {
-        saleSummary = null;
-      }
+      final analysis = summaries[0] as GrowthRecordAnalysis?;
+      final feedSummary = summaries[1] as FeedSummary?;
+      final waterRatio = summaries[2] as WaterRatio?;
+      final mortalitySummary = summaries[3] as MortalitySummary?;
+      final vaccinationStatus = summaries[4] as VaccinationScheduleStatus?;
+      final financialSummary = summaries[5] as FinancialSummary?;
 
       setState(() {
         _flock = flock;
@@ -398,7 +411,24 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       ),
       floatingActionButton: _floatingActionButton,
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? ListView(
+              padding: const EdgeInsets.all(16),
+              children: const [
+                Skeleton(height: 160),
+                SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: Skeleton(height: 70)),
+                    SizedBox(width: 8),
+                    Expanded(child: Skeleton(height: 70)),
+                    SizedBox(width: 8),
+                    Expanded(child: Skeleton(height: 70)),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Skeleton(height: 120),
+              ],
+            )
           : _error != null
               ? Center(
                   child: Column(

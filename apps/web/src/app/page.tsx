@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api/client";
 import { DashboardSummary } from "@/lib/types";
+import { AdSlot } from "@/components/ads/AdSlot";
 import {
   TrendingUp, Users, DollarSign, HeartPulse, Scale, AlertTriangle,
   Activity, Syringe, ClipboardList, Thermometer, Bird, Wallet, TrendingDown,
@@ -81,10 +83,28 @@ export default function DashboardPage() {
     }
   }, [user, isLoading, router]);
 
-  if (isLoading) return <div className="p-8">Loading...</div>;
+  const dashboardSkeleton = (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8 space-y-2">
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-24" />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Skeleton className="h-72" />
+        <Skeleton className="h-72" />
+      </div>
+    </div>
+  );
+
+  if (isLoading) return dashboardSkeleton;
   if (!user) return null;
   if (error) return <div className="p-8 text-destructive">{error}</div>;
-  if (!data) return <div className="p-8">Loading dashboard...</div>;
+  if (!data) return dashboardSkeleton;
 
   const k = data.kpis;
   const hasFinancials = k.totalRevenue > 0 || k.totalCost > 0;
@@ -169,6 +189,10 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">{data.alertsBySeverity.critical} critical</p>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mb-8">
+        <AdSlot page="dashboard" />
       </div>
 
       {/* ── Charts Row 1: Revenue vs Cost + Cost Breakdown ─── */}

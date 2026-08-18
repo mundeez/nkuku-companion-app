@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'api_cache.dart';
 import 'api_service.dart';
 
 class AuthService {
@@ -714,6 +715,9 @@ class AuthService {
     await _secure.delete(key: 'refresh_token');
     await _prefs.remove('user_email');
     await _prefs.remove('user_role');
+    // Clear the session-scoped API cache so the next login never sees
+    // another account's cached data.
+    ApiCache.clear();
     _notifyAuthStateChanged();
   }
 }

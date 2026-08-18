@@ -62,8 +62,11 @@ These four items (register, appoint DPO, confirm/fix hosting residency, add cons
 - Feature-gating middleware wired into flock/user/document limits per tier.
 - Grace period + auto-suspend on payment failure; free-tier default on signup.
 
-**Phase 4 — Pricing page & upgrade UX**
-- Public pricing page, in-app upgrade prompts at free-tier limits, billing settings page (web); mobile shows plan status and deep-links to web for billing (avoids app-store IAP cut).
+**Phase 4 — Pricing page & upgrade UX** — DONE (2026-08-18)
+- Public `/pricing` page, an app-wide `UpgradePromptProvider` that shows a consistent dialog on any 402 `PLAN_LIMIT_REACHED` response (feature-gate hits across flock/user/document limits and feature flags), existing `/billing` settings page (web); mobile continues to show plan status and deep-link to web for billing (avoids app-store IAP cut).
+
+**Phase 4b — Advertising** — DONE, core scope (2026-08-18) — see `docs/ADVERTISING_PLAN.md`
+- House ad campaigns (flat/CPM/CPC) served to Free-tier orgs only, targeted by country, on dashboard/projections/document-search/flock-detail; "Remove Ads" add-on; platform-admin campaign management UI. Google AdSense/AdMob network fallback and consent-management (Funding Choices/UMP) integration deferred until a real ad-network account exists — see ADVERTISING_PLAN.md §9 for the full done/deferred breakdown.
 
 **Phase 5 — Enterprise/white-label packaging**
 - Package existing single-tenant deployment (`docker-compose.prod.yml`) as a licensable self-hosted SKU with branding config and a support contract template.

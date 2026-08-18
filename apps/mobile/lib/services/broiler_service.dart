@@ -14,6 +14,7 @@ import '../models/sale_record.dart';
 import '../models/supplier.dart';
 import '../models/vaccination_event.dart';
 import '../models/water_record.dart';
+import 'api_cache.dart';
 import 'api_service.dart';
 
 class BroilerServiceException implements Exception {
@@ -25,13 +26,30 @@ class BroilerServiceException implements Exception {
 
 class BroilerService {
   // Flocks
-  static Future<List<BroilerFlock>> getFlocks({String? status}) async {
-    final res = await ApiService.dio.get(
-      '/api/v1/broiler-flocks',
-      queryParameters: {if (status != null) 'status': status},
+  //
+  // Cached briefly (session-only, see ApiCache) since the flock list is
+  // fetched on every visit to the Flocks tab and the Dashboard — a 30s TTL
+  // means switching tabs back and forth doesn't always re-hit the network,
+  // while still staying fresh enough after a create/edit/delete (which also
+  // explicitly invalidates this cache below).
+  static Future<List<BroilerFlock>> getFlocks({
+    String? status,
+    bool forceRefresh = false,
+  }) async {
+    final cacheKey = 'flocks:${status ?? 'all'}';
+    if (forceRefresh) ApiCache.invalidate(cacheKey);
+    return ApiCache.fetch(
+      cacheKey,
+      () async {
+        final res = await ApiService.dio.get(
+          '/api/v1/broiler-flocks',
+          queryParameters: {if (status != null) 'status': status},
+        );
+        _assertOk(res);
+        return (res.data as List).map((e) => BroilerFlock.fromJson(e)).toList();
+      },
+      ttl: const Duration(seconds: 30),
     );
-    _assertOk(res);
-    return (res.data as List).map((e) => BroilerFlock.fromJson(e)).toList();
   }
 
   static Future<BroilerFlock> getFlock(String id) async {
@@ -44,25 +62,37 @@ class BroilerService {
   static Future<BroilerFlock> createFlock(BroilerFlock flock) async {
     final res = await ApiService.dio.post('/api/v1/broiler-flocks', data: flock.toJson());
     _assertOk(res);
+    ApiCache.invalidatePrefix('flocks:');
     return BroilerFlock.fromJson(res.data);
   }
 
   static Future<BroilerFlock> updateFlock(String id, Map<String, dynamic> data) async {
     final res = await ApiService.dio.patch('/api/v1/broiler-flocks/$id', data: data);
     _assertOk(res);
+    ApiCache.invalidatePrefix('flocks:');
     return BroilerFlock.fromJson(res.data);
   }
 
   static Future<void> deleteFlock(String id) async {
     final res = await ApiService.dio.delete('/api/v1/broiler-flocks/$id');
     _assertOk(res);
+    ApiCache.invalidatePrefix('flocks:');
   }
 
   // Breeds / Suppliers
+  //
+  // Breeds are close to static reference data (Ross 308, Cobb 500, etc.) —
+  // safe to cache for the whole session.
   static Future<List<Breed>> getBreeds() async {
-    final res = await ApiService.dio.get('/api/v1/breeds');
-    _assertOk(res);
-    return (res.data as List).map((e) => Breed.fromJson(e)).toList();
+    return ApiCache.fetch(
+      'breeds',
+      () async {
+        final res = await ApiService.dio.get('/api/v1/breeds');
+        _assertOk(res);
+        return (res.data as List).map((e) => Breed.fromJson(e)).toList();
+      },
+      ttl: const Duration(minutes: 30),
+    );
   }
 
   static Future<List<Supplier>> getSuppliers() async {

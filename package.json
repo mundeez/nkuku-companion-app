@@ -1,6 +1,6 @@
 {
   "name": "nkuku-companion-app",
-  "version": "1.10.0-alpha",
+  "version": "1.16.0-alpha",
   "private": true,
   "description": "Nkuku Companion App — broiler chicken business management platform",
   "scripts": {

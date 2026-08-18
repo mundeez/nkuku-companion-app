@@ -5,6 +5,7 @@
 
 import type { PrismaClient } from '@prisma/client';
 import { PLANS, getPlan, getPlanPrice, type PlanCode } from './plans.js';
+import { getAddon, getAddonPrice, type AddonCode } from './addons.js';
 import {
   initiateCheckout,
   verifyTransaction,
@@ -35,8 +36,13 @@ export interface SubscriptionInfo {
  * org from before billing), create a free-tier one.
  */
 export async function getOrCreateSubscription(prisma: PrismaClient, organizationId: string) {
+  // IMPORTANT: only consider real plan-tier subscriptions here, never
+  // add-ons (e.g. "remove_ads_addon" — see core/billing/addons.ts). An org
+  // can hold two independent Subscription rows at once (its plan + an
+  // add-on); picking the most recently created one regardless of type
+  // would let an add-on purchase silently masquerade as the org's plan.
   let sub = await prisma.subscription.findFirst({
-    where: { organizationId, status: { in: ['trialing', 'active', 'past_due'] } },
+    where: { organizationId, status: { in: ['trialing', 'active', 'past_due'] }, planCode: { in: Object.keys(PLANS) } },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -321,11 +327,15 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
           currentPeriodEnd: invoice.periodEnd,
         },
       });
-      // Update org planCode
-      await prisma.organization.update({
-        where: { id: invoice.organizationId },
-        data: { planCode: invoice.planCode },
-      });
+      // Update org planCode — only for real plan tiers, never for add-ons
+      // (e.g. "remove_ads_addon" stacks on top of the org's existing plan
+      // via a second Subscription row; see core/billing/addons.ts).
+      if (getPlan(invoice.planCode)) {
+        await prisma.organization.update({
+          where: { id: invoice.organizationId },
+          data: { planCode: invoice.planCode },
+        });
+      }
     }
 
     return { success: true, invoice, message: 'Payment processed successfully' };
@@ -401,15 +411,20 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
       where: { id: sub.id },
       data: { status: 'suspended' },
     });
-    // Downgrade org to free
-    await prisma.organization.update({
-      where: { id: sub.organizationId },
-      data: { planCode: 'free' },
-    });
+    // Downgrade org to free — only applies to real plan subscriptions.
+    // An add-on (e.g. remove_ads_addon) lapsing must not touch the org's
+    // actual plan tier.
+    if (getPlan(sub.planCode)) {
+      await prisma.organization.update({
+        where: { id: sub.organizationId },
+        data: { planCode: 'free' },
+      });
+    }
     subscriptionsSuspended++;
   }
 
-  // 3. Generate recurring invoices for active paid subscriptions whose period has ended
+  // 3. Generate recurring invoices for active paid subscriptions (plans and
+  // add-ons alike) whose period has ended.
   const activeSubs = await prisma.subscription.findMany({
     where: {
       status: 'active',
@@ -432,7 +447,13 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
     });
     if (existingInvoice) continue; // already generated
 
-    const amount = getPlanPrice(sub.planCode as PlanCode, sub.billingCycle as any, org.currency);
+    const plan = getPlan(sub.planCode);
+    const addon = plan ? undefined : getAddon(sub.planCode);
+    if (!plan && !addon) continue; // unknown planCode — skip rather than bill 0
+
+    const amount = plan
+      ? getPlanPrice(sub.planCode as PlanCode, sub.billingCycle as any, org.currency)
+      : getAddonPrice(sub.planCode as AddonCode, org.currency);
     const txRef = generateTxRef();
     const invoiceNumber = generateInvoiceNumber();
 
@@ -472,8 +493,11 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
 // ── Helpers ──
 
 async function updateSubscription(prisma: PrismaClient, organizationId: string, data: any) {
+  // Same add-on exclusion as getOrCreateSubscription above — this helper
+  // backs subscribeToPlan/cancelSubscription and must never touch an
+  // add-on's Subscription row.
   const existing = await prisma.subscription.findFirst({
-    where: { organizationId, status: { in: ['trialing', 'active', 'past_due', 'suspended'] } },
+    where: { organizationId, status: { in: ['trialing', 'active', 'past_due', 'suspended'] }, planCode: { in: Object.keys(PLANS) } },
     orderBy: { createdAt: 'desc' },
   });
 

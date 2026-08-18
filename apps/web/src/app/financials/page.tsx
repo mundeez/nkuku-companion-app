@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { DollarSign, TrendingUp, TrendingDown, PiggyBank, FileText, BarChart3, Calendar, Wrench, Eye } from "lucide-react";
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const COLORS = ["#1B5E20", "#C6A017", "#1565C0", "#D32F2F", "#7B1FA2", "#E65100", "#00695C", "#5D4037"];
 
@@ -50,7 +51,25 @@ export default function FinancialsDashboard() {
     }
   }, [user, isLoading, router, year]);
 
-  if (isLoading) return <div className="p-8">Loading...</div>;
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-2 mb-6">
+          <Skeleton className="h-8 w-56" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-80" />
+          <Skeleton className="h-80" />
+        </div>
+      </div>
+    );
+  }
   if (!user) return null;
 
   const kpi = summary ?? { totalRevenue: 0, totalCost: 0, grossProfit: 0, netProfit: 0, grossMargin: 0, netMargin: 0, categoryBreakdown: [], flockBreakdown: [] };

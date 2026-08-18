@@ -32,6 +32,11 @@ model User {
   consentAcceptedAt DateTime? @map("consent_accepted_at") @db.Timestamptz(6)
   consentVersion    String?   @map("consent_version") @db.VarChar(20)
 
+  // Platform-level admin flag — grants access to cross-organization admin
+  // surfaces (currently: ad campaign management). Not self-serve; set
+  // manually via a one-off DB update. See docs/ADVERTISING_PLAN.md §2.
+  isPlatformAdmin Boolean @default(false) @map("is_platform_admin")
+
   createdSuppliers                    Supplier[]                    @relation("SupplierCreatedBy")
   createdBatches                      Batch[]                       @relation("BatchCreatedBy")
   createdCycles                       ProductionCycle[]             @relation("CycleCreatedBy")
@@ -46,6 +51,7 @@ model User {
   otpCodes                            OtpCode[]
   devices                             UserDevice[]
   socialAccounts                      SocialAccount[]
+  createdAdCampaigns                  AdCampaign[]                  @relation("AdCampaignCreatedBy")
 
   @@map("users")
 }
@@ -147,6 +153,7 @@ model Organization {
   subscriptions                Subscription[]
   invoices                     Invoice[]
   feedPurchases                FeedPurchase[]
+  adEvents                     AdEvent[]
 
   @@map("organizations")
 }
@@ -1491,4 +1498,91 @@ model SaleRecord {
   @@index([saleDate])
   @@index([organizationId])
   @@map("sale_records")
+}
+
+// ── ADVERTISING (Phase 4b) ────────────────────
+// See docs/ADVERTISING_PLAN.md. AdCampaign is platform-level (NOT
+// organization-scoped) — it represents inventory Nkuku sells directly to
+// advertisers (agri-suppliers, feed/vaccine/equipment vendors), who may or
+// may not themselves be Nkuku customers. Served only to Free-tier
+// organizations without an active "remove_ads_addon" subscription.
+
+enum AdPricingModel {
+  flat
+  cpm
+  cpc
+}
+
+enum AdCampaignStatus {
+  draft
+  active
+  paused
+  completed
+}
+
+enum AdPlacement {
+  banner
+  native
+}
+
+enum AdPage {
+  dashboard
+  projections
+  document_search
+  flock_detail
+}
+
+model AdCampaign {
+  id               String           @id @default(uuid()) @db.Uuid
+  advertiserName   String           @map("advertiser_name") @db.VarChar(150)
+  creativeImageUrl String           @map("creative_image_url") @db.Text
+  targetUrl        String           @map("target_url") @db.Text
+  altText          String           @map("alt_text") @db.VarChar(200)
+  placement        AdPlacement
+  pages            AdPage[]         @map("pages")
+  countryTargets   String[]         @map("country_targets") // ISO-3166-1 alpha-2; empty = all countries
+  pricingModel     AdPricingModel   @map("pricing_model")
+  flatFeeAmount    Decimal?         @map("flat_fee_amount") @db.Decimal(12, 2)
+  cpmRate          Decimal?         @map("cpm_rate") @db.Decimal(10, 4) // price per 1000 impressions
+  cpcRate          Decimal?         @map("cpc_rate") @db.Decimal(10, 4) // price per click
+  currency         String           @default("ZMW") @db.Char(3)
+  budgetCap        Decimal?         @map("budget_cap") @db.Decimal(12, 2) // cpm/cpc only; null = uncapped
+  spendToDate      Decimal          @default(0) @map("spend_to_date") @db.Decimal(12, 2)
+  priorityWeight   Int              @default(1) @map("priority_weight")
+  startDate        DateTime         @map("start_date") @db.Timestamptz(6)
+  endDate          DateTime         @map("end_date") @db.Timestamptz(6)
+  status           AdCampaignStatus @default(draft)
+  impressionsCount Int              @default(0) @map("impressions_count")
+  clicksCount      Int              @default(0) @map("clicks_count")
+  createdBy        String           @map("created_by") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  creator User      @relation("AdCampaignCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  events  AdEvent[]
+
+  @@index([status, startDate, endDate])
+  @@map("ad_campaigns")
+}
+
+enum AdEventType {
+  impression
+  click
+}
+
+// Lightweight event log for metering (cpm/cpc billing) and reporting.
+model AdEvent {
+  id             String      @id @default(uuid()) @db.Uuid
+  adCampaignId   String      @map("ad_campaign_id") @db.Uuid
+  organizationId String?     @map("organization_id") @db.Uuid
+  eventType      AdEventType @map("event_type")
+  page           AdPage
+  occurredAt     DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  campaign     AdCampaign    @relation(fields: [adCampaignId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([adCampaignId, eventType, occurredAt])
+  @@index([organizationId])
+  @@map("ad_events")
 }

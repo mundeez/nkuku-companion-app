@@ -22,6 +22,8 @@ import {
 import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout, ClipboardList, Thermometer, Pill, CalendarDays, Printer, Paperclip, ChevronDown, ChevronRight } from "lucide-react";
 import { FlockTabChart } from "@/components/flock-tab-chart";
 import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AdSlot } from "@/components/ads/AdSlot";
 
 function fmtCollectionDate(date: string | Date | undefined): string {
   if (!date) return "";
@@ -62,20 +64,38 @@ export default function FlockDetailPage() {
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
 
   function loadAll() {
-    apiFetch<any>(`/api/v1/broiler-flocks/${flockId}`)
-      .then((d) => {
+    // Batch all independent fetches into a single coordinated flow so the
+    // browser fires them concurrently and we apply one state update per
+    // endpoint. Each endpoint is isolated via allSettled so a single failure
+    // (e.g. suppliers) doesn't block the rest.
+    const flockP = apiFetch<any>(`/api/v1/broiler-flocks/${flockId}`);
+    const growthP = apiFetch<GrowthRecord[]>(`/api/v1/growth-records?flockId=${flockId}`);
+    const feedP = apiFetch<FeedRecord[]>(`/api/v1/feed-records?flockId=${flockId}`);
+    const waterP = apiFetch<WaterRecord[]>(`/api/v1/water-records?flockId=${flockId}`);
+    const mortalityP = apiFetch<MortalityEvent[]>(`/api/v1/mortality-events?flockId=${flockId}`);
+    const vaccinationP = apiFetch<VaccinationEvent[]>(`/api/v1/vaccination-events?flockId=${flockId}`);
+    const financialP = apiFetch<FinancialRecord[]>(`/api/v1/financial-records?flockId=${flockId}`);
+    const suppliersP = apiFetch<Supplier[]>("/api/v1/suppliers");
+
+    Promise.allSettled([
+      flockP, growthP, feedP, waterP, mortalityP, vaccinationP, financialP, suppliersP,
+    ]).then(([flockRes, growthRes, feedRes, waterRes, mortalityRes, vaccRes, finRes, supRes]) => {
+      if (flockRes.status === "fulfilled") {
+        const d = flockRes.value;
         setFlock(d);
         setProjectedSalePrice(d.salePriceZmw != null ? String(d.salePriceZmw) : "");
         setAgeDays(d.startDate ? Math.floor((new Date().getTime() - new Date(d.startDate).getTime()) / 86400000) : -1);
-      })
-      .catch((err) => setError(err.message));
-    apiFetch<GrowthRecord[]>(`/api/v1/growth-records?flockId=${flockId}`).then(setGrowthRecords).catch(() => {});
-    apiFetch<FeedRecord[]>(`/api/v1/feed-records?flockId=${flockId}`).then(setFeedRecords).catch(() => {});
-    apiFetch<WaterRecord[]>(`/api/v1/water-records?flockId=${flockId}`).then(setWaterRecords).catch(() => {});
-    apiFetch<MortalityEvent[]>(`/api/v1/mortality-events?flockId=${flockId}`).then(setMortalityEvents).catch(() => {});
-    apiFetch<VaccinationEvent[]>(`/api/v1/vaccination-events?flockId=${flockId}`).then(setVaccinationEvents).catch(() => {});
-    apiFetch<FinancialRecord[]>(`/api/v1/financial-records?flockId=${flockId}`).then(setFinancialRecords).catch(() => {});
-    apiFetch<Supplier[]>("/api/v1/suppliers").then(setSuppliers).catch(() => {});
+      } else {
+        setError(flockRes.reason?.message || "Failed to load flock");
+      }
+      if (growthRes.status === "fulfilled") setGrowthRecords(growthRes.value);
+      if (feedRes.status === "fulfilled") setFeedRecords(feedRes.value);
+      if (waterRes.status === "fulfilled") setWaterRecords(waterRes.value);
+      if (mortalityRes.status === "fulfilled") setMortalityEvents(mortalityRes.value);
+      if (vaccRes.status === "fulfilled") setVaccinationEvents(vaccRes.value);
+      if (finRes.status === "fulfilled") setFinancialRecords(finRes.value);
+      if (supRes.status === "fulfilled") setSuppliers(supRes.value);
+    });
   }
 
   async function saveCollectionStatus() {
@@ -150,9 +170,28 @@ export default function FlockDetailPage() {
     }
   }
 
-  if (isLoading) return <div className="p-8">Loading...</div>;
+  const detailSkeleton = (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex items-center gap-4 mb-6">
+        <Skeleton className="h-9 w-24" />
+        <div className="space-y-2 flex-1">
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-28" />
+        ))}
+      </div>
+      <Skeleton className="h-10 w-full mb-6" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
+
+  if (isLoading) return detailSkeleton;
   if (!user) return null;
-  if (!flock) return <div className="p-8">Loading flock details...</div>;
+  if (!flock) return detailSkeleton;
 
   const latestGrowth = growthRecords[growthRecords.length - 1];
   const totalFeed = feedRecords.reduce((sum, r) => sum + Number(r.quantityKg), 0);
@@ -328,6 +367,9 @@ export default function FlockDetailPage() {
                 </Link>
               </CardContent>
             </Card>
+          </div>
+          <div className="mt-4">
+            <AdSlot page="flock_detail" />
           </div>
         </TabsContent>
 

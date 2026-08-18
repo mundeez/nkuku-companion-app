@@ -7,6 +7,36 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
 import { getEffectivePlanCode, getOrCreateSubscription } from './billing.service.js';
 import { hasFeature, getPlan } from './plans.js';
+import { hasActiveAddon } from './addons.js';
+
+/**
+ * Whether ads should be shown to this organization: Free tier only, and
+ * only if it hasn't purchased the "remove_ads_addon". See
+ * docs/ADVERTISING_PLAN.md.
+ */
+export async function shouldShowAds(prisma: PrismaClient, organizationId: string): Promise<boolean> {
+  const planCode = await getEffectivePlanCode(prisma, organizationId);
+  if (planCode !== 'free') return false;
+  const adsRemoved = await hasActiveAddon(prisma, organizationId, 'remove_ads_addon');
+  return !adsRemoved;
+}
+
+/**
+ * Restrict a route to platform administrators (cross-organization admin
+ * surfaces, e.g. ad campaign management). Not part of the org-scoped RBAC
+ * system — checked via a dedicated `User.isPlatformAdmin` flag.
+ */
+export async function requirePlatformAdmin(request: FastifyRequest, reply: FastifyReply) {
+  const prisma = (request as any).server?.prisma ?? (reply as any).server?.prisma;
+  const userId = (request as any).authUser?.userId;
+  if (!prisma || !userId) {
+    return reply.status(403).send({ error: 'FORBIDDEN' });
+  }
+  const user = await (prisma as PrismaClient).user.findUnique({ where: { id: userId } });
+  if (!user?.isPlatformAdmin) {
+    return reply.status(403).send({ error: 'FORBIDDEN', message: 'Platform admin access required' });
+  }
+}
 
 /**
  * Check if the organization's current plan includes a feature.

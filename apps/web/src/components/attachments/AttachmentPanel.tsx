@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { FileText, Trash2, Download, Upload, File, Search, Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
+import { AdNativeCard } from "@/components/ads/AdNativeCard";
 
 /**
  * Props for the AttachmentPanel.
@@ -282,50 +283,55 @@ export function AttachmentPanel({
           </div>
         ) : (
           <div className="space-y-2">
-            {displayDocs.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center justify-between gap-3 rounded-lg border p-3"
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  {fileIcon(doc.mimeType)}
-                  <div className="min-w-0">
-                    <div className="font-medium truncate text-sm">{doc.fileName}</div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-2">
-                      {fmtSize(doc.fileSizeKb)} · {new Date(doc.createdAt).toLocaleDateString()}
-                      {doc.scanStatus === "clean" && (
-                        <span className="flex items-center gap-0.5 text-green-600">
-                          <ShieldCheck className="h-3 w-3" />
-                        </span>
-                      )}
-                      {doc.scanStatus === "skipped" && (
-                        <span className="flex items-center gap-0.5 text-yellow-600">
-                          <ShieldAlert className="h-3 w-3" />
-                        </span>
-                      )}
-                      {doc.extractionStatus === "pending" && (
-                        <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-                      )}
+            {displayDocs.map((doc, i) => (
+              <div key={doc.id}>
+                {/* Native sponsored card interleaved every 5 search results */}
+                {searchResults && i > 0 && i % 5 === 0 && (
+                  <div className="mb-2">
+                    <AdNativeCard page="document_search" />
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {fileIcon(doc.mimeType)}
+                    <div className="min-w-0">
+                      <div className="font-medium truncate text-sm">{doc.fileName}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        {fmtSize(doc.fileSizeKb)} · {new Date(doc.createdAt).toLocaleDateString()}
+                        {doc.scanStatus === "clean" && (
+                          <span className="flex items-center gap-0.5 text-green-600">
+                            <ShieldCheck className="h-3 w-3" />
+                          </span>
+                        )}
+                        {doc.scanStatus === "skipped" && (
+                          <span className="flex items-center gap-0.5 text-yellow-600">
+                            <ShieldAlert className="h-3 w-3" />
+                          </span>
+                        )}
+                        {doc.extractionStatus === "pending" && (
+                          <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button variant="ghost" size="sm" onClick={() => viewFile(doc)}>
-                    View
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => downloadFile(doc)}>
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  {canDelete && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      onClick={() => deleteDocument(doc.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="sm" onClick={() => viewFile(doc)}>
+                      View
                     </Button>
-                  )}
+                    <Button variant="outline" size="sm" onClick={() => downloadFile(doc)}>
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() => deleteDocument(doc.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

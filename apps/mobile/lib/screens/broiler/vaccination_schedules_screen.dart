@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/api_cache.dart';
 import '../../services/api_service.dart';
 import '../../models/flock.dart';
 
@@ -26,8 +27,19 @@ class _VaccinationSchedulesScreenState extends State<VaccinationSchedulesScreen>
       _error = null;
     });
     try {
-      final res = await ApiService.dio.get('/api/v1/vaccination-events/schedules');
-      final schedules = (res.data as List).map((e) => VaccinationSchedule.fromJson(e)).toList();
+      // Vaccination schedules are static reference data (Standard Broiler,
+      // Ross 308 Comprehensive) — safe to cache for the whole session.
+      final schedules = await ApiCache.fetch(
+        'vaccination-schedules',
+        () async {
+          final res =
+              await ApiService.dio.get('/api/v1/vaccination-events/schedules');
+          return (res.data as List)
+              .map((e) => VaccinationSchedule.fromJson(e))
+              .toList();
+        },
+        ttl: const Duration(minutes: 30),
+      );
       setState(() {
         _schedules = schedules;
         _loading = false;

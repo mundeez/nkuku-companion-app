@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/api_cache.dart';
 import '../../services/api_service.dart';
 import '../../models/flock.dart';
 
@@ -29,8 +30,16 @@ class _DiseasesScreenState extends State<DiseasesScreen> {
       _error = null;
     });
     try {
-      final res = await ApiService.dio.get('/api/v1/diseases');
-      final diseases = (res.data as List).map((e) => Disease.fromJson(e)).toList();
+      // The disease database is static reference data — safe to cache for
+      // the whole session.
+      final diseases = await ApiCache.fetch(
+        'diseases',
+        () async {
+          final res = await ApiService.dio.get('/api/v1/diseases');
+          return (res.data as List).map((e) => Disease.fromJson(e)).toList();
+        },
+        ttl: const Duration(minutes: 30),
+      );
       setState(() {
         _diseases = diseases;
         _filtered = diseases;

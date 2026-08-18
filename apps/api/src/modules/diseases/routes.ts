@@ -16,7 +16,7 @@ const DiseaseCreateSchema = z.object({
 export async function buildDiseaseModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
-  app.get('/', { preHandler: [authenticate] }, async (request) => {
+  app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
     const query = z.object({
       category: z.string().optional(),
       search: z.string().optional(),
@@ -31,13 +31,18 @@ export async function buildDiseaseModule(app: FastifyInstance) {
       ];
     }
 
+    // Disease database is global reference data; cache briefly to speed up
+    // repeat navigations. Search/category-filtered responses are also safe
+    // to cache since the underlying data changes rarely.
+    reply.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
     return prisma.disease.findMany({
       where,
       orderBy: { name: 'asc' },
     });
   });
 
-  app.get('/categories', { preHandler: [authenticate] }, async () => {
+  app.get('/categories', { preHandler: [authenticate] }, async (_request, reply) => {
+    reply.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
     const categories = await prisma.disease.groupBy({
       by: ['category'],
       _count: true,
@@ -47,6 +52,7 @@ export async function buildDiseaseModule(app: FastifyInstance) {
 
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    reply.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
     const disease = await prisma.disease.findUnique({ where: { id } });
     if (!disease) return reply.status(404).send({ error: 'NOT_FOUND' });
     return disease;

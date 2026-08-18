@@ -3,6 +3,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../models/dashboard_summary.dart';
 import '../services/dashboard_service.dart';
+import '../widgets/skeleton.dart';
+import '../widgets/ad_slot.dart';
 import 'alerts_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -23,10 +25,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadSummary();
   }
 
-  Future<void> _loadSummary() async {
+  Future<void> _loadSummary({bool forceRefresh = false}) async {
     try {
       setState(() => _loading = true);
-      final summary = await DashboardService.fetchSummary();
+      final summary =
+          await DashboardService.fetchSummary(forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
           _summary = summary;
@@ -59,16 +62,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              tooltip: 'Alerts',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AlertsScreen()),
-              ),
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'Alerts',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AlertsScreen()),
             ),
+          ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadSummary,
+        onRefresh: () => _loadSummary(forceRefresh: true),
         child: _buildBody(theme),
       ),
     );
@@ -76,7 +79,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildBody(ThemeData theme) {
     if (_loading && _summary == null) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            children: const [
+              Expanded(child: Skeleton(height: 80)),
+              SizedBox(width: 12),
+              Expanded(child: Skeleton(height: 80)),
+              SizedBox(width: 12),
+              Expanded(child: Skeleton(height: 80)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Skeleton(height: 180),
+          const SizedBox(height: 16),
+          const SkeletonListCard(withAvatar: false),
+          const SkeletonListCard(withAvatar: false),
+          const SkeletonListCard(withAvatar: false),
+        ],
+      );
     }
     if (_error != null) {
       return Center(
@@ -85,7 +107,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Failed to load dashboard', style: theme.textTheme.titleMedium),
+              Text('Failed to load dashboard',
+                  style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
@@ -101,14 +124,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         _KpiGrid(kpis: k),
+        const SizedBox(height: 16),
+        const AdSlot(page: 'dashboard'),
         const SizedBox(height: 24),
-        _SectionTitle(title: 'Financials', action: s.monthlyTrend.isEmpty ? const Text('No data yet', style: TextStyle(color: Colors.grey)) : null),
+        _SectionTitle(
+            title: 'Financials',
+            action: s.monthlyTrend.isEmpty
+                ? const Text('No data yet',
+                    style: TextStyle(color: Colors.grey))
+                : null),
         const SizedBox(height: 12),
         if (s.monthlyTrend.isNotEmpty) _MonthlyTrendCard(items: s.monthlyTrend),
         const SizedBox(height: 24),
         _SectionTitle(title: 'Cost Breakdown'),
         const SizedBox(height: 12),
-        if (s.costBreakdown.isNotEmpty) _CostBreakdownCard(items: s.costBreakdown),
+        if (s.costBreakdown.isNotEmpty)
+          _CostBreakdownCard(items: s.costBreakdown),
         const SizedBox(height: 24),
         _SectionTitle(title: 'Flock Profitability'),
         const SizedBox(height: 12),
@@ -132,7 +163,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
         _SectionTitle(
           title: 'Recent Alerts',
-          action: Text('${k.openAlerts} open', style: TextStyle(color: k.openAlerts > 0 ? theme.colorScheme.error : Colors.grey)),
+          action: Text('${k.openAlerts} open',
+              style: TextStyle(
+                  color: k.openAlerts > 0
+                      ? theme.colorScheme.error
+                      : Colors.grey)),
         ),
         const SizedBox(height: 12),
         if (s.recentAlerts.isNotEmpty)
@@ -161,7 +196,8 @@ class _SectionTitle extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         if (action != null) action!,
       ],
     );
@@ -176,12 +212,33 @@ class _KpiGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _Kpi('Active Flocks', kpis.activeFlocks.toString(), Icons.trending_up, Colors.blue, subtitle: '${kpis.pendingFlocks} pending'),
-      _Kpi('Total Birds', kpis.totalBirds.toString(), Icons.egg_alt, Colors.green, subtitle: 'Across active flocks'),
-      _Kpi('Mortality Rate', '${kpis.mortalityRate.toStringAsFixed(1)}%', Icons.warning, _mortalityColor(kpis.mortalityRate), subtitle: 'Active flocks avg'),
-      _Kpi('Net Profit', 'ZMW ${_fmt(kpis.netProfit)}', Icons.account_balance_wallet, kpis.netProfit < 0 ? Colors.red : Colors.green, subtitle: 'All flocks'),
-      _Kpi('Profit / Bird', 'ZMW ${_fmt(kpis.profitPerBird)}', Icons.attach_money, kpis.profitPerBird < 0 ? Colors.red : Colors.green, subtitle: 'Per bird'),
-      _Kpi('Open Alerts', kpis.openAlerts.toString(), Icons.notifications_active, kpis.openAlerts > 0 ? Colors.orange : Colors.grey, subtitle: '${kpis.openAlerts} critical'),
+      _Kpi('Active Flocks', kpis.activeFlocks.toString(), Icons.trending_up,
+          Colors.blue,
+          subtitle: '${kpis.pendingFlocks} pending'),
+      _Kpi('Total Birds', kpis.totalBirds.toString(), Icons.egg_alt,
+          Colors.green,
+          subtitle: 'Across active flocks'),
+      _Kpi('Mortality Rate', '${kpis.mortalityRate.toStringAsFixed(1)}%',
+          Icons.warning, _mortalityColor(kpis.mortalityRate),
+          subtitle: 'Active flocks avg'),
+      _Kpi(
+          'Net Profit',
+          'ZMW ${_fmt(kpis.netProfit)}',
+          Icons.account_balance_wallet,
+          kpis.netProfit < 0 ? Colors.red : Colors.green,
+          subtitle: 'All flocks'),
+      _Kpi(
+          'Profit / Bird',
+          'ZMW ${_fmt(kpis.profitPerBird)}',
+          Icons.attach_money,
+          kpis.profitPerBird < 0 ? Colors.red : Colors.green,
+          subtitle: 'Per bird'),
+      _Kpi(
+          'Open Alerts',
+          kpis.openAlerts.toString(),
+          Icons.notifications_active,
+          kpis.openAlerts > 0 ? Colors.orange : Colors.grey,
+          subtitle: '${kpis.openAlerts} critical'),
     ];
 
     return GridView.builder(
@@ -234,15 +291,21 @@ class _KpiCard extends StatelessWidget {
                 Icon(item.icon, size: 18, color: item.color),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(item.label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  child: Text(item.label,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ),
               ],
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: item.color)),
-                Text(item.subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text(item.value,
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: item.color)),
+                Text(item.subtitle,
+                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
               ],
             ),
           ],
@@ -259,7 +322,10 @@ class _MonthlyTrendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxY = items.map((e) => e.revenue > e.cost ? e.revenue : e.cost).reduce((a, b) => a > b ? a : b).toDouble();
+    final maxY = items
+        .map((e) => e.revenue > e.cost ? e.revenue : e.cost)
+        .reduce((a, b) => a > b ? a : b)
+        .toDouble();
     final interval = maxY > 0 ? maxY / 4 : 1.0;
 
     return SizedBox(
@@ -277,24 +343,37 @@ class _MonthlyTrendCard extends StatelessWidget {
                     showTitles: true,
                     getTitlesWidget: (v, _) {
                       final idx = v.toInt();
-                      if (idx < 0 || idx >= items.length) return const SizedBox.shrink();
-                      return Text(items[idx].month.substring(0, 3), style: const TextStyle(fontSize: 10));
+                      if (idx < 0 || idx >= items.length)
+                        return const SizedBox.shrink();
+                      return Text(items[idx].month.substring(0, 3),
+                          style: const TextStyle(fontSize: 10));
                     },
                   ),
                 ),
                 leftTitles: AxisTitles(
-                  sideTitles: SideTitles(showTitles: true, reservedSize: 40, interval: interval),
+                  sideTitles: SideTitles(
+                      showTitles: true, reservedSize: 40, interval: interval),
                 ),
-                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
               ),
               borderData: FlBorderData(show: false),
               barGroups: List.generate(items.length, (i) {
                 return BarChartGroupData(
                   x: i,
                   barRods: [
-                    BarChartRodData(toY: items[i].revenue, color: Colors.green, width: 6, borderRadius: BorderRadius.circular(2)),
-                    BarChartRodData(toY: items[i].cost, color: Colors.red, width: 6, borderRadius: BorderRadius.circular(2)),
+                    BarChartRodData(
+                        toY: items[i].revenue,
+                        color: Colors.green,
+                        width: 6,
+                        borderRadius: BorderRadius.circular(2)),
+                    BarChartRodData(
+                        toY: items[i].cost,
+                        color: Colors.red,
+                        width: 6,
+                        borderRadius: BorderRadius.circular(2)),
                   ],
                 );
               }),
@@ -345,7 +424,10 @@ class _CostBreakdownCard extends StatelessWidget {
                       title: '${(pct * 100).toStringAsFixed(0)}%',
                       color: _categoryColors[e.category] ?? Colors.grey,
                       radius: 48,
-                      titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                      titleStyle: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
                     );
                   }).toList(),
                 ),
@@ -359,9 +441,15 @@ class _CostBreakdownCard extends StatelessWidget {
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(width: 10, height: 10, decoration: BoxDecoration(color: _categoryColors[e.category] ?? Colors.grey, borderRadius: BorderRadius.circular(2))),
+                    Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                            color: _categoryColors[e.category] ?? Colors.grey,
+                            borderRadius: BorderRadius.circular(2))),
                     const SizedBox(width: 4),
-                    Text('${e.category}: ZMW ${_fmt(e.amount)}', style: const TextStyle(fontSize: 11)),
+                    Text('${e.category}: ZMW ${_fmt(e.amount)}',
+                        style: const TextStyle(fontSize: 11)),
                   ],
                 );
               }).toList(),
@@ -461,7 +549,8 @@ class _FlockProfitabilityChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxAbs = items.fold<double>(0, (max, f) => f.profit.abs() > max ? f.profit.abs() : max);
+    final maxAbs = items.fold<double>(
+        0, (max, f) => f.profit.abs() > max ? f.profit.abs() : max);
     if (maxAbs == 0) return const SizedBox.shrink();
 
     return Card(
@@ -470,7 +559,8 @@ class _FlockProfitabilityChart extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Net Profit per Flock', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const Text('Net Profit per Flock',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             SizedBox(
               height: 180,
@@ -478,7 +568,8 @@ class _FlockProfitabilityChart extends StatelessWidget {
                 BarChartData(
                   maxY: maxAbs * 1.2,
                   minY: -maxAbs * 1.2,
-                  gridData: const FlGridData(show: true, drawVerticalLine: false),
+                  gridData:
+                      const FlGridData(show: true, drawVerticalLine: false),
                   titlesData: FlTitlesData(
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
@@ -486,9 +577,14 @@ class _FlockProfitabilityChart extends StatelessWidget {
                         reservedSize: 40,
                         getTitlesWidget: (v, _) {
                           final idx = v.toInt();
-                          if (idx < 0 || idx >= items.length) return const SizedBox.shrink();
+                          if (idx < 0 || idx >= items.length)
+                            return const SizedBox.shrink();
                           final name = items[idx].flockName;
-                          return Text(name.length > 10 ? name.substring(0, 8) : name, style: const TextStyle(fontSize: 8), maxLines: 2, overflow: TextOverflow.ellipsis);
+                          return Text(
+                              name.length > 10 ? name.substring(0, 8) : name,
+                              style: const TextStyle(fontSize: 8),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis);
                         },
                       ),
                     ),
@@ -496,11 +592,14 @@ class _FlockProfitabilityChart extends StatelessWidget {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 44,
-                        getTitlesWidget: (v, _) => Text('ZMW${v.toInt()}', style: const TextStyle(fontSize: 8)),
+                        getTitlesWidget: (v, _) => Text('ZMW${v.toInt()}',
+                            style: const TextStyle(fontSize: 8)),
                       ),
                     ),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
                   ),
                   borderData: FlBorderData(show: false),
                   barGroups: items.asMap().entries.map((e) {
@@ -510,7 +609,9 @@ class _FlockProfitabilityChart extends StatelessWidget {
                       barRods: [
                         BarChartRodData(
                           toY: profit,
-                          color: profit >= 0 ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                          color: profit >= 0
+                              ? const Color(0xFF22C55E)
+                              : const Color(0xFFEF4444),
                           width: 16,
                           borderRadius: BorderRadius.circular(3),
                         ),
@@ -545,7 +646,8 @@ class _AlertsSeverityChart extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Alerts by Severity', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const Text('Alerts by Severity',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             SizedBox(
               height: 160,
@@ -560,7 +662,10 @@ class _AlertsSeverityChart extends StatelessWidget {
                         title: '${severity.critical}',
                         color: const Color(0xFFEF4444),
                         radius: 48,
-                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                        titleStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
                       ),
                     if (severity.warning > 0)
                       PieChartSectionData(
@@ -568,7 +673,10 @@ class _AlertsSeverityChart extends StatelessWidget {
                         title: '${severity.warning}',
                         color: const Color(0xFFF59E0B),
                         radius: 48,
-                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                        titleStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
                       ),
                     if (severity.info > 0)
                       PieChartSectionData(
@@ -576,7 +684,10 @@ class _AlertsSeverityChart extends StatelessWidget {
                         title: '${severity.info}',
                         color: const Color(0xFF3B82F6),
                         radius: 48,
-                        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                        titleStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
                       ),
                   ],
                 ),
@@ -587,8 +698,10 @@ class _AlertsSeverityChart extends StatelessWidget {
               spacing: 12,
               runSpacing: 6,
               children: [
-                _legendItem(const Color(0xFFEF4444), 'Critical: ${severity.critical}'),
-                _legendItem(const Color(0xFFF59E0B), 'Warning: ${severity.warning}'),
+                _legendItem(
+                    const Color(0xFFEF4444), 'Critical: ${severity.critical}'),
+                _legendItem(
+                    const Color(0xFFF59E0B), 'Warning: ${severity.warning}'),
                 _legendItem(const Color(0xFF3B82F6), 'Info: ${severity.info}'),
               ],
             ),
@@ -602,7 +715,11 @@ class _AlertsSeverityChart extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+        Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+                color: color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 4),
         Text(label, style: const TextStyle(fontSize: 11)),
       ],

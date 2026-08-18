@@ -396,7 +396,7 @@ export async function buildAuthModule(app: FastifyInstance) {
       return reply.status(201).send({
         accessToken,
         refreshToken,
-        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId: organization.id, phoneVerified: true },
+        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId: organization.id, isPlatformAdmin: user.isPlatformAdmin, phoneVerified: true },
         organization: { id: organization.id, name: organization.name, country: organization.country, currency: organization.currency },
       });
     }
@@ -437,7 +437,7 @@ export async function buildAuthModule(app: FastifyInstance) {
       return reply.status(200).send({
         accessToken,
         refreshToken,
-        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, phoneVerified: !!user.phoneVerifiedAt },
+        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, isPlatformAdmin: user.isPlatformAdmin, phoneVerified: !!user.phoneVerifiedAt },
       });
     }
 
@@ -534,7 +534,7 @@ export async function buildAuthModule(app: FastifyInstance) {
     return reply.status(201).send({
       accessToken,
       refreshToken,
-      user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId: organization.id, phoneVerified: false },
+      user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId: organization.id, isPlatformAdmin: user.isPlatformAdmin, phoneVerified: false },
       organization: { id: organization.id, name: organization.name, country: organization.country, currency: organization.currency },
     });
   });
@@ -635,7 +635,7 @@ export async function buildAuthModule(app: FastifyInstance) {
     return reply.status(201).send({
       accessToken,
       refreshToken,
-      user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: invite.role, organizationId: invite.organizationId },
+      user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: invite.role, organizationId: invite.organizationId, isPlatformAdmin: user.isPlatformAdmin },
     });
   });
 
@@ -699,7 +699,7 @@ export async function buildAuthModule(app: FastifyInstance) {
       return {
         accessToken,
         refreshToken,
-        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, phoneVerified: !!user.phoneVerifiedAt },
+        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, isPlatformAdmin: user.isPlatformAdmin, phoneVerified: !!user.phoneVerifiedAt },
       };
     }
 
@@ -770,7 +770,7 @@ export async function buildAuthModule(app: FastifyInstance) {
       return {
         accessToken,
         refreshToken,
-        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, phoneVerified: !!user.phoneVerifiedAt },
+        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, isPlatformAdmin: user.isPlatformAdmin, phoneVerified: !!user.phoneVerifiedAt },
       };
     }
 
@@ -965,7 +965,7 @@ export async function buildAuthModule(app: FastifyInstance) {
       return reply.status(200).send({
         accessToken,
         refreshToken,
-        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, phoneVerified: !!user.phoneVerifiedAt },
+        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, isPlatformAdmin: user.isPlatformAdmin, phoneVerified: !!user.phoneVerifiedAt },
         organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
       });
     }
@@ -1020,7 +1020,7 @@ export async function buildAuthModule(app: FastifyInstance) {
         return reply.status(200).send({
           accessToken,
           refreshToken,
-          user: { id: existingUser.id, email: existingUser.email, phone: existingUser.phone, name: existingUser.name, role: existingUser.role, organizationId, phoneVerified: !!existingUser.phoneVerifiedAt },
+          user: { id: existingUser.id, email: existingUser.email, phone: existingUser.phone, name: existingUser.name, role: existingUser.role, organizationId, isPlatformAdmin: existingUser.isPlatformAdmin, phoneVerified: !!existingUser.phoneVerifiedAt },
           organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
         });
       }
@@ -1124,7 +1124,7 @@ export async function buildAuthModule(app: FastifyInstance) {
       return reply.status(200).send({
         accessToken,
         refreshToken,
-        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, phoneVerified: !!user.phoneVerifiedAt },
+        user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, isPlatformAdmin: user.isPlatformAdmin, phoneVerified: !!user.phoneVerifiedAt },
         organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
       });
     }
@@ -1179,7 +1179,7 @@ export async function buildAuthModule(app: FastifyInstance) {
         return reply.status(200).send({
           accessToken,
           refreshToken,
-          user: { id: existingUser.id, email: existingUser.email, phone: existingUser.phone, name: existingUser.name, role: existingUser.role, organizationId, phoneVerified: !!existingUser.phoneVerifiedAt },
+          user: { id: existingUser.id, email: existingUser.email, phone: existingUser.phone, name: existingUser.name, role: existingUser.role, organizationId, isPlatformAdmin: existingUser.isPlatformAdmin, phoneVerified: !!existingUser.phoneVerifiedAt },
           organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
         });
       }
@@ -1255,7 +1255,7 @@ export async function buildAuthModule(app: FastifyInstance) {
         const org = await prisma.organization.findUnique({ where: { id: organizationId } });
         return reply.status(200).send({
           accessToken, refreshToken,
-          user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, phoneVerified: !!user.phoneVerifiedAt },
+          user: { id: user.id, email: user.email, phone: user.phone, name: user.name, role: user.role, organizationId, isPlatformAdmin: user.isPlatformAdmin, phoneVerified: !!user.phoneVerifiedAt },
           organization: org ? { id: org.id, name: org.name, country: org.country, currency: org.currency } : null,
         });
       }

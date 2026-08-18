@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/alert.dart';
 import '../services/alerts_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/skeleton.dart';
 
 class AlertsScreen extends StatefulWidget {
   const AlertsScreen({super.key});
@@ -269,7 +270,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
           const Divider(height: 1),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const SkeletonList()
                 : _error != null
                     ? Center(
                         child: Column(

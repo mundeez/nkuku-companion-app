@@ -22,7 +22,9 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
   // GET /api/v1/vaccination-events/schedules - list all vaccination schedules
-  app.get('/schedules', { preHandler: [authenticate] }, async () => {
+  app.get('/schedules', { preHandler: [authenticate] }, async (_request, reply) => {
+    // Vaccination schedules are global reference data; cache briefly.
+    reply.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
     return prisma.vaccinationSchedule.findMany({
       include: { items: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { isDefault: 'desc' },

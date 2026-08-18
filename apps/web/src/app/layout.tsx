@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/toast-provider";
 import { Navbar } from "@/components/navbar";
+import { UpgradePromptProvider } from "@/components/billing/upgrade-prompt-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,8 +46,10 @@ export default function RootLayout({
         <AuthProvider>
           <ThemeProvider>
             <ToastProvider>
-              <Navbar />
-              <main className="min-h-screen bg-muted/30">{children}</main>
+              <UpgradePromptProvider>
+                <Navbar />
+                <main className="min-h-screen bg-muted/30">{children}</main>
+              </UpgradePromptProvider>
             </ToastProvider>
           </ThemeProvider>
         </AuthProvider>

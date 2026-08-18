@@ -3,6 +3,7 @@ import '../../models/flock.dart';
 import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/skeleton.dart';
 import 'flock_detail_screen.dart';
 import 'flock_form_screen.dart';
 
@@ -24,13 +25,13 @@ class _FlocksScreenState extends State<FlocksScreen> {
     _loadFlocks();
   }
 
-  Future<void> _loadFlocks() async {
+  Future<void> _loadFlocks({bool forceRefresh = false}) async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final flocks = await BroilerService.getFlocks();
+      final flocks = await BroilerService.getFlocks(forceRefresh: forceRefresh);
       if (!mounted) return;
       setState(() {
         _flocks = flocks;
@@ -123,7 +124,10 @@ class _FlocksScreenState extends State<FlocksScreen> {
       appBar: AppBar(
         title: const Text('Broiler Flocks'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadFlocks),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _loadFlocks(forceRefresh: true),
+          ),
         ],
       ),
       floatingActionButton: AuthService.canEdit
@@ -133,9 +137,9 @@ class _FlocksScreenState extends State<FlocksScreen> {
             )
           : null,
       body: RefreshIndicator(
-        onRefresh: _loadFlocks,
+        onRefresh: () => _loadFlocks(forceRefresh: true),
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const SkeletonList()
             : _error != null
                 ? Center(
                     child: Column(

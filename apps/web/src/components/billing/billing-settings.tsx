@@ -7,11 +7,14 @@ import {
   subscribeToPlan,
   cancelSubscriptionApi,
   getInvoices,
+  getAddons,
+  subscribeToAddon,
+  cancelAddonApi,
 } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Check, X, Zap, Crown, Loader2 } from "lucide-react";
+import { CreditCard, Check, X, Zap, Crown, Loader2, ShieldOff } from "lucide-react";
 
 interface Plan {
   code: string;
@@ -43,6 +46,16 @@ interface SubscriptionInfo {
   canceledAt: string | null;
   limits: any;
   usage: { activeFlocks: number; users: number };
+  adsShown?: boolean;
+  addons?: { remove_ads_addon: boolean };
+}
+
+interface Addon {
+  code: string;
+  name: string;
+  description: string;
+  pricing: { monthly: Record<string, number> };
+  eligiblePlans: string[];
 }
 
 type BillingCycle = "monthly" | "cycle_3mo" | "annual";
@@ -63,6 +76,7 @@ export function BillingSettings() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [addons, setAddons] = useState<Addon[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedCycle, setSelectedCycle] = useState<BillingCycle>("monthly");
@@ -74,18 +88,51 @@ export function BillingSettings() {
 
   async function loadData() {
     try {
-      const [plansData, subData, invoicesData] = await Promise.all([
+      const [plansData, subData, invoicesData, addonsData] = await Promise.all([
         getBillingPlans(),
         getSubscription().catch(() => null),
         getInvoices().catch(() => []),
+        getAddons().catch(() => ({ addons: [] })),
       ]);
       setPlans(plansData.plans);
       setSubscription(subData);
       setInvoices(invoicesData);
+      setAddons(addonsData.addons);
     } catch (err: any) {
       setError(err.message || "Failed to load billing data");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleAddonSubscribe(code: string) {
+    setActionLoading(code);
+    setError(null);
+    try {
+      const result = await subscribeToAddon(code);
+      if (result.checkout?.paymentLink) {
+        window.location.href = result.checkout.paymentLink;
+      } else {
+        await loadData();
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to subscribe to add-on");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleAddonCancel(code: string) {
+    if (!confirm("Remove this add-on? Ads will resume on your Free plan.")) return;
+    setActionLoading(`cancel-${code}`);
+    setError(null);
+    try {
+      await cancelAddonApi(code);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to cancel add-on");
+    } finally {
+      setActionLoading(null);
     }
   }
 
@@ -311,6 +358,43 @@ export function BillingSettings() {
           );
         })}
       </div>
+
+      {/* Add-ons — only relevant while on the Free plan (ads only ever show there) */}
+      {currentPlanCode === "free" && addons.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {addons.map((addon) => {
+            const isActive = addon.code === "remove_ads_addon" && subscription?.addons?.remove_ads_addon;
+            const price = addon.pricing.monthly?.ZMW ?? 0;
+            return (
+              <Card key={addon.code}>
+                <CardContent className="pt-6 flex items-start gap-3">
+                  <ShieldOff className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{addon.name}</span>
+                      {isActive && <Badge>Active</Badge>}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{addon.description}</p>
+                    <p className="text-sm font-semibold mt-1">ZMW {price.toLocaleString()} / month</p>
+                    <Button
+                      size="sm"
+                      variant={isActive ? "outline" : "default"}
+                      className="mt-2"
+                      disabled={actionLoading === addon.code || actionLoading === `cancel-${addon.code}`}
+                      onClick={() => (isActive ? handleAddonCancel(addon.code) : handleAddonSubscribe(addon.code))}
+                    >
+                      {actionLoading === addon.code || actionLoading === `cancel-${addon.code}` ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : null}
+                      {isActive ? "Remove add-on" : "Add to plan"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Invoices */}
       {invoices.length > 0 && (
