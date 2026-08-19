@@ -56,3 +56,4 @@ apps/mobile/*.aab
 key.properties
 release.keystore
 *.jks
+*.tsbuildinfo

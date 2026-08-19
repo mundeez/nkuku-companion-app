@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { AuditService } from '../../core/financial-engine/audit.service.js';
+import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 
 const FinancialRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -193,7 +194,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const data = FinancialRecordCreateSchema.partial().parse(request.body);
+    const data = FinancialRecordCreateSchema.partial().omit({ flockId: true }).parse(request.body);
     const authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
@@ -256,7 +257,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
   });
 
   // POST /bulk — bulk create or bulk delete financial records
-  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager'), bulkRateLimit] }, async (request, reply) => {
     const body = z.object({
       action: z.enum(['create', 'delete']),
       records: z.array(FinancialRecordCreateSchema).max(500).optional(),
@@ -277,30 +278,33 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
       const validRecords = body.records.filter((r) => validFlockIds.has(r.flockId));
 
-      const created = await prisma.$transaction(
-        validRecords.map((r) =>
-          prisma.financialRecord.create({
+      const created = await prisma.$transaction(async (tx: any) => {
+        const records = [];
+        for (const r of validRecords) {
+          const record = await tx.financialRecord.create({
             data: {
-              ...r,
-              recordDate: new Date(r.recordDate),
               flockId: r.flockId,
+              recordDate: new Date(r.recordDate),
+              category: r.category,
+              description: r.description,
+              amountZmw: r.amountZmw,
+              isIncome: r.isIncome,
+              notes: r.notes,
             },
-          })
-        )
-      );
-
-      // Audit log each creation
-      for (const record of created) {
-        await audit.log({
-          organizationId,
-          userId: authUser.userId,
-          entityType: 'FinancialRecord',
-          entityId: record.id,
-          action: 'create',
-          newState: record,
-          ipAddress: request.ip,
-        });
-      }
+          });
+          await audit.log({
+            organizationId,
+            userId: authUser.userId,
+            entityType: 'FinancialRecord',
+            entityId: record.id,
+            action: 'create',
+            newState: record,
+            ipAddress: request.ip,
+          }, tx);
+          records.push(record);
+        }
+        return records;
+      });
 
       return { action: 'create', affected: created.length, skipped: body.records.length - created.length, records: created };
     }
@@ -319,20 +323,20 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
       const validRecords = records.filter((r: any) => r.flock.organizationId === organizationId);
       const validIds = validRecords.map((r: any) => r.id);
 
-      await prisma.financialRecord.deleteMany({ where: { id: { in: validIds } } });
-
-      // Audit log each deletion
-      for (const record of validRecords) {
-        await audit.log({
-          organizationId,
-          userId: authUser.userId,
-          entityType: 'FinancialRecord',
-          entityId: record.id,
-          action: 'delete',
-          previousState: record,
-          ipAddress: request.ip,
-        });
-      }
+      await prisma.$transaction(async (tx: any) => {
+        await tx.financialRecord.deleteMany({ where: { id: { in: validIds } } });
+        for (const record of validRecords) {
+          await audit.log({
+            organizationId,
+            userId: authUser.userId,
+            entityType: 'FinancialRecord',
+            entityId: record.id,
+            action: 'delete',
+            previousState: record,
+            ipAddress: request.ip,
+          }, tx);
+        }
+      });
 
       return { action: 'delete', affected: validIds.length, skipped: body.ids.length - validIds.length };
     }

@@ -1,4 +1,4 @@
-import type { PrismaClient, AuditAction } from '@prisma/client';
+import type { PrismaClient, AuditAction, Prisma } from '@prisma/client';
 
 export interface AuditEntry {
   organizationId: string;
@@ -23,8 +23,11 @@ export interface AuditQuery {
 export class AuditService {
   constructor(private prisma: PrismaClient) {}
 
-  async log(entry: AuditEntry): Promise<void> {
-    await this.prisma.auditLog.create({
+  // If `tx` is provided, the audit row is written within that transaction
+  // client, ensuring atomicity with the mutation it audits.
+  async log(entry: AuditEntry, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = tx ?? this.prisma;
+    await client.auditLog.create({
       data: {
         organizationId: entry.organizationId,
         userId: entry.userId ?? null,

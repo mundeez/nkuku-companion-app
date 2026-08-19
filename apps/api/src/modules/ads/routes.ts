@@ -69,6 +69,6 @@ export async function buildAdModule(app: FastifyInstance) {
     // full re-validation this guards against (click-fraud / budget drain
     // via arbitrary campaign ids).
     await recordAdEvent(prisma, { campaignId: id, organizationId, eventType: 'click', page: query.page });
-    return reply.redirect(302, campaign.targetUrl);
+    return reply.redirect(campaign.targetUrl, 302);
   });
 }

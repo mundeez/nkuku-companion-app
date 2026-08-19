@@ -17,6 +17,7 @@ FROM base AS production
 COPY apps/api/src ./src
 COPY apps/api/tsconfig.json ./
 COPY apps/api/vitest.config.ts ./
+COPY apps/api/eslint.config.js ./
 COPY apps/api/tests ./tests
 
 EXPOSE 3001
@@ -28,6 +29,7 @@ FROM base AS development
 COPY apps/api/src ./src
 COPY apps/api/tsconfig.json ./
 COPY apps/api/vitest.config.ts ./
+COPY apps/api/eslint.config.js ./
 COPY apps/api/tests ./tests
 
 EXPOSE 3001

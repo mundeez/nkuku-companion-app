@@ -59,7 +59,7 @@ export async function buildEnvironmentalRecordModule(app: FastifyInstance) {
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const data = EnvironmentalRecordCreateSchema.partial().parse(request.body);
+    const data = EnvironmentalRecordCreateSchema.partial().omit({ flockId: true }).parse(request.body);
     const authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 

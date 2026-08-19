@@ -58,6 +58,20 @@ const app = Fastify({
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
 
+// Fastify 5 strictly validates the Content-Type header against the body.
+// Bodyless requests (DELETE, GET, HEAD, OPTIONS) from clients often send
+// `Content-Type: application/json` with no body, which Fastify 5 rejects
+// with FST_ERR_CTP_EMPTY_JSON_BODY. Strip the header for these methods
+// when no content-length is present so they are treated as no-body.
+app.addHook('onRequest', async (request: any) => {
+  if (!['DELETE', 'GET', 'HEAD', 'OPTIONS'].includes(request.method)) return;
+  const ct = request.headers['content-type'];
+  const cl = request.headers['content-length'];
+  if (ct && ct.startsWith('application/json') && (!cl || cl === '0')) {
+    delete request.headers['content-type'];
+  }
+});
+
 // CORS: allow configured origins (comma-separated) or default to all in dev
 const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())

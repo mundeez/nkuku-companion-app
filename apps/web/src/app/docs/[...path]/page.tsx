@@ -3,11 +3,12 @@ import path from 'path';
 import { notFound } from 'next/navigation';
 
 interface DocsPageProps {
-  params: { path: string[] };
+  params: Promise<{ path: string[] }>;
 }
 
-export default function DocsPage({ params }: DocsPageProps) {
-  const filePath = path.join(process.cwd(), 'public', 'docs', ...params.path);
+export default async function DocsPage({ params }: DocsPageProps) {
+  const { path: pathSegments } = await params;
+  const filePath = path.join(process.cwd(), 'public', 'docs', ...pathSegments);
   const resolved = path.resolve(filePath);
   const docsRoot = path.resolve(process.cwd(), 'public', 'docs');
 

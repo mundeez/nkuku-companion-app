@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 
 const VaccinationEventCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -143,7 +144,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const data = VaccinationEventCreateSchema.partial().parse(request.body);
+    const data = VaccinationEventCreateSchema.partial().omit({ flockId: true, vaccineInventoryId: true }).parse(request.body);
     const authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
@@ -228,7 +229,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
   });
 
   // POST /bulk — bulk create or bulk delete vaccination events
-  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager'), bulkRateLimit] }, async (request, reply) => {
     const body = z.object({
       action: z.enum(['create', 'delete']),
       records: z.array(VaccinationEventCreateSchema).max(500).optional(),
@@ -254,12 +255,18 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
         for (const r of validRecords) {
           const record = await tx.vaccinationEvent.create({
             data: {
-              vaccineType: r.vaccineType || r.vaccineName,
-              ...r,
-              adminDate: new Date(r.adminDate),
-              nextDueDate: r.nextDueDate ? new Date(r.nextDueDate) : null,
-              expiryDate: r.expiryDate ? new Date(r.expiryDate) : null,
               flockId: r.flockId,
+              vaccineName: r.vaccineName,
+              vaccineType: r.vaccineType || r.vaccineName,
+              adminDate: new Date(r.adminDate),
+              adminMethod: r.adminMethod,
+              ageDays: r.ageDays,
+              costZmw: r.costZmw,
+              nextDueDate: r.nextDueDate ? new Date(r.nextDueDate) : null,
+              batchNumber: r.batchNumber,
+              expiryDate: r.expiryDate ? new Date(r.expiryDate) : null,
+              vaccineInventoryId: r.vaccineInventoryId,
+              notes: r.notes,
             },
           });
           if (r.costZmw && r.costZmw > 0) {

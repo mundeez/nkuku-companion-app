@@ -86,7 +86,7 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const data = MedicationRecordCreateSchema.partial().parse(request.body);
+    const data = MedicationRecordCreateSchema.partial().omit({ flockId: true }).parse(request.body);
     const authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 

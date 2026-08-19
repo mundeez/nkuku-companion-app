@@ -6,6 +6,7 @@ services:
       target: development
     environment:
       NODE_ENV: development
+      BULK_RATE_LIMIT: ${BULK_RATE_LIMIT:-0}
       DATABASE_URL: ${DATABASE_URL:-postgresql://nkuku_user:dev_password_change_me@shared-postgres:5432/nkuku_db}
       REDIS_URL: ${REDIS_URL:-redis://shared-redis:6379}
       PORT: ${API_PORT:-3001}

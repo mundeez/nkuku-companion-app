@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 
 const FeedRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -140,7 +141,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const data = FeedRecordCreateSchema.partial().parse(request.body);
+    const data = FeedRecordCreateSchema.partial().omit({ flockId: true, supplierId: true }).parse(request.body);
     const authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
@@ -222,7 +223,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
   });
 
   // POST /bulk — bulk create or bulk delete feed records
-  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager'), bulkRateLimit] }, async (request, reply) => {
     const body = z.object({
       action: z.enum(['create', 'delete']),
       records: z.array(FeedRecordCreateSchema).max(500).optional(),
@@ -260,10 +261,14 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
           }
           const record = await tx.feedRecord.create({
             data: {
-              ...r,
-              feedBrand,
-              recordDate: new Date(r.recordDate),
               flockId: r.flockId,
+              supplierId: r.supplierId,
+              recordDate: new Date(r.recordDate),
+              feedType: r.feedType,
+              feedBrand,
+              quantityKg: r.quantityKg,
+              costZmw: r.costZmw,
+              notes: r.notes,
             },
           });
           // Auto-create financial record for feed cost

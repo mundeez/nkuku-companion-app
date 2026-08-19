@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 
 const WaterRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -112,7 +113,7 @@ export async function buildWaterRecordModule(app: FastifyInstance) {
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const data = WaterRecordCreateSchema.partial().parse(request.body);
+    const data = WaterRecordCreateSchema.partial().omit({ flockId: true }).parse(request.body);
     const authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
@@ -190,7 +191,7 @@ export async function buildWaterRecordModule(app: FastifyInstance) {
   });
 
   // POST /bulk — bulk create or bulk delete water records
-  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager'), bulkRateLimit] }, async (request, reply) => {
     const body = z.object({
       action: z.enum(['create', 'delete']),
       records: z.array(WaterRecordCreateSchema).max(500).optional(),
@@ -216,9 +217,13 @@ export async function buildWaterRecordModule(app: FastifyInstance) {
         for (const r of validRecords) {
           const record = await tx.waterRecord.create({
             data: {
-              ...r,
-              recordDate: new Date(r.recordDate),
               flockId: r.flockId,
+              recordDate: new Date(r.recordDate),
+              quantityLiters: r.quantityLiters,
+              ph: r.ph,
+              temperature: r.temperature,
+              costZmw: r.costZmw,
+              notes: r.notes,
             },
           });
           if (r.costZmw && r.costZmw > 0) {

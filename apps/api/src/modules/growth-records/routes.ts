@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 
 const GrowthRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -118,7 +119,7 @@ export async function buildGrowthRecordModule(app: FastifyInstance) {
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const data = GrowthRecordCreateSchema.partial().parse(request.body);
+    const data = GrowthRecordCreateSchema.partial().omit({ flockId: true }).parse(request.body);
     const authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
@@ -157,7 +158,7 @@ export async function buildGrowthRecordModule(app: FastifyInstance) {
   });
 
   // POST /bulk — bulk create or bulk delete growth records
-  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager'), bulkRateLimit] }, async (request, reply) => {
     const body = z.object({
       action: z.enum(['create', 'delete']),
       records: z.array(GrowthRecordCreateSchema).max(500).optional(),
@@ -183,9 +184,11 @@ export async function buildGrowthRecordModule(app: FastifyInstance) {
           .map((r) =>
             prisma.growthRecord.create({
               data: {
-                ...r,
-                recordDate: new Date(r.recordDate),
                 flockId: r.flockId,
+                recordDate: new Date(r.recordDate),
+                sampleSize: r.sampleSize,
+                avgWeight: r.avgWeight,
+                notes: r.notes,
               },
             })
           )

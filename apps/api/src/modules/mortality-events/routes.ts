@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 
 const MortalityEventCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -121,7 +122,7 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
 
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const data = MortalityEventCreateSchema.partial().parse(request.body);
+    const data = MortalityEventCreateSchema.partial().omit({ flockId: true }).parse(request.body);
     const authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
@@ -214,7 +215,7 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
   });
 
   // POST /bulk — bulk create or bulk delete mortality events
-  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager'), bulkRateLimit] }, async (request, reply) => {
     const body = z.object({
       action: z.enum(['create', 'delete']),
       records: z.array(MortalityEventCreateSchema).max(500).optional(),
@@ -252,9 +253,13 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
         for (const r of validRecords) {
           const record = await tx.mortalityEvent.create({
             data: {
-              ...r,
-              eventDate: new Date(r.eventDate),
               flockId: r.flockId,
+              eventDate: new Date(r.eventDate),
+              count: r.count,
+              cause: r.cause,
+              ageDays: r.ageDays,
+              costZmw: r.costZmw,
+              notes: r.notes,
             },
           });
           if (r.costZmw && r.costZmw > 0) {

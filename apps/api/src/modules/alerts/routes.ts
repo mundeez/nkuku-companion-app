@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 
 function publishNtfy(topic: string, title: string, message: string, priority: 'default' | 'urgent') {
@@ -127,7 +128,7 @@ export async function buildAlertModule(app: FastifyInstance) {
   });
 
   // POST /api/v1/alerts/bulk — bulk mark read / mark resolved / delete
-  app.post('/bulk', { preHandler: [authenticate] }, async (request, reply) => {
+  app.post('/bulk', { preHandler: [authenticate, bulkRateLimit] }, async (request, reply) => {
     const body = z.object({
       action: z.enum(['mark_read', 'mark_resolved', 'delete']),
       ids: z.array(z.string().uuid()).min(1).max(500),

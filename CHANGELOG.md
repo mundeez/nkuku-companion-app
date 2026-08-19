@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.18.0-alpha] — 2026-08-19
+
+### Security
+- **Fastify 4→5 upgrade** (HIGH): All @fastify/* plugins upgraded to v5-compatible versions. Fixed `reply.redirect()` signature change. Added content-type stripping hook for bodyless requests.
+- **Next.js 14→15 upgrade** (HIGH): Updated docs page for async `params`. Web build passes with 0 errors.
+- **Nodemailer 6→9 upgrade** (HIGH): No API changes required.
+- **PostCSS 8.4→8.5 upgrade** (HIGH): Added pnpm override to force patched version in Next.js dependency tree.
+- **Transactional audit logging** (MEDIUM): Bulk financial-record create/delete now writes audit rows inside the same Prisma `$transaction`, ensuring atomicity.
+- **Rate limiting on bulk endpoints** (LOW): Redis-backed sliding-window rate limiter added to all 7 bulk endpoints. Configurable via `BULK_RATE_LIMIT` env var (default: 10/min in prod, disabled in dev).
+- **Mass-assignment hardening** (LOW): Bulk create routes now use explicit field mappings instead of object spreads. PATCH routes now omit `flockId` (and other foreign keys) from update schemas to prevent cross-tenant record moving.
+
+### Infrastructure
+- Added `eslint.config.js` to Docker container for lint support.
+- Removed `tsconfig.tsbuildinfo` from git tracking (now gitignored).
+- Added `BULK_RATE_LIMIT` env var to docker-compose.yml and docker-compose.prod.yml.
+
+### Validation
+- 280/280 tests pass (24 test files)
+- API typecheck: clean
+- Web typecheck: clean
+- API lint: 0 errors (118 pre-existing warnings)
+- API health: OK
+- Web: HTTP 200
+
 ## v1.17.1-alpha — 2026-08-19
 
 ### Security

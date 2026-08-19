@@ -44,6 +44,7 @@ services:
       target: production
     environment:
       NODE_ENV: production
+      BULK_RATE_LIMIT: ${BULK_RATE_LIMIT:-10}
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       PORT: 3001
