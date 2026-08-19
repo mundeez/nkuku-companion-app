@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "1.19.0-alpha",
+  "version": "1.20.0-alpha",
   "private": true,
   "description": "Nkuku Companion Web Dashboard — Next.js 14 + Tailwind + shadcn/ui",
   "scripts": {
@@ -47,5 +47,11 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "15.5.21",
     "typescript": "^5.3.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "sharp": ">=0.35.0",
+      "postcss": ">=8.5.23"
+    }
   }
 }

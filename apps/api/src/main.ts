@@ -86,30 +86,38 @@ await app.register(cors, { origin: corsOrigins, credentials: true });
 
 // Cookie support for HttpOnly auth tokens (web clients).
 // Mobile clients continue to use Bearer tokens from the JSON response body.
+const cookieSecret = process.env.JWT_SECRET;
+if (!cookieSecret && process.env.NODE_ENV === 'production') {
+  app.log.error('JWT_SECRET environment variable is required in production — refusing to start');
+  process.exit(1);
+}
 await app.register(cookie, {
-  secret: process.env.JWT_SECRET || 'dev_cookie_secret',
+  secret: cookieSecret || 'dev_cookie_secret',
 });
 
 await app.register(multipart, {
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
 });
 
-await app.register(swagger, {
-  swagger: {
-    info: {
-      title: 'Nkuku Companion API',
-      description: 'Broiler chicken production management API',
-      version: '0.1.0-alpha',
+// Swagger UI — only exposed in development to avoid leaking API docs in production
+if (process.env.NODE_ENV !== 'production') {
+  await app.register(swagger, {
+    swagger: {
+      info: {
+        title: 'Nkuku Companion API',
+        description: 'Broiler chicken production management API',
+        version: '0.1.0-alpha',
+      },
+      consumes: ['application/json'],
+      produces: ['application/json'],
     },
-    consumes: ['application/json'],
-    produces: ['application/json'],
-  },
-});
+  });
 
-await app.register(swaggerUi, {
-  routePrefix: '/api/docs',
-  uiConfig: { docExpansion: 'list', deepLinking: false },
-});
+  await app.register(swaggerUi, {
+    routePrefix: '/api/docs',
+    uiConfig: { docExpansion: 'list', deepLinking: false },
+  });
+}
 
 // Decorate with shared Prisma instance
 app.decorate('prisma', prisma);

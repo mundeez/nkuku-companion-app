@@ -66,7 +66,7 @@ class BroilerService {
       if (e is DioException && _isNetworkError(e)) {
         ConnectivityService.instance.markOffline();
         // Fall back to offline cache.
-        final cached = OfflineCache.instance.getCachedFlocks();
+        final cached = await OfflineCache.instance.getCachedFlocksAsync();
         if (cached.isNotEmpty) {
           var flocks = cached.map((e) => BroilerFlock.fromJson(e)).toList();
           if (status != null) {

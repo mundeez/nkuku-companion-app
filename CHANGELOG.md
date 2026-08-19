@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.20.0-alpha] — 2026-08-19
+
+### Added
+- **Admin ops integration tests**: 25 new tests covering branding, license, metrics, organizations, failed payments, and audit logs.
+- **White-label enterprise UI**: `BrandingProvider` component, dynamic login/signup branding, public `/branding` endpoint, and `SUPPORT_CONTRACT_TEMPLATE.md` enterprise SLA documentation.
+- **License persistence**: Prisma `License` model with status tracking and `validateLicenseDb()` for database-backed license validation.
+- **Mobile sync robustness**: auto-skip after 5 retries, immediate skip on 4xx, concurrent sync prevention, `clearSkipped()` manual cleanup, and support for `sale_record`, `medication_record`, `environmental_record`, and `flock_task` entities.
+
+### Security
+- Gate Swagger UI behind `NODE_ENV !== 'production'`.
+- Remove `dev_cookie_secret` fallback; fail closed in production.
+- Add pnpm overrides for `sharp`, `postcss`, and `uuid` transitive vulnerabilities.
+- Migrate mobile offline cache from `SharedPreferences` to `flutter_secure_storage`.
+
+### Changed
+- Admin ops routes: fixed Prisma field name mismatches (`users` → `members`, `broilerFlocks` → `flocks`, `createdAt` → `occurredAt`).
+- Version bump: `1.19.0-alpha` → `1.20.0-alpha` in `apps/api/package.json`, `apps/web/package.json`, `apps/mobile/pubspec.yaml`, and root `package.json`.
+
+### Validation
+- 0 lint warnings, 0 type errors, 305 tests pass, 0 dependency vulnerabilities.
+
 ## [1.19.0-alpha] — 2026-08-19
 
 ### Added

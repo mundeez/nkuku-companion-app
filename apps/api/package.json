@@ -1,6 +1,6 @@
 {
   "name": "api",
-  "version": "1.19.0-alpha",
+  "version": "1.20.0-alpha",
   "private": true,
   "description": "Nkuku Companion API — Fastify + Prisma + PostgreSQL",
   "scripts": {
@@ -66,6 +66,11 @@
   },
   "prisma": {
     "seed": "tsx src/db/seeds/main.ts"
+  },
+  "pnpm": {
+    "overrides": {
+      "uuid": ">=11.1.1"
+    }
   },
   "type": "module"
 }

@@ -1590,3 +1590,35 @@ model AdEvent {
   @@index([organizationId])
   @@map("ad_events")
 }
+
+// Enterprise license records for self-hosted deployments.
+// One row per issued license. The branding config reads from env vars
+// for the active deployment, but this table provides an auditable record
+// of all issued licenses and their status.
+model License {
+  id              String       @id @default(uuid()) @db.Uuid
+  licenseKey      String       @unique @map("license_key")
+  licensedTo      String       @map("licensed_to")
+  licensedToEmail String?      @map("licensed_to_email")
+  plan            String       @default("enterprise")
+  maxUsers        Int?         @map("max_users")
+  maxOrganizations Int?        @map("max_organizations")
+  isWhiteLabel    Boolean      @default(false) @map("is_white_label")
+  issuedAt        DateTime     @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt       DateTime?    @map("expires_at") @db.Timestamptz(6)
+  status          LicenseStatus @default(active)
+  notes           String?
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status])
+  @@index([licenseKey])
+  @@map("licenses")
+}
+
+enum LicenseStatus {
+  active
+  expired
+  revoked
+  suspended
+}

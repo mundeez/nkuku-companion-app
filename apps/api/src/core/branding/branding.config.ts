@@ -101,3 +101,48 @@ export function validateLicense(): { valid: boolean; reason?: string } {
 export function resetBrandingConfig(): void {
   cachedConfig = null;
 }
+
+/**
+ * Validates the license key against the database (if a Prisma client is
+ * provided). Falls back to env-var-only validation if no client is given.
+ *
+ * This allows the admin-ops module to check whether a license key is
+ * registered in the `licenses` table and whether it's active.
+ */
+export async function validateLicenseDb(prisma?: any): Promise<{ valid: boolean; reason?: string }> {
+  // First do the env-based validation
+  const envResult = validateLicense();
+  if (!envResult.valid) return envResult;
+
+  // If no prisma client or no license key, env validation is sufficient
+  if (!prisma) return envResult;
+  const config = getBrandingConfig();
+  if (!config.licenseKey) return envResult;
+
+  try {
+    const license = await prisma.license.findUnique({
+      where: { licenseKey: config.licenseKey },
+    });
+
+    if (!license) {
+      return { valid: false, reason: "License key not found in database" };
+    }
+
+    if (license.status === 'revoked') {
+      return { valid: false, reason: "License has been revoked" };
+    }
+
+    if (license.status === 'suspended') {
+      return { valid: false, reason: "License is suspended" };
+    }
+
+    if (license.expiresAt && license.expiresAt < new Date()) {
+      return { valid: false, reason: "License has expired" };
+    }
+
+    return { valid: true };
+  } catch {
+    // If the licenses table doesn't exist yet, fall back to env validation
+    return envResult;
+  }
+}

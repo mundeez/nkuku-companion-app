@@ -8,13 +8,16 @@ import 'offline_cache.dart';
 /// Processes the sync queue when connectivity is restored.
 ///
 /// Pending mutations (create/update/delete) are replayed in order.
-/// Failed entries are retried up to 3 times before being skipped.
+/// Failed entries are retried up to 5 times before being auto-skipped.
+/// 4xx validation errors are skipped immediately since they will never
+/// succeed on retry. Skipped items can be cleared by the user.
 class SyncService {
   static final SyncService _instance = SyncService._();
   static SyncService get instance => _instance;
   SyncService._();
 
   bool _initialized = false;
+  bool _syncing = false;
 
   void init() {
     _initialized = true;
@@ -32,37 +35,53 @@ class SyncService {
   /// Attempts to process all pending sync queue entries.
   Future<void> _trySync() async {
     if (!_initialized || !ConnectivityService.instance.isOnline) return;
+    if (_syncing) return; // prevent concurrent sync runs
+    _syncing = true;
 
-    final pending = OfflineCache.instance.getPendingSyncs();
-    if (pending.isEmpty) return;
+    try {
+      final pending = await OfflineCache.instance.getPendingSyncsAsync();
+      if (pending.isEmpty) return;
 
-    log('Sync: processing ${pending.length} pending items', name: 'SyncService');
+      log('Sync: processing ${pending.length} pending items', name: 'SyncService');
 
-    // Process from oldest to newest. We iterate over a copy because
-    // the underlying list may change as we remove items.
-    final items = List<Map<String, dynamic>>.from(pending);
-    for (var i = 0; i < items.length; i++) {
-      final entry = items[i];
-      final retryCount = (entry['retryCount'] ?? 0) as int;
-      if (retryCount >= 3) continue;
+      // Process from oldest to newest. We iterate over a copy because
+      // the underlying list may change as we remove items.
+      final items = List<Map<String, dynamic>>.from(pending);
+      for (var i = 0; i < items.length; i++) {
+        final entry = items[i];
+        final status = entry['status'];
+        if (status == 'skipped') continue;
 
-      try {
-        await _processEntry(entry);
-        // Remove from queue on success (index 0 since we remove from front).
-        await OfflineCache.instance.removeSync(0);
-        log('Sync: completed ${entry['entityType']}/${entry['operation']}',
-            name: 'SyncService');
-      } catch (e) {
-        log('Sync: failed ${entry['entityType']}/${entry['operation']}: $e',
-            name: 'SyncService');
-        // Increment retry count; the entry stays in the queue.
-        await OfflineCache.instance.incrementRetry(0, e.toString());
-        // Stop processing on network errors.
-        if (e is DioException && _isNetworkError(e)) {
-          ConnectivityService.instance.markOffline();
-          break;
+        try {
+          await _processEntry(entry);
+          // Remove from queue on success (index 0 since we remove from front).
+          await OfflineCache.instance.removeSync(0);
+          log('Sync: completed ${entry['entityType']}/${entry['operation']}',
+              name: 'SyncService');
+        } catch (e) {
+          log('Sync: failed ${entry['entityType']}/${entry['operation']}: $e',
+              name: 'SyncService');
+
+          // 4xx errors are validation failures — skip immediately
+          if (e is _ApiException && e.statusCode >= 400 && e.statusCode < 500) {
+            await OfflineCache.instance.skipSync(0, 'Validation error: ${e.message}');
+            log('Sync: skipped ${entry['entityType']}/${entry['operation']} '
+                '(4xx validation error)', name: 'SyncService');
+            continue;
+          }
+
+          // Increment retry count; auto-skips after 5 retries.
+          await OfflineCache.instance.incrementRetry(0, e.toString());
+
+          // Stop processing on network errors.
+          if (e is DioException && _isNetworkError(e)) {
+            ConnectivityService.instance.markOffline();
+            break;
+          }
         }
       }
+    } finally {
+      _syncing = false;
     }
   }
 
@@ -151,6 +170,46 @@ class SyncService {
         }
         break;
 
+      case 'sale_record':
+        if (operation == 'create') {
+          final res = await dio.post('/api/v1/sale-records', data: payload);
+          _assertOk(res);
+        } else if (operation == 'delete') {
+          final res = await dio.delete('/api/v1/sale-records/$entityId');
+          _assertOk(res);
+        }
+        break;
+
+      case 'medication_record':
+        if (operation == 'create') {
+          final res = await dio.post('/api/v1/medication-records', data: payload);
+          _assertOk(res);
+        } else if (operation == 'delete') {
+          final res = await dio.delete('/api/v1/medication-records/$entityId');
+          _assertOk(res);
+        }
+        break;
+
+      case 'environmental_record':
+        if (operation == 'create') {
+          final res = await dio.post('/api/v1/environmental-records', data: payload);
+          _assertOk(res);
+        } else if (operation == 'delete') {
+          final res = await dio.delete('/api/v1/environmental-records/$entityId');
+          _assertOk(res);
+        }
+        break;
+
+      case 'flock_task':
+        if (operation == 'create') {
+          final res = await dio.post('/api/v1/flock-tasks', data: payload);
+          _assertOk(res);
+        } else if (operation == 'delete') {
+          final res = await dio.delete('/api/v1/flock-tasks/$entityId');
+          _assertOk(res);
+        }
+        break;
+
       default:
         log('Sync: unknown entityType $entityType', name: 'SyncService');
     }
@@ -158,7 +217,10 @@ class SyncService {
 
   void _assertOk(Response res) {
     if (res.statusCode == null || res.statusCode! >= 400) {
-      throw Exception('API error ${res.statusCode}: ${res.data}');
+      throw _ApiException(
+        res.statusCode ?? 0,
+        'API error ${res.statusCode}: ${res.data}',
+      );
     }
   }
 
@@ -172,12 +234,29 @@ class SyncService {
   /// Returns the number of pending sync items.
   int get pendingCount => OfflineCache.instance.pendingSyncCount;
 
+  /// Returns the number of skipped sync items (validation failures / max retries).
+  int get skippedCount => OfflineCache.instance.skippedSyncCount;
+
   /// Manually trigger a sync attempt (e.g. from a UI button).
   Future<void> syncNow() async {
     await _trySync();
   }
 
+  /// Clear skipped items from the queue.
+  Future<void> clearSkipped() async {
+    await OfflineCache.instance.clearSkippedSyncs();
+  }
+
   void dispose() {
     ConnectivityService.instance.removeListener(_onConnectivityChanged);
   }
+}
+
+/// Custom exception carrying the HTTP status code for retry/skip logic.
+class _ApiException implements Exception {
+  final int statusCode;
+  final String message;
+  _ApiException(this.statusCode, this.message);
+  @override
+  String toString() => message;
 }

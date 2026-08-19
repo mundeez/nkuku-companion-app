@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate } from '../auth/routes.js';
 import { requirePlatformAdmin } from '../../core/billing/feature-gate.js';
-import { getBrandingConfig, validateLicense } from '../../core/branding/branding.config.js';
+import { getBrandingConfig, validateLicenseDb } from '../../core/branding/branding.config.js';
 
 export async function buildAdminOpsModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -29,12 +29,22 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
   // ── License status (auth + platform admin) ──
   app.get('/license', { preHandler: [authenticate, requirePlatformAdmin] }, async () => {
     const config = getBrandingConfig();
-    const license = validateLicense();
+    const license = await validateLicenseDb(prisma);
+    // Also check if this license is registered in the DB
+    let dbLicense: any = null;
+    try {
+      dbLicense = config.licenseKey
+        ? await prisma.license.findUnique({ where: { licenseKey: config.licenseKey } })
+        : null;
+    } catch { /* table may not exist yet */ }
     return {
       licensedTo: config.licensedTo,
       licenseValid: license.valid,
       licenseExpiry: config.licenseExpiry,
       reason: license.reason,
+      dbRegistered: !!dbLicense,
+      dbStatus: dbLicense?.status ?? null,
+      dbExpiresAt: dbLicense?.expiresAt ?? null,
     };
   });
 
@@ -95,7 +105,7 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
         planCode: true,
         country: true,
         createdAt: true,
-        _count: { select: { users: true, broilerFlocks: true } },
+        _count: { select: { members: true, flocks: true } },
       },
     });
 
@@ -120,8 +130,8 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
         planCode: o.planCode,
         country: o.country,
         createdAt: o.createdAt,
-        userCount: o._count?.users ?? 0,
-        flockCount: o._count?.broilerFlocks ?? 0,
+        userCount: o._count?.members ?? 0,
+        flockCount: o._count?.flocks ?? 0,
       })),
     };
   });
@@ -150,7 +160,7 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
           country: true,
           currency: true,
           createdAt: true,
-          _count: { select: { users: true, broilerFlocks: true } },
+          _count: { select: { members: true, flocks: true } },
           subscriptions: {
             where: { status: { in: ['active', 'past_due', 'suspended'] } },
             select: { status: true, planCode: true, billingCycle: true, currentPeriodEnd: true },
@@ -170,8 +180,8 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
         country: o.country,
         currency: o.currency,
         createdAt: o.createdAt,
-        userCount: o._count?.users ?? 0,
-        flockCount: o._count?.broilerFlocks ?? 0,
+        userCount: o._count?.members ?? 0,
+        flockCount: o._count?.flocks ?? 0,
         subscription: o.subscriptions?.[0] ?? null,
       })),
       total,
@@ -188,7 +198,7 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
     const org = await prisma.organization.findUnique({
       where: { id },
       include: {
-        _count: { select: { users: true, broilerFlocks: true, subscriptions: true, invoices: true } },
+        _count: { select: { members: true, flocks: true, subscriptions: true, invoices: true } },
         subscriptions: {
           orderBy: { createdAt: 'desc' },
           take: 5,
@@ -199,8 +209,12 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
           take: 5,
           select: { id: true, status: true, amountDue: true, amountPaid: true, currency: true, createdAt: true, paidAt: true },
         },
-        users: {
-          select: { id: true, email: true, role: true, isPlatformAdmin: true, createdAt: true },
+        members: {
+          include: {
+            user: {
+              select: { id: true, email: true, isPlatformAdmin: true, createdAt: true },
+            },
+          },
           take: 20,
         },
       },
@@ -261,7 +275,7 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { occurredAt: 'desc' },
         select: {
           id: true,
           organizationId: true,
@@ -270,7 +284,7 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
           entityId: true,
           action: true,
           ipAddress: true,
-          createdAt: true,
+          occurredAt: true,
         },
       }),
       prisma.auditLog.count({ where }),

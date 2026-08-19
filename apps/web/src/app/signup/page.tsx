@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { register, sendOtp, verifyOtp } from "@/lib/api/client";
 import { SocialLoginButtons } from "@/components/auth/social-login-buttons";
 import { SocialSignupForm } from "@/components/auth/social-signup-form";
+import { useBranding } from "@/components/branding-provider";
 
 const COUNTRIES = [
   { code: "ZM", name: "Zambia" },
@@ -40,6 +41,7 @@ type SignupMode = "email" | "phone";
 export default function SignupPage() {
   const router = useRouter();
   const { refreshUser } = useAuth();
+  const branding = useBranding();
   const [mode, setMode] = useState<SignupMode>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -150,7 +152,11 @@ export default function SignupPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
-            <img src="/logo.png" alt="Nkuku Companion" className="w-full h-auto" />
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} alt={branding.appName} className="w-full h-auto" />
+            ) : (
+              <img src="/logo.png" alt={branding.appName} className="w-full h-auto" />
+            )}
           </div>
           <div className="space-y-1">
             <CardTitle className="text-2xl">Create your account</CardTitle>
