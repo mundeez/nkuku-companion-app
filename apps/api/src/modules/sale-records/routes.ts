@@ -280,6 +280,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     });
 
     await audit.log({
+      organizationId,
       userId: authUser.userId,
       entityType: 'SaleRecord',
       entityId: created.id,
@@ -340,6 +341,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     }
 
     await audit.log({
+      organizationId,
       userId: authUser.userId,
       entityType: 'SaleRecord',
       entityId: id,
@@ -385,6 +387,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     });
 
     await audit.log({
+      organizationId,
       userId: authUser.userId,
       entityType: 'SaleRecord',
       entityId: id,

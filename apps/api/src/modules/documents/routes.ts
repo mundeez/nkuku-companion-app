@@ -415,6 +415,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     const scanResult = await scanBuffer(fileBuffer);
     if (!scanResult.clean) {
       await audit.log({
+        organizationId: authUser.organizationId,
         userId: authUser.userId,
         entityType: 'Document',
         entityId: authUser.userId, // no document ID yet; use user ID as entity ref
@@ -471,6 +472,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     });
 
     await audit.log({
+      organizationId: authUser.organizationId,
       userId: authUser.userId,
       entityType: 'Document',
       entityId: created.id,
@@ -608,6 +610,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     await prisma.document.delete({ where: { id } });
 
     await audit.log({
+      organizationId: authUser.organizationId,
       userId: authUser.userId,
       entityType: 'Document',
       entityId: id,
@@ -651,6 +654,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     });
 
     await audit.log({
+      organizationId: authUser.organizationId,
       userId: authUser.userId,
       entityType: 'Document',
       entityId: id,

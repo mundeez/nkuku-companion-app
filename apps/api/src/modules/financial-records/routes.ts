@@ -179,6 +179,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     });
 
     await audit.log({
+      organizationId,
       userId: authUser.userId,
       entityType: 'FinancialRecord',
       entityId: created.id,
@@ -213,6 +214,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     });
 
     await audit.log({
+      organizationId,
       userId: authUser.userId,
       entityType: 'FinancialRecord',
       entityId: id,
@@ -241,6 +243,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     await prisma.financialRecord.delete({ where: { id } });
 
     await audit.log({
+      organizationId,
       userId: authUser.userId,
       entityType: 'FinancialRecord',
       entityId: id,
@@ -289,6 +292,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
       // Audit log each creation
       for (const record of created) {
         await audit.log({
+          organizationId,
           userId: authUser.userId,
           entityType: 'FinancialRecord',
           entityId: record.id,
@@ -320,6 +324,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
       // Audit log each deletion
       for (const record of validRecords) {
         await audit.log({
+          organizationId,
           userId: authUser.userId,
           entityType: 'FinancialRecord',
           entityId: record.id,

@@ -96,6 +96,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
 
   // ── AUDIT LOG ──────────────────────────────
   app.get('/audit-log', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+    const authUser = (request as any).authUser;
     const query = z.object({
       startDate: dateOrIso.optional(),
       endDate: dateOrIso.optional(),
@@ -110,11 +111,12 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       entityType: query.entityType,
       page: query.page,
       limit: query.limit,
-    }, '');
+    }, authUser.organizationId);
   });
 
   // ── PERIOD CLOSE ───────────────────────────
   app.post('/periods/close', { preHandler: [authenticate, requireRole('owner')] }, async (request) => {
+    const authUser = (request as any).authUser;
     const body = z.object({
       label: z.string().min(1).max(20),
       periodType: z.enum(['monthly', 'quarterly', 'annual']),
@@ -134,6 +136,8 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
     });
 
     await audit.log({
+      organizationId: authUser.organizationId,
+      userId: authUser.userId,
       entityType: 'FinancialPeriod',
       entityId: period.id,
       action: 'period_close',

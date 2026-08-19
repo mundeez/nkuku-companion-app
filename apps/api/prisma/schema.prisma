@@ -154,6 +154,7 @@ model Organization {
   invoices                     Invoice[]
   feedPurchases                FeedPurchase[]
   adEvents                     AdEvent[]
+  auditLogs                    AuditLog[]
 
   @@map("organizations")
 }
@@ -1165,19 +1166,22 @@ enum PeriodType {
 
 // ── AUDIT LOG ────────────────────────────
 model AuditLog {
-  id            String      @id @default(uuid()) @db.Uuid
-  userId        String?     @map("user_id") @db.Uuid
-  entityType    String      @map("entity_type") @db.VarChar(50)
-  entityId      String      @map("entity_id") @db.Uuid
-  action        AuditAction
-  previousState Json?       @map("previous_state")
-  newState      Json?       @map("new_state")
-  ipAddress     String?     @map("ip_address") @db.VarChar(45)
-  periodId      String?     @map("period_id") @db.Uuid
-  occurredAt    DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  id             String      @id @default(uuid()) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  userId         String?     @map("user_id") @db.Uuid
+  entityType     String      @map("entity_type") @db.VarChar(50)
+  entityId       String      @map("entity_id") @db.Uuid
+  action         AuditAction
+  previousState  Json?       @map("previous_state")
+  newState       Json?       @map("new_state")
+  ipAddress      String?     @map("ip_address") @db.VarChar(45)
+  periodId       String?     @map("period_id") @db.Uuid
+  occurredAt     DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(6)
 
-  period FinancialPeriod? @relation(fields: [periodId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  period FinancialPeriod?   @relation(fields: [periodId], references: [id])
 
+  @@index([organizationId, occurredAt])
   @@index([entityType, entityId])
   @@index([userId, occurredAt])
   @@map("audit_logs")

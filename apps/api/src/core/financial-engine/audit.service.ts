@@ -1,6 +1,7 @@
 import type { PrismaClient, AuditAction } from '@prisma/client';
 
 export interface AuditEntry {
+  organizationId: string;
   userId?: string;
   entityType: string;
   entityId: string;
@@ -25,6 +26,7 @@ export class AuditService {
   async log(entry: AuditEntry): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
+        organizationId: entry.organizationId,
         userId: entry.userId ?? null,
         entityType: entry.entityType,
         entityId: entry.entityId,
@@ -37,12 +39,12 @@ export class AuditService {
     });
   }
 
-  async query(filters: AuditQuery, userId: string) {
+  async query(filters: AuditQuery, organizationId: string) {
     const page = Math.max(1, filters.page ?? 1);
     const limit = Math.min(100, Math.max(1, filters.limit ?? 20));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { organizationId };
     if (filters.entityType) where.entityType = filters.entityType;
     if (filters.startDate || filters.endDate) {
       where.occurredAt = {};

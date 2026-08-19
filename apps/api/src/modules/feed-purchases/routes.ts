@@ -119,6 +119,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
     }
 
     await audit.log({
+      organizationId,
       userId: authUser.userId,
       entityType: 'FeedPurchase',
       entityId: purchase.id,
@@ -203,6 +204,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
     }
 
     await audit.log({
+      organizationId,
       userId: authUser.userId,
       entityType: 'FeedPurchase',
       entityId: id,
@@ -248,6 +250,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
     await prisma.feedPurchase.delete({ where: { id } });
 
     await audit.log({
+      organizationId,
       userId: authUser.userId,
       entityType: 'FeedPurchase',
       entityId: id,
