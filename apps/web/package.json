@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "1.17.0-alpha",
+  "version": "1.17.1-alpha",
   "private": true,
   "description": "Nkuku Companion Web Dashboard — Next.js 14 + Tailwind + shadcn/ui",
   "scripts": {

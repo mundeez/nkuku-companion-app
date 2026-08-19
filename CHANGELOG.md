@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.17.1-alpha — 2026-08-19
+
+### Security
+- **AuditLog cross-tenant data leak fixed (CRITICAL).** The `AuditLog` table had no `organizationId`, so any authenticated owner/manager could query the entire audit log across all tenants and read `previousState`/`newState` JSON blobs containing full financial records.
+  - `apps/api/prisma/schema.prisma`: added `organizationId` column to `AuditLog`, FK relation to `Organization`, index on `(organizationId, occurredAt)`, and `auditLogs AuditLog[]` back-relation on `Organization`.
+  - Database: schema applied with `prisma db push --accept-data-loss`; 2315 existing rows backfilled from `organization_members`; `documents-search.sql` re-applied.
+  - `apps/api/src/core/financial-engine/audit.service.ts`: `AuditEntry` now requires `organizationId`; `log()` writes it to every row; `query()` now takes `organizationId` and filters all rows by it.
+  - Updated all 16 `audit.log()` call sites across `financial-records`, `feed-purchases`, `sale-records`, `documents`, and `financial-engine/period_close` routes.
+  - `GET /api/v1/financial-engine/audit-log` now passes `authUser.organizationId` to `audit.query()` instead of an empty string.
+  - New integration test: `apps/api/tests/integration/audit-log-isolation.test.ts` (3 tests) verifies an org can see only its own audit entries.
+
+### Changed
+- Version bump: `1.17.0-alpha` → `1.17.1-alpha` in `apps/api/package.json`, `apps/web/package.json`, `apps/mobile/pubspec.yaml`, and root `package.json`.
+
+### Test Results
+- 280/280 tests pass (24 test files: 56 unit + 224 integration).
+- TypeScript typecheck: clean.
+- Container health: API + web serving 200.
+
 ## v1.17.0-alpha — 2026-08-19
 
 ### Added
