@@ -60,14 +60,17 @@ class BroilerService {
   }
 
   static Future<BroilerFlock> createFlock(BroilerFlock flock) async {
-    final res = await ApiService.dio.post('/api/v1/broiler-flocks', data: flock.toJson());
+    final res = await ApiService.dio
+        .post('/api/v1/broiler-flocks', data: flock.toJson());
     _assertOk(res);
     ApiCache.invalidatePrefix('flocks:');
     return BroilerFlock.fromJson(res.data);
   }
 
-  static Future<BroilerFlock> updateFlock(String id, Map<String, dynamic> data) async {
-    final res = await ApiService.dio.patch('/api/v1/broiler-flocks/$id', data: data);
+  static Future<BroilerFlock> updateFlock(
+      String id, Map<String, dynamic> data) async {
+    final res =
+        await ApiService.dio.patch('/api/v1/broiler-flocks/$id', data: data);
     _assertOk(res);
     ApiCache.invalidatePrefix('flocks:');
     return BroilerFlock.fromJson(res.data);
@@ -108,7 +111,8 @@ class BroilerService {
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => GrowthRecord.fromJson(e)).toList();
   }
 
@@ -122,13 +126,16 @@ class BroilerService {
   }
 
   static Future<GrowthRecord> createGrowthRecord(GrowthRecord record) async {
-    final res = await ApiService.dio.post('/api/v1/growth-records', data: record.toJson());
+    final res = await ApiService.dio
+        .post('/api/v1/growth-records', data: record.toJson());
     _assertOk(res);
     return GrowthRecord.fromJson(res.data);
   }
 
-  static Future<GrowthRecord> updateGrowthRecord(String id, GrowthRecord record) async {
-    final res = await ApiService.dio.patch('/api/v1/growth-records/$id', data: record.toJson());
+  static Future<GrowthRecord> updateGrowthRecord(
+      String id, GrowthRecord record) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/growth-records/$id', data: record.toJson());
     _assertOk(res);
     return GrowthRecord.fromJson(res.data);
   }
@@ -145,7 +152,8 @@ class BroilerService {
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => FeedRecord.fromJson(e)).toList();
   }
 
@@ -159,13 +167,16 @@ class BroilerService {
   }
 
   static Future<FeedRecord> createFeedRecord(FeedRecord record) async {
-    final res = await ApiService.dio.post('/api/v1/feed-records', data: record.toJson());
+    final res = await ApiService.dio
+        .post('/api/v1/feed-records', data: record.toJson());
     _assertOk(res);
     return FeedRecord.fromJson(res.data);
   }
 
-  static Future<FeedRecord> updateFeedRecord(String id, FeedRecord record) async {
-    final res = await ApiService.dio.patch('/api/v1/feed-records/$id', data: record.toJson());
+  static Future<FeedRecord> updateFeedRecord(
+      String id, FeedRecord record) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/feed-records/$id', data: record.toJson());
     _assertOk(res);
     return FeedRecord.fromJson(res.data);
   }
@@ -182,7 +193,8 @@ class BroilerService {
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => WaterRecord.fromJson(e)).toList();
   }
 
@@ -196,13 +208,16 @@ class BroilerService {
   }
 
   static Future<WaterRecord> createWaterRecord(WaterRecord record) async {
-    final res = await ApiService.dio.post('/api/v1/water-records', data: record.toJson());
+    final res = await ApiService.dio
+        .post('/api/v1/water-records', data: record.toJson());
     _assertOk(res);
     return WaterRecord.fromJson(res.data);
   }
 
-  static Future<WaterRecord> updateWaterRecord(String id, WaterRecord record) async {
-    final res = await ApiService.dio.patch('/api/v1/water-records/$id', data: record.toJson());
+  static Future<WaterRecord> updateWaterRecord(
+      String id, WaterRecord record) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/water-records/$id', data: record.toJson());
     _assertOk(res);
     return WaterRecord.fromJson(res.data);
   }
@@ -219,7 +234,8 @@ class BroilerService {
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => MortalityEvent.fromJson(e)).toList();
   }
 
@@ -232,14 +248,18 @@ class BroilerService {
     return MortalitySummary.fromJson(res.data);
   }
 
-  static Future<MortalityEvent> createMortalityEvent(MortalityEvent event) async {
-    final res = await ApiService.dio.post('/api/v1/mortality-events', data: event.toJson());
+  static Future<MortalityEvent> createMortalityEvent(
+      MortalityEvent event) async {
+    final res = await ApiService.dio
+        .post('/api/v1/mortality-events', data: event.toJson());
     _assertOk(res);
     return MortalityEvent.fromJson(res.data);
   }
 
-  static Future<MortalityEvent> updateMortalityEvent(String id, MortalityEvent event) async {
-    final res = await ApiService.dio.patch('/api/v1/mortality-events/$id', data: event.toJson());
+  static Future<MortalityEvent> updateMortalityEvent(
+      String id, MortalityEvent event) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/mortality-events/$id', data: event.toJson());
     _assertOk(res);
     return MortalityEvent.fromJson(res.data);
   }
@@ -250,17 +270,20 @@ class BroilerService {
   }
 
   // Vaccination events
-  static Future<List<VaccinationEvent>> getVaccinationEvents(String flockId) async {
+  static Future<List<VaccinationEvent>> getVaccinationEvents(
+      String flockId) async {
     final res = await ApiService.dio.get(
       '/api/v1/vaccination-events',
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => VaccinationEvent.fromJson(e)).toList();
   }
 
-  static Future<VaccinationScheduleStatus> getVaccinationScheduleStatus(String flockId) async {
+  static Future<VaccinationScheduleStatus> getVaccinationScheduleStatus(
+      String flockId) async {
     final res = await ApiService.dio.get(
       '/api/v1/vaccination-events/schedule',
       queryParameters: {'flockId': flockId},
@@ -269,14 +292,18 @@ class BroilerService {
     return VaccinationScheduleStatus.fromJson(res.data);
   }
 
-  static Future<VaccinationEvent> createVaccinationEvent(VaccinationEvent event) async {
-    final res = await ApiService.dio.post('/api/v1/vaccination-events', data: event.toJson());
+  static Future<VaccinationEvent> createVaccinationEvent(
+      VaccinationEvent event) async {
+    final res = await ApiService.dio
+        .post('/api/v1/vaccination-events', data: event.toJson());
     _assertOk(res);
     return VaccinationEvent.fromJson(res.data);
   }
 
-  static Future<VaccinationEvent> updateVaccinationEvent(String id, VaccinationEvent event) async {
-    final res = await ApiService.dio.patch('/api/v1/vaccination-events/$id', data: event.toJson());
+  static Future<VaccinationEvent> updateVaccinationEvent(
+      String id, VaccinationEvent event) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/vaccination-events/$id', data: event.toJson());
     _assertOk(res);
     return VaccinationEvent.fromJson(res.data);
   }
@@ -287,13 +314,15 @@ class BroilerService {
   }
 
   // Financial records
-  static Future<List<FinancialRecord>> getFinancialRecords(String flockId) async {
+  static Future<List<FinancialRecord>> getFinancialRecords(
+      String flockId) async {
     final res = await ApiService.dio.get(
       '/api/v1/financial-records',
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => FinancialRecord.fromJson(e)).toList();
   }
 
@@ -306,14 +335,18 @@ class BroilerService {
     return FinancialSummary.fromJson(res.data);
   }
 
-  static Future<FinancialRecord> createFinancialRecord(FinancialRecord record) async {
-    final res = await ApiService.dio.post('/api/v1/financial-records', data: record.toJson());
+  static Future<FinancialRecord> createFinancialRecord(
+      FinancialRecord record) async {
+    final res = await ApiService.dio
+        .post('/api/v1/financial-records', data: record.toJson());
     _assertOk(res);
     return FinancialRecord.fromJson(res.data);
   }
 
-  static Future<FinancialRecord> updateFinancialRecord(String id, FinancialRecord record) async {
-    final res = await ApiService.dio.patch('/api/v1/financial-records/$id', data: record.toJson());
+  static Future<FinancialRecord> updateFinancialRecord(
+      String id, FinancialRecord record) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/financial-records/$id', data: record.toJson());
     _assertOk(res);
     return FinancialRecord.fromJson(res.data);
   }
@@ -323,25 +356,71 @@ class BroilerService {
     _assertOk(res);
   }
 
+  // Bulk delete records
+  static Future<Map<String, dynamic>> bulkDeleteRecords(
+      String type, List<String> ids) async {
+    final endpoints = {
+      'growth': '/api/v1/growth-records/bulk',
+      'feed': '/api/v1/feed-records/bulk',
+      'water': '/api/v1/water-records/bulk',
+      'mortality': '/api/v1/mortality-events/bulk',
+      'vaccination': '/api/v1/vaccination-events/bulk',
+      'financial': '/api/v1/financial-records/bulk',
+    };
+    final endpoint = endpoints[type];
+    if (endpoint == null)
+      throw BroilerServiceException('Unknown record type: $type');
+    final res = await ApiService.dio
+        .post(endpoint, data: {'action': 'delete', 'ids': ids});
+    _assertOk(res);
+    return res.data as Map<String, dynamic>;
+  }
+
+  // Bulk create records (accepts JSON list since each type has different fields)
+  static Future<Map<String, dynamic>> bulkCreateRecords(
+      String type, List<Map<String, dynamic>> records) async {
+    final endpoints = {
+      'growth': '/api/v1/growth-records/bulk',
+      'feed': '/api/v1/feed-records/bulk',
+      'water': '/api/v1/water-records/bulk',
+      'mortality': '/api/v1/mortality-events/bulk',
+      'vaccination': '/api/v1/vaccination-events/bulk',
+      'financial': '/api/v1/financial-records/bulk',
+    };
+    final endpoint = endpoints[type];
+    if (endpoint == null)
+      throw BroilerServiceException('Unknown record type: $type');
+    final res = await ApiService.dio
+        .post(endpoint, data: {'action': 'create', 'records': records});
+    _assertOk(res);
+    return res.data as Map<String, dynamic>;
+  }
+
   // Medication records
-  static Future<List<MedicationRecord>> getMedicationRecords(String flockId) async {
+  static Future<List<MedicationRecord>> getMedicationRecords(
+      String flockId) async {
     final res = await ApiService.dio.get(
       '/api/v1/medication-records',
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => MedicationRecord.fromJson(e)).toList();
   }
 
-  static Future<MedicationRecord> createMedicationRecord(MedicationRecord record) async {
-    final res = await ApiService.dio.post('/api/v1/medication-records', data: record.toJson());
+  static Future<MedicationRecord> createMedicationRecord(
+      MedicationRecord record) async {
+    final res = await ApiService.dio
+        .post('/api/v1/medication-records', data: record.toJson());
     _assertOk(res);
     return MedicationRecord.fromJson(res.data);
   }
 
-  static Future<MedicationRecord> updateMedicationRecord(String id, MedicationRecord record) async {
-    final res = await ApiService.dio.patch('/api/v1/medication-records/$id', data: record.toJson());
+  static Future<MedicationRecord> updateMedicationRecord(
+      String id, MedicationRecord record) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/medication-records/$id', data: record.toJson());
     _assertOk(res);
     return MedicationRecord.fromJson(res.data);
   }
@@ -352,57 +431,75 @@ class BroilerService {
   }
 
   // Environmental records
-  static Future<List<EnvironmentalRecord>> getEnvironmentalRecords(String flockId) async {
+  static Future<List<EnvironmentalRecord>> getEnvironmentalRecords(
+      String flockId) async {
     final res = await ApiService.dio.get(
       '/api/v1/environmental-records',
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
-    return (res.data as List).map((e) => EnvironmentalRecord.fromJson(e)).toList();
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
+    return (res.data as List)
+        .map((e) => EnvironmentalRecord.fromJson(e))
+        .toList();
   }
 
-  static Future<EnvironmentalRecord> createEnvironmentalRecord(EnvironmentalRecord record) async {
-    final res = await ApiService.dio.post('/api/v1/environmental-records', data: record.toJson());
+  static Future<EnvironmentalRecord> createEnvironmentalRecord(
+      EnvironmentalRecord record) async {
+    final res = await ApiService.dio
+        .post('/api/v1/environmental-records', data: record.toJson());
     _assertOk(res);
     return EnvironmentalRecord.fromJson(res.data);
   }
 
-  static Future<EnvironmentalRecord> updateEnvironmentalRecord(String id, EnvironmentalRecord record) async {
-    final res = await ApiService.dio.patch('/api/v1/environmental-records/$id', data: record.toJson());
+  static Future<EnvironmentalRecord> updateEnvironmentalRecord(
+      String id, EnvironmentalRecord record) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/environmental-records/$id', data: record.toJson());
     _assertOk(res);
     return EnvironmentalRecord.fromJson(res.data);
   }
 
   static Future<void> deleteEnvironmentalRecord(String id) async {
-    final res = await ApiService.dio.delete('/api/v1/environmental-records/$id');
+    final res =
+        await ApiService.dio.delete('/api/v1/environmental-records/$id');
     _assertOk(res);
   }
 
   // Flock tasks
-  static Future<List<FlockTask>> getFlockTasks(String flockId, {String? status}) async {
+  static Future<List<FlockTask>> getFlockTasks(String flockId,
+      {String? status}) async {
     final res = await ApiService.dio.get(
       '/api/v1/flock-tasks',
-      queryParameters: {'flockId': flockId, if (status != null) 'status': status},
+      queryParameters: {
+        'flockId': flockId,
+        if (status != null) 'status': status
+      },
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => FlockTask.fromJson(e)).toList();
   }
 
-  static Future<FlockTaskGenerateResult> generateFlockTasks(String flockId) async {
-    final res = await ApiService.dio.post('/api/v1/flock-tasks/generate', data: {'flockId': flockId});
+  static Future<FlockTaskGenerateResult> generateFlockTasks(
+      String flockId) async {
+    final res = await ApiService.dio
+        .post('/api/v1/flock-tasks/generate', data: {'flockId': flockId});
     _assertOk(res);
     return FlockTaskGenerateResult.fromJson(res.data);
   }
 
   static Future<FlockTask> createFlockTask(FlockTask task) async {
-    final res = await ApiService.dio.post('/api/v1/flock-tasks', data: task.toJson());
+    final res =
+        await ApiService.dio.post('/api/v1/flock-tasks', data: task.toJson());
     _assertOk(res);
     return FlockTask.fromJson(res.data);
   }
 
-  static Future<FlockTask> updateFlockTask(String id, {bool? isCompleted, bool? isSkipped, String? notes}) async {
+  static Future<FlockTask> updateFlockTask(String id,
+      {bool? isCompleted, bool? isSkipped, String? notes}) async {
     final res = await ApiService.dio.patch('/api/v1/flock-tasks/$id', data: {
       if (isCompleted != null) 'isCompleted': isCompleted,
       if (isSkipped != null) 'isSkipped': isSkipped,
@@ -418,8 +515,10 @@ class BroilerService {
   }
 
   // Calendar (flock summary)
-  static Future<FlockCalendarSummary> getFlockCalendarSummary(String flockId) async {
-    final res = await ApiService.dio.get('/api/v1/broiler-flocks/$flockId/summary');
+  static Future<FlockCalendarSummary> getFlockCalendarSummary(
+      String flockId) async {
+    final res =
+        await ApiService.dio.get('/api/v1/broiler-flocks/$flockId/summary');
     _assertOk(res);
     return FlockCalendarSummary.fromJson(res.data);
   }
@@ -431,11 +530,13 @@ class BroilerService {
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => SaleRecord.fromJson(e)).toList();
   }
 
-  static Future<Map<String, dynamic>> getSaleRecordSummary(String flockId) async {
+  static Future<Map<String, dynamic>> getSaleRecordSummary(
+      String flockId) async {
     final res = await ApiService.dio.get(
       '/api/v1/sale-records/summary',
       queryParameters: {'flockId': flockId},
@@ -445,13 +546,16 @@ class BroilerService {
   }
 
   static Future<SaleRecord> createSaleRecord(SaleRecord record) async {
-    final res = await ApiService.dio.post('/api/v1/sale-records', data: record.toJson());
+    final res = await ApiService.dio
+        .post('/api/v1/sale-records', data: record.toJson());
     _assertOk(res);
     return SaleRecord.fromJson(res.data);
   }
 
-  static Future<SaleRecord> updateSaleRecord(String id, SaleRecord record) async {
-    final res = await ApiService.dio.patch('/api/v1/sale-records/$id', data: record.toJson());
+  static Future<SaleRecord> updateSaleRecord(
+      String id, SaleRecord record) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/sale-records/$id', data: record.toJson());
     _assertOk(res);
     return SaleRecord.fromJson(res.data);
   }
@@ -468,7 +572,8 @@ class BroilerService {
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => DocumentRecord.fromJson(e)).toList();
   }
 
@@ -481,15 +586,18 @@ class BroilerService {
     String? saleRecordId,
   }) async {
     final params = <String, dynamic>{};
-    if (financialRecordId != null) params['financialRecordId'] = financialRecordId;
+    if (financialRecordId != null)
+      params['financialRecordId'] = financialRecordId;
     if (journalEntryId != null) params['journalEntryId'] = journalEntryId;
     if (saleRecordId != null) params['saleRecordId'] = saleRecordId;
     if (flockId != null && financialRecordId == null && saleRecordId == null) {
       params['flockId'] = flockId;
     }
-    final res = await ApiService.dio.get('/api/v1/documents', queryParameters: params);
+    final res =
+        await ApiService.dio.get('/api/v1/documents', queryParameters: params);
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null) throw BroilerServiceException(res.data['error']);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
     return (res.data as List).map((e) => DocumentRecord.fromJson(e)).toList();
   }
 
@@ -523,10 +631,14 @@ class BroilerService {
     final fields = <String, dynamic>{
       'category': category,
     };
-    if (financialRecordId != null) fields['financialRecordId'] = financialRecordId;
+    if (financialRecordId != null)
+      fields['financialRecordId'] = financialRecordId;
     if (journalEntryId != null) fields['journalEntryId'] = journalEntryId;
     if (saleRecordId != null) fields['saleRecordId'] = saleRecordId;
-    if (flockId != null && financialRecordId == null && saleRecordId == null && journalEntryId == null) {
+    if (flockId != null &&
+        financialRecordId == null &&
+        saleRecordId == null &&
+        journalEntryId == null) {
       fields['flockId'] = flockId;
     }
     fields['file'] = await MultipartFile.fromFile(filePath);
@@ -541,7 +653,8 @@ class BroilerService {
     _assertOk(res);
   }
 
-  static Future<DocumentRecord> updateDocument(String id, {String? category, String? recordType}) async {
+  static Future<DocumentRecord> updateDocument(String id,
+      {String? category, String? recordType}) async {
     final data = <String, dynamic>{};
     if (category != null) data['category'] = category;
     if (recordType != null) data['recordType'] = recordType;
@@ -552,7 +665,9 @@ class BroilerService {
 
   static void _assertOk(Response<dynamic> res) {
     if (res.statusCode == null || res.statusCode! >= 400) {
-      final message = res.data is Map ? (res.data['error'] ?? res.data['message'] ?? 'Request failed') : 'Request failed';
+      final message = res.data is Map
+          ? (res.data['error'] ?? res.data['message'] ?? 'Request failed')
+          : 'Request failed';
       log('BroilerService error: $message', name: 'BroilerService');
       throw BroilerServiceException(message.toString());
     }
@@ -576,9 +691,13 @@ class GrowthRecordAnalysis {
 
   factory GrowthRecordAnalysis.fromJson(Map<String, dynamic> json) {
     return GrowthRecordAnalysis(
-      records: (json['records'] as List? ?? []).map((e) => GrowthRecord.fromJson(e)).toList(),
+      records: (json['records'] as List? ?? [])
+          .map((e) => GrowthRecord.fromJson(e))
+          .toList(),
       ageDays: json['ageDays'] ?? 0,
-      targets: (json['targets'] as List? ?? []).map((e) => PerformanceTarget.fromJson(e)).toList(),
+      targets: (json['targets'] as List? ?? [])
+          .map((e) => PerformanceTarget.fromJson(e))
+          .toList(),
       fcr: json['fcr'] != null ? double.tryParse(json['fcr'].toString()) : null,
       currentCount: json['currentCount'] ?? 0,
     );
@@ -666,9 +785,15 @@ class VaccinationScheduleStatus {
 
   factory VaccinationScheduleStatus.fromJson(Map<String, dynamic> json) {
     return VaccinationScheduleStatus(
-      completed: (json['completed'] as List? ?? []).map((e) => VaccinationEvent.fromJson(e)).toList(),
-      upcoming: (json['upcoming'] as List? ?? []).map((e) => VaccinationScheduleItem.fromJson(e)).toList(),
-      overdue: (json['overdue'] as List? ?? []).map((e) => VaccinationScheduleItem.fromJson(e)).toList(),
+      completed: (json['completed'] as List? ?? [])
+          .map((e) => VaccinationEvent.fromJson(e))
+          .toList(),
+      upcoming: (json['upcoming'] as List? ?? [])
+          .map((e) => VaccinationScheduleItem.fromJson(e))
+          .toList(),
+      overdue: (json['overdue'] as List? ?? [])
+          .map((e) => VaccinationScheduleItem.fromJson(e))
+          .toList(),
       ageDays: json['ageDays'] ?? 0,
     );
   }
@@ -709,7 +834,9 @@ class FlockTaskGenerateResult {
   factory FlockTaskGenerateResult.fromJson(Map<String, dynamic> json) {
     return FlockTaskGenerateResult(
       generated: json['generated'] ?? 0,
-      tasks: (json['tasks'] as List? ?? []).map((e) => FlockTask.fromJson(e)).toList(),
+      tasks: (json['tasks'] as List? ?? [])
+          .map((e) => FlockTask.fromJson(e))
+          .toList(),
     );
   }
 }
@@ -720,14 +847,20 @@ class FlockCalendarSummary {
   final int targetAge;
   final List<CalendarDay> days;
 
-  FlockCalendarSummary({required this.flock, required this.ageDays, required this.targetAge, required this.days});
+  FlockCalendarSummary(
+      {required this.flock,
+      required this.ageDays,
+      required this.targetAge,
+      required this.days});
 
   factory FlockCalendarSummary.fromJson(Map<String, dynamic> json) {
     return FlockCalendarSummary(
       flock: BroilerFlock.fromJson(json['flock'] as Map<String, dynamic>),
       ageDays: json['ageDays'] ?? 0,
       targetAge: json['targetAge'] ?? 0,
-      days: (json['days'] as List? ?? []).map((e) => CalendarDay.fromJson(e)).toList(),
+      days: (json['days'] as List? ?? [])
+          .map((e) => CalendarDay.fromJson(e))
+          .toList(),
     );
   }
 }

@@ -15,9 +15,13 @@ class _AlertsScreenState extends State<AlertsScreen> {
   List<Alert> _alerts = [];
   bool _loading = true;
   String? _error;
-  String? _statusFilter;   // null=all, 'open', 'resolved'
+  String? _statusFilter; // null=all, 'open', 'resolved'
   String? _severityFilter; // null=all, 'info', 'warning', 'critical'
   bool _generating = false;
+  // Bulk selection
+  bool _selectMode = false;
+  final Set<String> _selectedIds = {};
+  bool _bulkAction = false;
 
   @override
   void initState() {
@@ -26,15 +30,24 @@ class _AlertsScreenState extends State<AlertsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final alerts = await AlertsService.getAlerts(
         status: _statusFilter,
         severity: _severityFilter,
       );
-      setState(() { _alerts = alerts; _loading = false; });
+      setState(() {
+        _alerts = alerts;
+        _loading = false;
+      });
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -51,7 +64,9 @@ class _AlertsScreenState extends State<AlertsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error generating alerts: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Error generating alerts: $e'),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -100,8 +115,12 @@ class _AlertsScreenState extends State<AlertsScreen> {
         title: const Text('Delete alert?'),
         content: Text('Delete "${alert.title}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -113,9 +132,135 @@ class _AlertsScreenState extends State<AlertsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Delete failed: $e'), backgroundColor: Colors.red),
         );
       }
+    }
+  }
+
+  void _enterSelectMode() {
+    setState(() {
+      _selectMode = true;
+      _selectedIds.clear();
+    });
+  }
+
+  void _exitSelectMode() {
+    setState(() {
+      _selectMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  void _toggleSelect(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedIds.length == _alerts.length) {
+        _selectedIds.clear();
+      } else {
+        _selectedIds.addAll(_alerts.map((a) => a.id));
+      }
+    });
+  }
+
+  Future<void> _bulkMarkRead() async {
+    if (_selectedIds.isEmpty) return;
+    setState(() => _bulkAction = true);
+    try {
+      await AlertsService.bulkMarkRead(_selectedIds.toList());
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Marked ${_selectedIds.length} alert(s) as read')),
+        );
+      }
+      _exitSelectMode();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _bulkAction = false);
+    }
+  }
+
+  Future<void> _bulkResolve() async {
+    if (_selectedIds.isEmpty) return;
+    setState(() => _bulkAction = true);
+    try {
+      await AlertsService.bulkMarkResolved(_selectedIds.toList());
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Resolved ${_selectedIds.length} alert(s)')),
+        );
+      }
+      _exitSelectMode();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _bulkAction = false);
+    }
+  }
+
+  Future<void> _bulkDelete() async {
+    if (_selectedIds.isEmpty) return;
+    if (!AuthService.canDelete) return;
+    final count = _selectedIds.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete $count alert${count == 1 ? '' : 's'}?'),
+        content: Text(
+            'This will permanently delete $count alert${count == 1 ? '' : 's'}. This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _bulkAction = true);
+    try {
+      await AlertsService.bulkDelete(_selectedIds.toList());
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Deleted $count alert${count == 1 ? '' : 's'}')),
+        );
+      }
+      _exitSelectMode();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Delete failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _bulkAction = false);
     }
   }
 
@@ -125,8 +270,12 @@ class _AlertsScreenState extends State<AlertsScreen> {
       isScrollControlled: true,
       builder: (ctx) => _AlertDetailSheet(
         alert: alert,
-        onMarkRead: !alert.isRead && AuthService.canEdit ? () => _markRead(alert) : null,
-        onResolve: !alert.isResolved && AuthService.canEdit ? () => _markResolved(alert) : null,
+        onMarkRead: !alert.isRead && AuthService.canEdit
+            ? () => _markRead(alert)
+            : null,
+        onResolve: !alert.isResolved && AuthService.canEdit
+            ? () => _markResolved(alert)
+            : null,
         onDelete: AuthService.canDelete ? () => _deleteAlert(alert) : null,
       ),
     );
@@ -142,19 +291,29 @@ class _AlertsScreenState extends State<AlertsScreen> {
           _filterChip(
             label: 'All',
             selected: _statusFilter == null && _severityFilter == null,
-            onSelected: (_) => setState(() { _statusFilter = null; _severityFilter = null; _load(); }),
+            onSelected: (_) => setState(() {
+              _statusFilter = null;
+              _severityFilter = null;
+              _load();
+            }),
           ),
           const SizedBox(width: 6),
           _filterChip(
             label: 'Open',
             selected: _statusFilter == 'open',
-            onSelected: (_) => setState(() { _statusFilter = _statusFilter == 'open' ? null : 'open'; _load(); }),
+            onSelected: (_) => setState(() {
+              _statusFilter = _statusFilter == 'open' ? null : 'open';
+              _load();
+            }),
           ),
           const SizedBox(width: 6),
           _filterChip(
             label: 'Resolved',
             selected: _statusFilter == 'resolved',
-            onSelected: (_) => setState(() { _statusFilter = _statusFilter == 'resolved' ? null : 'resolved'; _load(); }),
+            onSelected: (_) => setState(() {
+              _statusFilter = _statusFilter == 'resolved' ? null : 'resolved';
+              _load();
+            }),
           ),
           const SizedBox(width: 12),
           Container(width: 1, height: 20, color: Colors.grey.shade300),
@@ -164,21 +323,31 @@ class _AlertsScreenState extends State<AlertsScreen> {
             label: 'Info',
             selected: _severityFilter == 'info',
             color: Colors.blue,
-            onSelected: (_) => setState(() { _severityFilter = _severityFilter == 'info' ? null : 'info'; _load(); }),
+            onSelected: (_) => setState(() {
+              _severityFilter = _severityFilter == 'info' ? null : 'info';
+              _load();
+            }),
           ),
           const SizedBox(width: 6),
           _filterChip(
             label: 'Warning',
             selected: _severityFilter == 'warning',
             color: Colors.orange,
-            onSelected: (_) => setState(() { _severityFilter = _severityFilter == 'warning' ? null : 'warning'; _load(); }),
+            onSelected: (_) => setState(() {
+              _severityFilter = _severityFilter == 'warning' ? null : 'warning';
+              _load();
+            }),
           ),
           const SizedBox(width: 6),
           _filterChip(
             label: 'Critical',
             selected: _severityFilter == 'critical',
             color: Colors.red,
-            onSelected: (_) => setState(() { _severityFilter = _severityFilter == 'critical' ? null : 'critical'; _load(); }),
+            onSelected: (_) => setState(() {
+              _severityFilter =
+                  _severityFilter == 'critical' ? null : 'critical';
+              _load();
+            }),
           ),
         ],
       ),
@@ -206,13 +375,23 @@ class _AlertsScreenState extends State<AlertsScreen> {
   }
 
   Widget _buildAlertCard(Alert alert) {
+    final isSelected = _selectedIds.contains(alert.id);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      color: _selectMode && isSelected
+          ? Theme.of(context).colorScheme.primary.withAlpha(30)
+          : null,
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: alert.severityColor.withAlpha(30),
-          child: Icon(alert.alertIcon, color: alert.severityColor, size: 20),
-        ),
+        leading: _selectMode
+            ? Checkbox(
+                value: isSelected,
+                onChanged: (_) => _toggleSelect(alert.id),
+              )
+            : CircleAvatar(
+                backgroundColor: alert.severityColor.withAlpha(30),
+                child:
+                    Icon(alert.alertIcon, color: alert.severityColor, size: 20),
+              ),
         title: Text(
           alert.title,
           maxLines: 1,
@@ -227,47 +406,128 @@ class _AlertsScreenState extends State<AlertsScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         isThreeLine: true,
-        trailing: alert.isResolved
-            ? const Icon(Icons.check_circle, color: Colors.grey)
-            : (!alert.isRead
-                ? Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                    ),
-                  )
-                : null),
-        onTap: () => _showDetail(alert),
+        trailing: _selectMode
+            ? null
+            : alert.isResolved
+                ? const Icon(Icons.check_circle, color: Colors.grey)
+                : (!alert.isRead
+                    ? Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                      )
+                    : null),
+        onTap: _selectMode
+            ? () => _toggleSelect(alert.id)
+            : () => _showDetail(alert),
+        onLongPress: !_selectMode ? _enterSelectMode : null,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Alerts'),
-        actions: [
-          if (AuthService.canEdit)
-            _generating
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.auto_awesome),
-                    tooltip: 'Generate alerts',
-                    onPressed: _generate,
-                  ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
-        ],
+    // Selection mode app bar
+    final selectAppBar = AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: _exitSelectMode,
       ),
+      title: Text('${_selectedIds.length} selected'),
+      actions: [
+        IconButton(
+          icon: Icon(
+            _selectedIds.length == _alerts.length && _alerts.isNotEmpty
+                ? Icons.deselect
+                : Icons.select_all,
+          ),
+          tooltip: 'Select all',
+          onPressed: _toggleSelectAll,
+        ),
+      ],
+    );
+
+    // Normal app bar
+    final normalAppBar = AppBar(
+      title: const Text('Alerts'),
+      actions: [
+        if (AuthService.canEdit)
+          _generating
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.auto_awesome),
+                  tooltip: 'Generate alerts',
+                  onPressed: _generate,
+                ),
+        IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+      ],
+    );
+
+    // Bulk action bar (bottom)
+    final bulkActionBar = _selectMode && _selectedIds.isNotEmpty
+        ? Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(20),
+                  blurRadius: 4,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.mark_email_read),
+                    label: const Text('Read'),
+                    onPressed: _bulkAction ? null : _bulkMarkRead,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.check_circle),
+                    label: const Text('Resolve'),
+                    onPressed: _bulkAction ? null : _bulkResolve,
+                  ),
+                ),
+                if (AuthService.canDelete) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.delete),
+                      label: const Text('Delete'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _bulkAction ? null : _bulkDelete,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          )
+        : const SizedBox.shrink();
+
+    return Scaffold(
+      appBar: _selectMode ? selectAppBar : normalAppBar,
       body: Column(
         children: [
-          _buildFilterChips(),
-          const Divider(height: 1),
+          if (!_selectMode) _buildFilterChips(),
+          if (!_selectMode) const Divider(height: 1),
           Expanded(
             child: _loading
                 ? const SkeletonList()
@@ -276,9 +536,11 @@ class _AlertsScreenState extends State<AlertsScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(_error!, style: const TextStyle(color: Colors.red)),
+                            Text(_error!,
+                                style: const TextStyle(color: Colors.red)),
                             const SizedBox(height: 16),
-                            ElevatedButton(onPressed: _load, child: const Text('Retry')),
+                            ElevatedButton(
+                                onPressed: _load, child: const Text('Retry')),
                           ],
                         ),
                       )
@@ -287,21 +549,27 @@ class _AlertsScreenState extends State<AlertsScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.notifications_none, size: 64, color: Colors.grey),
+                                Icon(Icons.notifications_none,
+                                    size: 64, color: Colors.grey),
                                 SizedBox(height: 12),
-                                Text('No alerts', style: TextStyle(color: Colors.grey)),
+                                Text('No alerts',
+                                    style: TextStyle(color: Colors.grey)),
                               ],
                             ),
                           )
-                        : RefreshIndicator(
-                            onRefresh: _load,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              itemCount: _alerts.length,
-                              itemBuilder: (_, i) => _buildAlertCard(_alerts[i]),
-                            ),
-                          ),
+                        : _bulkAction
+                            ? const Center(child: CircularProgressIndicator())
+                            : RefreshIndicator(
+                                onRefresh: _load,
+                                child: ListView.builder(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  itemCount: _alerts.length,
+                                  itemBuilder: (_, i) =>
+                                      _buildAlertCard(_alerts[i]),
+                                ),
+                              ),
           ),
+          bulkActionBar,
         ],
       ),
     );
@@ -337,7 +605,8 @@ class _AlertDetailSheet extends StatelessWidget {
             children: [
               Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade300,
@@ -355,19 +624,27 @@ class _AlertDetailSheet extends StatelessWidget {
                   Expanded(
                     child: Text(
                       alert.title,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              _detailRow('Flock', alert.flockName.isNotEmpty ? alert.flockName : '—'),
+              _detailRow(
+                  'Flock', alert.flockName.isNotEmpty ? alert.flockName : '—'),
               _detailRow('Type', alert.alertType.replaceAll('_', ' ')),
               _detailRow('Severity', alert.severity.toUpperCase()),
-              _detailRow('Due Date', alert.dueDate.toIso8601String().split('T').first),
-              _detailRow('Status', alert.isResolved ? 'Resolved' : (alert.isRead ? 'Read' : 'Unread')),
+              _detailRow(
+                  'Due Date', alert.dueDate.toIso8601String().split('T').first),
+              _detailRow(
+                  'Status',
+                  alert.isResolved
+                      ? 'Resolved'
+                      : (alert.isRead ? 'Read' : 'Unread')),
               const SizedBox(height: 12),
-              const Text('Message', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Message',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
               Text(alert.message),
               const SizedBox(height: 24),
@@ -401,7 +678,8 @@ class _AlertDetailSheet extends StatelessWidget {
                 const SizedBox(height: 8),
                 TextButton.icon(
                   icon: const Icon(Icons.delete, color: Colors.red),
-                  label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  label:
+                      const Text('Delete', style: TextStyle(color: Colors.red)),
                   onPressed: () {
                     Navigator.of(context).pop();
                     onDelete!();

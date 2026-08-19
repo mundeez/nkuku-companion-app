@@ -10,6 +10,12 @@ class RecordCard extends StatelessWidget {
   final Widget trailing;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onTap;
+
+  // Selection mode props
+  final bool selectable;
+  final bool selected;
+  final ValueChanged<bool>? onSelectChanged;
 
   const RecordCard({
     super.key,
@@ -18,35 +24,52 @@ class RecordCard extends StatelessWidget {
     required this.trailing,
     this.onEdit,
     this.onDelete,
+    this.onTap,
+    this.selectable = false,
+    this.selected = false,
+    this.onSelectChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: selectable && selected
+          ? Theme.of(context).colorScheme.primary.withAlpha(30)
+          : null,
       child: ListTile(
+        leading: selectable
+            ? Checkbox(
+                value: selected,
+                onChanged: (bool? value) => onSelectChanged?.call(value ?? false),
+              )
+            : null,
         title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: subtitle != null
             ? Text(subtitle!, maxLines: 2, overflow: TextOverflow.ellipsis)
             : null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            trailing,
-            if (onEdit != null)
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: onEdit,
-                visualDensity: VisualDensity.compact,
+        trailing: selectable
+            ? null
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  trailing,
+                  if (onEdit != null)
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: onEdit,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  if (onDelete != null)
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: onDelete,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                ],
               ),
-            if (onDelete != null)
-              IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: onDelete,
-                visualDensity: VisualDensity.compact,
-              ),
-          ],
-        ),
+        onTap: selectable ? () => onSelectChanged?.call(!selected) : onTap,
+        onLongPress: !selectable && onDelete != null ? () => onSelectChanged?.call(true) : null,
       ),
     );
   }

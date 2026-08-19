@@ -85,141 +85,72 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
 
     const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, authUser.userId);
 
-    const generatedTasks = [];
+    // Fetch all existing tasks for this flock in a single query and index them
+    // by `${dateStr}|${title}` so we can dedupe candidate tasks in memory instead
+    // of issuing a findFirst + create per candidate (the previous loop fired
+    // ~300-400 sequential round-trips, which exceeded the test timeout under
+    // load). createMany then inserts all missing rows in one statement.
+    const existing = await prisma.flockTask.findMany({
+      where: { flockId },
+      select: { taskDate: true, title: true },
+    });
+    const existingKeys = new Set(
+      existing.map((t: { taskDate: Date; title: string }) => `${t.taskDate.toISOString().split('T')[0]}|${t.title}`)
+    );
+
+    type Candidate = {
+      flockId: string;
+      taskDate: Date;
+      ageDays: number;
+      category: 'vaccination' | 'feed' | 'water' | 'environment' | 'health' | 'biosecurity' | 'management';
+      title: string;
+      description?: string;
+    };
+    const candidates: Candidate[] = [];
+    const seenKeys = new Set<string>();
+
+    function pushCandidate(ageDays: number, dayTaskDate: Date, category: Candidate['category'], title: string, description?: string) {
+      const key = `${dayTaskDate.toISOString().split('T')[0]}|${title}`;
+      // Dedupe within this run (mirrors the old per-create findFirst check) and
+      // against tasks that already exist in the database.
+      if (seenKeys.has(key) || existingKeys.has(key)) return;
+      seenKeys.add(key);
+      candidates.push({ flockId, taskDate: dayTaskDate, ageDays, category, title, description });
+    }
 
     for (let ageDays = 0; ageDays <= targetAge; ageDays++) {
       const taskDate = new Date(startDate.getTime() + ageDays * 24 * 60 * 60 * 1000);
       const dateStr = taskDate.toISOString().split('T')[0];
+      const dayTaskDate = new Date(dateStr);
 
       // Daily routine tasks
       const routineTasks = [
-        { category: 'environment', title: 'Check temperature and humidity 2x daily', description: 'Record morning and evening readings.' },
-        { category: 'management', title: 'Record mortality and culls', description: 'Count dead birds and note cause if known.' },
-        { category: 'management', title: 'Monitor feed and water consumption', description: 'Compare to expected daily targets.' },
-        { category: 'environment', title: 'Inspect litter quality', description: 'Check for wet spots, caking, and ammonia.' },
+        { category: 'environment' as const, title: 'Check temperature and humidity 2x daily', description: 'Record morning and evening readings.' },
+        { category: 'management' as const, title: 'Record mortality and culls', description: 'Count dead birds and note cause if known.' },
+        { category: 'management' as const, title: 'Monitor feed and water consumption', description: 'Compare to expected daily targets.' },
+        { category: 'environment' as const, title: 'Inspect litter quality', description: 'Check for wet spots, caking, and ammonia.' },
       ];
-
       for (const task of routineTasks) {
-        const existing = await prisma.flockTask.findFirst({
-          where: {
-            flockId,
-            taskDate: { gte: new Date(dateStr), lt: new Date(taskDate.getTime() + 24 * 60 * 60 * 1000) },
-            title: task.title,
-          },
-        });
-        if (!existing) {
-          generatedTasks.push(
-            await prisma.flockTask.create({
-              data: {
-                flockId,
-                taskDate: new Date(dateStr),
-                ageDays,
-                category: task.category as any,
-                title: task.title,
-                description: task.description,
-              },
-            })
-          );
-        }
+        pushCandidate(ageDays, dayTaskDate, task.category, task.title, task.description);
       }
 
       // Weekly weight check (day 7, 14, 21, 28, 35, 42)
       if (ageDays > 0 && ageDays % 7 === 0) {
-        const existing = await prisma.flockTask.findFirst({
-          where: {
-            flockId,
-            taskDate: { gte: new Date(dateStr), lt: new Date(taskDate.getTime() + 24 * 60 * 60 * 1000) },
-            title: 'Weekly weight sample',
-          },
-        });
-        if (!existing) {
-          generatedTasks.push(
-            await prisma.flockTask.create({
-              data: {
-                flockId,
-                taskDate: new Date(dateStr),
-                ageDays,
-                category: 'health',
-                title: 'Weekly weight sample',
-                description: `Weigh a representative sample and compare to ${flock.breed?.name || 'breed'} target.`,
-              },
-            })
-          );
-        }
+        pushCandidate(ageDays, dayTaskDate, 'health', 'Weekly weight sample', `Weigh a representative sample and compare to ${flock.breed?.name || 'breed'} target.`);
       }
 
       // Feed transitions
       if (ageDays === feedTransitionDay) {
-        const existing = await prisma.flockTask.findFirst({
-          where: {
-            flockId,
-            taskDate: { gte: new Date(dateStr), lt: new Date(taskDate.getTime() + 24 * 60 * 60 * 1000) },
-            title: 'Feed transition: Starter to Grower',
-          },
-        });
-        if (!existing) {
-          generatedTasks.push(
-            await prisma.flockTask.create({
-              data: {
-                flockId,
-                taskDate: new Date(dateStr),
-                ageDays,
-                category: 'feed',
-                title: 'Feed transition: Starter to Grower',
-                description: 'Transition gradually over 3 days.',
-              },
-            })
-          );
-        }
+        pushCandidate(ageDays, dayTaskDate, 'feed', 'Feed transition: Starter to Grower', 'Transition gradually over 3 days.');
       }
       if (ageDays === finisherDay) {
-        const existing = await prisma.flockTask.findFirst({
-          where: {
-            flockId,
-            taskDate: { gte: new Date(dateStr), lt: new Date(taskDate.getTime() + 24 * 60 * 60 * 1000) },
-            title: 'Feed transition: Grower to Finisher',
-          },
-        });
-        if (!existing) {
-          generatedTasks.push(
-            await prisma.flockTask.create({
-              data: {
-                flockId,
-                taskDate: new Date(dateStr),
-                ageDays,
-                category: 'feed',
-                title: 'Feed transition: Grower to Finisher',
-                description: 'Adjust feed to market target.',
-              },
-            })
-          );
-        }
+        pushCandidate(ageDays, dayTaskDate, 'feed', 'Feed transition: Grower to Finisher', 'Adjust feed to market target.');
       }
 
       // Vaccination tasks from schedule
       for (const item of schedule?.items || []) {
         if (item.ageDays === ageDays) {
-          const existing = await prisma.flockTask.findFirst({
-            where: {
-              flockId,
-              taskDate: { gte: new Date(dateStr), lt: new Date(taskDate.getTime() + 24 * 60 * 60 * 1000) },
-              title: `Vaccination: ${item.vaccineName}`,
-            },
-          });
-          if (!existing) {
-            generatedTasks.push(
-              await prisma.flockTask.create({
-                data: {
-                  flockId,
-                  taskDate: new Date(dateStr),
-                  ageDays,
-                  category: 'vaccination',
-                  title: `Vaccination: ${item.vaccineName}`,
-                  description: `Administer via ${item.adminMethod}. ${item.notes || ''}`,
-                },
-              })
-            );
-          }
+          pushCandidate(ageDays, dayTaskDate, 'vaccination', `Vaccination: ${item.vaccineName}`, `Administer via ${item.adminMethod}. ${item.notes || ''}`);
         }
       }
 
@@ -252,32 +183,40 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
         }
 
         for (const envTask of envTasks) {
-          const existing = await prisma.flockTask.findFirst({
-            where: {
-              flockId,
-              taskDate: { gte: new Date(dateStr), lt: new Date(taskDate.getTime() + 24 * 60 * 60 * 1000) },
-              title: envTask.title,
-            },
-          });
-          if (!existing) {
-            generatedTasks.push(
-              await prisma.flockTask.create({
-                data: {
-                  flockId,
-                  taskDate: new Date(dateStr),
-                  ageDays,
-                  category: 'environment',
-                  title: envTask.title,
-                  description: envTask.description,
-                },
-              })
-            );
-          }
+          pushCandidate(ageDays, dayTaskDate, 'environment', envTask.title, envTask.description);
         }
       }
     }
 
-    return { generated: generatedTasks.length, tasks: generatedTasks.slice(0, 20) };
+    if (candidates.length > 0) {
+      await prisma.flockTask.createMany({
+        data: candidates.map((c) => ({
+          flockId: c.flockId,
+          taskDate: c.taskDate,
+          ageDays: c.ageDays,
+          category: c.category,
+          title: c.title,
+          description: c.description,
+        })),
+      });
+    }
+
+    // Preview of the generated tasks (shape-compatible with FlockTask). The
+    // web client ignores this and refetches; the mobile client only reads
+    // `generated` and refetches, so client-generated ids here are safe.
+    const tasks = candidates.slice(0, 20).map((c) => ({
+      id: crypto.randomUUID(),
+      flockId: c.flockId,
+      taskDate: c.taskDate.toISOString(),
+      ageDays: c.ageDays,
+      category: c.category,
+      title: c.title,
+      description: c.description,
+      isCompleted: false,
+      isSkipped: false,
+    }));
+
+    return { generated: candidates.length, tasks };
   });
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {

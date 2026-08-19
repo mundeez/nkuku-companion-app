@@ -220,4 +220,101 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
     await prisma.feedRecord.delete({ where: { id } });
     return { deleted: true };
   });
+
+  // POST /bulk — bulk create or bulk delete feed records
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const body = z.object({
+      action: z.enum(['create', 'delete']),
+      records: z.array(FeedRecordCreateSchema).max(500).optional(),
+      ids: z.array(z.string().uuid()).min(1).max(500).optional(),
+    }).parse(request.body);
+    const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    if (body.action === 'create') {
+      if (!body.records?.length) return reply.status(400).send({ error: 'RECORDS_REQUIRED' });
+
+      const flockIds = [...new Set(body.records.map((r) => r.flockId))];
+      const flocks = await prisma.broilerFlock.findMany({
+        where: { id: { in: flockIds }, organizationId },
+        select: { id: true },
+      });
+      const validFlockIds = new Set(flocks.map((f: any) => f.id));
+
+      // Pre-fetch suppliers for auto-deriving feedBrand (org-scoped to prevent cross-tenant supplier references)
+      const supplierIds = [...new Set(body.records.map((r) => r.supplierId).filter(Boolean))] as string[];
+      const suppliers = supplierIds.length
+        ? await prisma.supplier.findMany({ where: { id: { in: supplierIds }, organizationId }, select: { id: true, name: true } })
+        : [];
+      const supplierMap: Map<string, string> = new Map(suppliers.map((s: any) => [s.id, s.name] as [string, string]));
+      const validSupplierIds = new Set(suppliers.map((s: any) => s.id));
+
+      const validRecords = body.records.filter((r) => validFlockIds.has(r.flockId) && (!r.supplierId || validSupplierIds.has(r.supplierId)));
+
+      const created = await prisma.$transaction(async (tx: any) => {
+        const results: any[] = [];
+        for (const r of validRecords) {
+          let feedBrand = r.feedBrand;
+          if (r.supplierId && !feedBrand) {
+            feedBrand = supplierMap.get(r.supplierId) ?? undefined;
+          }
+          const record = await tx.feedRecord.create({
+            data: {
+              ...r,
+              feedBrand,
+              recordDate: new Date(r.recordDate),
+              flockId: r.flockId,
+            },
+          });
+          // Auto-create financial record for feed cost
+          if (r.costZmw && r.costZmw > 0) {
+            await tx.financialRecord.create({
+              data: {
+                flockId: r.flockId,
+                sourceRecordId: record.id,
+                sourceTable: 'feed_records',
+                recordDate: new Date(r.recordDate),
+                category: 'feed',
+                description: `Feed - ${feedBrand || r.feedType} (${r.quantityKg}kg)`,
+                amountZmw: r.costZmw,
+                isIncome: false,
+                isSystemGenerated: true,
+                notes: 'Auto-generated from feed record',
+              },
+            });
+          }
+          results.push(record);
+        }
+        return results;
+      });
+      return { action: 'create', affected: created.length, skipped: body.records.length - created.length, records: created };
+    }
+
+    if (body.action === 'delete') {
+      if (!body.ids?.length) return reply.status(400).send({ error: 'IDS_REQUIRED' });
+
+      if (authUser.role !== 'owner') {
+        return reply.status(403).send({ error: 'FORBIDDEN' });
+      }
+
+      const records = await prisma.feedRecord.findMany({
+        where: { id: { in: body.ids } },
+        include: { flock: { select: { organizationId: true } } },
+      });
+      const validIds = records
+        .filter((r: any) => r.flock.organizationId === organizationId)
+        .map((r: any) => r.id);
+
+      await prisma.$transaction(async (tx: any) => {
+        // Delete linked financial records
+        await tx.financialRecord.deleteMany({
+          where: { sourceRecordId: { in: validIds }, sourceTable: 'feed_records' },
+        });
+        await tx.feedRecord.deleteMany({ where: { id: { in: validIds } } });
+      });
+      return { action: 'delete', affected: validIds.length, skipped: body.ids.length - validIds.length };
+    }
+
+    return reply.status(400).send({ error: 'INVALID_ACTION' });
+  });
 }

@@ -251,4 +251,87 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
     return { deleted: true };
   });
+
+  // POST /bulk — bulk create or bulk delete financial records
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const body = z.object({
+      action: z.enum(['create', 'delete']),
+      records: z.array(FinancialRecordCreateSchema).max(500).optional(),
+      ids: z.array(z.string().uuid()).min(1).max(500).optional(),
+    }).parse(request.body);
+    const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    if (body.action === 'create') {
+      if (!body.records?.length) return reply.status(400).send({ error: 'RECORDS_REQUIRED' });
+
+      const flockIds = [...new Set(body.records.map((r) => r.flockId))];
+      const flocks = await prisma.broilerFlock.findMany({
+        where: { id: { in: flockIds }, organizationId },
+        select: { id: true },
+      });
+      const validFlockIds = new Set(flocks.map((f: any) => f.id));
+
+      const validRecords = body.records.filter((r) => validFlockIds.has(r.flockId));
+
+      const created = await prisma.$transaction(
+        validRecords.map((r) =>
+          prisma.financialRecord.create({
+            data: {
+              ...r,
+              recordDate: new Date(r.recordDate),
+              flockId: r.flockId,
+            },
+          })
+        )
+      );
+
+      // Audit log each creation
+      for (const record of created) {
+        await audit.log({
+          userId: authUser.userId,
+          entityType: 'FinancialRecord',
+          entityId: record.id,
+          action: 'create',
+          newState: record,
+          ipAddress: request.ip,
+        });
+      }
+
+      return { action: 'create', affected: created.length, skipped: body.records.length - created.length, records: created };
+    }
+
+    if (body.action === 'delete') {
+      if (!body.ids?.length) return reply.status(400).send({ error: 'IDS_REQUIRED' });
+
+      if (authUser.role !== 'owner') {
+        return reply.status(403).send({ error: 'FORBIDDEN' });
+      }
+
+      const records = await prisma.financialRecord.findMany({
+        where: { id: { in: body.ids } },
+        include: { flock: { select: { organizationId: true } } },
+      });
+      const validRecords = records.filter((r: any) => r.flock.organizationId === organizationId);
+      const validIds = validRecords.map((r: any) => r.id);
+
+      await prisma.financialRecord.deleteMany({ where: { id: { in: validIds } } });
+
+      // Audit log each deletion
+      for (const record of validRecords) {
+        await audit.log({
+          userId: authUser.userId,
+          entityType: 'FinancialRecord',
+          entityId: record.id,
+          action: 'delete',
+          previousState: record,
+          ipAddress: request.ip,
+        });
+      }
+
+      return { action: 'delete', affected: validIds.length, skipped: body.ids.length - validIds.length };
+    }
+
+    return reply.status(400).send({ error: 'INVALID_ACTION' });
+  });
 }

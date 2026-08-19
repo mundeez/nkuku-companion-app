@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
 import { Alert } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, CheckCircle, Clock, AlertTriangle, Info, RefreshCw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Bell, CheckCircle, Clock, AlertTriangle, Info, RefreshCw, Trash2, CheckCheck, X } from "lucide-react";
 
 export default function AlertsPage() {
   const router = useRouter();
@@ -18,6 +19,10 @@ export default function AlertsPage() {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState(false);
+
+  const canDelete = user?.role === "owner" || user?.role === "manager";
 
   function loadAlerts() {
     setLoading(true);
@@ -35,6 +40,11 @@ export default function AlertsPage() {
     }
     if (user) loadAlerts();
   }, [user, isLoading, router, filter]);
+
+  // Clear selection when filter changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filter]);
 
   async function handleResolve(alertId: string) {
     try {
@@ -72,6 +82,50 @@ export default function AlertsPage() {
     }
   }
 
+  // Bulk actions
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      if (prev.size === alerts.length) return new Set();
+      return new Set(alerts.map((a) => a.id));
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkAction(action: "mark_read" | "mark_resolved" | "delete") {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    if (action === "delete") {
+      if (!confirm(`Delete ${ids.length} alert(s)? This cannot be undone.`)) return;
+    }
+
+    setBulkAction(true);
+    try {
+      await apiFetch(`/api/v1/alerts/bulk`, {
+        method: "POST",
+        body: JSON.stringify({ action, ids }),
+      });
+      clearSelection();
+      loadAlerts();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setBulkAction(false);
+    }
+  }
+
   function getSeverityIcon(severity: string) {
     switch (severity) {
       case "critical": return <AlertTriangle className="h-5 w-5 text-red-600" />;
@@ -97,6 +151,8 @@ export default function AlertsPage() {
 
   const openCount = alerts.filter((a) => !a.isResolved).length;
   const resolvedCount = alerts.filter((a) => a.isResolved).length;
+  const selectedCount = selectedIds.size;
+  const allSelected = selectedCount === alerts.length && alerts.length > 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -129,6 +185,46 @@ export default function AlertsPage() {
         ))}
       </div>
 
+      {/* Bulk action bar */}
+      {selectedCount > 0 && (
+        <div className="sticky top-0 z-10 mb-4 p-3 rounded-lg bg-primary text-primary-foreground flex items-center gap-3 shadow-lg">
+          <span className="text-sm font-medium">{selectedCount} selected</span>
+          <div className="flex-1" />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => handleBulkAction("mark_read")}
+            disabled={bulkAction}
+          >
+            <CheckCheck className="h-4 w-4 mr-1" />
+            Mark Read
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => handleBulkAction("mark_resolved")}
+            disabled={bulkAction}
+          >
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Resolve
+          </Button>
+          {canDelete && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => handleBulkAction("delete")}
+              disabled={bulkAction}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={clearSelection} className="text-primary-foreground hover:bg-primary/80">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-3">
         {alerts.length === 0 && (
           <div className="text-center py-12">
@@ -137,10 +233,21 @@ export default function AlertsPage() {
             <p className="text-sm text-muted-foreground mt-1">Click "Generate Alerts" to scan your flocks for pending actions.</p>
           </div>
         )}
+        {alerts.length > 0 && (
+          <div className="flex items-center gap-2 pb-2">
+            <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
+            <span className="text-sm text-muted-foreground">{allSelected ? "Deselect all" : "Select all"}</span>
+          </div>
+        )}
         {alerts.map((alert) => (
           <Card key={alert.id} className={alert.isResolved ? "opacity-60" : ""}>
             <CardContent className="py-4">
               <div className="flex items-start gap-4">
+                <Checkbox
+                  checked={selectedIds.has(alert.id)}
+                  onCheckedChange={() => toggleSelect(alert.id)}
+                  className="mt-1"
+                />
                 <div className="mt-1">{getSeverityIcon(alert.severity)}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">

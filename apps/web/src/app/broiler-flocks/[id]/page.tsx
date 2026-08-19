@@ -19,10 +19,11 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout, ClipboardList, Thermometer, Pill, CalendarDays, Printer, Paperclip, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout, ClipboardList, Thermometer, Pill, CalendarDays, Printer, Paperclip, ChevronDown, ChevronRight, X } from "lucide-react";
 import { FlockTabChart } from "@/components/flock-tab-chart";
 import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AdSlot } from "@/components/ads/AdSlot";
 
 function fmtCollectionDate(date: string | Date | undefined): string {
@@ -567,6 +568,9 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
   const [deletingRecord, setDeletingRecord] = useState<any | null>(null);
   const [costOverride, setCostOverride] = useState(false);
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const titles: any = {
     growth: { title: "Growth Records", icon: TrendingUp, endpoint: "/api/v1/growth-records", fields: [
@@ -653,6 +657,45 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       alert(e.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      if (prev.size === records.length) return new Set();
+      return new Set(records.map((r: any) => r.id));
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkSaving(true);
+    try {
+      await apiFetch(`${config.endpoint}/bulk`, {
+        method: "POST",
+        body: JSON.stringify({ action: "delete", ids }),
+      });
+      setBulkDeleteOpen(false);
+      clearSelection();
+      onRefresh();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBulkSaving(false);
     }
   }
 
@@ -904,6 +947,8 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
 
   const hasSupplier = form.supplierId && form.supplierId !== "custom" && form._bagSizeKg;
   const isCustom = form.supplierId === "custom";
+  const selectedCount = selectedIds.size;
+  const allSelected = selectedCount === records.length && records.length > 0;
 
   return (
     <div>
@@ -919,11 +964,45 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
         </div>
       )}
       <FlockTabChart type={type} records={records} flockId={flockId} breedId={breedId} startDate={startDate} />
+
+      {/* Bulk action bar */}
+      {selectedCount > 0 && userRole === "owner" && (
+        <div className="sticky top-0 z-10 mb-4 p-3 rounded-lg bg-primary text-primary-foreground flex items-center gap-3 shadow-lg">
+          <span className="text-sm font-medium">{selectedCount} selected</span>
+          <div className="flex-1" />
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={bulkSaving}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Delete Selected
+          </Button>
+          <Button variant="ghost" size="sm" onClick={clearSelection} className="text-primary-foreground hover:bg-primary/80">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {records.length === 0 ? <p className="text-muted-foreground">No records yet.</p> : (
-        <div className="space-y-2">{records.map((r: any) => (
+        <div className="space-y-2">
+          {userRole === "owner" && (
+            <div className="flex items-center gap-2 pb-2">
+              <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
+              <span className="text-sm text-muted-foreground">{allSelected ? "Deselect all" : "Select all"}</span>
+            </div>
+          )}
+          {records.map((r: any) => (
           <Card key={r.id}>
             <CardContent className="py-3 flex justify-between items-center">
               <div className="flex items-center gap-2 flex-1 min-w-0">
+                {userRole === "owner" && (
+                  <Checkbox
+                    checked={selectedIds.has(r.id)}
+                    onCheckedChange={() => toggleSelect(r.id)}
+                  />
+                )}
                 {type === "financial" && (
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => setExpandedRecordId(expandedRecordId === r.id ? null : r.id)}>
                     {expandedRecordId === r.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -1087,6 +1166,24 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
           <DialogFooter>
             <Button variant="outline" onClick={() => { setDeleteOpen(false); setDeletingRecord(null); }}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={saving}>{saving ? "Deleting..." : "Delete"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete {selectedCount} Record{selectedCount === 1 ? "" : "s"}</DialogTitle>
+            <DialogDescription>
+              This will permanently delete {selectedCount} {config.title.toLowerCase()}. Linked financial records and flock counts will be updated. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkSaving}>
+              {bulkSaving ? "Deleting..." : `Delete ${selectedCount} Record${selectedCount === 1 ? "" : "s"}`}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

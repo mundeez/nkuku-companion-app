@@ -226,4 +226,89 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     await prisma.vaccinationEvent.delete({ where: { id } });
     return { deleted: true };
   });
+
+  // POST /bulk — bulk create or bulk delete vaccination events
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const body = z.object({
+      action: z.enum(['create', 'delete']),
+      records: z.array(VaccinationEventCreateSchema).max(500).optional(),
+      ids: z.array(z.string().uuid()).min(1).max(500).optional(),
+    }).parse(request.body);
+    const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    if (body.action === 'create') {
+      if (!body.records?.length) return reply.status(400).send({ error: 'RECORDS_REQUIRED' });
+
+      const flockIds = [...new Set(body.records.map((r) => r.flockId))];
+      const flocks = await prisma.broilerFlock.findMany({
+        where: { id: { in: flockIds }, organizationId },
+        select: { id: true },
+      });
+      const validFlockIds = new Set(flocks.map((f: any) => f.id));
+
+      const validRecords = body.records.filter((r) => validFlockIds.has(r.flockId));
+
+      const created = await prisma.$transaction(async (tx: any) => {
+        const results: any[] = [];
+        for (const r of validRecords) {
+          const record = await tx.vaccinationEvent.create({
+            data: {
+              vaccineType: r.vaccineType || r.vaccineName,
+              ...r,
+              adminDate: new Date(r.adminDate),
+              nextDueDate: r.nextDueDate ? new Date(r.nextDueDate) : null,
+              expiryDate: r.expiryDate ? new Date(r.expiryDate) : null,
+              flockId: r.flockId,
+            },
+          });
+          if (r.costZmw && r.costZmw > 0) {
+            await tx.financialRecord.create({
+              data: {
+                flockId: r.flockId,
+                sourceRecordId: record.id,
+                sourceTable: 'vaccination_events',
+                recordDate: new Date(r.adminDate),
+                category: 'vaccines',
+                description: `Vaccine - ${r.vaccineName} (${r.adminMethod})`,
+                amountZmw: r.costZmw,
+                isIncome: false,
+                isSystemGenerated: true,
+                notes: 'Auto-generated from vaccination record',
+              },
+            });
+          }
+          results.push(record);
+        }
+        return results;
+      });
+      return { action: 'create', affected: created.length, skipped: body.records.length - created.length, records: created };
+    }
+
+    if (body.action === 'delete') {
+      if (!body.ids?.length) return reply.status(400).send({ error: 'IDS_REQUIRED' });
+
+      if (authUser.role !== 'owner') {
+        return reply.status(403).send({ error: 'FORBIDDEN' });
+      }
+
+      const events = await prisma.vaccinationEvent.findMany({
+        where: { id: { in: body.ids } },
+        include: { flock: { select: { organizationId: true } } },
+      });
+      const validIds = events
+        .filter((e: any) => e.flock.organizationId === organizationId)
+        .map((e: any) => e.id);
+
+      await prisma.$transaction(async (tx: any) => {
+        await tx.financialRecord.deleteMany({
+          where: { sourceRecordId: { in: validIds }, sourceTable: 'vaccination_events' },
+        });
+        await tx.vaccinationEvent.deleteMany({ where: { id: { in: validIds } } });
+      });
+      return { action: 'delete', affected: validIds.length, skipped: body.ids.length - validIds.length };
+    }
+
+    return reply.status(400).send({ error: 'INVALID_ACTION' });
+  });
 }

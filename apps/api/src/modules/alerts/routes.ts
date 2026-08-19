@@ -126,6 +126,50 @@ export async function buildAlertModule(app: FastifyInstance) {
     return { deleted: true };
   });
 
+  // POST /api/v1/alerts/bulk — bulk mark read / mark resolved / delete
+  app.post('/bulk', { preHandler: [authenticate] }, async (request, reply) => {
+    const body = z.object({
+      action: z.enum(['mark_read', 'mark_resolved', 'delete']),
+      ids: z.array(z.string().uuid()).min(1).max(500),
+    }).parse(request.body);
+    const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    // Fetch all alerts owned by the org
+    const alerts = await prisma.alert.findMany({
+      where: { id: { in: body.ids }, flock: { organizationId } },
+    });
+    const validIds = alerts.map((a: any) => a.id);
+    const skipped = body.ids.length - validIds.length;
+
+    if (body.action === 'delete') {
+      // owner-only (consistent with all other bulk delete endpoints)
+      if (authUser.role !== 'owner') {
+        return reply.status(403).send({ error: 'FORBIDDEN' });
+      }
+      await prisma.alert.deleteMany({ where: { id: { in: validIds } } });
+      return { action: 'delete', affected: validIds.length, skipped };
+    }
+
+    if (body.action === 'mark_read') {
+      await prisma.alert.updateMany({
+        where: { id: { in: validIds } },
+        data: { isRead: true },
+      });
+      return { action: 'mark_read', affected: validIds.length, skipped };
+    }
+
+    if (body.action === 'mark_resolved') {
+      await prisma.alert.updateMany({
+        where: { id: { in: validIds } },
+        data: { isResolved: true },
+      });
+      return { action: 'mark_resolved', affected: validIds.length, skipped };
+    }
+
+    return reply.status(400).send({ error: 'INVALID_ACTION' });
+  });
+
   // POST /api/v1/alerts/generate - Generate alerts for active flocks
   app.post('/generate', { preHandler: [authenticate] }, async (request) => {
     const authUser = (request as any).authUser;
@@ -141,6 +185,10 @@ export async function buildAlertModule(app: FastifyInstance) {
     const generatedAlerts = [];
 
     for (const flock of flocks) {
+      // Wrap each flock in a try/catch so a FK violation on one flock (e.g.
+      // deleted mid-request by a concurrent operation) doesn't abort the
+      // entire generate pass for all other flocks.
+      try {
       if (!flock.startDate) continue; // skip flocks not yet collected
       const startDate = new Date(flock.startDate);
       const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -342,6 +390,10 @@ export async function buildAlertModule(app: FastifyInstance) {
             },
           })
         );
+      }
+      } catch (err) {
+        // Skip flocks that fail (e.g. deleted mid-request); continue with others
+        request.log.warn({ err, flockId: flock.id }, 'alerts/generate: skipping flock due to error');
       }
     }
 

@@ -155,4 +155,66 @@ export async function buildGrowthRecordModule(app: FastifyInstance) {
     await prisma.growthRecord.delete({ where: { id } });
     return { deleted: true };
   });
+
+  // POST /bulk — bulk create or bulk delete growth records
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const body = z.object({
+      action: z.enum(['create', 'delete']),
+      records: z.array(GrowthRecordCreateSchema).max(500).optional(),
+      ids: z.array(z.string().uuid()).min(1).max(500).optional(),
+    }).parse(request.body);
+    const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    if (body.action === 'create') {
+      if (!body.records?.length) return reply.status(400).send({ error: 'RECORDS_REQUIRED' });
+
+      // Collect unique flockIds and verify ownership in one query
+      const flockIds = [...new Set(body.records.map((r) => r.flockId))];
+      const flocks = await prisma.broilerFlock.findMany({
+        where: { id: { in: flockIds }, organizationId },
+        select: { id: true },
+      });
+      const validFlockIds = new Set(flocks.map((f: any) => f.id));
+
+      const created = await prisma.$transaction(
+        body.records
+          .filter((r) => validFlockIds.has(r.flockId))
+          .map((r) =>
+            prisma.growthRecord.create({
+              data: {
+                ...r,
+                recordDate: new Date(r.recordDate),
+                flockId: r.flockId,
+              },
+            })
+          )
+      );
+      return { action: 'create', affected: created.length, skipped: body.records.length - created.length, records: created };
+    }
+
+    if (body.action === 'delete') {
+      if (!body.ids?.length) return reply.status(400).send({ error: 'IDS_REQUIRED' });
+
+      // owner-only for delete
+      if (authUser.role !== 'owner') {
+        return reply.status(403).send({ error: 'FORBIDDEN' });
+      }
+
+      const records = await prisma.growthRecord.findMany({
+        where: { id: { in: body.ids } },
+        include: { flock: { select: { organizationId: true } } },
+      });
+      const validIds = records
+        .filter((r: any) => r.flock.organizationId === organizationId)
+        .map((r: any) => r.id);
+
+      const result = await prisma.growthRecord.deleteMany({
+        where: { id: { in: validIds } },
+      });
+      return { action: 'delete', affected: result.count, skipped: body.ids.length - result.count };
+    }
+
+    return reply.status(400).send({ error: 'INVALID_ACTION' });
+  });
 }

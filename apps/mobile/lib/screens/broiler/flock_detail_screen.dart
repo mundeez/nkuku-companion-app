@@ -104,6 +104,13 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   List<DocumentRecord> _documents = [];
   List<PerformanceTarget> _breedTargets = [];
 
+  // Bulk selection for records
+  bool _recordSelectMode = false;
+  String?
+      _currentRecordType; // 'growth', 'feed', 'water', 'mortality', 'vaccination', 'financial'
+  final Set<String> _selectedRecordIds = {};
+  bool _bulkSaving = false;
+
   /// Top-level tab groups (13 legacy flat tabs consolidated into 6 groups —
   /// see the mobile modernization plan). Declared `late` since the builder
   /// tear-offs (`_buildOverviewTab` etc.) reference instance methods.
@@ -392,24 +399,183 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     }
   }
 
+  // Bulk record selection
+  void _enterRecordSelectMode(String type) {
+    setState(() {
+      _recordSelectMode = true;
+      _currentRecordType = type;
+      _selectedRecordIds.clear();
+    });
+  }
+
+  void _exitRecordSelectMode() {
+    setState(() {
+      _recordSelectMode = false;
+      _currentRecordType = null;
+      _selectedRecordIds.clear();
+    });
+  }
+
+  void _toggleRecordSelect(String id) {
+    setState(() {
+      if (_selectedRecordIds.contains(id)) {
+        _selectedRecordIds.remove(id);
+      } else {
+        _selectedRecordIds.add(id);
+      }
+    });
+  }
+
+  List<String> _currentRecordIds() {
+    switch (_currentRecordType) {
+      case 'growth':
+        return _growthRecords.map((r) => r.id).toList();
+      case 'feed':
+        return _feedRecords.map((r) => r.id).toList();
+      case 'water':
+        return _waterRecords.map((r) => r.id).toList();
+      case 'mortality':
+        return _mortalityEvents.map((r) => r.id).toList();
+      case 'vaccination':
+        return _vaccinationEvents.map((r) => r.id).toList();
+      case 'financial':
+        return _financialRecords.map((r) => r.id).toList();
+      default:
+        return [];
+    }
+  }
+
+  void _toggleSelectAllRecords() {
+    final allIds = _currentRecordIds();
+    setState(() {
+      if (_selectedRecordIds.length == allIds.length) {
+        _selectedRecordIds.clear();
+      } else {
+        _selectedRecordIds.addAll(allIds);
+      }
+    });
+  }
+
+  Future<void> _bulkDeleteRecords() async {
+    if (_selectedRecordIds.isEmpty || _currentRecordType == null) return;
+    if (!AuthService.canDelete) return;
+    final count = _selectedRecordIds.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete $count record${count == 1 ? '' : 's'}?'),
+        content: Text(
+            'This will permanently delete $count ${_currentRecordType} record${count == 1 ? '' : 's'}. '
+            'Linked financial records and flock counts will be updated. This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _bulkSaving = true);
+    try {
+      await BroilerService.bulkDeleteRecords(
+          _currentRecordType!, _selectedRecordIds.toList());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Deleted $count record${count == 1 ? '' : 's'}')),
+        );
+      }
+      _exitRecordSelectMode();
+      _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Bulk delete failed: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _bulkSaving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.flockName),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
-        ],
-        bottom: TabBar(
-          controller: _groupController,
-          isScrollable: true,
-          tabs: [
-            for (final group in _groups)
-              Tab(icon: Icon(group.icon), text: group.title),
-          ],
-        ),
+    // Selection mode app bar
+    final selectAppBar = AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: _exitRecordSelectMode,
       ),
-      floatingActionButton: _floatingActionButton,
+      title: Text('${_selectedRecordIds.length} selected'),
+      actions: [
+        IconButton(
+          icon: Icon(
+            _selectedRecordIds.length == _currentRecordIds().length &&
+                    _currentRecordIds().isNotEmpty
+                ? Icons.deselect
+                : Icons.select_all,
+          ),
+          tooltip: 'Select all',
+          onPressed: _toggleSelectAllRecords,
+        ),
+      ],
+    );
+
+    final normalAppBar = AppBar(
+      title: Text(widget.flockName),
+      actions: [
+        IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
+      ],
+      bottom: TabBar(
+        controller: _groupController,
+        isScrollable: true,
+        tabs: [
+          for (final group in _groups)
+            Tab(icon: Icon(group.icon), text: group.title),
+        ],
+      ),
+    );
+
+    // Bulk action bar
+    final bulkActionBar = _recordSelectMode && _selectedRecordIds.isNotEmpty
+        ? Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(20),
+                  blurRadius: 4,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.delete),
+                    label: const Text('Delete Selected'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _bulkSaving ? null : _bulkDeleteRecords,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : const SizedBox.shrink();
+
+    return Scaffold(
+      appBar: _recordSelectMode ? selectAppBar : normalAppBar,
+      floatingActionButton: _recordSelectMode ? null : _floatingActionButton,
       body: _loading
           ? ListView(
               padding: const EdgeInsets.all(16),
@@ -441,13 +607,16 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     ],
                   ),
                 )
-              : TabBarView(
-                  controller: _groupController,
-                  children: [
-                    for (var gi = 0; gi < _groups.length; gi++)
-                      _buildGroupBody(_groups[gi], gi),
-                  ],
-                ),
+              : _bulkSaving
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(
+                      controller: _groupController,
+                      children: [
+                        for (var gi = 0; gi < _groups.length; gi++)
+                          _buildGroupBody(_groups[gi], gi),
+                      ],
+                    ),
+      bottomNavigationBar: bulkActionBar,
     );
   }
 
@@ -657,7 +826,16 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text('No growth records yet.')))
-          else
+          else ...[
+            if (AuthService.canDelete && !_recordSelectMode)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.checklist),
+                  label: const Text('Select'),
+                  onPressed: () => _enterRecordSelectMode('growth'),
+                ),
+              ),
             ..._growthRecords.reversed.map((r) => RecordCard(
                   title:
                       'Day ${r.recordDate.difference(DateTime.parse(_flock!.startDate ?? r.recordDate.toIso8601String())).inDays}',
@@ -678,7 +856,17 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                                 BroilerService.deleteGrowthRecord(r.id),
                           )
                       : null,
+                  selectable:
+                      _recordSelectMode && _currentRecordType == 'growth',
+                  selected: _selectedRecordIds.contains(r.id),
+                  onSelectChanged: (v) {
+                    if (!_recordSelectMode) {
+                      _enterRecordSelectMode('growth');
+                    }
+                    _toggleRecordSelect(r.id);
+                  },
                 )),
+          ],
         ],
       ),
     );
@@ -707,7 +895,16 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text('No feed records yet.')))
-          else
+          else ...[
+            if (AuthService.canDelete && !_recordSelectMode)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.checklist),
+                  label: const Text('Select'),
+                  onPressed: () => _enterRecordSelectMode('feed'),
+                ),
+              ),
             ..._feedRecords.reversed.map((r) => RecordCard(
                   title:
                       '${r.feedType} · ${r.quantityKg.toStringAsFixed(1)} kg',
@@ -739,7 +936,14 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                                 BroilerService.deleteFeedRecord(r.id),
                           )
                       : null,
+                  selectable: _recordSelectMode && _currentRecordType == 'feed',
+                  selected: _selectedRecordIds.contains(r.id),
+                  onSelectChanged: (v) {
+                    if (!_recordSelectMode) _enterRecordSelectMode('feed');
+                    _toggleRecordSelect(r.id);
+                  },
                 )),
+          ],
         ],
       ),
     );
@@ -767,7 +971,16 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text('No water records yet.')))
-          else
+          else ...[
+            if (AuthService.canDelete && !_recordSelectMode)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.checklist),
+                  label: const Text('Select'),
+                  onPressed: () => _enterRecordSelectMode('water'),
+                ),
+              ),
             ..._waterRecords.reversed.map((r) => RecordCard(
                   title: '${r.quantityLiters.toStringAsFixed(1)} L',
                   subtitle:
@@ -788,7 +1001,15 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                                 BroilerService.deleteWaterRecord(r.id),
                           )
                       : null,
+                  selectable:
+                      _recordSelectMode && _currentRecordType == 'water',
+                  selected: _selectedRecordIds.contains(r.id),
+                  onSelectChanged: (v) {
+                    if (!_recordSelectMode) _enterRecordSelectMode('water');
+                    _toggleRecordSelect(r.id);
+                  },
                 )),
+          ],
         ],
       ),
     );
@@ -815,7 +1036,16 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text('No mortality events yet.')))
-          else
+          else ...[
+            if (AuthService.canDelete && !_recordSelectMode)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.checklist),
+                  label: const Text('Select'),
+                  onPressed: () => _enterRecordSelectMode('mortality'),
+                ),
+              ),
             ..._mortalityEvents.reversed.map((r) => RecordCard(
                   title: '${r.count} birds · ${r.cause ?? 'Unknown cause'}',
                   subtitle: r.ageDays != null ? 'Age day ${r.ageDays}' : null,
@@ -835,7 +1065,15 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                                 BroilerService.deleteMortalityEvent(r.id),
                           )
                       : null,
+                  selectable:
+                      _recordSelectMode && _currentRecordType == 'mortality',
+                  selected: _selectedRecordIds.contains(r.id),
+                  onSelectChanged: (v) {
+                    if (!_recordSelectMode) _enterRecordSelectMode('mortality');
+                    _toggleRecordSelect(r.id);
+                  },
                 )),
+          ],
         ],
       ),
     );
@@ -875,7 +1113,16 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text('No vaccination records yet.')))
-          else
+          else ...[
+            if (AuthService.canDelete && !_recordSelectMode)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.checklist),
+                  label: const Text('Select'),
+                  onPressed: () => _enterRecordSelectMode('vaccination'),
+                ),
+              ),
             ...completed.reversed.map((r) => RecordCard(
                   title: r.vaccineName,
                   subtitle:
@@ -895,7 +1142,16 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                                 BroilerService.deleteVaccinationEvent(r.id),
                           )
                       : null,
+                  selectable:
+                      _recordSelectMode && _currentRecordType == 'vaccination',
+                  selected: _selectedRecordIds.contains(r.id),
+                  onSelectChanged: (v) {
+                    if (!_recordSelectMode)
+                      _enterRecordSelectMode('vaccination');
+                    _toggleRecordSelect(r.id);
+                  },
                 )),
+          ],
         ],
       ),
     );
@@ -926,7 +1182,18 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text('No financial records yet.')))
-          else
+          else ...[
+            if (AuthService.canDelete &&
+                _financialRecords.any((r) => !r.isSystemGenerated) &&
+                !_recordSelectMode)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.checklist),
+                  label: const Text('Select'),
+                  onPressed: () => _enterRecordSelectMode('financial'),
+                ),
+              ),
             ..._financialRecords.map((r) => RecordCard(
                   title: '${r.category} · ${r.description}',
                   subtitle: r.isSystemGenerated ? 'System-generated' : null,
@@ -949,7 +1216,19 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                                 BroilerService.deleteFinancialRecord(r.id),
                           )
                       : null,
+                  selectable: _recordSelectMode &&
+                      _currentRecordType == 'financial' &&
+                      !r.isSystemGenerated,
+                  selected: _selectedRecordIds.contains(r.id),
+                  onSelectChanged: r.isSystemGenerated
+                      ? null
+                      : (v) {
+                          if (!_recordSelectMode)
+                            _enterRecordSelectMode('financial');
+                          _toggleRecordSelect(r.id);
+                        },
                 )),
+          ],
         ],
       ),
     );
@@ -1104,7 +1383,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           }
           final day = envDays[dayIndex];
           final env = day.lightingTemperature!;
-          final isCurrent = _flock?.ageDays != null && day.day == _flock!.ageDays;
+          final isCurrent =
+              _flock?.ageDays != null && day.day == _flock!.ageDays;
           final primary = Theme.of(context).colorScheme.primary;
           return Card(
             margin: const EdgeInsets.only(bottom: 12),

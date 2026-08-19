@@ -78,7 +78,17 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
     const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     const schedule = await getScheduleForFlock(flock, authUser.userId);
-    const item = schedule?.items?.find((i: any) => i.ageDays === ageDays);
+    // Items are ordered by ageDays asc (see service include). The "current"
+    // schedule item is the one with the largest ageDays <= the flock's age —
+    // i.e. the applicable guidance for the age band the flock is currently in.
+    // When the flock is older than the last defined item (e.g. a delayed
+    // harvest past the 42-day target), clamp to the final item rather than
+    // returning null. A negative age (startDate in the future) yields no match
+    // and correctly returns null.
+    const items = (schedule?.items ?? []) as any[];
+    const item = ageDays >= 0
+      ? [...items].reverse().find((i) => i.ageDays <= ageDays) ?? null
+      : null;
 
     return {
       schedule: schedule ? { id: schedule.id, name: schedule.name, description: schedule.description } : null,

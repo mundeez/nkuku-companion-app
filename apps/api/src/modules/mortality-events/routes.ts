@@ -212,4 +212,109 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
     await prisma.mortalityEvent.delete({ where: { id } });
     return { deleted: true };
   });
+
+  // POST /bulk — bulk create or bulk delete mortality events
+  app.post('/bulk', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const body = z.object({
+      action: z.enum(['create', 'delete']),
+      records: z.array(MortalityEventCreateSchema).max(500).optional(),
+      ids: z.array(z.string().uuid()).min(1).max(500).optional(),
+    }).parse(request.body);
+    const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    if (body.action === 'create') {
+      if (!body.records?.length) return reply.status(400).send({ error: 'RECORDS_REQUIRED' });
+
+      const flockIds = [...new Set(body.records.map((r) => r.flockId))];
+      const flocks = await prisma.broilerFlock.findMany({
+        where: { id: { in: flockIds }, organizationId },
+        select: { id: true, currentCount: true },
+      });
+      const flockMap = new Map(flocks.map((f: any) => [f.id, f]));
+
+      const validRecords = body.records.filter((r) => flockMap.has(r.flockId));
+
+      const created = await prisma.$transaction(async (tx: any) => {
+        const results: any[] = [];
+        // Track per-flock count adjustments
+        const countAdjustments = new Map<string, number>();
+        for (const r of validRecords) {
+          countAdjustments.set(r.flockId, (countAdjustments.get(r.flockId) ?? 0) + r.count);
+        }
+        // Apply flock count decrements atomically (avoids stale-read race)
+        for (const [flockId, totalDeaths] of countAdjustments) {
+          await tx.broilerFlock.updateMany({
+            where: { id: flockId, currentCount: { gte: totalDeaths } },
+            data: { currentCount: { decrement: totalDeaths } },
+          });
+        }
+        for (const r of validRecords) {
+          const record = await tx.mortalityEvent.create({
+            data: {
+              ...r,
+              eventDate: new Date(r.eventDate),
+              flockId: r.flockId,
+            },
+          });
+          if (r.costZmw && r.costZmw > 0) {
+            await tx.financialRecord.create({
+              data: {
+                flockId: r.flockId,
+                sourceRecordId: record.id,
+                sourceTable: 'mortality_events',
+                recordDate: new Date(r.eventDate),
+                category: 'other',
+                description: `Mortality/Disposal - ${r.count} birds (${r.cause || 'Unknown cause'})`,
+                amountZmw: r.costZmw,
+                isIncome: false,
+                isSystemGenerated: true,
+                notes: 'Auto-generated from mortality record',
+              },
+            });
+          }
+          results.push(record);
+        }
+        return results;
+      });
+      return { action: 'create', affected: created.length, skipped: body.records.length - created.length, records: created };
+    }
+
+    if (body.action === 'delete') {
+      if (!body.ids?.length) return reply.status(400).send({ error: 'IDS_REQUIRED' });
+
+      if (authUser.role !== 'owner') {
+        return reply.status(403).send({ error: 'FORBIDDEN' });
+      }
+
+      const events = await prisma.mortalityEvent.findMany({
+        where: { id: { in: body.ids } },
+        include: { flock: { select: { organizationId: true } } },
+      });
+      const validEvents = events.filter((e: any) => e.flock.organizationId === organizationId);
+      const validIds = validEvents.map((e: any) => e.id);
+
+      await prisma.$transaction(async (tx: any) => {
+        // Restore flock counts (group by flockId)
+        const countRestorations = new Map<string, number>();
+        for (const e of validEvents) {
+          countRestorations.set(e.flockId, (countRestorations.get(e.flockId) ?? 0) + e.count);
+        }
+        for (const [flockId, totalRestored] of countRestorations) {
+          await tx.broilerFlock.update({
+            where: { id: flockId },
+            data: { currentCount: { increment: totalRestored } },
+          });
+        }
+        // Delete linked financial records
+        await tx.financialRecord.deleteMany({
+          where: { sourceRecordId: { in: validIds }, sourceTable: 'mortality_events' },
+        });
+        await tx.mortalityEvent.deleteMany({ where: { id: { in: validIds } } });
+      });
+      return { action: 'delete', affected: validIds.length, skipped: body.ids.length - validIds.length };
+    }
+
+    return reply.status(400).send({ error: 'INVALID_ACTION' });
+  });
 }
