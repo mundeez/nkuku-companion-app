@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { authenticate } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+
+const RangeSchema = z.enum(['7d', '30d', '90d', 'all']).default('all');
+
+const RANGE_DAYS: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 };
 
 export async function buildDashboardModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -8,6 +13,12 @@ export async function buildDashboardModule(app: FastifyInstance) {
   // ── Dashboard Summary ─────────────────────────
   app.get('/summary', { preHandler: [authenticate] }, async (request) => {
     const organizationId = getOrganizationId(request);
+    const query = RangeSchema.parse((request.query as any)?.range ?? 'all');
+    const rangeDays = RANGE_DAYS[query];
+    const rangeStart = rangeDays
+      ? new Date(Date.now() - rangeDays * 86400000)
+      : undefined;
+
     const [
       flocks,
       openAlerts,
@@ -22,12 +33,19 @@ export async function buildDashboardModule(app: FastifyInstance) {
         orderBy: { startDate: 'desc' },
       }),
       prisma.alert.findMany({
-        where: { isResolved: false, flock: { organizationId } },
+        where: {
+          isResolved: false,
+          flock: { organizationId },
+          ...(rangeStart ? { createdAt: { gte: rangeStart } } : {}),
+        },
         include: { flock: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.financialRecord.findMany({
-        where: { flock: { organizationId } },
+        where: {
+          flock: { organizationId },
+          ...(rangeStart ? { recordDate: { gte: rangeStart } } : {}),
+        },
         select: {
           category: true,
           amountZmw: true,
@@ -155,6 +173,24 @@ export async function buildDashboardModule(app: FastifyInstance) {
       dueDate: a.dueDate,
     }));
 
+    // ── Flock Mortality Comparison ──────────
+    const flockMortalityComparison = flocks
+      .filter((f: any) => f.status === 'active' || f.status === 'sold')
+      .map((f: any) => {
+        const initial = f.initialCount || 0;
+        const deaths = Number(mortalityByFlock.get(f.id) ?? 0);
+        const mortRate = initial > 0 ? Number(((deaths / initial) * 100).toFixed(1)) : 0;
+        return {
+          flockId: f.id,
+          flockName: f.name,
+          initialCount: initial,
+          currentCount: f.currentCount || 0,
+          totalDeaths: deaths,
+          mortalityRate: mortRate,
+        };
+      })
+      .sort((a: any, b: any) => b.mortalityRate - a.mortalityRate);
+
     return {
       kpis: {
         activeFlocks: activeFlocks.length,
@@ -171,6 +207,7 @@ export async function buildDashboardModule(app: FastifyInstance) {
       monthlyTrend,
       costBreakdown,
       flockProfitability,
+      flockMortalityComparison,
       alertsBySeverity,
       alertsByType,
       recentAlerts,

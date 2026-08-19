@@ -45,6 +45,7 @@ import { buildLedgerModule } from './modules/ledger/routes.js';
 import { buildDocumentModule } from './modules/documents/routes.js';
 import { buildAdModule } from './modules/ads/routes.js';
 import { buildAdCampaignModule } from './modules/ad-campaigns/routes.js';
+import { buildAdminOpsModule } from './modules/admin-ops/routes.js';
 import { ensureBucket } from './core/storage/storage.service.js';
 import { SchedulerService } from './core/financial-engine/scheduler.service.js';
 import { DailyRecalculationService } from './core/financial-engine/daily-recalculation.service.js';
@@ -72,10 +73,14 @@ app.addHook('onRequest', async (request: any) => {
   }
 });
 
-// CORS: allow configured origins (comma-separated) or default to all in dev
+// CORS: allow configured origins (comma-separated).
+// In development, default to allowing all origins. In production, require
+// explicit configuration to prevent open CORS.
 const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
-  : true;
+  : process.env.NODE_ENV === 'production'
+    ? [] // fail closed in production if not configured
+    : true;
 
 await app.register(cors, { origin: corsOrigins, credentials: true });
 
@@ -186,6 +191,7 @@ await app.register(buildLedgerModule, { prefix: '/api/v1/ledger' });
 await app.register(buildDocumentModule, { prefix: '/api/v1/documents' });
 await app.register(buildAdModule, { prefix: '/api/v1/ads' });
 await app.register(buildAdCampaignModule, { prefix: '/api/v1/ad-campaigns' });
+await app.register(buildAdminOpsModule, { prefix: '/api/v1/admin' });
 
 // ── Health check ─────────────────────────
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

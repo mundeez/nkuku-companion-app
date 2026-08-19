@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api/client";
 import { DashboardSummary } from "@/lib/types";
 import { AdSlot } from "@/components/ads/AdSlot";
@@ -17,6 +18,15 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
+
+type DateRange = "7d" | "30d" | "90d" | "all";
+
+const RANGE_LABELS: Record<DateRange, string> = {
+  "7d": "7D",
+  "30d": "30D",
+  "90d": "90D",
+  all: "All",
+};
 
 const CATEGORY_COLORS: Record<string, string> = {
   chick_purchase: "#3b82f6",
@@ -70,6 +80,13 @@ export default function DashboardPage() {
   const { user, isLoading } = useAuth();
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+
+  const fetchData = useCallback((range: DateRange) => {
+    apiFetch<DashboardSummary>(`/api/v1/dashboard/summary?range=${range}`)
+      .then(setData)
+      .catch((err) => setError(err.message));
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -77,11 +94,9 @@ export default function DashboardPage() {
       return;
     }
     if (user) {
-      apiFetch<DashboardSummary>("/api/v1/dashboard/summary")
-        .then(setData)
-        .catch((err) => setError(err.message));
+      fetchData(dateRange);
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, dateRange, fetchData]);
 
   const dashboardSkeleton = (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -124,7 +139,23 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold mb-1">Dashboard</h1>
           <p className="text-muted-foreground">Overview of your broiler production</p>
         </div>
-        <Link href="/alerts" className="text-sm text-primary hover:underline">View all alerts →</Link>
+        <div className="flex items-center gap-4">
+          {/* Date Range Selector */}
+          <div className="flex items-center gap-1 rounded-lg border p-1">
+            {(Object.keys(RANGE_LABELS) as DateRange[]).map((r) => (
+              <Button
+                key={r}
+                variant={dateRange === r ? "default" : "ghost"}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setDateRange(r)}
+              >
+                {RANGE_LABELS[r]}
+              </Button>
+            ))}
+          </div>
+          <Link href="/alerts" className="text-sm text-primary hover:underline">View all alerts →</Link>
+        </div>
       </div>
 
       {/* ── KPI Row ─────────────────────────────── */}
@@ -389,6 +420,34 @@ export default function DashboardPage() {
                 <Bar dataKey="count" name="Alerts" radius={[4, 4, 0, 0]}>
                   {data.alertsByType.map((entry, i) => (
                     <Cell key={i} fill={SEVERITY_COLORS[entry.severity] || "#3b82f6"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Flock Mortality Comparison ──────────── */}
+      {data.flockMortalityComparison && data.flockMortalityComparison.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-base">Flock Mortality Comparison</CardTitle>
+            <CardDescription>Mortality rate (%) per flock</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={data.flockMortalityComparison}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="flockName" className="text-xs" tick={{ fontSize: 11 }} angle={-15} textAnchor="end" height={60} />
+                <YAxis className="text-xs" tick={{ fontSize: 12 }} unit="%" />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                  formatter={(v: number) => `${v}%`}
+                />
+                <Bar dataKey="mortalityRate" name="Mortality Rate" radius={[4, 4, 0, 0]}>
+                  {data.flockMortalityComparison.map((entry, i) => (
+                    <Cell key={i} fill={entry.mortalityRate > 10 ? "#ef4444" : entry.mortalityRate > 5 ? "#f59e0b" : "#22c55e"} />
                   ))}
                 </Bar>
               </BarChart>

@@ -11,14 +11,12 @@ RUN pnpm install
 RUN npx prisma generate
 
 # ── Production stage ─────────────────────
+# Reinstall with --prod to prune dev dependencies (vitest, eslint, etc.)
 FROM base AS production
+RUN pnpm install --prod && npx prisma generate
 
-# Copy full source (tsx runs TypeScript directly)
 COPY apps/api/src ./src
 COPY apps/api/tsconfig.json ./
-COPY apps/api/vitest.config.ts ./
-COPY apps/api/eslint.config.js ./
-COPY apps/api/tests ./tests
 
 EXPOSE 3001
 CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npx tsx src/main.ts"]

@@ -16,6 +16,9 @@ import '../models/vaccination_event.dart';
 import '../models/water_record.dart';
 import 'api_cache.dart';
 import 'api_service.dart';
+import 'connectivity_service.dart';
+import 'offline_cache.dart';
+import 'sync_service.dart';
 
 class BroilerServiceException implements Exception {
   final String message;
@@ -32,24 +35,48 @@ class BroilerService {
   // means switching tabs back and forth doesn't always re-hit the network,
   // while still staying fresh enough after a create/edit/delete (which also
   // explicitly invalidates this cache below).
+  //
+  // When offline, falls back to the persisted offline cache.
   static Future<List<BroilerFlock>> getFlocks({
     String? status,
     bool forceRefresh = false,
   }) async {
     final cacheKey = 'flocks:${status ?? 'all'}';
     if (forceRefresh) ApiCache.invalidate(cacheKey);
-    return ApiCache.fetch(
-      cacheKey,
-      () async {
-        final res = await ApiService.dio.get(
-          '/api/v1/broiler-flocks',
-          queryParameters: {if (status != null) 'status': status},
-        );
-        _assertOk(res);
-        return (res.data as List).map((e) => BroilerFlock.fromJson(e)).toList();
-      },
-      ttl: const Duration(seconds: 30),
-    );
+    try {
+      final flocks = await ApiCache.fetch(
+        cacheKey,
+        () async {
+          final res = await ApiService.dio.get(
+            '/api/v1/broiler-flocks',
+            queryParameters: {if (status != null) 'status': status},
+          );
+          _assertOk(res);
+          return (res.data as List).map((e) => BroilerFlock.fromJson(e)).toList();
+        },
+        ttl: const Duration(seconds: 30),
+      );
+      // Persist to offline cache for offline access.
+      ConnectivityService.instance.markOnline();
+      await OfflineCache.instance.cacheFlocks(
+        flocks.map((f) => f.toJson()).toList(),
+      );
+      return flocks;
+    } catch (e) {
+      if (e is DioException && _isNetworkError(e)) {
+        ConnectivityService.instance.markOffline();
+        // Fall back to offline cache.
+        final cached = OfflineCache.instance.getCachedFlocks();
+        if (cached.isNotEmpty) {
+          var flocks = cached.map((e) => BroilerFlock.fromJson(e)).toList();
+          if (status != null) {
+            flocks = flocks.where((f) => f.status == status).toList();
+          }
+          return flocks;
+        }
+      }
+      rethrow;
+    }
   }
 
   static Future<BroilerFlock> getFlock(String id) async {
@@ -60,25 +87,57 @@ class BroilerService {
   }
 
   static Future<BroilerFlock> createFlock(BroilerFlock flock) async {
+    if (!ConnectivityService.instance.isOnline) {
+      // Queue for later sync.
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'flock',
+        operation: 'create',
+        payload: flock.toJson(),
+      );
+      // Return a temporary local copy so the UI can proceed.
+      return flock.copyWith(id: 'pending_${DateTime.now().millisecondsSinceEpoch}');
+    }
     final res = await ApiService.dio
         .post('/api/v1/broiler-flocks', data: flock.toJson());
     _assertOk(res);
+    ConnectivityService.instance.markOnline();
     ApiCache.invalidatePrefix('flocks:');
     return BroilerFlock.fromJson(res.data);
   }
 
   static Future<BroilerFlock> updateFlock(
       String id, Map<String, dynamic> data) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'flock',
+        operation: 'update',
+        entityId: id,
+        payload: data,
+      );
+      return BroilerFlock.fromJson({'id': id, ...data});
+    }
     final res =
         await ApiService.dio.patch('/api/v1/broiler-flocks/$id', data: data);
     _assertOk(res);
+    ConnectivityService.instance.markOnline();
     ApiCache.invalidatePrefix('flocks:');
     return BroilerFlock.fromJson(res.data);
   }
 
   static Future<void> deleteFlock(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'flock',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      ApiCache.invalidatePrefix('flocks:');
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/broiler-flocks/$id');
     _assertOk(res);
+    ConnectivityService.instance.markOnline();
     ApiCache.invalidatePrefix('flocks:');
   }
 
@@ -126,9 +185,18 @@ class BroilerService {
   }
 
   static Future<GrowthRecord> createGrowthRecord(GrowthRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'growth_record',
+        operation: 'create',
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .post('/api/v1/growth-records', data: record.toJson());
     _assertOk(res);
+    ConnectivityService.instance.markOnline();
     return GrowthRecord.fromJson(res.data);
   }
 
@@ -167,9 +235,18 @@ class BroilerService {
   }
 
   static Future<FeedRecord> createFeedRecord(FeedRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'feed_record',
+        operation: 'create',
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .post('/api/v1/feed-records', data: record.toJson());
     _assertOk(res);
+    ConnectivityService.instance.markOnline();
     return FeedRecord.fromJson(res.data);
   }
 
@@ -208,9 +285,18 @@ class BroilerService {
   }
 
   static Future<WaterRecord> createWaterRecord(WaterRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'water_record',
+        operation: 'create',
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .post('/api/v1/water-records', data: record.toJson());
     _assertOk(res);
+    ConnectivityService.instance.markOnline();
     return WaterRecord.fromJson(res.data);
   }
 
@@ -250,9 +336,18 @@ class BroilerService {
 
   static Future<MortalityEvent> createMortalityEvent(
       MortalityEvent event) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'mortality_event',
+        operation: 'create',
+        payload: event.toJson(),
+      );
+      return event;
+    }
     final res = await ApiService.dio
         .post('/api/v1/mortality-events', data: event.toJson());
     _assertOk(res);
+    ConnectivityService.instance.markOnline();
     return MortalityEvent.fromJson(res.data);
   }
 
@@ -294,9 +389,18 @@ class BroilerService {
 
   static Future<VaccinationEvent> createVaccinationEvent(
       VaccinationEvent event) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'vaccination_event',
+        operation: 'create',
+        payload: event.toJson(),
+      );
+      return event;
+    }
     final res = await ApiService.dio
         .post('/api/v1/vaccination-events', data: event.toJson());
     _assertOk(res);
+    ConnectivityService.instance.markOnline();
     return VaccinationEvent.fromJson(res.data);
   }
 
@@ -337,9 +441,18 @@ class BroilerService {
 
   static Future<FinancialRecord> createFinancialRecord(
       FinancialRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'financial_record',
+        operation: 'create',
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .post('/api/v1/financial-records', data: record.toJson());
     _assertOk(res);
+    ConnectivityService.instance.markOnline();
     return FinancialRecord.fromJson(res.data);
   }
 
@@ -671,6 +784,13 @@ class BroilerService {
       log('BroilerService error: $message', name: 'BroilerService');
       throw BroilerServiceException(message.toString());
     }
+  }
+
+  static bool _isNetworkError(DioException e) {
+    return e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.connectionError;
   }
 }
 

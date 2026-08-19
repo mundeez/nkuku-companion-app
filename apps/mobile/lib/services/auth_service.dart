@@ -7,6 +7,7 @@ import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'api_cache.dart';
 import 'api_service.dart';
+import 'offline_cache.dart';
 
 class AuthService {
   static String? _token;
@@ -718,6 +719,8 @@ class AuthService {
     // Clear the session-scoped API cache so the next login never sees
     // another account's cached data.
     ApiCache.clear();
+    // Clear the offline cache and sync queue.
+    await OfflineCache.instance.clearAll();
     _notifyAuthStateChanged();
   }
 }

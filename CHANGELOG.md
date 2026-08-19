@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.19.0-alpha] — 2026-08-19
+
+### Added
+- **Mobile offline sync**: connectivity service, SharedPreferences-based offline cache, sync queue with retry, offline-aware BroilerService for flocks and all record types, offline/pending-sync banner in bottom nav.
+- **Admin ops dashboard (Phase 6)**: platform-admin API endpoints for metrics, tenant list, org detail, failed payments, audit logs; web dashboard with KPI cards, plan distribution chart, revenue chart, failed payments table, recent organizations, and org detail page.
+- **Enterprise branding (Phase 5)**: white-label branding config via env vars, license key validation, public `/branding` endpoint, protected `/license` endpoint, enterprise deployment documentation.
+- **Dashboard date-range selector** (7d/30d/90d/all) with API filtering.
+- **Dashboard flock mortality comparison bar chart** with threshold colors.
+- **Auth rate limiting** on `/send-otp`, `/verify-otp`, `/register`, `/login`.
+- **Production Docker hardening**: `--prod` install, CORS fail-closed.
+- **Vitest upgraded 1.6→3.2.7** (critical dev-dep vuln).
+- **Admin guide and user manual updated** with roles, ledger, documents, bulk ops, billing.
+
+### Changed
+- Version bump: `1.18.0-alpha` → `1.19.0-alpha` in `apps/api/package.json`, `apps/web/package.json`, `apps/mobile/pubspec.yaml`, and root `package.json`.
+
 ## [1.18.0-alpha] — 2026-08-19
 
 ### Security

@@ -17,6 +17,7 @@ import {
   isProviderConfigured,
   type SocialProvider,
 } from '../../core/security/social-auth.service.js';
+import { authRateLimit } from '../../core/security/rate-limiter.js';
 
 const LoginSchema = z.object({
   email: z.string().email().optional(),
@@ -237,7 +238,7 @@ export async function buildAuthModule(app: FastifyInstance) {
   // POST /api/v1/auth/send-otp — send an OTP code to a phone number.
   // Used for: signup (verify phone before creating account), login
   // (passwordless OTP login), and new_device (re-verify on unrecognized device).
-  app.post('/send-otp', async (request, reply) => {
+  app.post('/send-otp', { preHandler: [authRateLimit] }, async (request, reply) => {
     let body;
     try {
       body = SendOtpSchema.parse(request.body);
@@ -300,7 +301,7 @@ export async function buildAuthModule(app: FastifyInstance) {
   // For signup: verifies the phone and creates the account (if signupData provided).
   // For login: verifies the OTP and logs the user in (returns tokens).
   // For new_device: verifies the OTP and registers the device.
-  app.post('/verify-otp', async (request, reply) => {
+  app.post('/verify-otp', { preHandler: [authRateLimit] }, async (request, reply) => {
     let body;
     try {
       body = VerifyOtpSchema.parse(request.body);
@@ -446,7 +447,7 @@ export async function buildAuthModule(app: FastifyInstance) {
 
   // POST /api/v1/auth/register — self-serve signup with email (no OTP needed).
   // Phone-only signup goes through send-otp → verify-otp flow instead.
-  app.post('/register', async (request, reply) => {
+  app.post('/register', { preHandler: [authRateLimit] }, async (request, reply) => {
     let body;
     try {
       body = RegisterSchema.parse(request.body);
@@ -641,7 +642,7 @@ export async function buildAuthModule(app: FastifyInstance) {
 
   // POST /api/v1/auth/login — supports email+password or phone+OTP.
   // For phone+OTP: the OTP must have been sent via /send-otp first.
-  app.post('/login', async (request, reply) => {
+  app.post('/login', { preHandler: [authRateLimit] }, async (request, reply) => {
     let body;
     try {
       body = LoginSchema.parse(request.body);

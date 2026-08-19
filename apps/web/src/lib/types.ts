@@ -536,6 +536,15 @@ export interface FlockProfitabilityItem {
   status: string;
 }
 
+export interface FlockMortalityComparisonItem {
+  flockId: string;
+  flockName: string;
+  initialCount: number;
+  currentCount: number;
+  totalDeaths: number;
+  mortalityRate: number;
+}
+
 export interface AlertsBySeverity {
   critical: number;
   warning: number;
@@ -563,6 +572,7 @@ export interface DashboardSummary {
   monthlyTrend: MonthlyTrendItem[];
   costBreakdown: CostBreakdownItem[];
   flockProfitability: FlockProfitabilityItem[];
+  flockMortalityComparison: FlockMortalityComparisonItem[];
   alertsBySeverity: AlertsBySeverity;
   alertsByType: AlertsByTypeItem[];
   recentAlerts: RecentAlertItem[];

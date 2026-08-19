@@ -45,6 +45,7 @@ services:
     environment:
       NODE_ENV: production
       BULK_RATE_LIMIT: ${BULK_RATE_LIMIT:-10}
+      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-10}
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       PORT: 3001
