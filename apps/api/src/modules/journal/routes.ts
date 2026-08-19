@@ -81,7 +81,7 @@ export async function buildJournalModule(app: FastifyInstance) {
     return {
       ...safe,
       documents: documents.map((doc: any) => {
-        const { filePath, storageKey, contentText, ...docSafe } = doc;
+        const { filePath: _filePath, storageKey: _storageKey, contentText: _contentText, ...docSafe } = doc;
         return { ...docSafe, downloadUrl: `/api/v1/documents/${doc.id}/download` };
       }),
     };
@@ -91,7 +91,7 @@ export async function buildJournalModule(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const data = ManualEntrySchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     try {
       const id = await engine.post({
@@ -100,7 +100,7 @@ export async function buildJournalModule(app: FastifyInstance) {
         reference: data.reference,
         sourceType: 'manual',
         lines: data.lines,
-        postedBy: authUser.userId,
+        postedBy: _authUser.userId,
         organizationId,
       });
       const entry = await prisma.journalEntry.findUnique({
@@ -118,13 +118,13 @@ export async function buildJournalModule(app: FastifyInstance) {
     const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const { reason } = z.object({ reason: z.string().optional() }).parse(request.body ?? {});
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const original = await prisma.journalEntry.findFirst({ where: { id, organizationId } });
     if (!original) return reply.status(404).send({ error: 'JOURNAL_ENTRY_NOT_FOUND' });
 
     try {
-      const reversalId = await engine.reverse(id, authUser.userId, reason);
+      const reversalId = await engine.reverse(id, _authUser.userId, reason);
       const entry = await prisma.journalEntry.findUnique({
         where: { id: reversalId },
         include: { lines: { include: { account: true } } },

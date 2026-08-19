@@ -50,9 +50,9 @@ export async function buildSupplierModule(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const organizationId = getOrganizationId(request);
     const data = SupplierCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     return prisma.supplier.create({
-      data: { ...data, organizationId, createdBy: authUser.userId },
+      data: { ...data, organizationId, createdBy: _authUser.userId },
       include: { feedStages: true },
     });
   });

@@ -30,7 +30,7 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
       date: dateOrIso.optional(),
       status: z.enum(['pending', 'completed', 'skipped']).optional(),
     }).parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -60,7 +60,7 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
 
   app.post('/generate', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -83,7 +83,7 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
       include: { items: { orderBy: { sortOrder: 'asc' } } },
     });
 
-    const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, authUser.userId);
+    const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, _authUser.userId);
 
     // Fetch all existing tasks for this flock in a single query and index them
     // by `${dateStr}|${title}` so we can dedupe candidate tasks in memory instead
@@ -221,7 +221,7 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const data = FlockTaskCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -240,7 +240,7 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = FlockTaskUpdateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const task = await prisma.flockTask.findFirst({
@@ -269,7 +269,7 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const task = await prisma.flockTask.findFirst({

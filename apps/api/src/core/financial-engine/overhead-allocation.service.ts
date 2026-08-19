@@ -89,7 +89,7 @@ export class OverheadAllocationService {
     const [year, month] = overhead.yearMonth.split('-').map(Number);
     const monthStart = new Date(year, month - 1, 1);
     const monthEnd = new Date(year, month, 0); // last day of month
-    const daysInMonth = monthEnd.getDate();
+    const _daysInMonth = monthEnd.getDate();
 
     // Find all flocks that were active during this month
     const flocks = await this.prisma.broilerFlock.findMany({

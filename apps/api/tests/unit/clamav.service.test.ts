@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock clamscan
-const mockScanStream = vi.fn();
+const _mockScanStream = vi.fn();
 const mockInit = vi.fn();
 
 vi.mock('clamscan', () => ({

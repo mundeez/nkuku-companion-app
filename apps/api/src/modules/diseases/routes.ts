@@ -63,14 +63,14 @@ export async function buildDiseaseModule(app: FastifyInstance) {
     return prisma.disease.create({ data });
   });
 
-  app.patch('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.patch('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, _reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = DiseaseCreateSchema.partial().parse(request.body);
     const disease = await prisma.disease.update({ where: { id }, data });
     return disease;
   });
 
-  app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, _reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     await prisma.disease.delete({ where: { id } });
     return { deleted: true };

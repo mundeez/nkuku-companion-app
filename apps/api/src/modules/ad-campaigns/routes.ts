@@ -136,7 +136,7 @@ export async function buildAdCampaignModule(app: FastifyInstance) {
 
   // ── POST / — create a campaign ──
   app.post('/', { preHandler: guard }, async (request, reply) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     let body;
     try {
       body = CreateCampaignSchema.parse(request.body);
@@ -144,7 +144,7 @@ export async function buildAdCampaignModule(app: FastifyInstance) {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: err.errors?.[0]?.message || 'Invalid request' });
     }
     const campaign = await prisma.adCampaign.create({
-      data: { ...body, createdBy: authUser.userId },
+      data: { ...body, createdBy: _authUser.userId },
     });
     return reply.status(201).send(campaign);
   });

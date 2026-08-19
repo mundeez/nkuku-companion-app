@@ -46,7 +46,7 @@ export async function buildFeedStageModule(app: FastifyInstance) {
     const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = FeedStageUpdateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     // Fetch the existing record to compare price/size before updating
     const existing = await prisma.feedStage.findFirst({ where: { id, supplier: { organizationId } } });
@@ -69,7 +69,7 @@ export async function buildFeedStageModule(app: FastifyInstance) {
           newUnitPriceZmw: data.unitPriceZmw !== undefined ? data.unitPriceZmw : existing.unitPriceZmw,
           oldUnitSizeKg: existing.unitSizeKg,
           newUnitSizeKg: data.unitSizeKg !== undefined ? data.unitSizeKg : existing.unitSizeKg,
-          changedBy: authUser?.userId ?? null,
+          changedBy: _authUser?.userId ?? null,
         },
       });
     }

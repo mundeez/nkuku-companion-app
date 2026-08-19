@@ -33,14 +33,14 @@ async function authedRequest(path: string, options: any = {}, token?: string) {
 
 describe('Billing Module', () => {
   let token: string;
-  let orgId: string;
-  let userEmail: string;
+  let _orgId: string;
+  let _userEmail: string;
 
   beforeAll(async () => {
     const reg = await registerUser(`bill-${Date.now()}`);
     token = reg.accessToken;
-    orgId = reg.organization.id;
-    userEmail = reg.email;
+    _orgId = reg.organization.id;
+    _userEmail = reg.email;
   });
 
   describe('GET /plans', () => {
@@ -122,7 +122,7 @@ describe('Billing Module', () => {
     });
 
     it('rejects enterprise plan (not self-serve)', async () => {
-      const { status, data } = await authedRequest(
+      const { status, data: _data } = await authedRequest(
         '/api/v1/billing/subscribe',
         {
           method: 'POST',
@@ -276,7 +276,7 @@ describe('Billing Module', () => {
       });
       // In mock mode (no WEBHOOK_HASH set), all signatures are accepted
       // So this should actually succeed
-      const data = await res.json();
+      const _data = await res.json();
       // Either 200 (mock mode accepts) or 401 (if hash is configured)
       expect([200, 401]).toContain(res.status);
     });

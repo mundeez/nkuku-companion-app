@@ -63,7 +63,7 @@ export async function buildSupplierTemplateModule(app: FastifyInstance) {
   });
 
   // PATCH /api/v1/supplier-templates/:id
-  app.patch('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.patch('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, _reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = z.object({
       name: z.string().min(1).max(100).optional(),
@@ -80,7 +80,7 @@ export async function buildSupplierTemplateModule(app: FastifyInstance) {
   });
 
   // POST /api/v1/supplier-templates/:id/items
-  app.post('/:id/items', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.post('/:id/items', { preHandler: [authenticate, requireRole('owner')] }, async (request, _reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = TemplateItemCreateSchema.parse(request.body);
 
@@ -90,7 +90,7 @@ export async function buildSupplierTemplateModule(app: FastifyInstance) {
   });
 
   // PATCH /api/v1/supplier-templates/items/:itemId
-  app.patch('/items/:itemId', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.patch('/items/:itemId', { preHandler: [authenticate, requireRole('owner')] }, async (request, _reply) => {
     const { itemId } = z.object({ itemId: z.string().uuid() }).parse(request.params);
     const data = TemplateItemUpdateSchema.parse(request.body);
 
@@ -101,7 +101,7 @@ export async function buildSupplierTemplateModule(app: FastifyInstance) {
   });
 
   // DELETE /api/v1/supplier-templates/items/:itemId
-  app.delete('/items/:itemId', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.delete('/items/:itemId', { preHandler: [authenticate, requireRole('owner')] }, async (request, _reply) => {
     const { itemId } = z.object({ itemId: z.string().uuid() }).parse(request.params);
     await prisma.supplierCategoryTemplateItem.delete({ where: { id: itemId } });
     return { deleted: true };
@@ -109,7 +109,7 @@ export async function buildSupplierTemplateModule(app: FastifyInstance) {
 
   // PATCH /api/v1/supplier-templates/:id/reorder
   // Body: { items: [{ id: string, sortOrder: number }] }
-  app.patch('/:id/reorder', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.patch('/:id/reorder', { preHandler: [authenticate, requireRole('owner')] }, async (request, _reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const { items } = z.object({
       items: z.array(z.object({ id: z.string().uuid(), sortOrder: z.number().int() })),

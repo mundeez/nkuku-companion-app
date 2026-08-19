@@ -43,14 +43,14 @@ export async function buildBreedModule(app: FastifyInstance) {
     return prisma.breed.create({ data });
   });
 
-  app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+  app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, _reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = BreedUpdateSchema.parse(request.body);
     const breed = await prisma.breed.update({ where: { id }, data });
     return breed;
   });
 
-  app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, _reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     await prisma.breed.delete({ where: { id } });
     return { deleted: true };

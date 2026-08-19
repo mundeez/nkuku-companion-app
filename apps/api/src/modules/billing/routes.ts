@@ -9,7 +9,6 @@ import {
   cancelSubscription,
   processPaymentEvent,
   verifyPaymentRedirect,
-  getOrCreateSubscription,
 } from '../../core/billing/billing.service.js';
 import { verifyWebhookSignature, isMockMode } from '../../core/billing/flutterwave.service.js';
 import { getPlanLimitsForOrg, shouldShowAds } from '../../core/billing/feature-gate.js';
@@ -78,11 +77,11 @@ export async function buildBillingModule(app: FastifyInstance) {
   // ── POST /addons/:code/subscribe — purchase an add-on ──
   app.post('/addons/:code/subscribe', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const { code } = z.object({ code: z.enum(['remove_ads_addon']) }).parse(request.params);
     const { redirectUrl } = z.object({ redirectUrl: z.string().url().optional() }).parse(request.body ?? {});
 
-    const user = await prisma.user.findUnique({ where: { id: authUser.userId } });
+    const user = await prisma.user.findUnique({ where: { id: _authUser.userId } });
     if (!user) return reply.status(404).send({ error: 'USER_NOT_FOUND' });
 
     const redirectError = validateRedirectUrl(redirectUrl);
@@ -127,7 +126,7 @@ export async function buildBillingModule(app: FastifyInstance) {
   // ── POST /subscribe — subscribe to a plan (or change plans) ──
   app.post('/subscribe', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     let body;
     try {
@@ -137,7 +136,7 @@ export async function buildBillingModule(app: FastifyInstance) {
     }
 
     // Get user email for Flutterwave customer
-    const user = await prisma.user.findUnique({ where: { id: authUser.userId } });
+    const user = await prisma.user.findUnique({ where: { id: _authUser.userId } });
     if (!user) return reply.status(404).send({ error: 'USER_NOT_FOUND' });
 
     // Get org for currency

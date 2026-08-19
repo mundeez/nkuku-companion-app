@@ -34,7 +34,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
   // GET /all — list all sale records for the user (for sales dashboard)
   app.get('/all', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
     const query = z.object({
       fromDate: z.string().optional(),
@@ -56,7 +56,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
   // GET /dashboard — global sales summary for the sales dashboard
   app.get('/dashboard', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
     const query = z.object({
       fromDate: z.string().optional(),
@@ -131,7 +131,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   // GET /?flockId=... (optional — returns all user's sales if no flockId)
   app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
     const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     if (flockId) {
@@ -157,7 +157,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   // GET /:id
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const record = await prisma.saleRecord.findFirst({
@@ -169,11 +169,11 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     }
 
     // Strip sensitive fields from documents
-    const { flock, documents, ...safe } = record;
+    const { _flock, documents, ...safe } = record;
     return {
       ...safe,
       documents: documents.map((doc: any) => {
-        const { filePath, storageKey, contentText, ...docSafe } = doc;
+        const { filePath: _filePath, storageKey: _storageKey, contentText: _contentText, ...docSafe } = doc;
         return { ...docSafe, downloadUrl: `/api/v1/documents/${doc.id}/download` };
       }),
     };
@@ -182,7 +182,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   // GET /summary?flockId=... (optional — returns global summary if no flockId)
   app.get('/summary', { preHandler: [authenticate] }, async (request, reply) => {
     const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const where = flockId
@@ -236,7 +236,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   // POST /
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager', 'sales_person')] }, async (request, reply) => {
     const { flockId, ...data } = SaleRecordCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -268,7 +268,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
         flockId,
         amountPaidZmw: data.amountPaidZmw ?? null,
         notes: `${notesPrefix}${originalNotes}`,
-        createdBy: authUser.userId,
+        createdBy: _authUser.userId,
         organizationId,
       },
     });
@@ -281,7 +281,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
     await audit.log({
       organizationId,
-      userId: authUser.userId,
+      userId: _authUser.userId,
       entityType: 'SaleRecord',
       entityId: created.id,
       action: 'create',
@@ -296,7 +296,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager', 'sales_person')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = SaleRecordUpdateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const record = await prisma.saleRecord.findFirst({
@@ -342,7 +342,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
     await audit.log({
       organizationId,
-      userId: authUser.userId,
+      userId: _authUser.userId,
       entityType: 'SaleRecord',
       entityId: id,
       action: 'update',
@@ -357,7 +357,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   // DELETE /:id
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const record = await prisma.saleRecord.findFirst({
@@ -388,7 +388,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
     await audit.log({
       organizationId,
-      userId: authUser.userId,
+      userId: _authUser.userId,
       entityType: 'SaleRecord',
       entityId: id,
       action: 'delete',

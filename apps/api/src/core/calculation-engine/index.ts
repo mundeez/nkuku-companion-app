@@ -109,7 +109,7 @@ export function calculateBatchProjection(
   const breakdown: ProjectionBreakdownItem[] = [];
 
   for (const stage of feedStages) {
-    const { itemsRaw, itemsRoundedUp, error } = calculateItemsRequired(
+    const { itemsRaw, itemsRoundedUp, error: _error } = calculateItemsRequired(
       birdCount,
       stage.intakePerBirdKg,
       stage.unitSizeKg,

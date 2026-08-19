@@ -25,7 +25,7 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -41,7 +41,7 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const data = MedicationRecordCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -87,7 +87,7 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = MedicationRecordCreateSchema.partial().omit({ flockId: true }).parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const record = await prisma.medicationRecord.findFirst({
@@ -155,7 +155,7 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const record = await prisma.medicationRecord.findFirst({

@@ -110,7 +110,7 @@ export async function buildAccountModule(app: FastifyInstance) {
   });
 
   // ── PATCH /me — update profile ──
-  app.patch('/me', { preHandler: [authenticate] }, async (request, reply) => {
+  app.patch('/me', { preHandler: [authenticate] }, async (request, _reply) => {
     const userId = (request as any).authUser.userId;
     const data = UpdateProfileSchema.parse(request.body);
 

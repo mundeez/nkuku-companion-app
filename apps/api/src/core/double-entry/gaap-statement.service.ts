@@ -257,7 +257,7 @@ export class GaapStatementService {
     // 2. Get balance changes for non-cash accounts
     // Cash account (1010) is excluded — it's the plug
     const cashAccount = await this.prisma.account.findUnique({ where: { code: '1010' } });
-    let netCashChange = new Decimal(0);
+    let _netCashChange = new Decimal(0);
 
     if (cashAccount) {
       const openingCash = await this.prisma.journalLine.aggregate({
@@ -278,7 +278,7 @@ export class GaapStatementService {
         .minus(new Decimal(openingCash._sum.creditZmw?.toString() ?? '0'));
       const closing = new Decimal(closingCash._sum.debitZmw?.toString() ?? '0')
         .minus(new Decimal(closingCash._sum.creditZmw?.toString() ?? '0'));
-      netCashChange = closing.minus(opening);
+      _netCashChange = closing.minus(opening);
     }
 
     // 3. Get changes in receivables, inventory, payables (working capital)

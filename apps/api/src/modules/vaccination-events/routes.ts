@@ -34,7 +34,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     if (flockId) {
@@ -58,7 +58,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
   app.get('/schedule', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -102,7 +102,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const { flockId, ...data } = VaccinationEventCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -145,7 +145,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = VaccinationEventCreateSchema.partial().omit({ flockId: true, vaccineInventoryId: true }).parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const event = await prisma.vaccinationEvent.findFirst({
@@ -209,7 +209,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const event = await prisma.vaccinationEvent.findFirst({
@@ -235,7 +235,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
       records: z.array(VaccinationEventCreateSchema).max(500).optional(),
       ids: z.array(z.string().uuid()).min(1).max(500).optional(),
     }).parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     if (body.action === 'create') {
@@ -295,7 +295,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     if (body.action === 'delete') {
       if (!body.ids?.length) return reply.status(400).send({ error: 'IDS_REQUIRED' });
 
-      if (authUser.role !== 'owner') {
+      if (_authUser.role !== 'owner') {
         return reply.status(403).send({ error: 'FORBIDDEN' });
       }
 

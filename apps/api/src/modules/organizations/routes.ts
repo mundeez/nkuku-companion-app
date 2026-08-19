@@ -66,11 +66,11 @@ export async function buildOrganizationModule(app: FastifyInstance) {
   app.delete('/members/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const membership = await prisma.organizationMember.findFirst({ where: { id, organizationId } });
     if (!membership) return reply.status(404).send({ error: 'NOT_FOUND' });
-    if (membership.userId === authUser.userId) {
+    if (membership.userId === _authUser.userId) {
       return reply.status(400).send({ error: 'CANNOT_REMOVE_SELF' });
     }
     await prisma.organizationMember.delete({ where: { id } });
@@ -80,7 +80,7 @@ export async function buildOrganizationModule(app: FastifyInstance) {
   // POST /api/v1/organizations/invites — invite a user to the current org (owner/manager)
   app.post('/invites', { preHandler: [authenticate, requireRole('owner', 'manager'), checkUserLimit] }, async (request) => {
     const organizationId = getOrganizationId(request);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const data = InviteCreateSchema.parse(request.body);
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -92,7 +92,7 @@ export async function buildOrganizationModule(app: FastifyInstance) {
         email: data.email,
         role: data.role,
         token,
-        invitedBy: authUser.userId,
+        invitedBy: _authUser.userId,
         expiresAt,
       },
     });

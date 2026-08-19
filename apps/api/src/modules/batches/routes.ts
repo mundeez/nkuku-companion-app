@@ -63,9 +63,9 @@ export async function buildBatchModule(app: FastifyInstance) {
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const organizationId = getOrganizationId(request);
     const data = BatchCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     return prisma.batch.create({
-      data: { ...data, createdBy: authUser.userId, organizationId },
+      data: { ...data, createdBy: _authUser.userId, organizationId },
       include: { supplier: true, cycle: true },
     });
   });

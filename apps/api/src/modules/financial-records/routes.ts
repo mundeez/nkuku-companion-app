@@ -21,7 +21,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     if (flockId) {
@@ -46,7 +46,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
   // GET /:id — single financial record with documents
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const record = await prisma.financialRecord.findFirst({
@@ -58,11 +58,11 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     }
 
     // Strip sensitive fields from documents
-    const { flock, documents, ...safe } = record;
+    const { _flock, documents, ...safe } = record;
     return {
       ...safe,
       documents: documents.map((doc: any) => {
-        const { filePath, storageKey, contentText, ...docSafe } = doc;
+        const { filePath: _filePath, storageKey: _storageKey, contentText: _contentText, ...docSafe } = doc;
         return { ...docSafe, downloadUrl: `/api/v1/documents/${doc.id}/download` };
       }),
     };
@@ -70,7 +70,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
   app.get('/summary', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const where = flockId
@@ -163,7 +163,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const { flockId, ...data } = FinancialRecordCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -181,7 +181,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
     await audit.log({
       organizationId,
-      userId: authUser.userId,
+      userId: _authUser.userId,
       entityType: 'FinancialRecord',
       entityId: created.id,
       action: 'create',
@@ -195,7 +195,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = FinancialRecordCreateSchema.partial().omit({ flockId: true }).parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const record = await prisma.financialRecord.findFirst({
@@ -216,7 +216,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
     await audit.log({
       organizationId,
-      userId: authUser.userId,
+      userId: _authUser.userId,
       entityType: 'FinancialRecord',
       entityId: id,
       action: 'update',
@@ -230,7 +230,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const record = await prisma.financialRecord.findFirst({
@@ -245,7 +245,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
 
     await audit.log({
       organizationId,
-      userId: authUser.userId,
+      userId: _authUser.userId,
       entityType: 'FinancialRecord',
       entityId: id,
       action: 'delete',
@@ -263,7 +263,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
       records: z.array(FinancialRecordCreateSchema).max(500).optional(),
       ids: z.array(z.string().uuid()).min(1).max(500).optional(),
     }).parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     if (body.action === 'create') {
@@ -294,7 +294,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
           });
           await audit.log({
             organizationId,
-            userId: authUser.userId,
+            userId: _authUser.userId,
             entityType: 'FinancialRecord',
             entityId: record.id,
             action: 'create',
@@ -312,7 +312,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     if (body.action === 'delete') {
       if (!body.ids?.length) return reply.status(400).send({ error: 'IDS_REQUIRED' });
 
-      if (authUser.role !== 'owner') {
+      if (_authUser.role !== 'owner') {
         return reply.status(403).send({ error: 'FORBIDDEN' });
       }
 
@@ -328,7 +328,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
         for (const record of validRecords) {
           await audit.log({
             organizationId,
-            userId: authUser.userId,
+            userId: _authUser.userId,
             entityType: 'FinancialRecord',
             entityId: record.id,
             action: 'delete',

@@ -35,7 +35,7 @@ export async function buildVaccineInventoryModule(app: FastifyInstance) {
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const data = VaccineInventoryCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const expiryDate = new Date(data.expiryDate);
     const status = data.status || (expiryDate < new Date() ? 'expired' : 'available');
@@ -54,7 +54,7 @@ export async function buildVaccineInventoryModule(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = VaccineInventoryCreateSchema.partial().parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const record = await prisma.vaccineInventory.findUnique({ where: { id } });
     if (!record) return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -76,7 +76,7 @@ export async function buildVaccineInventoryModule(app: FastifyInstance) {
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const record = await prisma.vaccineInventory.findUnique({ where: { id } });
     if (!record) return reply.status(404).send({ error: 'NOT_FOUND' });

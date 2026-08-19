@@ -122,7 +122,7 @@ export async function extractAndStore(
         extractionStatus: 'done',
       },
     });
-  } catch (err: any) {
+  } catch (_err: any) {
     // Non-fatal — mark as failed but don't throw
     try {
       await prisma.document.update({

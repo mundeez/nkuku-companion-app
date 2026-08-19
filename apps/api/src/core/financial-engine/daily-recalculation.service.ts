@@ -15,7 +15,7 @@ export class DailyRecalculationService {
     this.projections = new HarvestProjectionService(prisma);
   }
 
-  async runDaily(organizationId: string, config: RecalculationConfig): Promise<void> {
+  async runDaily(organizationId: string, _config: RecalculationConfig): Promise<void> {
     const today = new Date();
     const yearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 
-const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
+const _dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
 const LightingTemperatureScheduleCreateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -49,9 +49,9 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
 
   // GET /api/v1/lighting-temperature-schedules - list schedules
   app.get('/', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     return prisma.lightingTemperatureSchedule.findMany({
-      where: { OR: [{ createdBy: authUser.userId }, { createdBy: null }] },
+      where: { OR: [{ createdBy: _authUser.userId }, { createdBy: null }] },
       include: { items: { orderBy: { ageDays: 'asc' } }, breed: { select: { name: true } } },
       orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
     });
@@ -60,10 +60,10 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
   // GET /api/v1/lighting-temperature-schedules/current?flockId=...
   app.get('/current', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const flock = await prisma.broilerFlock.findFirst({
-      where: { id: flockId, createdBy: authUser.userId },
+      where: { id: flockId, createdBy: _authUser.userId },
       include: { breed: true },
     });
     if (!flock) return { error: 'NOT_FOUND' };
@@ -77,7 +77,7 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
     const startDate = new Date(flock.startDate);
     const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    const schedule = await getScheduleForFlock(flock, authUser.userId);
+    const schedule = await getScheduleForFlock(flock, _authUser.userId);
     // Items are ordered by ageDays asc (see service include). The "current"
     // schedule item is the one with the largest ageDays <= the flock's age —
     // i.e. the applicable guidance for the age band the flock is currently in.
@@ -100,10 +100,10 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
   // GET /api/v1/lighting-temperature-schedules/:id
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const schedule = await prisma.lightingTemperatureSchedule.findFirst({
-      where: { id, OR: [{ createdBy: authUser.userId }, { createdBy: null }] },
+      where: { id, OR: [{ createdBy: _authUser.userId }, { createdBy: null }] },
       include: { items: { orderBy: { ageDays: 'asc' } }, breed: { select: { name: true } } },
     });
     if (!schedule) return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -114,7 +114,7 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
   // POST /api/v1/lighting-temperature-schedules - create schedule (owner/manager)
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const data = LightingTemperatureScheduleCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const schedule = await prisma.lightingTemperatureSchedule.create({
       data: {
@@ -123,7 +123,7 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
         description: data.description,
         housingType: data.housingType,
         isDefault: data.isDefault ?? false,
-        createdBy: authUser.userId,
+        createdBy: _authUser.userId,
         items: {
           create: (data.items || []).map((item, idx) => ({ ...item, sortOrder: idx })),
         },
@@ -138,12 +138,12 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = LightingTemperatureScheduleCreateSchema.partial().parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const schedule = await prisma.lightingTemperatureSchedule.findFirst({
       where: { id },
     });
-    if (!schedule || (schedule.createdBy && schedule.createdBy !== authUser.userId)) {
+    if (!schedule || (schedule.createdBy && schedule.createdBy !== _authUser.userId)) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
@@ -165,12 +165,12 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
   // DELETE /api/v1/lighting-temperature-schedules/:id
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const schedule = await prisma.lightingTemperatureSchedule.findFirst({
       where: { id },
     });
-    if (!schedule || (schedule.createdBy && schedule.createdBy !== authUser.userId)) {
+    if (!schedule || (schedule.createdBy && schedule.createdBy !== _authUser.userId)) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
@@ -182,12 +182,12 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
   app.post('/:id/items', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = LightingTemperatureScheduleItemUpdateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const schedule = await prisma.lightingTemperatureSchedule.findFirst({
       where: { id },
     });
-    if (!schedule || (schedule.createdBy && schedule.createdBy !== authUser.userId)) {
+    if (!schedule || (schedule.createdBy && schedule.createdBy !== _authUser.userId)) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
@@ -205,12 +205,12 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
   app.patch('/:id/items/:itemId', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id, itemId } = z.object({ id: z.string().uuid(), itemId: z.string().uuid() }).parse(request.params);
     const data = LightingTemperatureScheduleItemUpdateSchema.partial().parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const schedule = await prisma.lightingTemperatureSchedule.findFirst({
       where: { id },
     });
-    if (!schedule || (schedule.createdBy && schedule.createdBy !== authUser.userId)) {
+    if (!schedule || (schedule.createdBy && schedule.createdBy !== _authUser.userId)) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
@@ -225,12 +225,12 @@ export async function buildLightingTemperatureScheduleModule(app: FastifyInstanc
   // DELETE /api/v1/lighting-temperature-schedules/:id/items/:itemId
   app.delete('/:id/items/:itemId', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id, itemId } = z.object({ id: z.string().uuid(), itemId: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const schedule = await prisma.lightingTemperatureSchedule.findFirst({
       where: { id },
     });
-    if (!schedule || (schedule.createdBy && schedule.createdBy !== authUser.userId)) {
+    if (!schedule || (schedule.createdBy && schedule.createdBy !== _authUser.userId)) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 

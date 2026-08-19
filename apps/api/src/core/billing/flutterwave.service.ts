@@ -12,7 +12,7 @@ import crypto from 'crypto';
 
 const BASE_URL = 'https://api.flutterwave.com/v3';
 const SECRET_KEY = process.env.FLUTTERWAVE_SECRET_KEY || '';
-const PUBLIC_KEY = process.env.FLUTTERWAVE_PUBLIC_KEY || '';
+const _PUBLIC_KEY = process.env.FLUTTERWAVE_PUBLIC_KEY || '';
 const WEBHOOK_HASH = process.env.FLUTTERWAVE_WEBHOOK_HASH || '';
 const IS_MOCK = !SECRET_KEY;
 

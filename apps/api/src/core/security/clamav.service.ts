@@ -36,7 +36,7 @@ async function getScanner(): Promise<ClamScan | null> {
     });
     initFailed = false; // reset on success
     return scanner;
-  } catch (err: any) {
+  } catch (_err: any) {
     // Mark as failed but allow retry after RETRY_INTERVAL_MS
     initFailed = true;
     lastFailTime = Date.now();

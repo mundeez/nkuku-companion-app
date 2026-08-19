@@ -6,7 +6,7 @@ async function main() {
   console.log('[MIGRATE] Updating existing flocks...');
 
   // Flocks not collected: clear startDate (pending collection)
-  const pending = await prisma.$executeRaw`
+  const _pending = await prisma.$executeRaw`
     UPDATE broiler_flocks SET start_date = NULL WHERE chicks_collected = false
   `;
   console.log('[MIGRATE] Cleared startDate for pending flocks');

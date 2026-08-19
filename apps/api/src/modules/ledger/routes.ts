@@ -142,7 +142,7 @@ export async function buildLedgerModule(app: FastifyInstance) {
   });
 
   // GET /cash-flow — cash flow statement (indirect method)
-  app.get('/cash-flow', { preHandler: [authenticate] }, async (request, reply) => {
+  app.get('/cash-flow', { preHandler: [authenticate] }, async (request, _reply) => {
     const organizationId = getOrganizationId(request);
     const q = StatementQuerySchema.parse(request.query);
     const toDate = q.toDate ? new Date(q.toDate) : new Date();
@@ -156,9 +156,9 @@ export async function buildLedgerModule(app: FastifyInstance) {
   app.post('/year-end-close', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const { year } = YearEndCloseSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     try {
-      const result = await closingService.yearEndClose(year, organizationId, authUser.userId);
+      const result = await closingService.yearEndClose(year, organizationId, _authUser.userId);
       return reply.status(201).send(result);
     } catch (err: any) {
       return reply.status(400).send({ error: err.message });

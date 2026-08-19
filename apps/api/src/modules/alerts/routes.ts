@@ -35,7 +35,7 @@ export async function buildAlertModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
     const query = z.object({
       status: z.enum(['open', 'resolved']).optional(),
@@ -62,7 +62,7 @@ export async function buildAlertModule(app: FastifyInstance) {
 
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const alert = await prisma.alert.findFirst({
@@ -75,7 +75,7 @@ export async function buildAlertModule(app: FastifyInstance) {
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
     const data = AlertCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     // Verify flock ownership
@@ -98,7 +98,7 @@ export async function buildAlertModule(app: FastifyInstance) {
       isRead: z.boolean().optional(),
       isResolved: z.boolean().optional(),
     }).parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const alert = await prisma.alert.findFirst({
@@ -115,7 +115,7 @@ export async function buildAlertModule(app: FastifyInstance) {
   // DELETE /:id — delete an alert (owner/manager only)
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const alert = await prisma.alert.findFirst({
@@ -133,7 +133,7 @@ export async function buildAlertModule(app: FastifyInstance) {
       action: z.enum(['mark_read', 'mark_resolved', 'delete']),
       ids: z.array(z.string().uuid()).min(1).max(500),
     }).parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     // Fetch all alerts owned by the org
@@ -145,7 +145,7 @@ export async function buildAlertModule(app: FastifyInstance) {
 
     if (body.action === 'delete') {
       // owner-only (consistent with all other bulk delete endpoints)
-      if (authUser.role !== 'owner') {
+      if (_authUser.role !== 'owner') {
         return reply.status(403).send({ error: 'FORBIDDEN' });
       }
       await prisma.alert.deleteMany({ where: { id: { in: validIds } } });
@@ -173,7 +173,7 @@ export async function buildAlertModule(app: FastifyInstance) {
 
   // POST /api/v1/alerts/generate - Generate alerts for active flocks
   app.post('/generate', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
@@ -310,7 +310,7 @@ export async function buildAlertModule(app: FastifyInstance) {
         orderBy: { recordDate: 'desc' },
       });
       if (latestEnv && latestEnv.recordDate.toISOString().split('T')[0] === todayStr) {
-        const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, authUser.userId);
+        const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, _authUser.userId);
         const envItem = envSchedule?.items?.find((i: any) => i.ageDays === ageDays);
 
         if (envItem) {

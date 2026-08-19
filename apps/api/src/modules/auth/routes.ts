@@ -107,7 +107,7 @@ const SocialLoginSchema = z.object({
   { message: 'Either token or code is required' },
 );
 
-const SocialCompleteSignupSchema = z.object({
+const _SocialCompleteSignupSchema = z.object({
   organizationName: z.string().min(1).max(150),
   country: z.string().length(2),
   currency: z.string().length(3).default('ZMW'),
@@ -116,7 +116,7 @@ const SocialCompleteSignupSchema = z.object({
   }),
 });
 
-const SocialAuthUrlSchema = z.object({
+const _SocialAuthUrlSchema = z.object({
   provider: z.enum(['google', 'facebook', 'apple', 'microsoft']),
   redirectUri: z.string().url(),
 });

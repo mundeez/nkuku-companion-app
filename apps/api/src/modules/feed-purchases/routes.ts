@@ -48,7 +48,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
   // POST /api/v1/feed-purchases
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const data = FeedPurchaseCreateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const flock = await prisma.broilerFlock.findFirst({
@@ -87,7 +87,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
         unitPriceZmw: data.unitPriceZmw,
         totalCostZmw,
         notes: data.notes ?? null,
-        createdBy: authUser.userId,
+        createdBy: _authUser.userId,
       },
     });
 
@@ -111,7 +111,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
 
       // Auto-post the double-entry journal entry (debit 5020 Feed COGS, credit 1010 Cash)
       try {
-        await autoPost.postFromFinancialRecord(financialRecord.id, authUser.userId, 'feed_purchase');
+        await autoPost.postFromFinancialRecord(financialRecord.id, _authUser.userId, 'feed_purchase');
       } catch (err: any) {
         // Journal post failure should not block the purchase; log and continue.
         app.log.error(`[FeedPurchase] Auto-post failed for FR ${financialRecord.id}: ${err.message}`);
@@ -120,7 +120,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
 
     await audit.log({
       organizationId,
-      userId: authUser.userId,
+      userId: _authUser.userId,
       entityType: 'FeedPurchase',
       entityId: purchase.id,
       action: 'create',
@@ -135,7 +135,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = FeedPurchaseUpdateSchema.parse(request.body);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const existing = await prisma.feedPurchase.findFirst({
@@ -205,7 +205,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
 
     await audit.log({
       organizationId,
-      userId: authUser.userId,
+      userId: _authUser.userId,
       entityType: 'FeedPurchase',
       entityId: id,
       action: 'update',
@@ -220,7 +220,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
   // DELETE /api/v1/feed-purchases/:id
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const existing = await prisma.feedPurchase.findFirst({
@@ -239,7 +239,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
       });
       if (je) {
         try {
-          await journalEngine.reverse(je.id, authUser.userId, `Feed purchase ${id} deleted`);
+          await journalEngine.reverse(je.id, _authUser.userId, `Feed purchase ${id} deleted`);
         } catch (err: any) {
           app.log.error(`[FeedPurchase] Journal reversal failed for JE ${je.id}: ${err.message}`);
         }
@@ -251,7 +251,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
 
     await audit.log({
       organizationId,
-      userId: authUser.userId,
+      userId: _authUser.userId,
       entityType: 'FeedPurchase',
       entityId: id,
       action: 'delete',

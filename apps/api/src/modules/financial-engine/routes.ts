@@ -32,7 +32,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
 
   // ── UNIFIED SUMMARY ──────────────────────
   app.get('/summary', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const query = z.object({
       startDate: dateOrIso.optional(),
       endDate: dateOrIso.optional(),
@@ -43,13 +43,13 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       startDate: query.startDate ? new Date(query.startDate) : undefined,
       endDate: query.endDate ? new Date(query.endDate) : undefined,
       flockIds: query.flockIds ? query.flockIds.split(',') : undefined,
-      userId: authUser.userId,
+      userId: _authUser.userId,
     });
   });
 
   // ── INCOME STATEMENT ───────────────────────
   app.get('/income-statement', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const query = z.object({
       startDate: dateOrIso.optional(),
       endDate: dateOrIso.optional(),
@@ -60,26 +60,26 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       startDate: query.startDate ? new Date(query.startDate) : undefined,
       endDate: query.endDate ? new Date(query.endDate) : undefined,
       flockIds: query.flockIds ? query.flockIds.split(',') : undefined,
-      userId: authUser.userId,
+      userId: _authUser.userId,
     });
   });
 
   // ── BALANCE SHEET ──────────────────────────
   app.get('/balance-sheet', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const query = z.object({
       asOfDate: dateOrIso.optional(),
     }).parse(request.query);
 
     return statements.getBalanceSheet(
       query.asOfDate ? new Date(query.asOfDate) : new Date(),
-      authUser.userId,
+      _authUser.userId,
     );
   });
 
   // ── CASH FLOW ──────────────────────────────
   app.get('/cash-flow', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const query = z.object({
       startDate: dateOrIso.optional(),
       endDate: dateOrIso.optional(),
@@ -90,13 +90,13 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       startDate: query.startDate ? new Date(query.startDate) : undefined,
       endDate: query.endDate ? new Date(query.endDate) : undefined,
       flockIds: query.flockIds ? query.flockIds.split(',') : undefined,
-      userId: authUser.userId,
+      userId: _authUser.userId,
     });
   });
 
   // ── AUDIT LOG ──────────────────────────────
   app.get('/audit-log', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const query = z.object({
       startDate: dateOrIso.optional(),
       endDate: dateOrIso.optional(),
@@ -111,12 +111,12 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       entityType: query.entityType,
       page: query.page,
       limit: query.limit,
-    }, authUser.organizationId);
+    }, _authUser.organizationId);
   });
 
   // ── PERIOD CLOSE ───────────────────────────
   app.post('/periods/close', { preHandler: [authenticate, requireRole('owner')] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const body = z.object({
       label: z.string().min(1).max(20),
       periodType: z.enum(['monthly', 'quarterly', 'annual']),
@@ -136,8 +136,8 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
     });
 
     await audit.log({
-      organizationId: authUser.organizationId,
-      userId: authUser.userId,
+      organizationId: _authUser.organizationId,
+      userId: _authUser.userId,
       entityType: 'FinancialPeriod',
       entityId: period.id,
       action: 'period_close',
@@ -149,23 +149,23 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
 
   // ── MONTHLY TREND ──────────────────────────
   app.get('/monthly-trend', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const query = z.object({
       year: z.string().transform(Number),
     }).parse(request.query);
 
-    return unified.getMonthlyTrend(query.year, authUser.userId);
+    return unified.getMonthlyTrend(query.year, _authUser.userId);
   });
 
   // ── FLOCK PROFITABILITY ────────────────────
   app.get('/flock-profitability', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
-    return unified.getFlockProfitability(authUser.userId);
+    const _authUser = (request as any).authUser;
+    return unified.getFlockProfitability(_authUser.userId);
   });
 
   // ── EXPORT: INCOME STATEMENT ───────────────
   app.get('/export/income-statement', { preHandler: [authenticate] }, async (request, reply) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const query = z.object({
       format: z.enum(['csv']),
       startDate: dateOrIso.optional(),
@@ -175,7 +175,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
     const stmt = await statements.getIncomeStatement({
       startDate: query.startDate ? new Date(query.startDate) : undefined,
       endDate: query.endDate ? new Date(query.endDate) : undefined,
-      userId: authUser.userId,
+      userId: _authUser.userId,
     });
 
     const buf = reports.generateCsvIncomeStatement(stmt);
@@ -186,7 +186,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
 
   // ── EXPORT: BALANCE SHEET ──────────────────
   app.get('/export/balance-sheet', { preHandler: [authenticate] }, async (request, reply) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const query = z.object({
       format: z.enum(['csv']),
       asOfDate: dateOrIso.optional(),
@@ -194,7 +194,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
 
     const sheet = await statements.getBalanceSheet(
       query.asOfDate ? new Date(query.asOfDate) : new Date(),
-      authUser.userId,
+      _authUser.userId,
     );
 
     const buf = reports.generateCsvBalanceSheet(sheet);
@@ -205,7 +205,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
 
   // ── EXPORT: CASH FLOW ──────────────────────
   app.get('/export/cash-flow', { preHandler: [authenticate] }, async (request, reply) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const query = z.object({
       format: z.enum(['csv']),
       startDate: dateOrIso.optional(),
@@ -215,7 +215,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
     const cf = await statements.getCashFlow({
       startDate: query.startDate ? new Date(query.startDate) : undefined,
       endDate: query.endDate ? new Date(query.endDate) : undefined,
-      userId: authUser.userId,
+      userId: _authUser.userId,
     });
 
     const buf = reports.generateCsvCashFlow(cf);
@@ -226,7 +226,7 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
 
   // ── SCHEDULED REPORTS ──────────────────────
   app.post('/scheduled-reports', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const body = z.object({
       name: z.string().min(1).max(100),
       reportType: z.enum(['income_statement', 'balance_sheet', 'cash_flow', 'cost_breakdown', 'flock_profitability', 'cycle_summary']),
@@ -238,12 +238,12 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       isActive: z.boolean().optional(),
     }).parse(request.body);
 
-    return scheduler.createSchedule({ ...body, createdBy: authUser.userId });
+    return scheduler.createSchedule({ ...body, createdBy: _authUser.userId });
   });
 
   app.get('/scheduled-reports', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
-    return scheduler.listSchedules(authUser.userId);
+    const _authUser = (request as any).authUser;
+    return scheduler.listSchedules(_authUser.userId);
   });
 
   app.patch('/scheduled-reports/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
@@ -275,12 +275,12 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
 
   // ── MONTHLY OVERHEADS ──────────────────────
   app.get('/overheads', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const authUser = (request as any).authUser;
-    return overheads.listMonthlyOverheads(authUser.organizationId);
+    const _authUser = (request as any).authUser;
+    return overheads.listMonthlyOverheads(_authUser.organizationId);
   });
 
   app.post('/overheads', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const body = z.object({
       yearMonth: z.string().regex(/^\d{4}-\d{2}$/),
       category: z.enum(['medication', 'vaccination', 'labour', 'electricity', 'water', 'litter', 'transport_to_market', 'other']),
@@ -289,29 +289,29 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       contractType: z.enum(['monthly', 'weekly', 'daily', 'once_off']),
     }).parse(request.body);
 
-    const created = await overheads.createMonthlyOverhead({ ...body, createdBy: authUser.userId, organizationId: authUser.organizationId });
-    await overheads.allocateOverheadForMonth(body.yearMonth, authUser.organizationId);
+    const created = await overheads.createMonthlyOverhead({ ...body, createdBy: _authUser.userId, organizationId: _authUser.organizationId });
+    await overheads.allocateOverheadForMonth(body.yearMonth, _authUser.organizationId);
     return created;
   });
 
   app.delete('/overheads/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const result = await overheads.deleteMonthlyOverhead(id, authUser.organizationId);
+    const result = await overheads.deleteMonthlyOverhead(id, _authUser.organizationId);
     if (!result) return reply.status(404).send({ error: 'NOT_FOUND' });
     reply.status(204).send();
   });
 
   app.post('/overheads/allocate/:yearMonth', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const { yearMonth } = z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) }).parse(request.params);
-    return overheads.allocateOverheadForMonth(yearMonth, authUser.organizationId);
+    return overheads.allocateOverheadForMonth(yearMonth, _authUser.organizationId);
   });
 
   // ── HARVEST PROJECTIONS ────────────────────
   app.get('/projections', { preHandler: [authenticate] }, async (request) => {
-    const authUser = (request as any).authUser;
-    return projections.getProjections(authUser.userId);
+    const _authUser = (request as any).authUser;
+    return projections.getProjections(_authUser.userId);
   });
 
   app.post('/projections/refresh', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {

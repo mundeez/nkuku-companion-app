@@ -77,7 +77,7 @@ function getMaxAttachments(): number {
  */
 async function resolveOwnership(
   prisma: any,
-  authUser: any,
+  _authUser: any,
   opts: {
     flockId?: string;
     financialRecordId?: string;
@@ -85,7 +85,7 @@ async function resolveOwnership(
     saleRecordId?: string;
   },
 ): Promise<{ flockId: string | null; recordType: string }> {
-  const organizationId = authUser.organizationId;
+  const organizationId = _authUser.organizationId;
 
   // FinancialRecord — flock-scoped
   if (opts.financialRecordId) {
@@ -113,7 +113,7 @@ async function resolveOwnership(
 
   // JournalEntry — org-scoped ledger, owner/manager only
   if (opts.journalEntryId) {
-    if (authUser.role !== 'owner' && authUser.role !== 'manager') {
+    if (_authUser.role !== 'owner' && _authUser.role !== 'manager') {
       throw new Error('NOT_FOUND');
     }
     const entry = await prisma.journalEntry.findFirst({
@@ -168,8 +168,8 @@ async function countAttachments(
  * Check ownership for an existing document (for GET/download/delete).
  * Resolves which entity the doc is linked to and verifies access.
  */
-async function checkDocumentOwnership(prisma: any, doc: any, authUser: any): Promise<boolean> {
-  const organizationId = authUser.organizationId;
+async function checkDocumentOwnership(prisma: any, doc: any, _authUser: any): Promise<boolean> {
+  const organizationId = _authUser.organizationId;
 
   // Fast path: the document itself carries organizationId (set at upload
   // time). If it doesn't match, deny immediately regardless of link type.
@@ -197,7 +197,7 @@ async function checkDocumentOwnership(prisma: any, doc: any, authUser: any): Pro
 
   // Linked to a JournalEntry — org-scoped, owner/manager can access
   if (doc.journalEntryId) {
-    if (authUser.role !== 'owner' && authUser.role !== 'manager') return false;
+    if (_authUser.role !== 'owner' && _authUser.role !== 'manager') return false;
     const entry = await prisma.journalEntry.findFirst({ where: { id: doc.journalEntryId, organizationId } });
     return !!entry;
   }
@@ -221,11 +221,11 @@ export async function buildDocumentModule(app: FastifyInstance) {
   // GET / — list documents (optionally filtered)
   app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
     const query = DocumentQuerySchema.parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     // Verify ownership of the target entity
     try {
-      await resolveOwnership(prisma, authUser, query);
+      await resolveOwnership(prisma, _authUser, query);
     } catch (err: any) {
       if (err.message === 'NO_TARGET_SPECIFIED') {
         // No filter specified — return empty list instead of error
@@ -234,7 +234,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    const where: any = { organizationId: authUser.organizationId };
+    const where: any = { organizationId: _authUser.organizationId };
     if (query.financialRecordId) where.financialRecordId = query.financialRecordId;
     if (query.journalEntryId) where.journalEntryId = query.journalEntryId;
     if (query.saleRecordId) where.saleRecordId = query.saleRecordId;
@@ -250,7 +250,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
 
     // Exclude filePath/storageKey from response; return download URL
     return docs.map((doc: any) => {
-      const { filePath, storageKey, contentText, ...safe } = doc;
+      const { filePath: _filePath, storageKey: _storageKey, contentText: _contentText, ...safe } = doc;
       return { ...safe, downloadUrl: `/api/v1/documents/${doc.id}/download` };
     });
   });
@@ -258,16 +258,16 @@ export async function buildDocumentModule(app: FastifyInstance) {
   // GET /search — full-text search across document content
   app.get('/search', { preHandler: [authenticate] }, async (request, reply) => {
     const query = SearchSchema.parse(request.query);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     // Verify ownership of the target entity (if specified)
-    let isGlobalSearch = false;
+    let _isGlobalSearch = false;
     try {
-      await resolveOwnership(prisma, authUser, query);
+      await resolveOwnership(prisma, _authUser, query);
     } catch (err: any) {
       if (err.message === 'NO_TARGET_SPECIFIED') {
         // Global search — restrict to documents linked to flocks owned by the user
-        isGlobalSearch = true;
+        _isGlobalSearch = true;
       } else {
         return reply.status(404).send({ error: 'NOT_FOUND' });
       }
@@ -305,7 +305,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     }
 
     // For global search (no target), restrict to the caller's organization
-    params.push(authUser.organizationId);
+    params.push(_authUser.organizationId);
     filters.push(`organization_id = $${paramIdx}::uuid`);
     paramIdx++;
 
@@ -334,25 +334,25 @@ export async function buildDocumentModule(app: FastifyInstance) {
   // GET /:id — document metadata
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = DocumentIdSchema.parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const doc = await prisma.document.findUnique({ where: { id } });
     if (!doc) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    const hasAccess = await checkDocumentOwnership(prisma, doc, authUser);
+    const hasAccess = await checkDocumentOwnership(prisma, doc, _authUser);
     if (!hasAccess) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    const { filePath, storageKey, contentText, ...safe } = doc;
+    const { filePath: _filePath, storageKey: _storageKey, contentText: _contentText, ...safe } = doc;
     return { ...safe, downloadUrl: `/api/v1/documents/${doc.id}/download` };
   });
 
   // POST / — multipart upload
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager', 'flock_minder', 'sales_person')] }, async (request, reply) => {
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const parts = request.parts();
     const fields: Record<string, string> = {};
@@ -393,7 +393,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     // Resolve ownership and get flockId + recordType
     let ownership: { flockId: string | null; recordType: string };
     try {
-      ownership = await resolveOwnership(prisma, authUser, targetOpts);
+      ownership = await resolveOwnership(prisma, _authUser, targetOpts);
     } catch (err: any) {
       if (err.message === 'NO_TARGET_SPECIFIED') {
         return reply.status(400).send({ error: 'Must specify flockId, financialRecordId, journalEntryId, or saleRecordId' });
@@ -415,10 +415,10 @@ export async function buildDocumentModule(app: FastifyInstance) {
     const scanResult = await scanBuffer(fileBuffer);
     if (!scanResult.clean) {
       await audit.log({
-        organizationId: authUser.organizationId,
-        userId: authUser.userId,
+        organizationId: _authUser.organizationId,
+        userId: _authUser.userId,
         entityType: 'Document',
-        entityId: authUser.userId, // no document ID yet; use user ID as entity ref
+        entityId: _authUser.userId, // no document ID yet; use user ID as entity ref
         action: 'virus_scan_rejected',
         newState: { fileName: filePart.filename, reason: scanResult.reason },
         ipAddress: request.ip,
@@ -449,7 +449,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     // Persist document metadata
     const created = await prisma.document.create({
       data: {
-        organizationId: authUser.organizationId,
+        organizationId: _authUser.organizationId,
         flockId: ownership.flockId,
         recordType: ownership.recordType,
         recordId: targetOpts.financialRecordId || targetOpts.journalEntryId ||
@@ -467,13 +467,13 @@ export async function buildDocumentModule(app: FastifyInstance) {
         scanStatus: scanResult.scannerAvailable ? 'clean' : 'skipped',
         scannedAt: new Date(),
         extractionStatus: 'pending',
-        uploadedBy: authUser.userId,
+        uploadedBy: _authUser.userId,
       },
     });
 
     await audit.log({
-      organizationId: authUser.organizationId,
-      userId: authUser.userId,
+      organizationId: _authUser.organizationId,
+      userId: _authUser.userId,
       entityType: 'Document',
       entityId: created.id,
       action: 'create',
@@ -488,7 +488,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
       });
     });
 
-    const { filePath, storageKey: _sk, contentText, ...safe } = created;
+    const { filePath: _filePath, storageKey: _sk, contentText: _contentText, ...safe } = created;
     return {
       ...safe,
       downloadUrl: `/api/v1/documents/${created.id}/download`,
@@ -498,14 +498,14 @@ export async function buildDocumentModule(app: FastifyInstance) {
   // GET /:id/download — stream file back to client (download mode)
   app.get('/:id/download', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = DocumentIdSchema.parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const doc = await prisma.document.findUnique({ where: { id } });
     if (!doc) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    const hasAccess = await checkDocumentOwnership(prisma, doc, authUser);
+    const hasAccess = await checkDocumentOwnership(prisma, doc, _authUser);
     if (!hasAccess) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
@@ -538,14 +538,14 @@ export async function buildDocumentModule(app: FastifyInstance) {
   // GET /:id/view — stream file inline for in-browser viewing (PDFs, images)
   app.get('/:id/view', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = DocumentIdSchema.parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const doc = await prisma.document.findUnique({ where: { id } });
     if (!doc) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    const hasAccess = await checkDocumentOwnership(prisma, doc, authUser);
+    const hasAccess = await checkDocumentOwnership(prisma, doc, _authUser);
     if (!hasAccess) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
@@ -576,20 +576,20 @@ export async function buildDocumentModule(app: FastifyInstance) {
   // DELETE /:id — remove document + file
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner', 'manager', 'flock_minder', 'sales_person')] }, async (request, reply) => {
     const { id } = DocumentIdSchema.parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
 
     const doc = await prisma.document.findUnique({ where: { id } });
     if (!doc) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    const hasAccess = await checkDocumentOwnership(prisma, doc, authUser);
+    const hasAccess = await checkDocumentOwnership(prisma, doc, _authUser);
     if (!hasAccess) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
     // Non-owner roles may only delete documents they uploaded
-    if (authUser.role !== 'owner' && doc.uploadedBy !== authUser.userId) {
+    if (_authUser.role !== 'owner' && doc.uploadedBy !== _authUser.userId) {
       return reply.status(403).send({ error: 'FORBIDDEN' });
     }
 
@@ -610,8 +610,8 @@ export async function buildDocumentModule(app: FastifyInstance) {
     await prisma.document.delete({ where: { id } });
 
     await audit.log({
-      organizationId: authUser.organizationId,
-      userId: authUser.userId,
+      organizationId: _authUser.organizationId,
+      userId: _authUser.userId,
       entityType: 'Document',
       entityId: id,
       action: 'delete',
@@ -625,7 +625,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
   // PATCH /:id — update document metadata (category)
   app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager', 'flock_minder', 'sales_person')] }, async (request, reply) => {
     const { id } = DocumentIdSchema.parse(request.params);
-    const authUser = (request as any).authUser;
+    const _authUser = (request as any).authUser;
     const body = z.object({
       category: z.enum(['receipt', 'invoice', 'quotation', 'other', 'bank_statement', 'contract', 'delivery_note']).optional(),
     }).parse(request.body);
@@ -635,13 +635,13 @@ export async function buildDocumentModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    const hasAccess = await checkDocumentOwnership(prisma, doc, authUser);
+    const hasAccess = await checkDocumentOwnership(prisma, doc, _authUser);
     if (!hasAccess) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
     // Non-owner roles may only edit documents they uploaded
-    if (authUser.role !== 'owner' && doc.uploadedBy !== authUser.userId) {
+    if (_authUser.role !== 'owner' && doc.uploadedBy !== _authUser.userId) {
       return reply.status(403).send({ error: 'FORBIDDEN' });
     }
 
@@ -654,8 +654,8 @@ export async function buildDocumentModule(app: FastifyInstance) {
     });
 
     await audit.log({
-      organizationId: authUser.organizationId,
-      userId: authUser.userId,
+      organizationId: _authUser.organizationId,
+      userId: _authUser.userId,
       entityType: 'Document',
       entityId: id,
       action: 'update',
@@ -664,7 +664,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
       ipAddress: request.ip,
     });
 
-    const { filePath, storageKey, contentText, ...safe } = updated;
+    const { filePath: _filePath, storageKey: _storageKey, contentText: _contentText, ...safe } = updated;
     return { ...safe, downloadUrl: `/api/v1/documents/${updated.id}/download` };
   });
 }

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import jwt from 'jsonwebtoken';
+import _jwt from 'jsonwebtoken';
 
 const API_URL = 'http://localhost:3001';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret_change_in_production';
+const _JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret_change_in_production';
 
 // Helper: register a new user and return auth tokens
 async function registerUser(suffix: string) {
@@ -39,8 +39,8 @@ describe('Account Management', () => {
   let token: string;
   let userId: string;
   let userEmail: string;
-  let phoneOnlyToken: string;
-  let phoneOnlyUserId: string;
+  let _phoneOnlyToken: string;
+  let _phoneOnlyUserId: string;
 
   beforeAll(async () => {
     const reg = await registerUser(`acct-${Date.now()}`);

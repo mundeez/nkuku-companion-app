@@ -48,7 +48,7 @@ export async function getOrCreateSubscription(prisma: PrismaClient, organization
 
   if (!sub) {
     // Check for any cancelled subscription (to avoid creating duplicates)
-    const cancelled = await prisma.subscription.findFirst({
+    const _cancelled = await prisma.subscription.findFirst({
       where: { organizationId, status: 'cancelled' },
       orderBy: { createdAt: 'desc' },
     });
