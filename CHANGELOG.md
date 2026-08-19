@@ -1,5 +1,47 @@
 # Changelog
 
+## v1.17.0-alpha — 2026-08-19
+
+### Added
+- **Bulk Operations API + UI across all records and alerts.**
+  - New `POST /api/v1/{alerts,growth-records,feed-records,water-records,mortality-events,vaccination-events,financial-records}/bulk` endpoints.
+  - Actions: `create`/`delete` for record modules; `mark_read`/`mark_resolved`/`delete` for alerts.
+  - Org-scoped batching, max 500 records per request, owner-only delete.
+  - `$transaction`-wrapped cascades for water/mortality/vaccination/feed to `financial-records`, with `sourceTable` tagging and `isSystemGenerated` flags.
+  - Audit logging on `financial-records` bulk operations.
+  - New integration tests in `apps/api/tests/integration/bulk-operations.test.ts` (23 tests).
+  - Web: bulk selection UI on the alerts page and flock detail page, plus a new `checkbox.tsx` shadcn/ui component.
+  - Mobile: `bulkDelete`/`bulkCreate` service methods and multi-select UI on `alerts_screen` and `flock_detail_screen`, with `record_card.dart` selection support.
+
+### Changed
+- `apps/api/package.json`: `1.16.0-alpha` → `1.17.0-alpha`
+- `apps/web/package.json`: `0.4.0-alpha` → `1.17.0-alpha`
+- `apps/mobile/pubspec.yaml`: `1.16.0-alpha` → `1.17.0-alpha`
+- `package.json` (root): `1.16.0-alpha` → `1.17.0-alpha`
+
+### Security
+- Feed bulk `supplierId` validation is now organization-scoped (prevents cross-tenant supplier references).
+- Water/mortality financial cascades now set `sourceTable` and `isSystemGenerated`.
+- Mortality `currentCount` now uses an atomic decrement (fixes a race condition on concurrent bulk deletes).
+- Alerts bulk delete is now owner-only, consistent with other modules (was owner+manager).
+- `alerts/generate` is now resilient to per-flock failures and logs per-flock errors instead of failing the whole request.
+
+### Fixed
+- `flock-tasks/routes.ts`: performance refactor — replaced ~300–400 sequential `findFirst`/`create` calls with batched `findMany` + `createMany`, and fixed an implicit-`any` TypeScript error.
+- `lighting-temperature-schedules/routes.ts`: minor query tweak.
+- `vitest.config.ts`: set `fileParallelism=false` for integration tests that share one database; parallel execution was causing foreign-key violations.
+
+### Known Limitations
+- **CRITICAL (pre-existing):** `AuditLog` table lacks `organizationId`, enabling potential cross-tenant audit-log access. Not introduced this phase, but the `financial-records` bulk feature expands the surface area. A follow-up fix is strongly recommended.
+- **MEDIUM:** `audit.log` calls in `financial-records` bulk are performed outside the `$transaction`. If audit logging fails, the DB mutation is still committed — a safer failure mode, but the audit trail could be incomplete.
+- **HIGH (pre-existing):** Dependency vulnerabilities in `fastify@4.29.1`, `nodemailer@6.10.1`, `next@14.2.35`, and `postcss` — not introduced this phase; track separately.
+- **LOW:** Bulk endpoints do not currently have per-user rate limiting; this is consistent with the existing codebase.
+
+### Test Results
+- Full suite: **277/277 tests pass**.
+- Typecheck: clean.
+- `flutter analyze`: 0 errors.
+
 ## v1.16.0-alpha — 2026-08-18
 
 ### Added
