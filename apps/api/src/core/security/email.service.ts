@@ -95,3 +95,47 @@ export async function sendVerificationEmail(
     return { success: false, message: `Email send failed: ${err.message}` };
   }
 }
+
+/**
+ * Send an organization invite email.
+ * @param to Recipient email
+ * @param inviteUrl The full URL for accepting the invite
+ * @param orgName The organization name
+ * @param inviterName The name of the person sending the invite
+ */
+export async function sendInviteEmail(
+  to: string,
+  inviteUrl: string,
+  orgName: string,
+  inviterName: string,
+): Promise<SendEmailResult> {
+  const subject = `You're invited to join ${orgName} on Nkuku Companion`;
+  const html = `
+    <p>Hi,</p>
+    <p><strong>${inviterName}</strong> has invited you to join <strong>${orgName}</strong> on Nkuku Companion.</p>
+    <p>Click the link below to accept your invitation and create your account:</p>
+    <p><a href="${inviteUrl}">Accept Invitation</a></p>
+    <p>Or copy this link: ${inviteUrl}</p>
+    <p>This invitation expires in 7 days. If you weren't expecting this invitation, you can safely ignore this email.</p>
+    <p>— Nkuku Companion Team</p>`;
+
+  if (EMAIL_DISABLED || !SMTP_HOST) {
+    const msg = `[EMAIL DISABLED] To: ${to} | Subject: ${subject} | URL: ${inviteUrl}`;
+    console.log(msg);
+    return { success: true, message: 'Email logged (EMAIL_DISABLED=true)', devUrl: inviteUrl };
+  }
+
+  try {
+    const t = getTransporter();
+    await t.sendMail({
+      from: SMTP_FROM,
+      to,
+      subject,
+      html,
+    });
+    return { success: true, message: 'Invite email sent' };
+  } catch (err: any) {
+    console.error('Invite email send failed:', err.message);
+    return { success: false, message: `Email send failed: ${err.message}` };
+  }
+}

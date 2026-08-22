@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { checkUserLimit } from '../../core/billing/feature-gate.js';
+import { sendInviteEmail } from '../../core/security/email.service.js';
 
 const OrgUpdateSchema = z.object({
   name: z.string().min(1).max(150).optional(),
@@ -97,16 +98,27 @@ export async function buildOrganizationModule(app: FastifyInstance) {
       },
     });
 
-    // NOTE: no email delivery yet — the invite link is returned directly to
-    // the inviting owner/manager to share manually. Wiring this to an email
-    // provider (nodemailer is already a dependency) is a follow-up.
     const webBaseUrl = process.env.WEB_BASE_URL || '';
+    const inviteUrl = `${webBaseUrl}/accept-invite?token=${token}`;
+
+    // Send invite email via nodemailer (falls back to console log if EMAIL_DISABLED)
+    const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+    const inviter = await prisma.user.findUnique({ where: { id: _authUser.userId } });
+    const emailResult = await sendInviteEmail(
+      data.email,
+      inviteUrl,
+      org?.name || 'your organization',
+      inviter?.name || 'A team member',
+    );
+
     return {
       id: invite.id,
       email: invite.email,
       role: invite.role,
       expiresAt: invite.expiresAt,
-      inviteUrl: `${webBaseUrl}/accept-invite?token=${token}`,
+      inviteUrl,
+      emailSent: emailResult.success,
+      emailMessage: emailResult.message,
     };
   });
 
