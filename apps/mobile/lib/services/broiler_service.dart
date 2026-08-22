@@ -5,6 +5,7 @@ import '../models/document.dart';
 import '../models/environmental_record.dart';
 import '../models/financial_record.dart';
 import '../models/feed_record.dart';
+import '../models/feed_purchase.dart';
 import '../models/flock.dart';
 import '../models/flock_task.dart';
 import '../models/growth_record.dart';
@@ -263,6 +264,55 @@ class BroilerService {
     _assertOk(res);
   }
 
+  // Feed purchases (procurement — matches web app flow)
+  static Future<List<FeedPurchase>> getFeedPurchases(String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/feed-purchases',
+      queryParameters: {'flockId': flockId},
+    );
+    _assertOk(res);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
+    return (res.data as List).map((e) => FeedPurchase.fromJson(e)).toList();
+  }
+
+  static Future<FeedProjection> getFeedProjection(String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/broiler-flocks/$flockId/feed-projection',
+    );
+    _assertOk(res);
+    return FeedProjection.fromJson(res.data);
+  }
+
+  static Future<FeedPurchase> createFeedPurchase(FeedPurchase purchase) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'feed_purchase',
+        operation: 'create',
+        payload: purchase.toJson(),
+      );
+      return purchase;
+    }
+    final res = await ApiService.dio
+        .post('/api/v1/feed-purchases', data: purchase.toJson());
+    _assertOk(res);
+    ConnectivityService.instance.markOnline();
+    return FeedPurchase.fromJson(res.data);
+  }
+
+  static Future<FeedPurchase> updateFeedPurchase(
+      String id, FeedPurchase purchase) async {
+    final res = await ApiService.dio
+        .patch('/api/v1/feed-purchases/$id', data: purchase.toJson());
+    _assertOk(res);
+    return FeedPurchase.fromJson(res.data);
+  }
+
+  static Future<void> deleteFeedPurchase(String id) async {
+    final res = await ApiService.dio.delete('/api/v1/feed-purchases/$id');
+    _assertOk(res);
+  }
+
   // Water records
   static Future<List<WaterRecord>> getWaterRecords(String flockId) async {
     final res = await ApiService.dio.get(
@@ -472,9 +522,19 @@ class BroilerService {
   // Bulk delete records
   static Future<Map<String, dynamic>> bulkDeleteRecords(
       String type, List<String> ids) async {
+    // Feed purchases don't have a bulk endpoint — delete individually.
+    if (type == 'feed') {
+      int deleted = 0;
+      for (final id in ids) {
+        try {
+          await ApiService.dio.delete('/api/v1/feed-purchases/$id');
+          deleted++;
+        } catch (_) {}
+      }
+      return {'deleted': deleted, 'requested': ids.length};
+    }
     final endpoints = {
       'growth': '/api/v1/growth-records/bulk',
-      'feed': '/api/v1/feed-records/bulk',
       'water': '/api/v1/water-records/bulk',
       'mortality': '/api/v1/mortality-events/bulk',
       'vaccination': '/api/v1/vaccination-events/bulk',
@@ -494,7 +554,6 @@ class BroilerService {
       String type, List<Map<String, dynamic>> records) async {
     final endpoints = {
       'growth': '/api/v1/growth-records/bulk',
-      'feed': '/api/v1/feed-records/bulk',
       'water': '/api/v1/water-records/bulk',
       'mortality': '/api/v1/mortality-events/bulk',
       'vaccination': '/api/v1/vaccination-events/bulk',

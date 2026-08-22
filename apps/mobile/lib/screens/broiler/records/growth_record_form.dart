@@ -118,8 +118,11 @@ class _GrowthRecordFormState extends State<GrowthRecordForm> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _weightController,
-                decoration: const InputDecoration(labelText: 'Average weight (kg)'),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    labelText: 'Average weight (grams)',
+                    helperText: 'Per bird, in grams (e.g. 450)'),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 validator: (v) {
                   final n = double.tryParse(v ?? '');
                   if (n == null || n <= 0) return 'Enter a positive weight';

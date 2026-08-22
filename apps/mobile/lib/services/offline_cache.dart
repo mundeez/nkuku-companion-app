@@ -27,8 +27,11 @@ class OfflineCache {
   static const _maxQueueSize = 200;
 
   Future<void> init() async {
+    // flutter_secure_storage v11 removed `encryptedSharedPreferences`.
+    // The default AndroidOptions() now uses AES-GCM with RSA-OAEP key
+    // wrapping (Android Keystore), which is the modern equivalent.
     _storage = const FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      aOptions: AndroidOptions(),
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
     _initialized = true;

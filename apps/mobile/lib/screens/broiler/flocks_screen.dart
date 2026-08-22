@@ -169,7 +169,21 @@ class _FlocksScreenState extends State<FlocksScreen> {
                               flock.mortalityRate?.toStringAsFixed(1) ?? '0.0';
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
-                            child: ListTile(
+                            // Wrap the entire card surface in an InkWell so
+                            // tapping anywhere on the card (not just the
+                            // ListTile's text region) opens the manage /
+                            // detail screen. The trailing PopupMenuButton
+                            // still receives its own taps independently.
+                            child: InkWell(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FlockDetailScreen(
+                                      flockId: flock.id, flockName: flock.name),
+                                ),
+                              ).then((_) => _loadFlocks()),
+                              borderRadius: BorderRadius.circular(12),
+                              child: ListTile(
                               contentPadding: const EdgeInsets.all(16),
                               leading: CircleAvatar(
                                 backgroundColor:
@@ -295,13 +309,10 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                         child: Text('No actions')),
                                 ],
                               ),
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => FlockDetailScreen(
-                                      flockId: flock.id, flockName: flock.name),
-                                ),
-                              ).then((_) => _loadFlocks()),
+                              // ListTile no longer carries its own onTap —
+                              // the enclosing InkWell handles navigation so
+                              // the whole card is tappable.
+                            ),
                             ),
                           );
                         },

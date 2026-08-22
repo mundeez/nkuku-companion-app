@@ -5,6 +5,7 @@ import '../../models/document.dart';
 import '../../models/environmental_record.dart';
 import '../../models/financial_record.dart';
 import '../../models/feed_record.dart';
+import '../../models/feed_purchase.dart';
 import '../../models/flock.dart';
 import '../../models/growth_record.dart';
 import '../../models/medication_record.dart';
@@ -88,6 +89,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   List<GrowthRecord> _growthRecords = [];
   GrowthRecordAnalysis? _growthAnalysis;
   List<FeedRecord> _feedRecords = [];
+  List<FeedPurchase> _feedPurchases = [];
   FeedSummary? _feedSummary;
   List<WaterRecord> _waterRecords = [];
   WaterRatio? _waterRatio;
@@ -187,6 +189,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             .catchError((_) => <GrowthRecord>[]),
         BroilerService.getFeedRecords(widget.flockId)
             .catchError((_) => <FeedRecord>[]),
+        BroilerService.getFeedPurchases(widget.flockId)
+            .catchError((_) => <FeedPurchase>[]),
         BroilerService.getWaterRecords(widget.flockId)
             .catchError((_) => <WaterRecord>[]),
         BroilerService.getMortalityEvents(widget.flockId)
@@ -237,14 +241,15 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
 
       final growth = results[0] as List<GrowthRecord>;
       final feed = results[1] as List<FeedRecord>;
-      final water = results[2] as List<WaterRecord>;
-      final mortality = results[3] as List<MortalityEvent>;
-      final vaccination = results[4] as List<VaccinationEvent>;
-      final financial = results[5] as List<FinancialRecord>;
-      final medication = results[6] as List<MedicationRecord>;
-      final environment = results[7] as List<EnvironmentalRecord>;
-      final sales = results[8] as List<SaleRecord>;
-      final documents = results[9] as List<DocumentRecord>;
+      final feedPurchases = results[2] as List<FeedPurchase>;
+      final water = results[3] as List<WaterRecord>;
+      final mortality = results[4] as List<MortalityEvent>;
+      final vaccination = results[5] as List<VaccinationEvent>;
+      final financial = results[6] as List<FinancialRecord>;
+      final medication = results[7] as List<MedicationRecord>;
+      final environment = results[8] as List<EnvironmentalRecord>;
+      final sales = results[9] as List<SaleRecord>;
+      final documents = results[10] as List<DocumentRecord>;
 
       final analysis = summaries[0] as GrowthRecordAnalysis?;
       final feedSummary = summaries[1] as FeedSummary?;
@@ -259,6 +264,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         _growthRecords = growth;
         _growthAnalysis = analysis;
         _feedRecords = feed;
+        _feedPurchases = feedPurchases;
         _feedSummary = feedSummary;
         _waterRecords = water;
         _waterRatio = waterRatio;
@@ -431,7 +437,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       case 'growth':
         return _growthRecords.map((r) => r.id).toList();
       case 'feed':
-        return _feedRecords.map((r) => r.id).toList();
+        return _feedPurchases.map((r) => r.id).toList();
       case 'water':
         return _waterRecords.map((r) => r.id).toList();
       case 'mortality':
@@ -839,7 +845,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             ..._growthRecords.reversed.map((r) => RecordCard(
                   title:
                       'Day ${r.recordDate.difference(DateTime.parse(_flock!.startDate ?? r.recordDate.toIso8601String())).inDays}',
-                  subtitle: '${r.avgWeight} kg avg · ${r.sampleSize} sampled',
+                  subtitle: '${r.avgWeight}g avg · ${r.sampleSize} sampled',
                   trailing:
                       Text(r.recordDate.toIso8601String().split('T').first),
                   onEdit: AuthService.canEdit
@@ -851,7 +857,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                             label: 'growth record',
                             record: r,
                             name: (r) =>
-                                '${r.avgWeight} kg on ${r.recordDate.toIso8601String().split('T').first}',
+                                '${r.avgWeight}g on ${r.recordDate.toIso8601String().split('T').first}',
                             onDelete: () =>
                                 BroilerService.deleteGrowthRecord(r.id),
                           )
@@ -874,6 +880,9 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
 
   Widget _buildFeedTab() {
     final summary = _feedSummary;
+    final totalPurchaseCost = _feedPurchases.fold<double>(
+        0, (sum, p) => sum + p.totalCostZmw);
+    final totalBags = _feedPurchases.fold<int>(0, (sum, p) => sum + p.bagsPurchased);
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
@@ -889,14 +898,21 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   'Cost/bird', 'ZMW ${summary.costPerBird.toStringAsFixed(2)}'),
             ]),
           const SizedBox(height: 12),
+          if (_feedPurchases.isNotEmpty)
+            SummaryCard(children: [
+              SummaryRow('Purchases', '$totalBags bags'),
+              SummaryRow('Purchase cost',
+                  'ZMW ${totalPurchaseCost.toStringAsFixed(2)}'),
+            ]),
+          if (_feedPurchases.isNotEmpty) const SizedBox(height: 12),
           if (_feedRecords.isNotEmpty) FeedChart(records: _feedRecords),
-          if (_feedRecords.isEmpty)
+          if (_feedPurchases.isEmpty && _feedRecords.isEmpty)
             const Center(
                 child: Padding(
                     padding: EdgeInsets.all(24),
-                    child: Text('No feed records yet.')))
+                    child: Text('No feed purchases yet. Tap + to record one.')))
           else ...[
-            if (AuthService.canDelete && !_recordSelectMode)
+            if (AuthService.canDelete && !_recordSelectMode && _feedPurchases.isNotEmpty)
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -905,42 +921,42 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   onPressed: () => _enterRecordSelectMode('feed'),
                 ),
               ),
-            ..._feedRecords.reversed.map((r) => RecordCard(
+            ..._feedPurchases.map((p) => RecordCard(
                   title:
-                      '${r.feedType} · ${r.quantityKg.toStringAsFixed(1)} kg',
-                  subtitle: r.supplierName != null
-                      ? 'Supplier: ${r.supplierName}'
+                      '${p.stageName ?? 'Unknown'} · ${p.bagsPurchased} × ${p.bagSizeKg}kg',
+                  subtitle: p.supplierName != null
+                      ? 'Supplier: ${p.supplierName}'
                       : null,
                   trailing: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(r.recordDate.toIso8601String().split('T').first),
-                      if (r.costZmw != null)
-                        Text('ZMW ${r.costZmw!.toStringAsFixed(2)}',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(p.purchaseDate.toIso8601String().split('T').first),
+                      Text(
+                          'ZMW ${p.totalCostZmw.toStringAsFixed(2)}',
+                          style:
+                              const TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),
                   onEdit: AuthService.canEdit
                       ? () => _navigateToForm(
-                          FeedRecordForm(flockId: widget.flockId, record: r))
+                          FeedRecordForm(flockId: widget.flockId, record: p))
                       : null,
                   onDelete: AuthService.canDelete
-                      ? () => _deleteRecord<FeedRecord>(
-                            label: 'feed record',
-                            record: r,
-                            name: (r) =>
-                                '${r.quantityKg.toStringAsFixed(1)} kg ${r.feedType}',
+                      ? () => _deleteRecord<FeedPurchase>(
+                            label: 'feed purchase',
+                            record: p,
+                            name: (p) =>
+                                '${p.bagsPurchased} × ${p.bagSizeKg}kg ${p.stageName ?? ''}',
                             onDelete: () =>
-                                BroilerService.deleteFeedRecord(r.id),
+                                BroilerService.deleteFeedPurchase(p.id),
                           )
                       : null,
                   selectable: _recordSelectMode && _currentRecordType == 'feed',
-                  selected: _selectedRecordIds.contains(r.id),
+                  selected: _selectedRecordIds.contains(p.id),
                   onSelectChanged: (v) {
                     if (!_recordSelectMode) _enterRecordSelectMode('feed');
-                    _toggleRecordSelect(r.id);
+                    _toggleRecordSelect(p.id);
                   },
                 )),
           ],

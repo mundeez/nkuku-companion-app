@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.21.0-alpha] — 2026-08-20
+
+### Added
+- **Mobile feed purchase flow**: rewrote feed record form to mirror the web app's feed procurement flow. Supplier dropdown (pre-selected with flock's supplier) → feed stage dropdown (populated from supplier's configured stages) → auto-populate bag size & unit price with override capability → live total cost calculation. Posts to `/api/v1/feed-purchases`, which auto-creates a FinancialRecord and double-entry journal entry on the backend.
+- **FeedPurchase, FeedProjection, FeedProjectionStage, FeedProjectionTotals models** (`apps/mobile/lib/models/feed_purchase.dart`).
+- **Feed purchase service methods**: `getFeedPurchases()`, `getFeedProjection()`, `createFeedPurchase()`, `updateFeedPurchase()`, `deleteFeedPurchase()` in BroilerService, with offline queue support.
+- **Feed tab redesign**: flock detail feed tab now shows feed purchases with summary cards (total bags, total purchase cost) and per-purchase cards (stage, bags × bag size, supplier, date, total cost).
+
+### Changed
+- **Tappable flock cards**: wrapped entire flock card in InkWell so tapping anywhere on the card opens the manage/detail screen (previously only the ListTile text region was tappable). Trailing PopupMenuButton still receives its own taps independently.
+- **Growth record unit fix**: corrected label from "Average weight (kg)" to "Average weight (grams)" — the web app and API use grams for `avgWeight` (FCR calculation divides by 1000). Flock detail growth cards now display "g" instead of "kg".
+- **Bulk delete for feed**: updated to delete feed purchases individually (no bulk endpoint exists for purchases) instead of calling the feed-records bulk endpoint.
+
+### Fixed
+- **flutter_secure_storage v11 breaking change**: removed `AndroidOptions(encryptedSharedPreferences: true)` which was removed in v11. Now uses default `AndroidOptions()` which provides AES-GCM with RSA-OAEP key wrapping (Android Keystore) — the modern equivalent.
+- **Release keystore**: regenerated `apps/mobile/android/release.keystore` (PKCS12, RSA-2048, 10000-day validity) and repointed `key.properties` to it. Added `.release-keystore-pass` to `.gitignore`.
+
+### Validation
+- Mobile analyzer: 0 errors in changed files (79 pre-existing errors in app_database.dart are known/unrelated — missing Drift generated code).
+- Mobile APK build: PASS (65.4MB, production-signed).
+- Backend unit tests: 56/56 PASS.
+- Backend integration tests: 249/249 PASS.
+- API type check: PASS (in container).
+- Web type check: PASS.
+- Security audit: no secrets committed, .gitignore covers all sensitive files, no injection risks, encryption not weakened.
+
+### Version bump
+- `1.20.0-alpha` → `1.21.0-alpha` in `apps/mobile/pubspec.yaml`.
+
 ## [1.20.0-alpha] — 2026-08-19
 
 ### Added
