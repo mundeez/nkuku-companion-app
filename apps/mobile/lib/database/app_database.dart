@@ -64,11 +64,16 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> markSyncFailed(int id, String error) async {
+    // Read current retry count, then increment — CustomExpression can't
+    // be used as a Value<int> in Drift's write() API.
+    final row = await (select(syncQueue)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    final newRetryCount = (row?.retryCount ?? 0) + 1;
     await (update(syncQueue)..where((t) => t.id.equals(id))).write(
       SyncQueueCompanion(
         status: const Value('failed'),
         lastError: Value(error),
-        retryCount: const CustomExpression('retry_count + 1'),
+        retryCount: Value(newRetryCount),
       ),
     );
   }
@@ -157,16 +162,16 @@ class AppDatabase extends _$AppDatabase {
   // ── Full cache clear (on logout) ─────────────
 
   Future<void> clearAll() async {
-    await batch((b) {
-      b.delete(cachedFlocks);
-      b.delete(cachedGrowthRecords);
-      b.delete(cachedFeedRecords);
-      b.delete(cachedWaterRecords);
-      b.delete(cachedMortalityEvents);
-      b.delete(cachedVaccinationEvents);
-      b.delete(cachedFinancialRecords);
-      b.delete(syncQueue);
-    });
+    // Drift's batch.delete() expects a row, not a table. For clearing
+    // all rows, use individual delete().go() calls instead.
+    await delete(cachedFlocks).go();
+    await delete(cachedGrowthRecords).go();
+    await delete(cachedFeedRecords).go();
+    await delete(cachedWaterRecords).go();
+    await delete(cachedMortalityEvents).go();
+    await delete(cachedVaccinationEvents).go();
+    await delete(cachedFinancialRecords).go();
+    await delete(syncQueue).go();
   }
 }
 

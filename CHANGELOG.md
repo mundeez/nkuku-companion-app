@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.22.0-alpha] — 2026-08-22
+
+### Added
+- **Mobile feed projection view**: feed tab now shows a projection card with required vs purchased bags per stage, day ranges, remaining counts (orange = still needed, green = fulfilled), and totals row. Based on the flock's initial bird count and supplier feed stage configuration.
+- **Mobile vaccination schedule redesign**: vaccination tab now shows a full schedule reference card with overdue (red) and upcoming (green) sections, each item displaying vaccine name, admin method, vaccine type, target day, and notes. Replaces the previous minimal summary rows.
+
+### Changed
+- **file_picker upgraded to stable 12.0.0**: migrated from 12.0.0-beta.7 to stable release. Updated document_form.dart to new API (pickFiles returns List<PlatformFile> directly, size is now async length()).
+- **sqlite3_flutter_libs upgraded to 0.5.42**: latest 0.5.x release (EOL 0.6.0+eol requires sqlite3 3.x which needs drift upgrade — deferred).
+
+### Fixed
+- **Drift generated code**: ran `flutter pub run build_runner build` to generate app_database.g.dart, clearing 79 pre-existing analyzer errors.
+- **Drift API errors in app_database.dart**: fixed 9 remaining errors — CustomExpression replaced with read-then-write pattern for retry count increment, batch.delete() replaced with individual delete().go() calls for clearAll().
+
+### Validation
+- Mobile analyzer: 0 errors (down from 79), only info-level lints.
+- Mobile APK build: PASS (65.5MB, production-signed).
+- Backend tests: 305/305 PASS (25 test files).
+- All containers healthy.
+
+### Version bump
+- `1.21.0-alpha` → `1.22.0-alpha` in `apps/mobile/pubspec.yaml`.
+
 ## [1.21.0-alpha] — 2026-08-20
 
 ### Added

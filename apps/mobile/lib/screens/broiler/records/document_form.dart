@@ -30,6 +30,7 @@ class DocumentForm extends StatefulWidget {
 class _DocumentFormState extends State<DocumentForm> {
   final _formKey = GlobalKey<FormState>();
   PlatformFile? _selectedFile;
+  int? _fileSizeBytes;
   String _category = 'receipt';
   bool _uploading = false;
   String? _error;
@@ -50,15 +51,26 @@ class _DocumentFormState extends State<DocumentForm> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'png', 'webp', 'doc', 'docx', 'csv', 'xlsx', 'xls'],
-    );
-    if (result != null && result.files.isNotEmpty) {
-      setState(() {
-        _selectedFile = result.files.first;
-        _error = null;
-      });
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'png', 'webp', 'doc', 'docx', 'csv', 'xlsx', 'xls'],
+      );
+      if (result.isNotEmpty) {
+        final file = result.first;
+        final size = await file.length();
+        if (mounted) {
+          setState(() {
+            _selectedFile = file;
+            _fileSizeBytes = size;
+            _error = null;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Failed to pick file: $e');
+      }
     }
   }
 
@@ -134,8 +146,8 @@ class _DocumentFormState extends State<DocumentForm> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    subtitle: _selectedFile != null
-                        ? Text('${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB')
+                    subtitle: _selectedFile != null && _fileSizeBytes != null
+                        ? Text('${(_fileSizeBytes! / 1024).toStringAsFixed(1)} KB')
                         : const Text('Tap below to choose a file (max 25MB)'),
                     trailing: _selectedFile != null
                         ? IconButton(

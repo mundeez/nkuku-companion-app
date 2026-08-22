@@ -91,6 +91,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   List<FeedRecord> _feedRecords = [];
   List<FeedPurchase> _feedPurchases = [];
   FeedSummary? _feedSummary;
+  FeedProjection? _feedProjection;
   List<WaterRecord> _waterRecords = [];
   WaterRatio? _waterRatio;
   List<MortalityEvent> _mortalityEvents = [];
@@ -216,6 +217,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         _safeCall(BroilerService.getMortalitySummary(widget.flockId)),
         _safeCall(BroilerService.getVaccinationScheduleStatus(widget.flockId)),
         _safeCall(BroilerService.getFinancialSummary(widget.flockId)),
+        _safeCall(BroilerService.getFeedProjection(widget.flockId)),
       ]);
 
       final saleSummaryFuture =
@@ -257,6 +259,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       final mortalitySummary = summaries[3] as MortalitySummary?;
       final vaccinationStatus = summaries[4] as VaccinationScheduleStatus?;
       final financialSummary = summaries[5] as FinancialSummary?;
+      final feedProjection = summaries[6] as FeedProjection?;
 
       setState(() {
         _flock = flock;
@@ -266,6 +269,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         _feedRecords = feed;
         _feedPurchases = feedPurchases;
         _feedSummary = feedSummary;
+        _feedProjection = feedProjection;
         _waterRecords = water;
         _waterRatio = waterRatio;
         _mortalityEvents = mortality;
@@ -878,8 +882,73 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     );
   }
 
+  // ── Feed projection helpers ─────────────────
+
+  Widget _projectionHeader() {
+    const style = TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          const Expanded(flex: 3, child: Text('Stage', style: style)),
+          const Expanded(flex: 2, child: Text('Day', style: style, textAlign: TextAlign.center)),
+          const Expanded(flex: 2, child: Text('Req', style: style, textAlign: TextAlign.end)),
+          const Expanded(flex: 2, child: Text('Bought', style: style, textAlign: TextAlign.end)),
+          const Expanded(flex: 2, child: Text('Left', style: style, textAlign: TextAlign.end)),
+        ],
+      ),
+    );
+  }
+
+  Widget _projectionStageRow(FeedProjectionStage s) {
+    final remainingColor = s.bagsRemaining > 0 ? Colors.orange : Colors.green;
+    final dayRange = s.dayRangeStart != null
+        ? 'Day ${s.dayRangeStart}${s.dayRangeEnd != null ? '-${s.dayRangeEnd}' : '+'}'
+        : '-';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(flex: 3, child: Text(s.stageName, style: const TextStyle(fontSize: 13))),
+          Expanded(flex: 2, child: Text(dayRange, style: TextStyle(fontSize: 11, color: Colors.grey[600]), textAlign: TextAlign.center)),
+          Expanded(flex: 2, child: Text('${s.bagsRequired}', style: const TextStyle(fontSize: 13), textAlign: TextAlign.end)),
+          Expanded(flex: 2, child: Text('${s.bagsPurchased}', style: const TextStyle(fontSize: 13), textAlign: TextAlign.end)),
+          Expanded(flex: 2, child: Text(
+            '${s.bagsRemaining}',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: remainingColor),
+            textAlign: TextAlign.end,
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _projectionTotalRow(FeedProjection p) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          const Expanded(flex: 3, child: Text('Total', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
+          const Expanded(flex: 2, child: SizedBox()),
+          Expanded(flex: 2, child: Text('${p.totals.bagsRequired}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), textAlign: TextAlign.end)),
+          Expanded(flex: 2, child: Text('${p.totals.bagsPurchased}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), textAlign: TextAlign.end)),
+          Expanded(flex: 2, child: Text(
+            '${p.totals.bagsRemaining}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: p.totals.bagsRemaining > 0 ? Colors.orange : Colors.green,
+            ),
+            textAlign: TextAlign.end,
+          )),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFeedTab() {
     final summary = _feedSummary;
+    final projection = _feedProjection;
     final totalPurchaseCost = _feedPurchases.fold<double>(
         0, (sum, p) => sum + p.totalCostZmw);
     final totalBags = _feedPurchases.fold<int>(0, (sum, p) => sum + p.bagsPurchased);
@@ -888,6 +957,45 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // ── Feed Projection (required vs purchased) ──
+          if (projection != null && projection.stages.isNotEmpty) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.inventory_2, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Feed Projection & Procurement',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Based on ${projection.initialCount} initial birds'
+                      '${projection.supplierName != null ? ' · ${projection.supplierName}' : ''}',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 12),
+                    // Header row
+                    _projectionHeader(),
+                    ...projection.stages.map((s) => _projectionStageRow(s)),
+                    const Divider(height: 1),
+                    _projectionTotalRow(projection),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (summary != null)
             SummaryCard(children: [
               SummaryRow(
@@ -1106,23 +1214,58 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (overdue.isNotEmpty)
-            SummaryCard(children: [
-              const Text('Overdue',
-                  style: TextStyle(
-                      color: Colors.red, fontWeight: FontWeight.bold)),
-              ...overdue
-                  .map((i) => SummaryRow(i.vaccineName, 'Day ${i.ageDays}')),
-            ]),
-          if (upcoming.isNotEmpty)
-            SummaryCard(children: [
-              const Text('Upcoming',
-                  style: TextStyle(
-                      color: Colors.green, fontWeight: FontWeight.bold)),
-              ...upcoming
-                  .map((i) => SummaryRow(i.vaccineName, 'Day ${i.ageDays}')),
-            ]),
-          const SizedBox(height: 12),
+          // ── Vaccination schedule reference ──
+          if (overdue.isNotEmpty || upcoming.isNotEmpty) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.vaccines, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Vaccination Schedule',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                        if (status != null)
+                          Text(
+                            'Day ${status.ageDays}',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[600]),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (overdue.isNotEmpty) ...[
+                      const Text('Overdue',
+                          style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13)),
+                      const SizedBox(height: 4),
+                      ...overdue.map((i) => _scheduleItemRow(i, Colors.red)),
+                      if (upcoming.isNotEmpty) const SizedBox(height: 12),
+                    ],
+                    if (upcoming.isNotEmpty) ...[
+                      const Text('Upcoming',
+                          style: TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13)),
+                      const SizedBox(height: 4),
+                      ...upcoming.map((i) => _scheduleItemRow(i, Colors.green)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (completed.isNotEmpty) VaccinationChart(records: completed),
           if (completed.isEmpty)
             const Center(
@@ -1168,6 +1311,41 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   },
                 )),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _scheduleItemRow(VaccinationScheduleItem item, Color accent) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.vaccineName,
+                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                Text(
+                  'Day ${item.ageDays} · ${item.adminMethod.replaceAll('_', ' ')}'
+                  '${item.vaccineType.isNotEmpty ? ' · ${item.vaccineType}' : ''}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                if (item.notes != null && item.notes!.isNotEmpty)
+                  Text(item.notes!,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+              ],
+            ),
+          ),
         ],
       ),
     );
