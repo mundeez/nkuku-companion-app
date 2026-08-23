@@ -155,6 +155,8 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
+    if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
+
     const updated = await prisma.feedRecord.update({
       where: { id },
       data: {
@@ -242,9 +244,21 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
       const flockIds = [...new Set(body.records.map((r) => r.flockId))];
       const flocks = await prisma.broilerFlock.findMany({
         where: { id: { in: flockIds }, organizationId },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       const validFlockIds = new Set(flocks.map((f: any) => f.id));
+
+      // Check for completed flocks (non-owner cannot create records on completed flocks)
+      const authUser = (request as any).authUser;
+      if (authUser?.role !== 'owner') {
+        const completedFlocks = flocks.filter((f: any) => f.status === 'completed');
+        if (completedFlocks.length > 0) {
+          return reply.status(403).send({
+            error: 'FLOCK_COMPLETED',
+            message: 'Cannot create records on a completed flock. Only the owner can modify completed flocks.',
+          });
+        }
+      }
 
       // Pre-fetch suppliers for auto-deriving feedBrand (org-scoped to prevent cross-tenant supplier references)
       const supplierIds = [...new Set(body.records.map((r) => r.supplierId).filter(Boolean))] as string[];

@@ -142,8 +142,11 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
 
     const existing = await prisma.feedPurchase.findFirst({
       where: { id, organizationId },
+      include: { flock: { select: { status: true } } },
     });
     if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    if (assertFlockNotCompleted(reply, existing.flock.status, (request as any).authUser?.role)) return;
 
     // Validate that feedStageId and supplierId belong to the caller's organization
     // to prevent cross-tenant information leakage.

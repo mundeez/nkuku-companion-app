@@ -433,6 +433,23 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
     if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
 
+    // Completion lock: non-owners cannot modify a completed flock
+    const authUser = (request as any).authUser;
+    if (existing.status === 'completed' && authUser?.role !== 'owner') {
+      return reply.status(403).send({
+        error: 'FLOCK_COMPLETED',
+        message: 'This flock is completed. Only the owner can modify it.',
+      });
+    }
+
+    // Status transitions are owner-only — managers must use POST /:id/complete
+    if (raw.status && authUser?.role !== 'owner') {
+      return reply.status(403).send({
+        error: 'STATUS_CHANGE_OWNER_ONLY',
+        message: 'Flock status changes are restricted to the owner. Use the Complete Flock action.',
+      });
+    }
+
     // When chicksCollected transitions to true, auto-set startDate = collectionDate
     if (raw.chicksCollected === true && !existing.chicksCollected) {
       const collDate = raw.collectionDate ? new Date(raw.collectionDate) : (existing.collectionDate ? new Date(existing.collectionDate) : new Date());

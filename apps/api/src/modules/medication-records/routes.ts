@@ -100,6 +100,8 @@ export async function buildMedicationRecordModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
+    if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
+
     const startDate = data.startDate ? new Date(data.startDate) : record.startDate;
     const withdrawalDate = data.withdrawalDays !== undefined
       ? data.withdrawalDays > 0

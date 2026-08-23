@@ -73,6 +73,8 @@ export async function buildEnvironmentalRecordModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
+    if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
+
     const updated = await prisma.environmentalRecord.update({
       where: { id },
       data: {
