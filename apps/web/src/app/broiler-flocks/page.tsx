@@ -303,7 +303,19 @@ export default function BroilerFlocksPage() {
           const projectedProfit = flock.projectedProfit ?? 0;
 
           return (
-            <Card key={flock.id} className="hover:shadow-md transition-shadow">
+            <Card
+              key={flock.id}
+              className="hover:shadow-md transition-shadow cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => router.push(`/broiler-flocks/${flock.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  router.push(`/broiler-flocks/${flock.id}`);
+                }
+              }}
+              role="link"
+              tabIndex={0}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">{flock.name}</CardTitle>
@@ -460,12 +472,12 @@ export default function BroilerFlocksPage() {
                       Manage
                     </Button>
                     {canCreateEdit && (
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(flock)}>
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(flock); }}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                     )}
                     {canDelete && (
-                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => openDelete(flock)}>
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={(e) => { e.stopPropagation(); openDelete(flock); }}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
