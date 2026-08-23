@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.23.0-alpha] — 2026-08-23
+
+### Added
+- **Flock financial aggregation**: 5 computed financial fields now returned on flock list and detail endpoints:
+  - `totalOutstandingPayments`
+  - `actualRevenueCollected`
+  - `actualProfitLessOutstanding`
+  - `actualAverageSalesPrice`
+  - `unrealisedProfit` (proportional cost allocation)
+- **Flock completion endpoint**: `POST /broiler-flocks/:id/complete` finalizes a flock and warns when outstanding payments remain.
+- **Completion lock middleware** (`apps/api/src/middleware/check-flock-locked.ts`): blocks POST/DELETE/PATCH and bulk-create mutations on completed flocks for non-owners; owners may bypass with an audit log entry.
+- **Completion lock wired into 10 record modules**: growth-records, feed-records, feed-purchases, water-records, mortality-events, vaccination-events, medication-records, environmental-records, financial-records, and sale-records.
+- **Sales API sorting**: `sortBy` and `sortDir` query parameters on sale-record list endpoints.
+- **Sales dashboard client-side sorting**: clickable column headers for sortable sales tables.
+- **Flock UI financial indicators**: flock cards and the detail Overview tab now display the 5 new financial fields.
+- **Complete Flock UI**: confirmation dialog on the flock detail page, with lock indicators for completed flocks.
+
+### Security
+- **Broiler flock status transition hardening**: only owners may change `status` via `PATCH /broiler-flocks/:id`; non-owners must use `POST /:id/complete`.
+- **Completion lock extended to PATCH and bulk-create endpoints**: closes bypass surfaces for status changes and bulk record creates on completed flocks.
+
+### Validation
+- Test suite: 301/305 pass (4 pre-existing email/SMTP environment failures unrelated to this phase).
+- Web type check: PASS.
+- API type check: PASS.
+
+### Version bump
+- `1.20.0-alpha` → `1.23.0-alpha` in `apps/api/package.json` and `apps/web/package.json`.
+- `apps/mobile/pubspec.yaml` left at `1.22.0-alpha` (no mobile changes in this phase).
+
 ## [1.22.0-alpha] — 2026-08-22
 
 ### Added
