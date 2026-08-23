@@ -18,7 +18,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, Paperclip, ChevronDown, ChevronRight } from "lucide-react";
+import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, Paperclip, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
 import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 
 export default function SalesDashboardPage() {
@@ -32,6 +32,8 @@ export default function SalesDashboardPage() {
   const [editRecord, setEditRecord] = useState<SaleRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<"saleDate" | "flockName" | "customerName" | "birdCount" | "pricePerBirdZmw" | "totalAmountZmw" | "paymentStatus">("saleDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [form, setForm] = useState({
     flockId: "",
     saleDate: new Date().toISOString().split("T")[0],
@@ -46,6 +48,54 @@ export default function SalesDashboardPage() {
   });
 
   const canEditSales = user?.role === "owner" || user?.role === "manager" || user?.role === "sales_person";
+
+  const paymentOrder: Record<string, number> = { paid: 0, partial: 1, pending: 2 };
+
+  function toggleSort(field: typeof sortField) {
+    if (sortField === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir(field === "saleDate" ? "desc" : "asc");
+    }
+  }
+
+  function SortHeader({ field, label, className }: { field: typeof sortField; label: string; className?: string }) {
+    const isActive = sortField === field;
+    return (
+      <th className={`p-2 ${className ?? ""}`}>
+        <button
+          onClick={() => toggleSort(field)}
+          className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"}`}
+        >
+          {label}
+          {isActive && (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+        </button>
+      </th>
+    );
+  }
+
+  const sortedSales = [...sales].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    switch (sortField) {
+      case "saleDate":
+        return (new Date(a.saleDate).getTime() - new Date(b.saleDate).getTime()) * dir;
+      case "flockName":
+        return ((a.flock?.name ?? "").localeCompare(b.flock?.name ?? "")) * dir;
+      case "customerName":
+        return ((a.customerName ?? "Walk-in").localeCompare(b.customerName ?? "Walk-in")) * dir;
+      case "birdCount":
+        return (a.birdCount - b.birdCount) * dir;
+      case "pricePerBirdZmw":
+        return (Number(a.pricePerBirdZmw) - Number(b.pricePerBirdZmw)) * dir;
+      case "totalAmountZmw":
+        return (Number(a.totalAmountZmw) - Number(b.totalAmountZmw)) * dir;
+      case "paymentStatus":
+        return ((paymentOrder[a.paymentStatus] ?? 99) - (paymentOrder[b.paymentStatus] ?? 99)) * dir;
+      default:
+        return 0;
+    }
+  });
 
   function loadData() {
     apiFetch<SalesDashboardSummary>("/api/v1/sale-records/dashboard")
@@ -239,18 +289,18 @@ export default function SalesDashboardPage() {
                 <thead>
                   <tr className="border-b text-left">
                     <th className="p-2 w-8"></th>
-                    <th className="p-2">Date</th>
-                    <th className="p-2">Flock</th>
-                    <th className="p-2">Customer</th>
-                    <th className="p-2">Birds</th>
-                    <th className="p-2">Price/Bird</th>
-                    <th className="p-2">Total</th>
-                    <th className="p-2">Payment</th>
+                    <SortHeader field="saleDate" label="Date" />
+                    <SortHeader field="flockName" label="Flock" />
+                    <SortHeader field="customerName" label="Customer" />
+                    <SortHeader field="birdCount" label="Birds" />
+                    <SortHeader field="pricePerBirdZmw" label="Price/Bird" />
+                    <SortHeader field="totalAmountZmw" label="Total" />
+                    <SortHeader field="paymentStatus" label="Payment" />
                     {canEditSales && <th className="p-2">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {sales.map((s) => (
+                  {sortedSales.map((s) => (
                     <Fragment key={s.id}>
                       <tr className="border-b last:border-0">
                         <td className="p-2">

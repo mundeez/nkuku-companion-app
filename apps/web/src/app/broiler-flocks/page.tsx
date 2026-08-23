@@ -390,6 +390,41 @@ export default function BroilerFlocksPage() {
                       ZMW {actualProfit.toFixed(2)}
                     </span>
                   </div>
+                  <div className="pt-2 border-t">
+                    <p className="text-xs text-muted-foreground mb-1.5">Sales & Outstanding</p>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Revenue Collected</span>
+                        <span className={`font-medium ${(flock.actualRevenueCollected ?? 0) > 0 ? "text-green-600" : ""}`}>
+                          ZMW {(flock.actualRevenueCollected ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Outstanding Payments</span>
+                        <span className={`font-medium ${(flock.totalOutstandingPayments ?? 0) > 0 ? "text-red-600" : "text-green-600"}`}>
+                          ZMW {(flock.totalOutstandingPayments ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Profit Less Outstanding</span>
+                        <span className={`font-medium ${(flock.actualProfitLessOutstanding ?? 0) > 0 ? "text-green-600" : (flock.actualProfitLessOutstanding ?? 0) < 0 ? "text-red-600" : ""}`}>
+                          ZMW {(flock.actualProfitLessOutstanding ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Avg Sale Price/Bird</span>
+                        <span className="font-medium">
+                          {(flock.actualAverageSalesPrice ?? 0) > 0 ? `ZMW ${(flock.actualAverageSalesPrice ?? 0).toFixed(2)}` : "-"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Unrealised Profit</span>
+                        <span className={`font-medium text-blue-600 ${(flock.unrealisedProfit ?? 0) > 0 ? "" : (flock.unrealisedProfit ?? 0) < 0 ? "text-red-600" : ""}`}>
+                          {(flock.unrealisedProfit ?? 0) !== 0 ? `ZMW ${(flock.unrealisedProfit ?? 0).toFixed(2)}` : "-"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                   {flock.targetWeight && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Target Weight</span>

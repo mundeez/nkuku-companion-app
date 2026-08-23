@@ -4,6 +4,7 @@ import { Decimal } from 'decimal.js';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { AuditService } from '../../core/financial-engine/audit.service.js';
+import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 
 const SaleRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -31,6 +32,7 @@ function parseFinancialRecordId(notes: string | null | undefined): string | null
 export async function buildSaleRecordModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
   const audit = new AuditService(prisma);
+  const flockLock = checkFlockNotLocked(prisma);
 
   // GET /all — list all sale records for the user (for sales dashboard)
   app.get('/all', { preHandler: [authenticate] }, async (request) => {
@@ -40,6 +42,8 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       fromDate: z.string().optional(),
       toDate: z.string().optional(),
       paymentStatus: z.enum(['pending', 'partial', 'paid']).optional(),
+      sortBy: z.enum(['saleDate', 'flockName', 'customerName', 'birdCount', 'pricePerBirdZmw', 'totalAmountZmw', 'paymentStatus']).optional(),
+      sortDir: z.enum(['asc', 'desc']).optional(),
     }).parse(request.query);
 
     const where: any = { flock: { organizationId } };
@@ -47,11 +51,27 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     if (query.toDate) where.saleDate = { ...where.saleDate, lte: new Date(query.toDate) };
     if (query.paymentStatus) where.paymentStatus = query.paymentStatus;
 
-    return prisma.saleRecord.findMany({
+    const sortBy = query.sortBy ?? 'saleDate';
+    const sortDir = query.sortDir ?? 'desc';
+
+    // Fields that require post-fetch sorting (relation or computed fields)
+    const prismaSortFields = new Set(['saleDate', 'customerName', 'birdCount', 'pricePerBirdZmw', 'totalAmountZmw', 'paymentStatus']);
+    const records = await prisma.saleRecord.findMany({
       where,
       include: { flock: { select: { name: true, breed: { select: { name: true } } } } },
-      orderBy: { saleDate: 'desc' },
+      orderBy: prismaSortFields.has(sortBy) ? { [sortBy]: sortDir } : { saleDate: 'desc' },
     });
+
+    // Post-fetch sort for flockName (requires relation field)
+    if (sortBy === 'flockName') {
+      records.sort((a: any, b: any) => {
+        const aName = a.flock?.name ?? '';
+        const bName = b.flock?.name ?? '';
+        return sortDir === 'asc' ? aName.localeCompare(bName) : bName.localeCompare(aName);
+      });
+    }
+
+    return records;
   });
 
   // GET /dashboard — global sales summary for the sales dashboard
@@ -234,7 +254,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   });
 
   // POST /
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager', 'sales_person')] }, async (request, reply) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager', 'sales_person'), flockLock] }, async (request, reply) => {
     const { flockId, ...data } = SaleRecordCreateSchema.parse(request.body);
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
@@ -367,6 +387,8 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
 
     // Delete the linked FinancialRecord first, if present.
     const financialRecordId = parseFinancialRecordId(record.notes);

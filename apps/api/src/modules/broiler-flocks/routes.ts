@@ -6,6 +6,7 @@ import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temp
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { checkFlockLimit } from '../../core/billing/feature-gate.js';
 import { calculateItemsRequired } from '../../core/calculation-engine/index.js';
+import { AuditService } from '../../core/financial-engine/audit.service.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -53,6 +54,7 @@ const FlockUpdateSchema = z.object({
 
 export async function buildBroilerFlockModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
+  const audit = new AuditService(prisma);
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const _authUser = (request as any).authUser;
@@ -122,6 +124,23 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const arr = feedRecordsByFlock.get(fr.flockId) ?? [];
       arr.push(fr);
       feedRecordsByFlock.set(fr.flockId, arr);
+    }
+
+    // Batch-load sale records for the 5 new financial computed fields
+    const saleRecords = await prisma.saleRecord.findMany({
+      where: { flockId: { in: flockIds } },
+      select: {
+        flockId: true,
+        birdCount: true,
+        totalAmountZmw: true,
+        amountPaidZmw: true,
+      },
+    });
+    const salesByFlock = new Map<string, any[]>();
+    for (const s of saleRecords) {
+      const arr = salesByFlock.get(s.flockId) ?? [];
+      arr.push(s);
+      salesByFlock.set(s.flockId, arr);
     }
 
     return flocks.map((f: any) => {
@@ -210,7 +229,45 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         };
       });
 
-      return { ...f, ageDays, totalMortality, mortalityRate, totalCost, totalRevenue, projectedRevenue, projectedProfit, feedProjection };
+      // Compute 5 new sale-based financial fields
+      const flockSales = salesByFlock.get(f.id) ?? [];
+      const totalRevenueFromSales = flockSales.reduce((sum: number, s: any) => sum + Number(s.totalAmountZmw), 0);
+      const totalBirdsSold = flockSales.reduce((sum: number, s: any) => sum + s.birdCount, 0);
+      const totalOutstandingPayments = flockSales.reduce((sum: number, s: any) => {
+        const outstanding = Number(s.totalAmountZmw) - Number(s.amountPaidZmw ?? 0);
+        return sum + Math.max(0, outstanding);
+      }, 0);
+      const actualRevenueCollected = totalRevenue - totalOutstandingPayments;
+      const actualProfit = totalRevenue - totalCost;
+      const actualProfitLessOutstanding = actualProfit - totalOutstandingPayments;
+      const actualAverageSalesPrice = totalBirdsSold > 0 ? totalRevenueFromSales / totalBirdsSold : 0;
+      // Proportional cost allocation for unrealised profit
+      const avgCostPerBird = totalBirdsSold > 0 ? totalCost / totalBirdsSold : 0;
+      const totalBirdsOutstanding = flockSales.reduce((sum: number, s: any) => {
+        const total = Number(s.totalAmountZmw);
+        if (total <= 0) return sum;
+        const outstanding = Number(s.totalAmountZmw) - Number(s.amountPaidZmw ?? 0);
+        const fractionOutstanding = Math.max(0, outstanding) / total;
+        return sum + s.birdCount * fractionOutstanding;
+      }, 0);
+      const unrealisedProfit = totalOutstandingPayments - (avgCostPerBird * totalBirdsOutstanding);
+
+      return {
+        ...f,
+        ageDays,
+        totalMortality,
+        mortalityRate,
+        totalCost,
+        totalRevenue,
+        projectedRevenue,
+        projectedProfit,
+        feedProjection,
+        totalOutstandingPayments,
+        actualRevenueCollected,
+        actualProfitLessOutstanding,
+        actualAverageSalesPrice,
+        unrealisedProfit,
+      };
     });
   });
 
@@ -224,6 +281,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         breed: { include: { performanceTargets: { orderBy: { ageDays: 'asc' } } } },
         supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } },
         growthRecords: { orderBy: { recordDate: 'desc' }, take: 1 },
+        financialRecords: { select: { amountZmw: true, isIncome: true, category: true } },
         _count: {
           select: {
             growthRecords: true,
@@ -247,7 +305,51 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const deaths = totalMortality._sum.count ?? 0;
     const mortalityRate = flock.initialCount > 0 ? (deaths / flock.initialCount) * 100 : 0;
 
-    return { ...flock, ageDays, totalMortality: deaths, mortalityRate };
+    // Compute sale-based financial fields for the detail page
+    const finRecs = flock.financialRecords || [];
+    const finCost = finRecs.filter((r: any) => !r.isIncome).reduce((sum: number, r: any) => sum + Number(r.amountZmw), 0);
+    const hasChickFin = finRecs.some((r: any) => r.category === 'chick_purchase' && !r.isIncome);
+    const chickCost = !hasChickFin && flock.chickPriceZmw ? Number(flock.chickPriceZmw) * flock.initialCount : 0;
+    const totalCost = finCost + chickCost;
+    const totalRevenue = finRecs.filter((r: any) => r.isIncome).reduce((sum: number, r: any) => sum + Number(r.amountZmw), 0);
+
+    const flockSales = await prisma.saleRecord.findMany({
+      where: { flockId: id },
+      select: { birdCount: true, totalAmountZmw: true, amountPaidZmw: true },
+    });
+    const totalRevenueFromSales = flockSales.reduce((sum: number, s: any) => sum + Number(s.totalAmountZmw), 0);
+    const totalBirdsSold = flockSales.reduce((sum: number, s: any) => sum + s.birdCount, 0);
+    const totalOutstandingPayments = flockSales.reduce((sum: number, s: any) => {
+      const outstanding = Number(s.totalAmountZmw) - Number(s.amountPaidZmw ?? 0);
+      return sum + Math.max(0, outstanding);
+    }, 0);
+    const actualRevenueCollected = totalRevenue - totalOutstandingPayments;
+    const actualProfit = totalRevenue - totalCost;
+    const actualProfitLessOutstanding = actualProfit - totalOutstandingPayments;
+    const actualAverageSalesPrice = totalBirdsSold > 0 ? totalRevenueFromSales / totalBirdsSold : 0;
+    const avgCostPerBird = totalBirdsSold > 0 ? totalCost / totalBirdsSold : 0;
+    const totalBirdsOutstanding = flockSales.reduce((sum: number, s: any) => {
+      const total = Number(s.totalAmountZmw);
+      if (total <= 0) return sum;
+      const outstanding = Number(s.totalAmountZmw) - Number(s.amountPaidZmw ?? 0);
+      const fractionOutstanding = Math.max(0, outstanding) / total;
+      return sum + s.birdCount * fractionOutstanding;
+    }, 0);
+    const unrealisedProfit = totalOutstandingPayments - (avgCostPerBird * totalBirdsOutstanding);
+
+    return {
+      ...flock,
+      ageDays,
+      totalMortality: deaths,
+      mortalityRate,
+      totalCost,
+      totalRevenue,
+      totalOutstandingPayments,
+      actualRevenueCollected,
+      actualProfitLessOutstanding,
+      actualAverageSalesPrice,
+      unrealisedProfit,
+    };
   });
 
   app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), checkFlockLimit] }, async (request) => {
@@ -387,6 +489,63 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
     if (result.count === 0) return reply.status(404).send({ error: 'NOT_FOUND' });
     return { deleted: true };
+  });
+
+  // POST /api/v1/broiler-flocks/:id/complete — mark a flock as completed
+  app.post('/:id/complete', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    const existing = await prisma.broilerFlock.findFirst({
+      where: { id, organizationId },
+    });
+    if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
+    if (existing.status === 'completed') {
+      return reply.status(409).send({ error: 'ALREADY_COMPLETED', message: 'This flock is already completed.' });
+    }
+
+    // Check for outstanding payments to include in the response as a warning
+    const sales = await prisma.saleRecord.findMany({
+      where: { flockId: id },
+      select: { totalAmountZmw: true, amountPaidZmw: true },
+    });
+    const outstandingPayments = sales.reduce((sum: number, s: any) => {
+      const outstanding = Number(s.totalAmountZmw) - Number(s.amountPaidZmw ?? 0);
+      return sum + Math.max(0, outstanding);
+    }, 0);
+    const outstandingSalesCount = sales.filter((s: any) => {
+      const outstanding = Number(s.totalAmountZmw) - Number(s.amountPaidZmw ?? 0);
+      return outstanding > 0;
+    }).length;
+
+    const updated = await prisma.broilerFlock.update({
+      where: { id },
+      data: {
+        status: 'completed',
+        soldDate: existing.soldDate ?? new Date(),
+      },
+    });
+
+    // Audit log the completion
+    await audit.log({
+      organizationId,
+      userId: authUser.userId,
+      entityType: 'BroilerFlock',
+      entityId: id,
+      action: 'update',
+      previousState: { status: existing.status },
+      newState: { status: 'completed', soldDate: updated.soldDate },
+    });
+
+    const warnings: any = {};
+    if (outstandingPayments > 0) {
+      warnings.outstandingPayments = outstandingPayments;
+      warnings.outstandingSalesCount = outstandingSalesCount;
+      warnings.message = `This flock has ${outstandingSalesCount} outstanding sale${outstandingSalesCount === 1 ? '' : 's'} totaling ZMW ${outstandingPayments.toFixed(2)}. Payment records can still be updated, but other records are locked for non-owners.`;
+    }
+
+    return { ...updated, warnings };
   });
 
   // GET /api/v1/broiler-flocks/:id/dashboard - Dashboard data

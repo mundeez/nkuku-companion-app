@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -20,6 +21,7 @@ const EnvironmentalRecordCreateSchema = z.object({
 
 export async function buildEnvironmentalRecordModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
+  const flockLock = checkFlockNotLocked(prisma);
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid() }).parse(request.query);
@@ -37,7 +39,7 @@ export async function buildEnvironmentalRecordModule(app: FastifyInstance) {
     });
   });
 
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request) => {
     const data = EnvironmentalRecordCreateSchema.parse(request.body);
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
@@ -94,6 +96,8 @@ export async function buildEnvironmentalRecordModule(app: FastifyInstance) {
     if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
 
     await prisma.environmentalRecord.delete({ where: { id } });
     return { deleted: true };

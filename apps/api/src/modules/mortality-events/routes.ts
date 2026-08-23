@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { bulkRateLimit } from '../../core/security/rate-limiter.js';
+import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 
 const MortalityEventCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -16,6 +17,7 @@ const MortalityEventCreateSchema = z.object({
 
 export async function buildMortalityEventModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
+  const flockLock = checkFlockNotLocked(prisma);
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
@@ -75,7 +77,7 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
     };
   });
 
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request) => {
     const { flockId, ...data } = MortalityEventCreateSchema.parse(request.body);
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
@@ -199,6 +201,8 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
     if (!event || event.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    if (assertFlockNotCompleted(reply, event.flock.status, (request as any).authUser?.role)) return;
 
     // Restore count
     await prisma.broilerFlock.update({

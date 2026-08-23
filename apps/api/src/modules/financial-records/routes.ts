@@ -4,6 +4,7 @@ import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { AuditService } from '../../core/financial-engine/audit.service.js';
 import { bulkRateLimit } from '../../core/security/rate-limiter.js';
+import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 
 const FinancialRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -18,6 +19,7 @@ const FinancialRecordCreateSchema = z.object({
 export async function buildFinancialRecordModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
   const audit = new AuditService(prisma);
+  const flockLock = checkFlockNotLocked(prisma);
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
@@ -161,7 +163,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     };
   });
 
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request) => {
     const { flockId, ...data } = FinancialRecordCreateSchema.parse(request.body);
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
@@ -240,6 +242,8 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
 
     await prisma.financialRecord.delete({ where: { id } });
 

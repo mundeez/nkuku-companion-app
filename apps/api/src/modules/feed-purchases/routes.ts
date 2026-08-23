@@ -6,6 +6,7 @@ import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { AuditService } from '../../core/financial-engine/audit.service.js';
 import { JournalEngine } from '../../core/double-entry/journal.engine.js';
 import { AutoPostService } from '../../core/double-entry/auto-post.service.js';
+import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 
 const FeedPurchaseCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -26,6 +27,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
   const audit = new AuditService(prisma);
   const journalEngine = new JournalEngine(prisma);
   const autoPost = new AutoPostService(journalEngine, prisma);
+  const flockLock = checkFlockNotLocked(prisma);
 
   // GET /api/v1/feed-purchases?flockId=...
   app.get('/', { preHandler: [authenticate] }, async (request) => {
@@ -46,7 +48,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
   });
 
   // POST /api/v1/feed-purchases
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request, reply) => {
     const data = FeedPurchaseCreateSchema.parse(request.body);
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
@@ -225,8 +227,11 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
 
     const existing = await prisma.feedPurchase.findFirst({
       where: { id, organizationId },
+      include: { flock: { select: { status: true } } },
     });
     if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    if (assertFlockNotCompleted(reply, existing.flock.status, (request as any).authUser?.role)) return;
 
     // Delete the linked FinancialRecord
     const finRecord = await prisma.financialRecord.findFirst({

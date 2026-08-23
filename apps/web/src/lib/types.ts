@@ -157,6 +157,11 @@ export interface BroilerFlock {
   totalRevenue?: number;
   projectedRevenue?: number;
   projectedProfit?: number;
+  totalOutstandingPayments?: number;
+  actualRevenueCollected?: number;
+  actualProfitLessOutstanding?: number;
+  actualAverageSalesPrice?: number;
+  unrealisedProfit?: number;
   housingType: "whole_house" | "spot_brooding";
   chicksCollected: boolean;
   collectionDate?: string;

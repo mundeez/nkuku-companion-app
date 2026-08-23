@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { bulkRateLimit } from '../../core/security/rate-limiter.js';
+import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 
 const FeedRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -17,6 +18,7 @@ const FeedRecordCreateSchema = z.object({
 
 export async function buildFeedRecordModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
+  const flockLock = checkFlockNotLocked(prisma);
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const { flockId } = z.object({
@@ -90,7 +92,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
     };
   });
 
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request) => {
     const { flockId, ...data } = FeedRecordCreateSchema.parse(request.body);
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
@@ -213,6 +215,8 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
     if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
 
     // Delete linked financial record
     const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });

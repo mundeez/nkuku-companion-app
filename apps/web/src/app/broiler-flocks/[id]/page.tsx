@@ -19,7 +19,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout, ClipboardList, Thermometer, Pill, CalendarDays, Printer, Paperclip, ChevronDown, ChevronRight, X } from "lucide-react";
+import { ArrowLeft, TrendingUp, Droplets, Syringe, Skull, DollarSign, Activity, Scale, Pencil, Trash2, Wheat, Package, Sprout, ClipboardList, Thermometer, Pill, CalendarDays, Printer, Paperclip, ChevronDown, ChevronRight, X, CheckCircle, Lock } from "lucide-react";
 import { FlockTabChart } from "@/components/flock-tab-chart";
 import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,6 +61,9 @@ export default function FlockDetailPage() {
   const [saving, setSaving] = useState(false);
   const [projectedSalePrice, setProjectedSalePrice] = useState<string>("");
   const [savingSalePrice, setSavingSalePrice] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [completeWarning, setCompleteWarning] = useState<string | null>(null);
 
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
 
@@ -154,6 +157,41 @@ export default function FlockDetailPage() {
     }
   }
 
+  async function handleCompleteFlock() {
+    setCompleting(true);
+    try {
+      const result = await apiFetch<any>(`/api/v1/broiler-flocks/${flockId}/complete`, {
+        method: "POST",
+      });
+      setCompleteOpen(false);
+      setCompleteWarning(null);
+      if (result.warnings?.message) {
+        setError(result.warnings.message);
+      } else {
+        setError("");
+      }
+      loadAll();
+    } catch (e: any) {
+      setError(e.message || "Failed to complete flock.");
+    } finally {
+      setCompleting(false);
+    }
+  }
+
+  function openCompleteDialog() {
+    const outstanding = flock?.totalOutstandingPayments ?? 0;
+    if (outstanding > 0) {
+      setCompleteWarning(
+        `This flock has outstanding payments totaling ZMW ${outstanding.toFixed(2)}. ` +
+        `Payment records can still be updated after completion, but other records ` +
+        `(growth, feed, mortality, etc.) will be locked for non-owners.`
+      );
+    } else {
+      setCompleteWarning(null);
+    }
+    setCompleteOpen(true);
+  }
+
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
     if (user && flockId) loadAll();
@@ -215,7 +253,7 @@ export default function FlockDetailPage() {
         <Button variant="outline" size="sm" onClick={() => router.push("/broiler-flocks")}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold">{flock.name}</h1>
           <div className="text-muted-foreground">
             {flock.breed?.name} | {ageDays < 0 ? "Pending collection" : `Day ${ageDays}`} | {getStatusBadge(flock.status, flock.chicksCollected)}
@@ -232,6 +270,12 @@ export default function FlockDetailPage() {
             })()}
           </div>
         </div>
+        {canCreateEdit && flock.status === "active" && (
+          <Button variant="default" onClick={openCompleteDialog} className="bg-green-600 hover:bg-green-700">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Complete Flock
+          </Button>
+        )}
       </div>
 
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
@@ -283,13 +327,31 @@ export default function FlockDetailPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4 flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="growth">Growth ({growthRecords.length})</TabsTrigger>
+          <TabsTrigger value="growth" className={flock.status === "completed" && user?.role !== "owner" ? "opacity-60" : ""}>
+            Growth ({growthRecords.length})
+            {flock.status === "completed" && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
+          </TabsTrigger>
           <TabsTrigger value="chicks">Chicks</TabsTrigger>
-          <TabsTrigger value="feed">Feed ({feedRecords.length})</TabsTrigger>
-          <TabsTrigger value="water">Water ({waterRecords.length})</TabsTrigger>
-          <TabsTrigger value="mortality">Mortality ({mortalityEvents.length})</TabsTrigger>
-          <TabsTrigger value="vaccination">Vaccines ({vaccinationEvents.length})</TabsTrigger>
-          <TabsTrigger value="financial">Financial ({financialRecords.length})</TabsTrigger>
+          <TabsTrigger value="feed" className={flock.status === "completed" && user?.role !== "owner" ? "opacity-60" : ""}>
+            Feed ({feedRecords.length})
+            {flock.status === "completed" && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
+          </TabsTrigger>
+          <TabsTrigger value="water" className={flock.status === "completed" && user?.role !== "owner" ? "opacity-60" : ""}>
+            Water ({waterRecords.length})
+            {flock.status === "completed" && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
+          </TabsTrigger>
+          <TabsTrigger value="mortality" className={flock.status === "completed" && user?.role !== "owner" ? "opacity-60" : ""}>
+            Mortality ({mortalityEvents.length})
+            {flock.status === "completed" && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
+          </TabsTrigger>
+          <TabsTrigger value="vaccination" className={flock.status === "completed" && user?.role !== "owner" ? "opacity-60" : ""}>
+            Vaccines ({vaccinationEvents.length})
+            {flock.status === "completed" && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
+          </TabsTrigger>
+          <TabsTrigger value="financial" className={flock.status === "completed" && user?.role !== "owner" ? "opacity-60" : ""}>
+            Financial ({financialRecords.length})
+            {flock.status === "completed" && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -337,6 +399,43 @@ export default function FlockDetailPage() {
                 <div className="flex justify-between"><span>Target Weight</span><span className="font-medium">{flock.targetWeight || "-"} kg @ Day {flock.targetAge || "-"}</span></div>
               </div>
             </CardContent></Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-base">Sales & Outstanding</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Revenue Collected</span>
+                    <span className={`font-medium ${(flock.actualRevenueCollected ?? 0) > 0 ? "text-green-600" : ""}`}>
+                      ZMW {(flock.actualRevenueCollected ?? 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Outstanding Payments</span>
+                    <span className={`font-medium ${(flock.totalOutstandingPayments ?? 0) > 0 ? "text-red-600" : "text-green-600"}`}>
+                      ZMW {(flock.totalOutstandingPayments ?? 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Profit Less Outstanding</span>
+                    <span className={`font-medium ${(flock.actualProfitLessOutstanding ?? 0) > 0 ? "text-green-600" : (flock.actualProfitLessOutstanding ?? 0) < 0 ? "text-red-600" : ""}`}>
+                      ZMW {(flock.actualProfitLessOutstanding ?? 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Avg Sale Price/Bird</span>
+                    <span className="font-medium">
+                      {(flock.actualAverageSalesPrice ?? 0) > 0 ? `ZMW ${(flock.actualAverageSalesPrice ?? 0).toFixed(2)}` : "-"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Unrealised Profit</span>
+                    <span className={`font-medium text-blue-600 ${(flock.unrealisedProfit ?? 0) < 0 ? "text-red-600" : ""}`}>
+                      {(flock.unrealisedProfit ?? 0) !== 0 ? `ZMW ${(flock.unrealisedProfit ?? 0).toFixed(2)}` : "-"}
+                    </span>
+                  </div>
+                </div>
+              </CardContent></Card>
 
             <Card className="md:col-span-2">
               <CardHeader><CardTitle className="text-base">Management Tools</CardTitle></CardHeader>
@@ -555,6 +654,41 @@ export default function FlockDetailPage() {
         <TabsContent value="vaccination"><SimpleRecordTab flockId={flockId} records={vaccinationEvents} type="vaccination" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
         <TabsContent value="financial"><SimpleRecordTab flockId={flockId} records={financialRecords} type="financial" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
       </Tabs>
+
+      {/* Complete Flock Confirmation Dialog */}
+      <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete Flock</DialogTitle>
+            <DialogDescription>
+              Mark <strong>{flock.name}</strong> as completed? This will set the flock status to "completed" and lock record modifications for non-owners.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="text-sm space-y-1">
+              <div className="flex justify-between"><span className="text-muted-foreground">Birds</span><span className="font-medium">{flock.currentCount} / {flock.initialCount}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Revenue</span><span className="font-medium">ZMW {totalRevenue.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Outstanding</span><span className={`font-medium ${(flock.totalOutstandingPayments ?? 0) > 0 ? "text-red-600" : ""}`}>ZMW {(flock.totalOutstandingPayments ?? 0).toFixed(2)}</span></div>
+            </div>
+            {completeWarning && (
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                {completeWarning}
+              </div>
+            )}
+            {user?.role === "owner" && (
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-xs">
+                As owner, you can still add and modify records on completed flocks. All actions are audit-logged.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompleteOpen(false)}>Cancel</Button>
+            <Button onClick={handleCompleteFlock} disabled={completing} className="bg-green-600 hover:bg-green-700">
+              {completing ? "Completing..." : "Complete Flock"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

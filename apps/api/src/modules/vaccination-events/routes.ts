@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { bulkRateLimit } from '../../core/security/rate-limiter.js';
+import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 
 const VaccinationEventCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -21,6 +22,7 @@ const VaccinationEventCreateSchema = z.object({
 
 export async function buildVaccinationEventModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
+  const flockLock = checkFlockNotLocked(prisma);
 
   // GET /api/v1/vaccination-events/schedules - list all vaccination schedules
   app.get('/schedules', { preHandler: [authenticate] }, async (_request, reply) => {
@@ -100,7 +102,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     };
   });
 
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request) => {
     const { flockId, ...data } = VaccinationEventCreateSchema.parse(request.body);
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
@@ -219,6 +221,8 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     if (!event || event.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    if (assertFlockNotCompleted(reply, event.flock.status, (request as any).authUser?.role)) return;
 
     // Delete linked financial record
     const finRecord = await prisma.financialRecord.findFirst({ where: { sourceRecordId: id } });
