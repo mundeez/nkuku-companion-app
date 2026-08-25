@@ -1,5 +1,65 @@
 # Changelog
 
+## [1.25.0-alpha] — 2026-08-25
+
+### Security dependency remediation + password show/hide UI
+
+### Fixed
+- **sharp HIGH vulnerability** (CVE-2026-33327/33328/35590/35591): `sharp@0.34.5`
+  → `0.35.3` via root `pnpm.overrides`. The override was previously declared
+  in `apps/web/package.json` but silently ignored by pnpm (overrides must be
+  at the workspace root). Moved to root `package.json`.
+- **uuid MODERATE vulnerability** (GHSA-w5hq-g745-h8pq): `uuid@8.3.2` →
+  `14.0.2` via root `pnpm.overrides`. The override was previously declared
+  in `apps/api/package.json` but silently ignored. Moved to root.
+  - `exceljs@4.4.0` (which depends on `uuid: ^8.3.0`) confirmed compatible
+    with uuid 14.x — it uses `const {v4} = require('uuid')` (named
+    destructured export), which uuid 14.x supports in CJS mode.
+- **node-cron upgraded** `3.0.3` → `4.6.0`: the 4.x line drops the `uuid`
+  dependency entirely (zero-dependency, TypeScript-native). This removes one
+  source of uuid 8.x. Required a type import fix in `scheduler.service.ts`
+  (`cron.ScheduledTask` → named `ScheduledTask` import, as 4.x exports it as
+  a named type rather than via the default export namespace).
+- Removed `@types/node-cron` (no longer needed — node-cron 4.x ships its own
+  TypeScript types).
+- Removed the now-redundant `pnpm.overrides` blocks from `apps/api/package.json`
+  and `apps/web/package.json` (they were being ignored; the root overrides
+  supersede them).
+- **`pnpm audit --prod`: "No known vulnerabilities found"** — both the HIGH
+  and MODERATE advisories from v1.24.0-alpha are now resolved.
+
+### Added
+- **Password show/hide toggle** on auth screens (web + mobile):
+  - **Web**: new reusable `PasswordInput` component
+    (`components/ui/password-input.tsx`) wrapping the shadcn `Input` with an
+    Eye/EyeOff toggle button (lucide-react). Deployed on login, signup, and
+    reset-password pages.
+  - **Mobile**: inline `_obscurePassword` state with a visibility/visibility-off
+    `IconButton` suffix on the password `TextField`. Deployed on login and
+    signup screens. (No mobile reset-password screen exists.)
+
+### Changed
+- `SchedulerService` type import: `import cron, { type ScheduledTask } from
+  'node-cron'` (was `import cron from 'node-cron'` + `cron.ScheduledTask`).
+- **API Dockerfile restructured** to use a pnpm workspace layout
+  (`/workspace` root with `pnpm-workspace.yaml` pointing to `apps/api`).
+  This ensures the root `pnpm.overrides` (uuid >=11.1.1) are applied inside
+  the Docker container — pnpm 8.x ignores `pnpm.overrides` in standalone
+  (non-workspace) `package.json` files.
+- **Web Dockerfile** kept as standalone install; `pnpm.overrides` for sharp
+  retained in `apps/web/package.json` (works in standalone Docker install,
+  ignored in local dev where root overrides take precedence).
+
+### Validation
+- `pnpm audit --prod`: 0 vulnerabilities (was 1 HIGH + 1 MODERATE).
+- Backend tests, web typecheck, mobile analyze + APK build: run by validator
+  subagent (see closeout report for exact numbers).
+- No new security findings from this phase's changes.
+
+### Version bump
+- `1.24.0-alpha` → `1.25.0-alpha` across root, `apps/api`, `apps/web`,
+  `apps/mobile`.
+
 ## [1.24.0-alpha] — 2026-08-25
 
 ### Mobile Modernization Plan — Phase 3 & 4 gap closure

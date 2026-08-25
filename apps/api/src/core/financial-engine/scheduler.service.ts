@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import cron from 'node-cron';
+import cron, { type ScheduledTask } from 'node-cron';
 
 export interface ScheduledReportInput {
   name: string;
@@ -14,7 +14,7 @@ export interface ScheduledReportInput {
 }
 
 export class SchedulerService {
-  private tasks = new Map<string, cron.ScheduledTask>();
+  private tasks = new Map<string, ScheduledTask>();
 
   constructor(private prisma: PrismaClient) {}
 
