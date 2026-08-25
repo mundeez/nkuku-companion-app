@@ -15,13 +15,28 @@ part 'app_database.g.dart';
   CachedMortalityEvents,
   CachedVaccinationEvents,
   CachedFinancialRecords,
+  CachedEnvironmentalRecords,
+  CachedAlerts,
+  CachedDashboardSummaries,
   SyncQueue,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(cachedEnvironmentalRecords);
+            await m.createTable(cachedAlerts);
+            await m.createTable(cachedDashboardSummaries);
+          }
+        },
+      );
 
   // ── Flock cache ──────────────────────────────
 
@@ -159,11 +174,137 @@ class AppDatabase extends _$AppDatabase {
         .get();
   }
 
-  // ── Full cache clear (on logout) ─────────────
+  // ── Environmental record cache ───────────────
 
-  Future<void> clearAll() async {
-    // Drift's batch.delete() expects a row, not a table. For clearing
-    // all rows, use individual delete().go() calls instead.
+  Future<void> upsertEnvironmentalRecords(
+          List<CachedEnvironmentalRecordsCompanion> entries) async =>
+      await batch(
+          (b) => b.insertAllOnConflictUpdate(cachedEnvironmentalRecords, entries));
+
+  Future<List<CachedEnvironmentalRecord>> getEnvironmentalRecords(String flockId) {
+    return (select(cachedEnvironmentalRecords)
+          ..where((t) => t.flockId.equals(flockId))
+          ..orderBy([(t) => OrderingTerm.desc(t.recordDate)]))
+        .get();
+  }
+
+  // ── Alert cache (read-only) ──────────────────
+
+  Future<void> upsertAlerts(List<CachedAlertsCompanion> entries) async =>
+      await batch((b) => b.insertAllOnConflictUpdate(cachedAlerts, entries));
+
+  Future<List<CachedAlert>> getAllAlerts() {
+    return (select(cachedAlerts)
+          ..orderBy([(t) => OrderingTerm.desc(t.cachedAt)]))
+        .get();
+  }
+
+  Future<List<CachedAlert>> getUnresolvedAlerts() {
+    return (select(cachedAlerts)
+          ..where((t) => t.isResolved.equals(false))
+          ..orderBy([(t) => OrderingTerm.desc(t.cachedAt)]))
+        .get();
+  }
+
+  // ── Dashboard summary cache (single row) ─────
+
+  Future<void> upsertDashboardSummary(String payloadJson) async {
+    await into(cachedDashboardSummaries).insertOnConflictUpdate(
+      CachedDashboardSummariesCompanion(
+        id: const Value(1),
+        payload: Value(payloadJson),
+        cachedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  Future<CachedDashboardSummary?> getDashboardSummary() {
+    return (select(cachedDashboardSummaries)..limit(1)).getSingleOrNull();
+  }
+
+  // ── Storage cap enforcement ──────────────────
+  /// Caps cached records per flock/entity to the most recent [limit] rows
+  /// (by recordDate / eventDate). Called after upserts to bound DB growth.
+  /// Per the mobile modernization plan §5.4: last 100 records or 90 days,
+  /// whichever is larger. Here we keep the last [limit] rows; the 90-day
+  /// floor is handled by the caller (only fetching recent data from the API).
+  Future<void> enforceStorageCap(String flockId, int limit) async {
+    // Growth records
+    final oldGrowth = await (select(cachedGrowthRecords)
+          ..where((t) => t.flockId.equals(flockId))
+          ..orderBy([(t) => OrderingTerm.desc(t.recordDate)])
+          ..limit(limit))
+        .get();
+    if (oldGrowth.length >= limit) {
+      final cutoff = oldGrowth.last.recordDate;
+      await (delete(cachedGrowthRecords)
+            ..where((t) =>
+                t.flockId.equals(flockId) & t.recordDate.isSmallerThanValue(cutoff)))
+          .go();
+    }
+
+    // Feed records
+    final oldFeed = await (select(cachedFeedRecords)
+          ..where((t) => t.flockId.equals(flockId))
+          ..orderBy([(t) => OrderingTerm.desc(t.recordDate)])
+          ..limit(limit))
+        .get();
+    if (oldFeed.length >= limit) {
+      final cutoff = oldFeed.last.recordDate;
+      await (delete(cachedFeedRecords)
+            ..where((t) =>
+                t.flockId.equals(flockId) & t.recordDate.isSmallerThanValue(cutoff)))
+          .go();
+    }
+
+    // Water records
+    final oldWater = await (select(cachedWaterRecords)
+          ..where((t) => t.flockId.equals(flockId))
+          ..orderBy([(t) => OrderingTerm.desc(t.recordDate)])
+          ..limit(limit))
+        .get();
+    if (oldWater.length >= limit) {
+      final cutoff = oldWater.last.recordDate;
+      await (delete(cachedWaterRecords)
+            ..where((t) =>
+                t.flockId.equals(flockId) & t.recordDate.isSmallerThanValue(cutoff)))
+          .go();
+    }
+
+    // Mortality events
+    final oldMortality = await (select(cachedMortalityEvents)
+          ..where((t) => t.flockId.equals(flockId))
+          ..orderBy([(t) => OrderingTerm.desc(t.eventDate)])
+          ..limit(limit))
+        .get();
+    if (oldMortality.length >= limit) {
+      final cutoff = oldMortality.last.eventDate;
+      await (delete(cachedMortalityEvents)
+            ..where((t) =>
+                t.flockId.equals(flockId) & t.eventDate.isSmallerThanValue(cutoff)))
+          .go();
+    }
+
+    // Environmental records
+    final oldEnv = await (select(cachedEnvironmentalRecords)
+          ..where((t) => t.flockId.equals(flockId))
+          ..orderBy([(t) => OrderingTerm.desc(t.recordDate)])
+          ..limit(limit))
+        .get();
+    if (oldEnv.length >= limit) {
+      final cutoff = oldEnv.last.recordDate;
+      await (delete(cachedEnvironmentalRecords)
+            ..where((t) =>
+                t.flockId.equals(flockId) & t.recordDate.isSmallerThanValue(cutoff)))
+          .go();
+    }
+  }
+
+  // ── Full cache clear (on logout / "Clear local cache") ────
+  /// Clears all cached data. Does NOT clear the sync queue (pending
+  /// mutations are never silently discarded — see plan §5.4).
+
+  Future<void> clearAllCache() async {
     await delete(cachedFlocks).go();
     await delete(cachedGrowthRecords).go();
     await delete(cachedFeedRecords).go();
@@ -171,6 +312,15 @@ class AppDatabase extends _$AppDatabase {
     await delete(cachedMortalityEvents).go();
     await delete(cachedVaccinationEvents).go();
     await delete(cachedFinancialRecords).go();
+    await delete(cachedEnvironmentalRecords).go();
+    await delete(cachedAlerts).go();
+    await delete(cachedDashboardSummaries).go();
+  }
+
+  /// Clears everything including the sync queue (used on logout only,
+  /// after the queue has been flushed or the user has confirmed discard).
+  Future<void> clearAll() async {
+    await clearAllCache();
     await delete(syncQueue).go();
   }
 }

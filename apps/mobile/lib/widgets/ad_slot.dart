@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/ad_service.dart';
@@ -76,10 +77,26 @@ class _AdSlotState extends State<AdSlot> {
         ),
         child: Stack(
           children: [
-            Image.network(campaign.creativeImageUrl,
+            CachedNetworkImage(
+                imageUrl: campaign.creativeImageUrl,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                semanticLabel: campaign.altText),
+                placeholder: (context, url) => Container(
+                  height: 80,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  height: 80,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: const Center(child: Icon(Icons.broken_image_outlined)),
+                )),
             Positioned(
               top: 4,
               left: 4,

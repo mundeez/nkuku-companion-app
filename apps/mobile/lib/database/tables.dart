@@ -125,6 +125,57 @@ class CachedFinancialRecords extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Cached environmental records.
+@DataClassName('CachedEnvironmentalRecord')
+class CachedEnvironmentalRecords extends Table {
+  TextColumn get id => text()();
+  TextColumn get flockId => text()();
+  TextColumn get recordDate => text()();
+  TextColumn get timeOfDay => text().nullable()();
+  RealColumn get temperatureC => real().nullable()();
+  RealColumn get humidityPct => real().nullable()();
+  RealColumn get ammoniaPpm => real().nullable()();
+  RealColumn get lightHours => real().nullable()();
+  IntColumn get litterScore => integer().nullable()();
+  TextColumn get ventilationNote => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Cached alerts (read-only, for offline visibility).
+@DataClassName('CachedAlert')
+class CachedAlerts extends Table {
+  TextColumn get id => text()();
+  TextColumn get flockId => text()();
+  TextColumn get alertType => text()();
+  TextColumn get title => text()();
+  TextColumn get message => text()();
+  TextColumn get severity => text().withDefault(const Constant('info'))();
+  TextColumn get dueDate => text().nullable()();
+  BoolColumn get isRead => boolean().withDefault(const Constant(false))();
+  BoolColumn get isResolved => boolean().withDefault(const Constant(false))();
+  TextColumn get createdAt => text().nullable()();
+  DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Single-row cache of the last successful dashboard summary fetch.
+/// Stores the raw JSON to avoid mirroring the full nested structure.
+@DataClassName('CachedDashboardSummary')
+class CachedDashboardSummaries extends Table {
+  IntColumn get id => integer().withDefault(const Constant(1))();
+  TextColumn get payload => text()();
+  DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Sync queue — tracks pending mutations created while offline.
 @DataClassName('SyncQueueEntry')
 class SyncQueue extends Table {

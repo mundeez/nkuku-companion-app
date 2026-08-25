@@ -21,10 +21,19 @@ class OfflineCache {
 
   static const _flocksKey = 'offline_flocks';
   static const _syncQueueKey = 'offline_sync_queue';
+  static const _alertsKey = 'offline_alerts';
+  static const _dashboardKey = 'offline_dashboard';
 
   /// Maximum sync queue item size — secure storage has platform limits.
   /// If the queue grows beyond this, oldest items are pruned.
   static const _maxQueueSize = 200;
+
+  /// Maximum cached alerts (most recent kept, older pruned).
+  static const _maxCachedAlerts = 100;
+
+  /// Maximum cached flocks (the API typically returns < 50, but this
+  /// bounds growth for organizations with many archived flocks).
+  static const _maxCachedFlocks = 200;
 
   Future<void> init() async {
     // flutter_secure_storage v11 removed `encryptedSharedPreferences`.
@@ -41,7 +50,11 @@ class OfflineCache {
 
   Future<void> cacheFlocks(List<Map<String, dynamic>> flocks) async {
     if (!_initialized) return;
-    final encoded = jsonEncode(flocks);
+    // Cap to most recent flocks to bound storage growth.
+    final capped = flocks.length > _maxCachedFlocks
+        ? flocks.sublist(0, _maxCachedFlocks)
+        : flocks;
+    final encoded = jsonEncode(capped);
     await _storage.write(key: _flocksKey, value: encoded);
   }
 
@@ -75,6 +88,64 @@ class OfflineCache {
   Future<void> clearFlocks() async {
     if (!_initialized) return;
     await _storage.delete(key: _flocksKey);
+    _cachedFlocks = [];
+  }
+
+  // ── Alerts cache (read-only, for offline visibility) ────────
+
+  Future<void> cacheAlerts(List<Map<String, dynamic>> alerts) async {
+    if (!_initialized) return;
+    // Cap to most recent _maxCachedAlerts (alerts are assumed newest-first
+    // from the API; if not, the caller should sort before caching).
+    final capped = alerts.length > _maxCachedAlerts
+        ? alerts.sublist(0, _maxCachedAlerts)
+        : alerts;
+    await _storage.write(key: _alertsKey, value: jsonEncode(capped));
+  }
+
+  Future<List<Map<String, dynamic>>> getCachedAlerts() async {
+    if (!_initialized) return [];
+    final raw = await _storage.read(key: _alertsKey);
+    if (raw == null) return [];
+    try {
+      final list = jsonDecode(raw) as List;
+      return list.cast<Map<String, dynamic>>();
+    } catch (e) {
+      log('OfflineCache: failed to decode alerts: $e', name: 'OfflineCache');
+      return [];
+    }
+  }
+
+  // ── Dashboard summary cache (single JSON blob) ──────────────
+
+  Future<void> cacheDashboardSummary(Map<String, dynamic> summary) async {
+    if (!_initialized) return;
+    await _storage.write(key: _dashboardKey, value: jsonEncode(summary));
+  }
+
+  Future<Map<String, dynamic>?> getCachedDashboardSummary() async {
+    if (!_initialized) return null;
+    final raw = await _storage.read(key: _dashboardKey);
+    if (raw == null) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (e) {
+      log('OfflineCache: failed to decode dashboard: $e', name: 'OfflineCache');
+      return null;
+    }
+  }
+
+  // ── Full cache clear (excluding sync queue) ─────────────────
+  /// Clears cached read data (flocks, alerts, dashboard) but does NOT
+  /// clear the sync queue — pending mutations are never silently discarded
+  /// (per mobile modernization plan §5.4). Used by the "Clear local cache"
+  /// action in Settings.
+
+  Future<void> clearLocalCache() async {
+    if (!_initialized) return;
+    await _storage.delete(key: _flocksKey);
+    await _storage.delete(key: _alertsKey);
+    await _storage.delete(key: _dashboardKey);
     _cachedFlocks = [];
   }
 
@@ -172,6 +243,12 @@ class OfflineCache {
   int get skippedSyncCount =>
       _cachedSyncQueue.where((q) => q['status'] == 'skipped').length;
 
+  /// Returns all skipped sync items (for the Sync Issues screen).
+  Future<List<Map<String, dynamic>>> getSkippedSyncs() async {
+    final queue = await _getSyncQueueAsync();
+    return queue.where((q) => q['status'] == 'skipped').toList();
+  }
+
   int get pendingSyncCount =>
       _cachedSyncQueue.where((q) => q['status'] != 'skipped').length;
 
@@ -231,6 +308,8 @@ class OfflineCache {
   Future<void> clearAll() async {
     if (!_initialized) return;
     await _storage.delete(key: _flocksKey);
+    await _storage.delete(key: _alertsKey);
+    await _storage.delete(key: _dashboardKey);
     await _storage.delete(key: _syncQueueKey);
     _cachedFlocks = [];
     _cachedSyncQueue = [];

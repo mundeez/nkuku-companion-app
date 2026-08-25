@@ -1,5 +1,59 @@
 # Changelog
 
+## [1.24.0-alpha] — 2026-08-25
+
+### Mobile Modernization Plan — Phase 3 & 4 gap closure
+
+This release closes the remaining gaps in the Mobile App Modernization &
+Performance Plan (Phases 3–4). Phases 1–2 were previously released as
+v1.15.6-alpha and v1.15.7-alpha; the core of Phases 3–4 was delivered in
+v1.17.0-alpha through v1.22.0-alpha. This release completes the plan.
+
+### Added
+- **`cached_network_image` dependency**: ad creative images in `AdSlot` are
+  now cached on-device (with placeholder + error widgets) instead of
+  re-downloading on every rebuild.
+- **Sync Issues screen** (`lib/screens/sync_issues_screen.dart`): surfaces
+  failed and auto-skipped sync queue entries for manual retry or discard,
+  per the offline sync design §5.4. Accessible from the More screen with a
+  badge showing the skipped-item count.
+- **Clear local cache action** in the More screen: clears cached flocks,
+  alerts, and dashboard data (but NOT the sync queue — pending mutations
+  are never silently discarded). Confirmation dialog explains the scope.
+- **Alerts offline caching**: `AlertsService.getAlerts()` now caches
+  unfiltered alert lists to `OfflineCache` on successful fetch and falls
+  back to the cache on network error, enabling offline alert visibility.
+- **Dashboard summary caching**: `OfflineCache` now supports caching and
+  retrieving the dashboard summary as a JSON blob for offline access.
+- **Drift cache tables** for environmental records, alerts, and dashboard
+  summary (`lib/database/tables.dart`): schema v2 migration adds
+  `CachedEnvironmentalRecords`, `CachedAlerts`, and `CachedDashboardSummaries`
+  tables, ready for the future Drift-backed offline database migration.
+  The `AppDatabase` class includes CRUD methods, storage cap enforcement
+  (`enforceStorageCap`), and a `clearAllCache` method that preserves the
+  sync queue.
+- **Storage caps**: flock cache capped at 200 entries, alerts at 100, sync
+  queue at 200 — bounding local storage growth per the plan §5.4.
+
+### Changed
+- **`MoreScreen` converted to `StatefulWidget`**: now loads and displays
+  pending/skipped sync counts, refreshing when returning from the Sync
+  Issues screen.
+- **`OfflineCache.clearAll()`** now also clears alerts and dashboard cache
+  keys.
+
+### Validation
+- Mobile analyzer: 0 errors (3 pre-existing warnings in unrelated files).
+- Mobile APK build (debug): PASS.
+- Backend tests: 301/305 pass (4 pre-existing email/SMTP environment
+  failures, unchanged from v1.23.0-alpha).
+- Web type check: PASS.
+- Drift code generation: PASS (schema v2 migration generated).
+
+### Version bump
+- `1.22.0-alpha` → `1.24.0-alpha` in `apps/mobile/pubspec.yaml`.
+- No backend or web changes in this release.
+
 ## [1.23.0-alpha] — 2026-08-23
 
 ### Added

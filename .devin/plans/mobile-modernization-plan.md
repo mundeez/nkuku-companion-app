@@ -1,6 +1,6 @@
 # Mobile App Modernization & Performance Plan
 
-Status: **Draft — pending re-approval (v2: adds M3-7 Offline Sync)**
+Status: **Complete — all 5 phases implemented and released (v1.15.6-alpha through v1.24.0-alpha)**
 Owner: Devin
 Scope: `apps/mobile` (primary), `apps/web` + `apps/api` (performance only)
 Related prior work: `navbar-redesign-plan.md` (web navbar redesign, released as v1.15.4-alpha)

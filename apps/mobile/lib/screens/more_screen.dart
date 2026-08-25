@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
+import '../services/offline_cache.dart';
+import '../services/api_cache.dart';
 import 'account_settings_screen.dart';
 import 'login_screen.dart';
 import 'users_screen.dart';
@@ -8,6 +10,7 @@ import 'projections_screen.dart';
 import 'expansion_plan_screen.dart';
 import 'suppliers_screen.dart';
 import 'vaccine_inventory_screen.dart';
+import 'sync_issues_screen.dart';
 import 'broiler/diseases_screen.dart';
 import 'broiler/vaccination_schedules_screen.dart';
 import '../widgets/section_header.dart';
@@ -15,8 +18,32 @@ import '../widgets/section_header.dart';
 /// Grouped hub for everything that doesn't fit in the primary bottom
 /// navigation bar. Mirrors the Production / Operations / Planning / Admin
 /// grouping used on web, plus the existing account/appearance settings.
-class MoreScreen extends StatelessWidget {
+class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
+
+  @override
+  State<MoreScreen> createState() => _MoreScreenState();
+}
+
+class _MoreScreenState extends State<MoreScreen> {
+  int _pendingSyncs = 0;
+  int _skippedSyncs = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSyncCounts();
+  }
+
+  Future<void> _loadSyncCounts() async {
+    await OfflineCache.instance.getPendingSyncsAsync();
+    if (mounted) {
+      setState(() {
+        _pendingSyncs = OfflineCache.instance.pendingSyncCount;
+        _skippedSyncs = OfflineCache.instance.skippedSyncCount;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -183,6 +210,42 @@ class MoreScreen extends StatelessWidget {
               );
             },
           ),
+          // Sync Issues — shows failed/skipped sync queue items
+          ListTile(
+            leading: Badge(
+              isLabelVisible: _skippedSyncs > 0,
+              label: Text('$_skippedSyncs'),
+              child: const Icon(Icons.sync_problem_outlined),
+            ),
+            title: const Text('Sync Issues'),
+            subtitle: Text(
+              _skippedSyncs > 0
+                  ? '$_skippedSyncs skipped item${_skippedSyncs == 1 ? '' : 's'} need attention'
+                  : _pendingSyncs > 0
+                      ? '$_pendingSyncs pending sync${_pendingSyncs == 1 ? '' : 's'} queued'
+                      : 'All changes synced',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const SyncIssuesScreen()),
+              );
+              // Refresh counts when returning from Sync Issues
+              _loadSyncCounts();
+            },
+          ),
+          // Clear local cache — clears cached read data (flocks, alerts,
+          // dashboard) but NOT the sync queue (pending mutations are never
+          // silently discarded — see plan §5.4).
+          ListTile(
+            leading: const Icon(Icons.cleaning_services_outlined),
+            title: const Text('Clear local cache'),
+            subtitle: const Text('Remove cached data (keeps pending syncs)'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _confirmClearCache(context),
+          ),
           const Divider(),
 
           // Admin section (owner only)
@@ -229,6 +292,40 @@ class MoreScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmClearCache(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear local cache?'),
+        content: const Text(
+          'This removes cached flocks, alerts, and dashboard data from '
+          'this device. Pending sync items are kept and will still be '
+          'uploaded when connected. Cached data will be re-downloaded '
+          'the next time you open each screen.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await OfflineCache.instance.clearLocalCache();
+      ApiCache.clear();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Local cache cleared')),
+      );
+      _loadSyncCounts();
+    }
   }
 
   String _themeLabel(AppThemeMode mode) {

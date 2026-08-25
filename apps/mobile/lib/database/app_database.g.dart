@@ -3592,6 +3592,1402 @@ class CachedFinancialRecordsCompanion
   }
 }
 
+class $CachedEnvironmentalRecordsTable extends CachedEnvironmentalRecords
+    with
+        TableInfo<$CachedEnvironmentalRecordsTable, CachedEnvironmentalRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedEnvironmentalRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _flockIdMeta =
+      const VerificationMeta('flockId');
+  @override
+  late final GeneratedColumn<String> flockId = GeneratedColumn<String>(
+      'flock_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _recordDateMeta =
+      const VerificationMeta('recordDate');
+  @override
+  late final GeneratedColumn<String> recordDate = GeneratedColumn<String>(
+      'record_date', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _timeOfDayMeta =
+      const VerificationMeta('timeOfDay');
+  @override
+  late final GeneratedColumn<String> timeOfDay = GeneratedColumn<String>(
+      'time_of_day', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _temperatureCMeta =
+      const VerificationMeta('temperatureC');
+  @override
+  late final GeneratedColumn<double> temperatureC = GeneratedColumn<double>(
+      'temperature_c', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _humidityPctMeta =
+      const VerificationMeta('humidityPct');
+  @override
+  late final GeneratedColumn<double> humidityPct = GeneratedColumn<double>(
+      'humidity_pct', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _ammoniaPpmMeta =
+      const VerificationMeta('ammoniaPpm');
+  @override
+  late final GeneratedColumn<double> ammoniaPpm = GeneratedColumn<double>(
+      'ammonia_ppm', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _lightHoursMeta =
+      const VerificationMeta('lightHours');
+  @override
+  late final GeneratedColumn<double> lightHours = GeneratedColumn<double>(
+      'light_hours', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _litterScoreMeta =
+      const VerificationMeta('litterScore');
+  @override
+  late final GeneratedColumn<int> litterScore = GeneratedColumn<int>(
+      'litter_score', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _ventilationNoteMeta =
+      const VerificationMeta('ventilationNote');
+  @override
+  late final GeneratedColumn<String> ventilationNote = GeneratedColumn<String>(
+      'ventilation_note', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+      'notes', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _cachedAtMeta =
+      const VerificationMeta('cachedAt');
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+      'cached_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        flockId,
+        recordDate,
+        timeOfDay,
+        temperatureC,
+        humidityPct,
+        ammoniaPpm,
+        lightHours,
+        litterScore,
+        ventilationNote,
+        notes,
+        cachedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_environmental_records';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<CachedEnvironmentalRecord> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('flock_id')) {
+      context.handle(_flockIdMeta,
+          flockId.isAcceptableOrUnknown(data['flock_id']!, _flockIdMeta));
+    } else if (isInserting) {
+      context.missing(_flockIdMeta);
+    }
+    if (data.containsKey('record_date')) {
+      context.handle(
+          _recordDateMeta,
+          recordDate.isAcceptableOrUnknown(
+              data['record_date']!, _recordDateMeta));
+    } else if (isInserting) {
+      context.missing(_recordDateMeta);
+    }
+    if (data.containsKey('time_of_day')) {
+      context.handle(
+          _timeOfDayMeta,
+          timeOfDay.isAcceptableOrUnknown(
+              data['time_of_day']!, _timeOfDayMeta));
+    }
+    if (data.containsKey('temperature_c')) {
+      context.handle(
+          _temperatureCMeta,
+          temperatureC.isAcceptableOrUnknown(
+              data['temperature_c']!, _temperatureCMeta));
+    }
+    if (data.containsKey('humidity_pct')) {
+      context.handle(
+          _humidityPctMeta,
+          humidityPct.isAcceptableOrUnknown(
+              data['humidity_pct']!, _humidityPctMeta));
+    }
+    if (data.containsKey('ammonia_ppm')) {
+      context.handle(
+          _ammoniaPpmMeta,
+          ammoniaPpm.isAcceptableOrUnknown(
+              data['ammonia_ppm']!, _ammoniaPpmMeta));
+    }
+    if (data.containsKey('light_hours')) {
+      context.handle(
+          _lightHoursMeta,
+          lightHours.isAcceptableOrUnknown(
+              data['light_hours']!, _lightHoursMeta));
+    }
+    if (data.containsKey('litter_score')) {
+      context.handle(
+          _litterScoreMeta,
+          litterScore.isAcceptableOrUnknown(
+              data['litter_score']!, _litterScoreMeta));
+    }
+    if (data.containsKey('ventilation_note')) {
+      context.handle(
+          _ventilationNoteMeta,
+          ventilationNote.isAcceptableOrUnknown(
+              data['ventilation_note']!, _ventilationNoteMeta));
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+          _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(_cachedAtMeta,
+          cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedEnvironmentalRecord map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedEnvironmentalRecord(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      flockId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}flock_id'])!,
+      recordDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}record_date'])!,
+      timeOfDay: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}time_of_day']),
+      temperatureC: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}temperature_c']),
+      humidityPct: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}humidity_pct']),
+      ammoniaPpm: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}ammonia_ppm']),
+      lightHours: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}light_hours']),
+      litterScore: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}litter_score']),
+      ventilationNote: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}ventilation_note']),
+      notes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      cachedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at'])!,
+    );
+  }
+
+  @override
+  $CachedEnvironmentalRecordsTable createAlias(String alias) {
+    return $CachedEnvironmentalRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedEnvironmentalRecord extends DataClass
+    implements Insertable<CachedEnvironmentalRecord> {
+  final String id;
+  final String flockId;
+  final String recordDate;
+  final String? timeOfDay;
+  final double? temperatureC;
+  final double? humidityPct;
+  final double? ammoniaPpm;
+  final double? lightHours;
+  final int? litterScore;
+  final String? ventilationNote;
+  final String? notes;
+  final DateTime cachedAt;
+  const CachedEnvironmentalRecord(
+      {required this.id,
+      required this.flockId,
+      required this.recordDate,
+      this.timeOfDay,
+      this.temperatureC,
+      this.humidityPct,
+      this.ammoniaPpm,
+      this.lightHours,
+      this.litterScore,
+      this.ventilationNote,
+      this.notes,
+      required this.cachedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['flock_id'] = Variable<String>(flockId);
+    map['record_date'] = Variable<String>(recordDate);
+    if (!nullToAbsent || timeOfDay != null) {
+      map['time_of_day'] = Variable<String>(timeOfDay);
+    }
+    if (!nullToAbsent || temperatureC != null) {
+      map['temperature_c'] = Variable<double>(temperatureC);
+    }
+    if (!nullToAbsent || humidityPct != null) {
+      map['humidity_pct'] = Variable<double>(humidityPct);
+    }
+    if (!nullToAbsent || ammoniaPpm != null) {
+      map['ammonia_ppm'] = Variable<double>(ammoniaPpm);
+    }
+    if (!nullToAbsent || lightHours != null) {
+      map['light_hours'] = Variable<double>(lightHours);
+    }
+    if (!nullToAbsent || litterScore != null) {
+      map['litter_score'] = Variable<int>(litterScore);
+    }
+    if (!nullToAbsent || ventilationNote != null) {
+      map['ventilation_note'] = Variable<String>(ventilationNote);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedEnvironmentalRecordsCompanion toCompanion(bool nullToAbsent) {
+    return CachedEnvironmentalRecordsCompanion(
+      id: Value(id),
+      flockId: Value(flockId),
+      recordDate: Value(recordDate),
+      timeOfDay: timeOfDay == null && nullToAbsent
+          ? const Value.absent()
+          : Value(timeOfDay),
+      temperatureC: temperatureC == null && nullToAbsent
+          ? const Value.absent()
+          : Value(temperatureC),
+      humidityPct: humidityPct == null && nullToAbsent
+          ? const Value.absent()
+          : Value(humidityPct),
+      ammoniaPpm: ammoniaPpm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ammoniaPpm),
+      lightHours: lightHours == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lightHours),
+      litterScore: litterScore == null && nullToAbsent
+          ? const Value.absent()
+          : Value(litterScore),
+      ventilationNote: ventilationNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ventilationNote),
+      notes:
+          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedEnvironmentalRecord.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedEnvironmentalRecord(
+      id: serializer.fromJson<String>(json['id']),
+      flockId: serializer.fromJson<String>(json['flockId']),
+      recordDate: serializer.fromJson<String>(json['recordDate']),
+      timeOfDay: serializer.fromJson<String?>(json['timeOfDay']),
+      temperatureC: serializer.fromJson<double?>(json['temperatureC']),
+      humidityPct: serializer.fromJson<double?>(json['humidityPct']),
+      ammoniaPpm: serializer.fromJson<double?>(json['ammoniaPpm']),
+      lightHours: serializer.fromJson<double?>(json['lightHours']),
+      litterScore: serializer.fromJson<int?>(json['litterScore']),
+      ventilationNote: serializer.fromJson<String?>(json['ventilationNote']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'flockId': serializer.toJson<String>(flockId),
+      'recordDate': serializer.toJson<String>(recordDate),
+      'timeOfDay': serializer.toJson<String?>(timeOfDay),
+      'temperatureC': serializer.toJson<double?>(temperatureC),
+      'humidityPct': serializer.toJson<double?>(humidityPct),
+      'ammoniaPpm': serializer.toJson<double?>(ammoniaPpm),
+      'lightHours': serializer.toJson<double?>(lightHours),
+      'litterScore': serializer.toJson<int?>(litterScore),
+      'ventilationNote': serializer.toJson<String?>(ventilationNote),
+      'notes': serializer.toJson<String?>(notes),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedEnvironmentalRecord copyWith(
+          {String? id,
+          String? flockId,
+          String? recordDate,
+          Value<String?> timeOfDay = const Value.absent(),
+          Value<double?> temperatureC = const Value.absent(),
+          Value<double?> humidityPct = const Value.absent(),
+          Value<double?> ammoniaPpm = const Value.absent(),
+          Value<double?> lightHours = const Value.absent(),
+          Value<int?> litterScore = const Value.absent(),
+          Value<String?> ventilationNote = const Value.absent(),
+          Value<String?> notes = const Value.absent(),
+          DateTime? cachedAt}) =>
+      CachedEnvironmentalRecord(
+        id: id ?? this.id,
+        flockId: flockId ?? this.flockId,
+        recordDate: recordDate ?? this.recordDate,
+        timeOfDay: timeOfDay.present ? timeOfDay.value : this.timeOfDay,
+        temperatureC:
+            temperatureC.present ? temperatureC.value : this.temperatureC,
+        humidityPct: humidityPct.present ? humidityPct.value : this.humidityPct,
+        ammoniaPpm: ammoniaPpm.present ? ammoniaPpm.value : this.ammoniaPpm,
+        lightHours: lightHours.present ? lightHours.value : this.lightHours,
+        litterScore: litterScore.present ? litterScore.value : this.litterScore,
+        ventilationNote: ventilationNote.present
+            ? ventilationNote.value
+            : this.ventilationNote,
+        notes: notes.present ? notes.value : this.notes,
+        cachedAt: cachedAt ?? this.cachedAt,
+      );
+  CachedEnvironmentalRecord copyWithCompanion(
+      CachedEnvironmentalRecordsCompanion data) {
+    return CachedEnvironmentalRecord(
+      id: data.id.present ? data.id.value : this.id,
+      flockId: data.flockId.present ? data.flockId.value : this.flockId,
+      recordDate:
+          data.recordDate.present ? data.recordDate.value : this.recordDate,
+      timeOfDay: data.timeOfDay.present ? data.timeOfDay.value : this.timeOfDay,
+      temperatureC: data.temperatureC.present
+          ? data.temperatureC.value
+          : this.temperatureC,
+      humidityPct:
+          data.humidityPct.present ? data.humidityPct.value : this.humidityPct,
+      ammoniaPpm:
+          data.ammoniaPpm.present ? data.ammoniaPpm.value : this.ammoniaPpm,
+      lightHours:
+          data.lightHours.present ? data.lightHours.value : this.lightHours,
+      litterScore:
+          data.litterScore.present ? data.litterScore.value : this.litterScore,
+      ventilationNote: data.ventilationNote.present
+          ? data.ventilationNote.value
+          : this.ventilationNote,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedEnvironmentalRecord(')
+          ..write('id: $id, ')
+          ..write('flockId: $flockId, ')
+          ..write('recordDate: $recordDate, ')
+          ..write('timeOfDay: $timeOfDay, ')
+          ..write('temperatureC: $temperatureC, ')
+          ..write('humidityPct: $humidityPct, ')
+          ..write('ammoniaPpm: $ammoniaPpm, ')
+          ..write('lightHours: $lightHours, ')
+          ..write('litterScore: $litterScore, ')
+          ..write('ventilationNote: $ventilationNote, ')
+          ..write('notes: $notes, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      flockId,
+      recordDate,
+      timeOfDay,
+      temperatureC,
+      humidityPct,
+      ammoniaPpm,
+      lightHours,
+      litterScore,
+      ventilationNote,
+      notes,
+      cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedEnvironmentalRecord &&
+          other.id == this.id &&
+          other.flockId == this.flockId &&
+          other.recordDate == this.recordDate &&
+          other.timeOfDay == this.timeOfDay &&
+          other.temperatureC == this.temperatureC &&
+          other.humidityPct == this.humidityPct &&
+          other.ammoniaPpm == this.ammoniaPpm &&
+          other.lightHours == this.lightHours &&
+          other.litterScore == this.litterScore &&
+          other.ventilationNote == this.ventilationNote &&
+          other.notes == this.notes &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedEnvironmentalRecordsCompanion
+    extends UpdateCompanion<CachedEnvironmentalRecord> {
+  final Value<String> id;
+  final Value<String> flockId;
+  final Value<String> recordDate;
+  final Value<String?> timeOfDay;
+  final Value<double?> temperatureC;
+  final Value<double?> humidityPct;
+  final Value<double?> ammoniaPpm;
+  final Value<double?> lightHours;
+  final Value<int?> litterScore;
+  final Value<String?> ventilationNote;
+  final Value<String?> notes;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedEnvironmentalRecordsCompanion({
+    this.id = const Value.absent(),
+    this.flockId = const Value.absent(),
+    this.recordDate = const Value.absent(),
+    this.timeOfDay = const Value.absent(),
+    this.temperatureC = const Value.absent(),
+    this.humidityPct = const Value.absent(),
+    this.ammoniaPpm = const Value.absent(),
+    this.lightHours = const Value.absent(),
+    this.litterScore = const Value.absent(),
+    this.ventilationNote = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedEnvironmentalRecordsCompanion.insert({
+    required String id,
+    required String flockId,
+    required String recordDate,
+    this.timeOfDay = const Value.absent(),
+    this.temperatureC = const Value.absent(),
+    this.humidityPct = const Value.absent(),
+    this.ammoniaPpm = const Value.absent(),
+    this.lightHours = const Value.absent(),
+    this.litterScore = const Value.absent(),
+    this.ventilationNote = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        flockId = Value(flockId),
+        recordDate = Value(recordDate);
+  static Insertable<CachedEnvironmentalRecord> custom({
+    Expression<String>? id,
+    Expression<String>? flockId,
+    Expression<String>? recordDate,
+    Expression<String>? timeOfDay,
+    Expression<double>? temperatureC,
+    Expression<double>? humidityPct,
+    Expression<double>? ammoniaPpm,
+    Expression<double>? lightHours,
+    Expression<int>? litterScore,
+    Expression<String>? ventilationNote,
+    Expression<String>? notes,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (flockId != null) 'flock_id': flockId,
+      if (recordDate != null) 'record_date': recordDate,
+      if (timeOfDay != null) 'time_of_day': timeOfDay,
+      if (temperatureC != null) 'temperature_c': temperatureC,
+      if (humidityPct != null) 'humidity_pct': humidityPct,
+      if (ammoniaPpm != null) 'ammonia_ppm': ammoniaPpm,
+      if (lightHours != null) 'light_hours': lightHours,
+      if (litterScore != null) 'litter_score': litterScore,
+      if (ventilationNote != null) 'ventilation_note': ventilationNote,
+      if (notes != null) 'notes': notes,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedEnvironmentalRecordsCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? flockId,
+      Value<String>? recordDate,
+      Value<String?>? timeOfDay,
+      Value<double?>? temperatureC,
+      Value<double?>? humidityPct,
+      Value<double?>? ammoniaPpm,
+      Value<double?>? lightHours,
+      Value<int?>? litterScore,
+      Value<String?>? ventilationNote,
+      Value<String?>? notes,
+      Value<DateTime>? cachedAt,
+      Value<int>? rowid}) {
+    return CachedEnvironmentalRecordsCompanion(
+      id: id ?? this.id,
+      flockId: flockId ?? this.flockId,
+      recordDate: recordDate ?? this.recordDate,
+      timeOfDay: timeOfDay ?? this.timeOfDay,
+      temperatureC: temperatureC ?? this.temperatureC,
+      humidityPct: humidityPct ?? this.humidityPct,
+      ammoniaPpm: ammoniaPpm ?? this.ammoniaPpm,
+      lightHours: lightHours ?? this.lightHours,
+      litterScore: litterScore ?? this.litterScore,
+      ventilationNote: ventilationNote ?? this.ventilationNote,
+      notes: notes ?? this.notes,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (flockId.present) {
+      map['flock_id'] = Variable<String>(flockId.value);
+    }
+    if (recordDate.present) {
+      map['record_date'] = Variable<String>(recordDate.value);
+    }
+    if (timeOfDay.present) {
+      map['time_of_day'] = Variable<String>(timeOfDay.value);
+    }
+    if (temperatureC.present) {
+      map['temperature_c'] = Variable<double>(temperatureC.value);
+    }
+    if (humidityPct.present) {
+      map['humidity_pct'] = Variable<double>(humidityPct.value);
+    }
+    if (ammoniaPpm.present) {
+      map['ammonia_ppm'] = Variable<double>(ammoniaPpm.value);
+    }
+    if (lightHours.present) {
+      map['light_hours'] = Variable<double>(lightHours.value);
+    }
+    if (litterScore.present) {
+      map['litter_score'] = Variable<int>(litterScore.value);
+    }
+    if (ventilationNote.present) {
+      map['ventilation_note'] = Variable<String>(ventilationNote.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedEnvironmentalRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('flockId: $flockId, ')
+          ..write('recordDate: $recordDate, ')
+          ..write('timeOfDay: $timeOfDay, ')
+          ..write('temperatureC: $temperatureC, ')
+          ..write('humidityPct: $humidityPct, ')
+          ..write('ammoniaPpm: $ammoniaPpm, ')
+          ..write('lightHours: $lightHours, ')
+          ..write('litterScore: $litterScore, ')
+          ..write('ventilationNote: $ventilationNote, ')
+          ..write('notes: $notes, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedAlertsTable extends CachedAlerts
+    with TableInfo<$CachedAlertsTable, CachedAlert> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedAlertsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _flockIdMeta =
+      const VerificationMeta('flockId');
+  @override
+  late final GeneratedColumn<String> flockId = GeneratedColumn<String>(
+      'flock_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _alertTypeMeta =
+      const VerificationMeta('alertType');
+  @override
+  late final GeneratedColumn<String> alertType = GeneratedColumn<String>(
+      'alert_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _messageMeta =
+      const VerificationMeta('message');
+  @override
+  late final GeneratedColumn<String> message = GeneratedColumn<String>(
+      'message', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _severityMeta =
+      const VerificationMeta('severity');
+  @override
+  late final GeneratedColumn<String> severity = GeneratedColumn<String>(
+      'severity', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('info'));
+  static const VerificationMeta _dueDateMeta =
+      const VerificationMeta('dueDate');
+  @override
+  late final GeneratedColumn<String> dueDate = GeneratedColumn<String>(
+      'due_date', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isReadMeta = const VerificationMeta('isRead');
+  @override
+  late final GeneratedColumn<bool> isRead = GeneratedColumn<bool>(
+      'is_read', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_read" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _isResolvedMeta =
+      const VerificationMeta('isResolved');
+  @override
+  late final GeneratedColumn<bool> isResolved = GeneratedColumn<bool>(
+      'is_resolved', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_resolved" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<String> createdAt = GeneratedColumn<String>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _cachedAtMeta =
+      const VerificationMeta('cachedAt');
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+      'cached_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        flockId,
+        alertType,
+        title,
+        message,
+        severity,
+        dueDate,
+        isRead,
+        isResolved,
+        createdAt,
+        cachedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_alerts';
+  @override
+  VerificationContext validateIntegrity(Insertable<CachedAlert> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('flock_id')) {
+      context.handle(_flockIdMeta,
+          flockId.isAcceptableOrUnknown(data['flock_id']!, _flockIdMeta));
+    } else if (isInserting) {
+      context.missing(_flockIdMeta);
+    }
+    if (data.containsKey('alert_type')) {
+      context.handle(_alertTypeMeta,
+          alertType.isAcceptableOrUnknown(data['alert_type']!, _alertTypeMeta));
+    } else if (isInserting) {
+      context.missing(_alertTypeMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('message')) {
+      context.handle(_messageMeta,
+          message.isAcceptableOrUnknown(data['message']!, _messageMeta));
+    } else if (isInserting) {
+      context.missing(_messageMeta);
+    }
+    if (data.containsKey('severity')) {
+      context.handle(_severityMeta,
+          severity.isAcceptableOrUnknown(data['severity']!, _severityMeta));
+    }
+    if (data.containsKey('due_date')) {
+      context.handle(_dueDateMeta,
+          dueDate.isAcceptableOrUnknown(data['due_date']!, _dueDateMeta));
+    }
+    if (data.containsKey('is_read')) {
+      context.handle(_isReadMeta,
+          isRead.isAcceptableOrUnknown(data['is_read']!, _isReadMeta));
+    }
+    if (data.containsKey('is_resolved')) {
+      context.handle(
+          _isResolvedMeta,
+          isResolved.isAcceptableOrUnknown(
+              data['is_resolved']!, _isResolvedMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(_cachedAtMeta,
+          cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedAlert map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedAlert(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      flockId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}flock_id'])!,
+      alertType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}alert_type'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      message: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}message'])!,
+      severity: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}severity'])!,
+      dueDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}due_date']),
+      isRead: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_read'])!,
+      isResolved: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_resolved'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}created_at']),
+      cachedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at'])!,
+    );
+  }
+
+  @override
+  $CachedAlertsTable createAlias(String alias) {
+    return $CachedAlertsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedAlert extends DataClass implements Insertable<CachedAlert> {
+  final String id;
+  final String flockId;
+  final String alertType;
+  final String title;
+  final String message;
+  final String severity;
+  final String? dueDate;
+  final bool isRead;
+  final bool isResolved;
+  final String? createdAt;
+  final DateTime cachedAt;
+  const CachedAlert(
+      {required this.id,
+      required this.flockId,
+      required this.alertType,
+      required this.title,
+      required this.message,
+      required this.severity,
+      this.dueDate,
+      required this.isRead,
+      required this.isResolved,
+      this.createdAt,
+      required this.cachedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['flock_id'] = Variable<String>(flockId);
+    map['alert_type'] = Variable<String>(alertType);
+    map['title'] = Variable<String>(title);
+    map['message'] = Variable<String>(message);
+    map['severity'] = Variable<String>(severity);
+    if (!nullToAbsent || dueDate != null) {
+      map['due_date'] = Variable<String>(dueDate);
+    }
+    map['is_read'] = Variable<bool>(isRead);
+    map['is_resolved'] = Variable<bool>(isResolved);
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<String>(createdAt);
+    }
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedAlertsCompanion toCompanion(bool nullToAbsent) {
+    return CachedAlertsCompanion(
+      id: Value(id),
+      flockId: Value(flockId),
+      alertType: Value(alertType),
+      title: Value(title),
+      message: Value(message),
+      severity: Value(severity),
+      dueDate: dueDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueDate),
+      isRead: Value(isRead),
+      isResolved: Value(isResolved),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedAlert.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedAlert(
+      id: serializer.fromJson<String>(json['id']),
+      flockId: serializer.fromJson<String>(json['flockId']),
+      alertType: serializer.fromJson<String>(json['alertType']),
+      title: serializer.fromJson<String>(json['title']),
+      message: serializer.fromJson<String>(json['message']),
+      severity: serializer.fromJson<String>(json['severity']),
+      dueDate: serializer.fromJson<String?>(json['dueDate']),
+      isRead: serializer.fromJson<bool>(json['isRead']),
+      isResolved: serializer.fromJson<bool>(json['isResolved']),
+      createdAt: serializer.fromJson<String?>(json['createdAt']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'flockId': serializer.toJson<String>(flockId),
+      'alertType': serializer.toJson<String>(alertType),
+      'title': serializer.toJson<String>(title),
+      'message': serializer.toJson<String>(message),
+      'severity': serializer.toJson<String>(severity),
+      'dueDate': serializer.toJson<String?>(dueDate),
+      'isRead': serializer.toJson<bool>(isRead),
+      'isResolved': serializer.toJson<bool>(isResolved),
+      'createdAt': serializer.toJson<String?>(createdAt),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedAlert copyWith(
+          {String? id,
+          String? flockId,
+          String? alertType,
+          String? title,
+          String? message,
+          String? severity,
+          Value<String?> dueDate = const Value.absent(),
+          bool? isRead,
+          bool? isResolved,
+          Value<String?> createdAt = const Value.absent(),
+          DateTime? cachedAt}) =>
+      CachedAlert(
+        id: id ?? this.id,
+        flockId: flockId ?? this.flockId,
+        alertType: alertType ?? this.alertType,
+        title: title ?? this.title,
+        message: message ?? this.message,
+        severity: severity ?? this.severity,
+        dueDate: dueDate.present ? dueDate.value : this.dueDate,
+        isRead: isRead ?? this.isRead,
+        isResolved: isResolved ?? this.isResolved,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        cachedAt: cachedAt ?? this.cachedAt,
+      );
+  CachedAlert copyWithCompanion(CachedAlertsCompanion data) {
+    return CachedAlert(
+      id: data.id.present ? data.id.value : this.id,
+      flockId: data.flockId.present ? data.flockId.value : this.flockId,
+      alertType: data.alertType.present ? data.alertType.value : this.alertType,
+      title: data.title.present ? data.title.value : this.title,
+      message: data.message.present ? data.message.value : this.message,
+      severity: data.severity.present ? data.severity.value : this.severity,
+      dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
+      isRead: data.isRead.present ? data.isRead.value : this.isRead,
+      isResolved:
+          data.isResolved.present ? data.isResolved.value : this.isResolved,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedAlert(')
+          ..write('id: $id, ')
+          ..write('flockId: $flockId, ')
+          ..write('alertType: $alertType, ')
+          ..write('title: $title, ')
+          ..write('message: $message, ')
+          ..write('severity: $severity, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('isRead: $isRead, ')
+          ..write('isResolved: $isResolved, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, flockId, alertType, title, message,
+      severity, dueDate, isRead, isResolved, createdAt, cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedAlert &&
+          other.id == this.id &&
+          other.flockId == this.flockId &&
+          other.alertType == this.alertType &&
+          other.title == this.title &&
+          other.message == this.message &&
+          other.severity == this.severity &&
+          other.dueDate == this.dueDate &&
+          other.isRead == this.isRead &&
+          other.isResolved == this.isResolved &&
+          other.createdAt == this.createdAt &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedAlertsCompanion extends UpdateCompanion<CachedAlert> {
+  final Value<String> id;
+  final Value<String> flockId;
+  final Value<String> alertType;
+  final Value<String> title;
+  final Value<String> message;
+  final Value<String> severity;
+  final Value<String?> dueDate;
+  final Value<bool> isRead;
+  final Value<bool> isResolved;
+  final Value<String?> createdAt;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedAlertsCompanion({
+    this.id = const Value.absent(),
+    this.flockId = const Value.absent(),
+    this.alertType = const Value.absent(),
+    this.title = const Value.absent(),
+    this.message = const Value.absent(),
+    this.severity = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.isRead = const Value.absent(),
+    this.isResolved = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedAlertsCompanion.insert({
+    required String id,
+    required String flockId,
+    required String alertType,
+    required String title,
+    required String message,
+    this.severity = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.isRead = const Value.absent(),
+    this.isResolved = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        flockId = Value(flockId),
+        alertType = Value(alertType),
+        title = Value(title),
+        message = Value(message);
+  static Insertable<CachedAlert> custom({
+    Expression<String>? id,
+    Expression<String>? flockId,
+    Expression<String>? alertType,
+    Expression<String>? title,
+    Expression<String>? message,
+    Expression<String>? severity,
+    Expression<String>? dueDate,
+    Expression<bool>? isRead,
+    Expression<bool>? isResolved,
+    Expression<String>? createdAt,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (flockId != null) 'flock_id': flockId,
+      if (alertType != null) 'alert_type': alertType,
+      if (title != null) 'title': title,
+      if (message != null) 'message': message,
+      if (severity != null) 'severity': severity,
+      if (dueDate != null) 'due_date': dueDate,
+      if (isRead != null) 'is_read': isRead,
+      if (isResolved != null) 'is_resolved': isResolved,
+      if (createdAt != null) 'created_at': createdAt,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedAlertsCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? flockId,
+      Value<String>? alertType,
+      Value<String>? title,
+      Value<String>? message,
+      Value<String>? severity,
+      Value<String?>? dueDate,
+      Value<bool>? isRead,
+      Value<bool>? isResolved,
+      Value<String?>? createdAt,
+      Value<DateTime>? cachedAt,
+      Value<int>? rowid}) {
+    return CachedAlertsCompanion(
+      id: id ?? this.id,
+      flockId: flockId ?? this.flockId,
+      alertType: alertType ?? this.alertType,
+      title: title ?? this.title,
+      message: message ?? this.message,
+      severity: severity ?? this.severity,
+      dueDate: dueDate ?? this.dueDate,
+      isRead: isRead ?? this.isRead,
+      isResolved: isResolved ?? this.isResolved,
+      createdAt: createdAt ?? this.createdAt,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (flockId.present) {
+      map['flock_id'] = Variable<String>(flockId.value);
+    }
+    if (alertType.present) {
+      map['alert_type'] = Variable<String>(alertType.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (message.present) {
+      map['message'] = Variable<String>(message.value);
+    }
+    if (severity.present) {
+      map['severity'] = Variable<String>(severity.value);
+    }
+    if (dueDate.present) {
+      map['due_date'] = Variable<String>(dueDate.value);
+    }
+    if (isRead.present) {
+      map['is_read'] = Variable<bool>(isRead.value);
+    }
+    if (isResolved.present) {
+      map['is_resolved'] = Variable<bool>(isResolved.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(createdAt.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedAlertsCompanion(')
+          ..write('id: $id, ')
+          ..write('flockId: $flockId, ')
+          ..write('alertType: $alertType, ')
+          ..write('title: $title, ')
+          ..write('message: $message, ')
+          ..write('severity: $severity, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('isRead: $isRead, ')
+          ..write('isResolved: $isResolved, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedDashboardSummariesTable extends CachedDashboardSummaries
+    with TableInfo<$CachedDashboardSummariesTable, CachedDashboardSummary> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedDashboardSummariesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1));
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _cachedAtMeta =
+      const VerificationMeta('cachedAt');
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+      'cached_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [id, payload, cachedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_dashboard_summaries';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<CachedDashboardSummary> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(_cachedAtMeta,
+          cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedDashboardSummary map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedDashboardSummary(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
+      cachedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at'])!,
+    );
+  }
+
+  @override
+  $CachedDashboardSummariesTable createAlias(String alias) {
+    return $CachedDashboardSummariesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedDashboardSummary extends DataClass
+    implements Insertable<CachedDashboardSummary> {
+  final int id;
+  final String payload;
+  final DateTime cachedAt;
+  const CachedDashboardSummary(
+      {required this.id, required this.payload, required this.cachedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['payload'] = Variable<String>(payload);
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedDashboardSummariesCompanion toCompanion(bool nullToAbsent) {
+    return CachedDashboardSummariesCompanion(
+      id: Value(id),
+      payload: Value(payload),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedDashboardSummary.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedDashboardSummary(
+      id: serializer.fromJson<int>(json['id']),
+      payload: serializer.fromJson<String>(json['payload']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'payload': serializer.toJson<String>(payload),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedDashboardSummary copyWith(
+          {int? id, String? payload, DateTime? cachedAt}) =>
+      CachedDashboardSummary(
+        id: id ?? this.id,
+        payload: payload ?? this.payload,
+        cachedAt: cachedAt ?? this.cachedAt,
+      );
+  CachedDashboardSummary copyWithCompanion(
+      CachedDashboardSummariesCompanion data) {
+    return CachedDashboardSummary(
+      id: data.id.present ? data.id.value : this.id,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedDashboardSummary(')
+          ..write('id: $id, ')
+          ..write('payload: $payload, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, payload, cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedDashboardSummary &&
+          other.id == this.id &&
+          other.payload == this.payload &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedDashboardSummariesCompanion
+    extends UpdateCompanion<CachedDashboardSummary> {
+  final Value<int> id;
+  final Value<String> payload;
+  final Value<DateTime> cachedAt;
+  const CachedDashboardSummariesCompanion({
+    this.id = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+  });
+  CachedDashboardSummariesCompanion.insert({
+    this.id = const Value.absent(),
+    required String payload,
+    this.cachedAt = const Value.absent(),
+  }) : payload = Value(payload);
+  static Insertable<CachedDashboardSummary> custom({
+    Expression<int>? id,
+    Expression<String>? payload,
+    Expression<DateTime>? cachedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (payload != null) 'payload': payload,
+      if (cachedAt != null) 'cached_at': cachedAt,
+    });
+  }
+
+  CachedDashboardSummariesCompanion copyWith(
+      {Value<int>? id, Value<String>? payload, Value<DateTime>? cachedAt}) {
+    return CachedDashboardSummariesCompanion(
+      id: id ?? this.id,
+      payload: payload ?? this.payload,
+      cachedAt: cachedAt ?? this.cachedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedDashboardSummariesCompanion(')
+          ..write('id: $id, ')
+          ..write('payload: $payload, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SyncQueueTable extends SyncQueue
     with TableInfo<$SyncQueueTable, SyncQueueEntry> {
   @override
@@ -4113,6 +5509,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedVaccinationEventsTable(this);
   late final $CachedFinancialRecordsTable cachedFinancialRecords =
       $CachedFinancialRecordsTable(this);
+  late final $CachedEnvironmentalRecordsTable cachedEnvironmentalRecords =
+      $CachedEnvironmentalRecordsTable(this);
+  late final $CachedAlertsTable cachedAlerts = $CachedAlertsTable(this);
+  late final $CachedDashboardSummariesTable cachedDashboardSummaries =
+      $CachedDashboardSummariesTable(this);
   late final $SyncQueueTable syncQueue = $SyncQueueTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -4126,6 +5527,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         cachedMortalityEvents,
         cachedVaccinationEvents,
         cachedFinancialRecords,
+        cachedEnvironmentalRecords,
+        cachedAlerts,
+        cachedDashboardSummaries,
         syncQueue
       ];
 }
@@ -5892,6 +7296,701 @@ typedef $$CachedFinancialRecordsTableProcessedTableManager
         ),
         CachedFinancialRecord,
         PrefetchHooks Function()>;
+typedef $$CachedEnvironmentalRecordsTableCreateCompanionBuilder
+    = CachedEnvironmentalRecordsCompanion Function({
+  required String id,
+  required String flockId,
+  required String recordDate,
+  Value<String?> timeOfDay,
+  Value<double?> temperatureC,
+  Value<double?> humidityPct,
+  Value<double?> ammoniaPpm,
+  Value<double?> lightHours,
+  Value<int?> litterScore,
+  Value<String?> ventilationNote,
+  Value<String?> notes,
+  Value<DateTime> cachedAt,
+  Value<int> rowid,
+});
+typedef $$CachedEnvironmentalRecordsTableUpdateCompanionBuilder
+    = CachedEnvironmentalRecordsCompanion Function({
+  Value<String> id,
+  Value<String> flockId,
+  Value<String> recordDate,
+  Value<String?> timeOfDay,
+  Value<double?> temperatureC,
+  Value<double?> humidityPct,
+  Value<double?> ammoniaPpm,
+  Value<double?> lightHours,
+  Value<int?> litterScore,
+  Value<String?> ventilationNote,
+  Value<String?> notes,
+  Value<DateTime> cachedAt,
+  Value<int> rowid,
+});
+
+class $$CachedEnvironmentalRecordsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedEnvironmentalRecordsTable> {
+  $$CachedEnvironmentalRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get flockId => $composableBuilder(
+      column: $table.flockId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recordDate => $composableBuilder(
+      column: $table.recordDate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get timeOfDay => $composableBuilder(
+      column: $table.timeOfDay, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get temperatureC => $composableBuilder(
+      column: $table.temperatureC, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get humidityPct => $composableBuilder(
+      column: $table.humidityPct, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get ammoniaPpm => $composableBuilder(
+      column: $table.ammoniaPpm, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get lightHours => $composableBuilder(
+      column: $table.lightHours, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get litterScore => $composableBuilder(
+      column: $table.litterScore, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get ventilationNote => $composableBuilder(
+      column: $table.ventilationNote,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CachedEnvironmentalRecordsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedEnvironmentalRecordsTable> {
+  $$CachedEnvironmentalRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get flockId => $composableBuilder(
+      column: $table.flockId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recordDate => $composableBuilder(
+      column: $table.recordDate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get timeOfDay => $composableBuilder(
+      column: $table.timeOfDay, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get temperatureC => $composableBuilder(
+      column: $table.temperatureC,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get humidityPct => $composableBuilder(
+      column: $table.humidityPct, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get ammoniaPpm => $composableBuilder(
+      column: $table.ammoniaPpm, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get lightHours => $composableBuilder(
+      column: $table.lightHours, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get litterScore => $composableBuilder(
+      column: $table.litterScore, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get ventilationNote => $composableBuilder(
+      column: $table.ventilationNote,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CachedEnvironmentalRecordsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedEnvironmentalRecordsTable> {
+  $$CachedEnvironmentalRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get flockId =>
+      $composableBuilder(column: $table.flockId, builder: (column) => column);
+
+  GeneratedColumn<String> get recordDate => $composableBuilder(
+      column: $table.recordDate, builder: (column) => column);
+
+  GeneratedColumn<String> get timeOfDay =>
+      $composableBuilder(column: $table.timeOfDay, builder: (column) => column);
+
+  GeneratedColumn<double> get temperatureC => $composableBuilder(
+      column: $table.temperatureC, builder: (column) => column);
+
+  GeneratedColumn<double> get humidityPct => $composableBuilder(
+      column: $table.humidityPct, builder: (column) => column);
+
+  GeneratedColumn<double> get ammoniaPpm => $composableBuilder(
+      column: $table.ammoniaPpm, builder: (column) => column);
+
+  GeneratedColumn<double> get lightHours => $composableBuilder(
+      column: $table.lightHours, builder: (column) => column);
+
+  GeneratedColumn<int> get litterScore => $composableBuilder(
+      column: $table.litterScore, builder: (column) => column);
+
+  GeneratedColumn<String> get ventilationNote => $composableBuilder(
+      column: $table.ventilationNote, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedEnvironmentalRecordsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CachedEnvironmentalRecordsTable,
+    CachedEnvironmentalRecord,
+    $$CachedEnvironmentalRecordsTableFilterComposer,
+    $$CachedEnvironmentalRecordsTableOrderingComposer,
+    $$CachedEnvironmentalRecordsTableAnnotationComposer,
+    $$CachedEnvironmentalRecordsTableCreateCompanionBuilder,
+    $$CachedEnvironmentalRecordsTableUpdateCompanionBuilder,
+    (
+      CachedEnvironmentalRecord,
+      BaseReferences<_$AppDatabase, $CachedEnvironmentalRecordsTable,
+          CachedEnvironmentalRecord>
+    ),
+    CachedEnvironmentalRecord,
+    PrefetchHooks Function()> {
+  $$CachedEnvironmentalRecordsTableTableManager(
+      _$AppDatabase db, $CachedEnvironmentalRecordsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedEnvironmentalRecordsTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedEnvironmentalRecordsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedEnvironmentalRecordsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> flockId = const Value.absent(),
+            Value<String> recordDate = const Value.absent(),
+            Value<String?> timeOfDay = const Value.absent(),
+            Value<double?> temperatureC = const Value.absent(),
+            Value<double?> humidityPct = const Value.absent(),
+            Value<double?> ammoniaPpm = const Value.absent(),
+            Value<double?> lightHours = const Value.absent(),
+            Value<int?> litterScore = const Value.absent(),
+            Value<String?> ventilationNote = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedEnvironmentalRecordsCompanion(
+            id: id,
+            flockId: flockId,
+            recordDate: recordDate,
+            timeOfDay: timeOfDay,
+            temperatureC: temperatureC,
+            humidityPct: humidityPct,
+            ammoniaPpm: ammoniaPpm,
+            lightHours: lightHours,
+            litterScore: litterScore,
+            ventilationNote: ventilationNote,
+            notes: notes,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String flockId,
+            required String recordDate,
+            Value<String?> timeOfDay = const Value.absent(),
+            Value<double?> temperatureC = const Value.absent(),
+            Value<double?> humidityPct = const Value.absent(),
+            Value<double?> ammoniaPpm = const Value.absent(),
+            Value<double?> lightHours = const Value.absent(),
+            Value<int?> litterScore = const Value.absent(),
+            Value<String?> ventilationNote = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedEnvironmentalRecordsCompanion.insert(
+            id: id,
+            flockId: flockId,
+            recordDate: recordDate,
+            timeOfDay: timeOfDay,
+            temperatureC: temperatureC,
+            humidityPct: humidityPct,
+            ammoniaPpm: ammoniaPpm,
+            lightHours: lightHours,
+            litterScore: litterScore,
+            ventilationNote: ventilationNote,
+            notes: notes,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CachedEnvironmentalRecordsTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $CachedEnvironmentalRecordsTable,
+        CachedEnvironmentalRecord,
+        $$CachedEnvironmentalRecordsTableFilterComposer,
+        $$CachedEnvironmentalRecordsTableOrderingComposer,
+        $$CachedEnvironmentalRecordsTableAnnotationComposer,
+        $$CachedEnvironmentalRecordsTableCreateCompanionBuilder,
+        $$CachedEnvironmentalRecordsTableUpdateCompanionBuilder,
+        (
+          CachedEnvironmentalRecord,
+          BaseReferences<_$AppDatabase, $CachedEnvironmentalRecordsTable,
+              CachedEnvironmentalRecord>
+        ),
+        CachedEnvironmentalRecord,
+        PrefetchHooks Function()>;
+typedef $$CachedAlertsTableCreateCompanionBuilder = CachedAlertsCompanion
+    Function({
+  required String id,
+  required String flockId,
+  required String alertType,
+  required String title,
+  required String message,
+  Value<String> severity,
+  Value<String?> dueDate,
+  Value<bool> isRead,
+  Value<bool> isResolved,
+  Value<String?> createdAt,
+  Value<DateTime> cachedAt,
+  Value<int> rowid,
+});
+typedef $$CachedAlertsTableUpdateCompanionBuilder = CachedAlertsCompanion
+    Function({
+  Value<String> id,
+  Value<String> flockId,
+  Value<String> alertType,
+  Value<String> title,
+  Value<String> message,
+  Value<String> severity,
+  Value<String?> dueDate,
+  Value<bool> isRead,
+  Value<bool> isResolved,
+  Value<String?> createdAt,
+  Value<DateTime> cachedAt,
+  Value<int> rowid,
+});
+
+class $$CachedAlertsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedAlertsTable> {
+  $$CachedAlertsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get flockId => $composableBuilder(
+      column: $table.flockId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get alertType => $composableBuilder(
+      column: $table.alertType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get message => $composableBuilder(
+      column: $table.message, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get severity => $composableBuilder(
+      column: $table.severity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get dueDate => $composableBuilder(
+      column: $table.dueDate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isRead => $composableBuilder(
+      column: $table.isRead, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isResolved => $composableBuilder(
+      column: $table.isResolved, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CachedAlertsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedAlertsTable> {
+  $$CachedAlertsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get flockId => $composableBuilder(
+      column: $table.flockId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get alertType => $composableBuilder(
+      column: $table.alertType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get message => $composableBuilder(
+      column: $table.message, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get severity => $composableBuilder(
+      column: $table.severity, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get dueDate => $composableBuilder(
+      column: $table.dueDate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isRead => $composableBuilder(
+      column: $table.isRead, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isResolved => $composableBuilder(
+      column: $table.isResolved, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CachedAlertsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedAlertsTable> {
+  $$CachedAlertsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get flockId =>
+      $composableBuilder(column: $table.flockId, builder: (column) => column);
+
+  GeneratedColumn<String> get alertType =>
+      $composableBuilder(column: $table.alertType, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get message =>
+      $composableBuilder(column: $table.message, builder: (column) => column);
+
+  GeneratedColumn<String> get severity =>
+      $composableBuilder(column: $table.severity, builder: (column) => column);
+
+  GeneratedColumn<String> get dueDate =>
+      $composableBuilder(column: $table.dueDate, builder: (column) => column);
+
+  GeneratedColumn<bool> get isRead =>
+      $composableBuilder(column: $table.isRead, builder: (column) => column);
+
+  GeneratedColumn<bool> get isResolved => $composableBuilder(
+      column: $table.isResolved, builder: (column) => column);
+
+  GeneratedColumn<String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedAlertsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CachedAlertsTable,
+    CachedAlert,
+    $$CachedAlertsTableFilterComposer,
+    $$CachedAlertsTableOrderingComposer,
+    $$CachedAlertsTableAnnotationComposer,
+    $$CachedAlertsTableCreateCompanionBuilder,
+    $$CachedAlertsTableUpdateCompanionBuilder,
+    (
+      CachedAlert,
+      BaseReferences<_$AppDatabase, $CachedAlertsTable, CachedAlert>
+    ),
+    CachedAlert,
+    PrefetchHooks Function()> {
+  $$CachedAlertsTableTableManager(_$AppDatabase db, $CachedAlertsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedAlertsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedAlertsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedAlertsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> flockId = const Value.absent(),
+            Value<String> alertType = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String> message = const Value.absent(),
+            Value<String> severity = const Value.absent(),
+            Value<String?> dueDate = const Value.absent(),
+            Value<bool> isRead = const Value.absent(),
+            Value<bool> isResolved = const Value.absent(),
+            Value<String?> createdAt = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedAlertsCompanion(
+            id: id,
+            flockId: flockId,
+            alertType: alertType,
+            title: title,
+            message: message,
+            severity: severity,
+            dueDate: dueDate,
+            isRead: isRead,
+            isResolved: isResolved,
+            createdAt: createdAt,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String flockId,
+            required String alertType,
+            required String title,
+            required String message,
+            Value<String> severity = const Value.absent(),
+            Value<String?> dueDate = const Value.absent(),
+            Value<bool> isRead = const Value.absent(),
+            Value<bool> isResolved = const Value.absent(),
+            Value<String?> createdAt = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedAlertsCompanion.insert(
+            id: id,
+            flockId: flockId,
+            alertType: alertType,
+            title: title,
+            message: message,
+            severity: severity,
+            dueDate: dueDate,
+            isRead: isRead,
+            isResolved: isResolved,
+            createdAt: createdAt,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CachedAlertsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $CachedAlertsTable,
+    CachedAlert,
+    $$CachedAlertsTableFilterComposer,
+    $$CachedAlertsTableOrderingComposer,
+    $$CachedAlertsTableAnnotationComposer,
+    $$CachedAlertsTableCreateCompanionBuilder,
+    $$CachedAlertsTableUpdateCompanionBuilder,
+    (
+      CachedAlert,
+      BaseReferences<_$AppDatabase, $CachedAlertsTable, CachedAlert>
+    ),
+    CachedAlert,
+    PrefetchHooks Function()>;
+typedef $$CachedDashboardSummariesTableCreateCompanionBuilder
+    = CachedDashboardSummariesCompanion Function({
+  Value<int> id,
+  required String payload,
+  Value<DateTime> cachedAt,
+});
+typedef $$CachedDashboardSummariesTableUpdateCompanionBuilder
+    = CachedDashboardSummariesCompanion Function({
+  Value<int> id,
+  Value<String> payload,
+  Value<DateTime> cachedAt,
+});
+
+class $$CachedDashboardSummariesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedDashboardSummariesTable> {
+  $$CachedDashboardSummariesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CachedDashboardSummariesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedDashboardSummariesTable> {
+  $$CachedDashboardSummariesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CachedDashboardSummariesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedDashboardSummariesTable> {
+  $$CachedDashboardSummariesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedDashboardSummariesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CachedDashboardSummariesTable,
+    CachedDashboardSummary,
+    $$CachedDashboardSummariesTableFilterComposer,
+    $$CachedDashboardSummariesTableOrderingComposer,
+    $$CachedDashboardSummariesTableAnnotationComposer,
+    $$CachedDashboardSummariesTableCreateCompanionBuilder,
+    $$CachedDashboardSummariesTableUpdateCompanionBuilder,
+    (
+      CachedDashboardSummary,
+      BaseReferences<_$AppDatabase, $CachedDashboardSummariesTable,
+          CachedDashboardSummary>
+    ),
+    CachedDashboardSummary,
+    PrefetchHooks Function()> {
+  $$CachedDashboardSummariesTableTableManager(
+      _$AppDatabase db, $CachedDashboardSummariesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedDashboardSummariesTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedDashboardSummariesTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedDashboardSummariesTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> payload = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+          }) =>
+              CachedDashboardSummariesCompanion(
+            id: id,
+            payload: payload,
+            cachedAt: cachedAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String payload,
+            Value<DateTime> cachedAt = const Value.absent(),
+          }) =>
+              CachedDashboardSummariesCompanion.insert(
+            id: id,
+            payload: payload,
+            cachedAt: cachedAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CachedDashboardSummariesTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $CachedDashboardSummariesTable,
+        CachedDashboardSummary,
+        $$CachedDashboardSummariesTableFilterComposer,
+        $$CachedDashboardSummariesTableOrderingComposer,
+        $$CachedDashboardSummariesTableAnnotationComposer,
+        $$CachedDashboardSummariesTableCreateCompanionBuilder,
+        $$CachedDashboardSummariesTableUpdateCompanionBuilder,
+        (
+          CachedDashboardSummary,
+          BaseReferences<_$AppDatabase, $CachedDashboardSummariesTable,
+              CachedDashboardSummary>
+        ),
+        CachedDashboardSummary,
+        PrefetchHooks Function()>;
 typedef $$SyncQueueTableCreateCompanionBuilder = SyncQueueCompanion Function({
   Value<int> id,
   required String entityType,
@@ -6153,6 +8252,15 @@ class $AppDatabaseManager {
   $$CachedFinancialRecordsTableTableManager get cachedFinancialRecords =>
       $$CachedFinancialRecordsTableTableManager(
           _db, _db.cachedFinancialRecords);
+  $$CachedEnvironmentalRecordsTableTableManager
+      get cachedEnvironmentalRecords =>
+          $$CachedEnvironmentalRecordsTableTableManager(
+              _db, _db.cachedEnvironmentalRecords);
+  $$CachedAlertsTableTableManager get cachedAlerts =>
+      $$CachedAlertsTableTableManager(_db, _db.cachedAlerts);
+  $$CachedDashboardSummariesTableTableManager get cachedDashboardSummaries =>
+      $$CachedDashboardSummariesTableTableManager(
+          _db, _db.cachedDashboardSummaries);
   $$SyncQueueTableTableManager get syncQueue =>
       $$SyncQueueTableTableManager(_db, _db.syncQueue);
 }
