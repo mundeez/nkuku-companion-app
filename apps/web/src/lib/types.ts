@@ -626,6 +626,25 @@ export interface SalesDashboardSummary {
   dailySales: { date: string; birds: number; revenue: number }[];
 }
 
+export interface PaginatedSales {
+  data: SaleRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface SalesFilter {
+  fromDate?: string;
+  toDate?: string;
+  paymentStatus?: PaymentStatus;
+  flockId?: string;
+  customer?: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+}
+
 // ── DOCUMENT RECORDS ───────────────────────────
 
 export interface DocumentRecord {

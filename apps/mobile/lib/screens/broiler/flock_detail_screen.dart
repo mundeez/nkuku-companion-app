@@ -205,6 +205,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         BroilerService.getEnvironmentalRecords(widget.flockId)
             .catchError((_) => <EnvironmentalRecord>[]),
         BroilerService.getSaleRecords(widget.flockId)
+            .then((r) => r.items)
             .catchError((_) => <SaleRecord>[]),
         BroilerService.getDocuments(widget.flockId)
             .catchError((_) => <DocumentRecord>[]),

@@ -1,5 +1,50 @@
 # Changelog
 
+## [1.28.0-alpha] — 2026-09-05
+
+### Sales filtering, pagination, and payment consistency
+
+### Added
+- **API**: Unified filter query params across `/all`, `/`, `/summary`, and `/dashboard` — `fromDate`, `toDate`, `paymentStatus`, `flockId`, `customer`.
+- **API**: Server-side pagination on `/all` and `/` via `limit` (default 50, max 100) and `offset` (default 0). Response shape changed to `{ data, total, limit, offset }`.
+- **API**: Customer search — case-insensitive partial match on `customerName` OR `customerPhone`.
+- **API**: `flockId` filter on `/all` and `/dashboard`.
+- **API**: `paymentStatus`, `flockId`, `customer` filters on `/summary` and `/dashboard`.
+- **API**: Prisma schema index `@@index([organizationId, customerName])` for efficient customer search.
+- **API**: 25 new integration tests covering filtering, pagination, payment validation, FR-prefix stripping, dashboard date-range behavior, and PATCH payment-bypass prevention.
+- **Web**: New reusable `SalesFilterBar` component (collapsible filter panel with date range, payment status, flock selector, debounced customer search, clear button).
+- **Web**: Pagination controls (Prev/Next, page indicator) on global sales and flock sales pages.
+- **Web**: Server-side sorting via API `sortBy`/`sortDir` params (replaces client-side sorting).
+- **Mobile**: New `SalesFilter` model with `toQueryParams()` and `toFilterParams()` helpers.
+- **Mobile**: New `SalesFilterSheet` bottom-sheet widget (date range pickers, payment status choice chips, flock dropdown, customer search, clear all).
+- **Mobile**: `BroilerService.getSalesDashboard` and `getAllSales` methods with filter support.
+- **Mobile**: Load-more pagination on the global sales dashboard.
+- **Mobile**: Active filter chips with individual delete buttons on the sales dashboard.
+- **Mobile**: Filter icon with active-count badge in the sales dashboard app bar.
+
+### Fixed
+- **API**: `toDate` boundary bug — end date now inclusive (adds 1 day and uses `lt` instead of `lte` midnight UTC).
+- **API**: `/dashboard` `dailySales` chart now respects the applied date range instead of always using last 30 days. Falls back to last 30 days only when no date range is provided.
+- **API**: Payment consistency — `paid` status auto-sets `amountPaidZmw = totalAmountZmw`; `pending` auto-sets `amountPaidZmw = 0`; `partial` validates `0 < amountPaidZmw < totalAmountZmw` (returns 422 on violation). PATCH now also enforces these rules using the existing record's status when `paymentStatus` is not in the patch body, preventing bypass attacks.
+- **API**: `[FR:<uuid>]` prefix now stripped in all GET/POST/PATCH responses (single source of truth — no longer visible to any client).
+- **Web**: Create/edit sale form now always shows the amount-paid field; disabled with auto-fill for `paid` (set to total) and `pending` (set to 0); editable only for `partial`.
+- **Web**: KPI cards and payment breakdown now reflect filtered data.
+- **Mobile**: Sales dashboard list tiles now show price-per-bird, total, and paid amount.
+- **Mobile**: `flock_detail_screen.dart` updated to use the new paginated `getSaleRecords` return shape.
+
+### Changed
+- **API**: `/all` and `/` response shape changed from bare array to `{ data: [], total, limit, offset }` — breaking change, all clients updated in this release.
+- **API**: Shared `buildFilterWhere` helper and `FilterQuerySchema` consolidate filter logic across endpoints.
+- **Web**: Global sales page and flock sales page use the new `SalesFilterBar` and paginated API responses.
+
+### Validation
+- API tests: 330/330 pass (305 existing + 25 new).
+- API lint: clean.
+- Web build: passes (lint + typecheck + production build).
+- Mobile: `flutter analyze` — no errors (only pre-existing infos/warnings).
+- Mobile tests: 55/55 pass.
+- Mobile APK: 66.5MB, SHA256 `e1db0eeadf5b781bdbaf71bdbfc80a6b4a37ace6203eb77b9aaa9ada714fe92e`.
+
 ## [1.27.0-alpha] — 2026-09-05
 
 ### Mobile sync & CRUD fixes

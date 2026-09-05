@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/sale_record.dart';
-import '../services/api_service.dart';
+import '../models/sales_filter.dart';
 import '../services/auth_service.dart';
 import '../services/broiler_service.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/stat_card.dart';
+import '../widgets/sales_filter_sheet.dart';
 import 'broiler/records/sale_record_form.dart';
 
 /// Global sales dashboard — mirrors the web app's `/sales` page.
@@ -20,13 +21,34 @@ class SalesDashboardScreen extends StatefulWidget {
 class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   Map<String, dynamic>? _summary;
   List<SaleRecord> _sales = [];
+  int _totalSales = 0;
   bool _loading = true;
+  bool _loadingMore = false;
   String? _error;
+  SalesFilter _filter = const SalesFilter(limit: 20, offset: 0);
+  final List<Map<String, dynamic>> _flocks = [];
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadFlocks();
+  }
+
+  Future<void> _loadFlocks() async {
+    try {
+      final flocks = await BroilerService.getFlocks();
+      if (mounted) {
+        setState(() {
+          _flocks.clear();
+          for (final f in flocks) {
+            _flocks.add({'id': f.id, 'name': f.name});
+          }
+        });
+      }
+    } catch (_) {
+      // Non-critical
+    }
   }
 
   Future<void> _load() async {
@@ -35,18 +57,13 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        ApiService.dio.get('/api/v1/sale-records/dashboard'),
-        ApiService.dio.get('/api/v1/sale-records/all'),
-      ]);
-      final dashboardData = results[0].data as Map<String, dynamic>;
-      final allSales = (results[1].data as List)
-          .map((e) => SaleRecord.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final dashboardData = await BroilerService.getSalesDashboard(filter: _filter);
+      final allSalesResult = await BroilerService.getAllSales(filter: _filter);
       if (mounted) {
         setState(() {
           _summary = dashboardData;
-          _sales = allSales;
+          _sales = allSalesResult.items;
+          _totalSales = allSalesResult.total;
           _loading = false;
         });
       }
@@ -60,15 +77,53 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     }
   }
 
+  Future<void> _loadMore() async {
+    if (_loadingMore || _sales.length >= _totalSales) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextFilter = _filter.copyWith(offset: _sales.length);
+      final result = await BroilerService.getAllSales(filter: nextFilter);
+      if (mounted) {
+        setState(() {
+          _sales.addAll(result.items);
+          _loadingMore = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  Future<void> _openFilter() async {
+    final result = await SalesFilterSheet.show(
+      context,
+      currentFilter: _filter,
+      showFlockFilter: true,
+      flocks: _flocks,
+    );
+    if (result != null) {
+      setState(() => _filter = result);
+      _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sales Dashboard'),
         actions: [
+          IconButton(
+            icon: Badge(
+              isLabelVisible: _filter.activeCount > 0,
+              label: Text('${_filter.activeCount}'),
+              child: const Icon(Icons.filter_list),
+            ),
+            onPressed: _openFilter,
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
-     ),
+      ),
       body: _loading
           ? const SkeletonList()
           : _error != null
@@ -88,6 +143,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      if (_filter.activeCount > 0) _buildActiveFilterChips(),
                       _buildKpiCards(),
                       const SizedBox(height: 16),
                       _buildPaymentBreakdown(),
@@ -102,6 +158,61 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
               child: const Icon(Icons.add),
             )
           : null,
+    );
+  }
+
+  Widget _buildActiveFilterChips() {
+    final chips = <Widget>[];
+    if (_filter.fromDate != null) {
+      chips.add(_filterChip('From: ${_formatDate(_filter.fromDate!)}',
+          () => setState(() {
+            _filter = _filter.copyWith(clearFromDate: true);
+            _load();
+          })));
+    }
+    if (_filter.toDate != null) {
+      chips.add(_filterChip('To: ${_formatDate(_filter.toDate!)}',
+          () => setState(() {
+            _filter = _filter.copyWith(clearToDate: true);
+            _load();
+          })));
+    }
+    if (_filter.paymentStatus != null && _filter.paymentStatus!.isNotEmpty) {
+      chips.add(_filterChip(
+          'Payment: ${_filter.paymentStatus![0].toUpperCase()}${_filter.paymentStatus!.substring(1)}',
+          () => setState(() {
+            _filter = _filter.copyWith(clearPaymentStatus: true);
+            _load();
+          })));
+    }
+    if (_filter.flockId != null && _filter.flockId!.isNotEmpty) {
+      final flockName = _flocks
+          .where((f) => f['id'] == _filter.flockId)
+          .map((f) => f['name'] as String?)
+          .firstWhere((_) => true, orElse: () => 'Flock');
+      chips.add(_filterChip('Flock: $flockName', () => setState(() {
+            _filter = _filter.copyWith(clearFlockId: true);
+            _load();
+          })));
+    }
+    if (_filter.customerQuery != null && _filter.customerQuery!.isNotEmpty) {
+      chips.add(_filterChip('Search: "${_filter.customerQuery}"',
+          () => setState(() {
+            _filter = _filter.copyWith(clearCustomerQuery: true);
+            _load();
+          })));
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Wrap(spacing: 8, children: chips),
+    );
+  }
+
+  Widget _filterChip(String label, VoidCallback onDeleted) {
+    return Chip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      deleteIcon: const Icon(Icons.close, size: 16),
+      onDeleted: onDeleted,
     );
   }
 
@@ -235,8 +346,9 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
             children: [
               Icon(Icons.point_of_sale_outlined, size: 64, color: Colors.grey),
               SizedBox(height: 12),
-              Text('No sale records yet.',
-                  style: TextStyle(color: Colors.grey)),
+              Text('No sale records found for the current filters.',
+                  style: TextStyle(color: Colors.grey),
+                  textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -246,93 +358,115 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('All Sales (${_sales.length})',
+        Text('All Sales ($_totalSales)',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        ..._sales.map((r) {
-          final statusColor = r.paymentStatus == 'paid'
-              ? Colors.green
-              : r.paymentStatus == 'partial'
-                  ? Colors.orange
-                  : Colors.grey;
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              title: Text(r.saleDate.toIso8601String().split('T').first),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (r.flockName != null && r.flockName!.isNotEmpty)
-                    Text('Flock: ${r.flockName}',
-                        style: const TextStyle(fontWeight: FontWeight.w500)),
-                  if (r.customerName != null && r.customerName!.isNotEmpty)
-                    Text('Customer: ${r.customerName}'),
-                  Text(
-                      '${r.birdCount} birds · ZMW ${r.totalAmountZmw.toStringAsFixed(2)}'),
-                  if (r.avgWeightKg != null)
-                    Text('Avg weight: ${r.avgWeightKg} kg'),
-                ],
-              ),
-              trailing: Chip(
-                label: Text(
-                  r.paymentStatus,
-                  style: TextStyle(fontSize: 10, color: statusColor),
-                ),
-                backgroundColor: statusColor.withAlpha(30),
-              ),
-              onTap: AuthService.canManageSales
-                  ? () async {
-                      final result = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              SaleRecordForm(flockId: r.flockId, record: r),
-                        ),
-                      );
-                      if (result == true) _load();
-                    }
-                  : null,
-              onLongPress: AuthService.isOwner
-                  ? () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Delete sale record?'),
-                          content: Text(
-                              'Delete sale on ${r.saleDate.toIso8601String().split('T').first} (${r.birdCount} birds)?'),
-                          actions: [
-                            TextButton(
-                                onPressed: () =>
-                                    Navigator.pop(ctx, false),
-                                child: const Text('Cancel')),
-                            TextButton(
-                                onPressed: () =>
-                                    Navigator.pop(ctx, true),
-                                child: const Text('Delete',
-                                    style:
-                                        TextStyle(color: Colors.red))),
-                          ],
-                        ),
-                      );
-                      if (confirmed != true) return;
-                      try {
-                        await BroilerService.deleteSaleRecord(r.id);
-                        _load();
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Delete failed: $e'),
-                                backgroundColor: Colors.red),
-                          );
-                        }
-                      }
-                    }
-                  : null,
+        ..._sales.map(_buildSaleTile),
+        if (_sales.length < _totalSales)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Center(
+              child: _loadingMore
+                  ? const CircularProgressIndicator()
+                  : TextButton.icon(
+                      onPressed: _loadMore,
+                      icon: const Icon(Icons.expand_more),
+                      label: const Text('Load More'),
+                    ),
             ),
-          );
-        }),
+          ),
       ],
+    );
+  }
+
+  Widget _buildSaleTile(SaleRecord r) {
+    final statusColor = r.paymentStatus == 'paid'
+        ? Colors.green
+        : r.paymentStatus == 'partial'
+            ? Colors.orange
+            : Colors.grey;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        title: Text(r.saleDate.toIso8601String().split('T').first),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (r.flockName != null && r.flockName!.isNotEmpty)
+              Text('Flock: ${r.flockName}',
+                  style: const TextStyle(fontWeight: FontWeight.w500)),
+            if (r.customerName != null && r.customerName!.isNotEmpty)
+              Text('Customer: ${r.customerName}'),
+            Text(
+                '${r.birdCount} birds · ZMW ${r.pricePerBirdZmw.toStringAsFixed(2)}/bird · Total: ZMW ${r.totalAmountZmw.toStringAsFixed(2)}'),
+            if (r.amountPaidZmw != null && r.paymentStatus != 'pending')
+              Text('Paid: ZMW ${r.amountPaidZmw!.toStringAsFixed(2)}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: r.paymentStatus == 'paid'
+                          ? Colors.green
+                          : Colors.orange)),
+            if (r.avgWeightKg != null)
+              Text('Avg weight: ${r.avgWeightKg} kg'),
+          ],
+        ),
+        trailing: Chip(
+          label: Text(
+            r.paymentStatus,
+            style: TextStyle(fontSize: 10, color: statusColor),
+          ),
+          backgroundColor: statusColor.withAlpha(30),
+        ),
+        onTap: AuthService.canManageSales
+            ? () async {
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        SaleRecordForm(flockId: r.flockId, record: r),
+                  ),
+                );
+                if (result == true) _load();
+              }
+            : null,
+        onLongPress: AuthService.isOwner
+            ? () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete sale record?'),
+                    content: Text(
+                        'Delete sale on ${r.saleDate.toIso8601String().split('T').first} (${r.birdCount} birds)?'),
+                    actions: [
+                      TextButton(
+                          onPressed: () =>
+                              Navigator.pop(ctx, false),
+                          child: const Text('Cancel')),
+                      TextButton(
+                          onPressed: () =>
+                              Navigator.pop(ctx, true),
+                          child: const Text('Delete',
+                              style:
+                                  TextStyle(color: Colors.red))),
+                    ],
+                  ),
+                );
+                if (confirmed != true) return;
+                try {
+                  await BroilerService.deleteSaleRecord(r.id);
+                  _load();
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Delete failed: $e'),
+                          backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              }
+            : null,
+      ),
     );
   }
 
@@ -394,5 +528,12 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     if (v == null) return 0;
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString()) ?? 0;
+  }
+
+  String _formatDate(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
   }
 }

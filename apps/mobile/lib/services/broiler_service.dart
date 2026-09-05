@@ -12,6 +12,7 @@ import '../models/growth_record.dart';
 import '../models/medication_record.dart';
 import '../models/mortality_event.dart';
 import '../models/sale_record.dart';
+import '../models/sales_filter.dart';
 import '../models/supplier.dart';
 import '../models/vaccination_event.dart';
 import '../models/water_record.dart';
@@ -857,25 +858,84 @@ class BroilerService {
   }
 
   // Sale records
-  static Future<List<SaleRecord>> getSaleRecords(String flockId) async {
+  static Future<({List<SaleRecord> items, int total})> getSaleRecords(
+      String flockId, {SalesFilter? filter}) async {
+    final params = <String, dynamic>{'flockId': flockId};
+    if (filter != null) params.addAll(filter.toQueryParams());
     final res = await ApiService.dio.get(
       '/api/v1/sale-records',
-      queryParameters: {'flockId': flockId},
+      queryParameters: params,
     );
     _assertOk(res);
+    // Handle paginated response shape { data, total, limit, offset }
+    if (res.data is Map && res.data['data'] is List) {
+      final items = (res.data['data'] as List)
+          .map((e) => SaleRecord.fromJson(e as Map<String, dynamic>))
+          .toList();
+      final total = (res.data['total'] as num?)?.toInt() ?? items.length;
+      return (items: items, total: total);
+    }
+    // Backward compat: bare array
+    if (res.data is List) {
+      final items = (res.data as List)
+          .map((e) => SaleRecord.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return (items: items, total: items.length);
+    }
     if (res.data is Map && res.data['error'] != null)
       throw BroilerServiceException(res.data['error']);
-    return (res.data as List).map((e) => SaleRecord.fromJson(e)).toList();
+    throw BroilerServiceException('Unexpected sale-records response');
   }
 
   static Future<Map<String, dynamic>> getSaleRecordSummary(
-      String flockId) async {
+      String flockId, {SalesFilter? filter}) async {
+    final params = <String, dynamic>{'flockId': flockId};
+    if (filter != null) params.addAll(filter.toFilterParams());
     final res = await ApiService.dio.get(
       '/api/v1/sale-records/summary',
-      queryParameters: {'flockId': flockId},
+      queryParameters: params,
     );
     _assertOk(res);
     return res.data as Map<String, dynamic>;
+  }
+
+  /// Global sales dashboard — accepts optional filter.
+  static Future<Map<String, dynamic>> getSalesDashboard(
+      {SalesFilter? filter}) async {
+    final params = <String, dynamic>{};
+    if (filter != null) params.addAll(filter.toFilterParams());
+    final res = await ApiService.dio.get(
+      '/api/v1/sale-records/dashboard',
+      queryParameters: params,
+    );
+    _assertOk(res);
+    return res.data as Map<String, dynamic>;
+  }
+
+  /// All sales (paginated) — accepts optional filter.
+  static Future<({List<SaleRecord> items, int total})> getAllSales(
+      {SalesFilter? filter}) async {
+    final params = <String, dynamic>{};
+    if (filter != null) params.addAll(filter.toQueryParams());
+    final res = await ApiService.dio.get(
+      '/api/v1/sale-records/all',
+      queryParameters: params,
+    );
+    _assertOk(res);
+    if (res.data is Map && res.data['data'] is List) {
+      final items = (res.data['data'] as List)
+          .map((e) => SaleRecord.fromJson(e as Map<String, dynamic>))
+          .toList();
+      final total = (res.data['total'] as num?)?.toInt() ?? items.length;
+      return (items: items, total: total);
+    }
+    if (res.data is List) {
+      final items = (res.data as List)
+          .map((e) => SaleRecord.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return (items: items, total: items.length);
+    }
+    throw BroilerServiceException('Unexpected sale-records/all response');
   }
 
   static Future<SaleRecord> createSaleRecord(SaleRecord record) async {

@@ -29,6 +29,129 @@ function parseFinancialRecordId(notes: string | null | undefined): string | null
   return match ? match[1] : null;
 }
 
+/** Strip the `[FR:<uuid>]` prefix from notes for API responses. */
+function stripFrPrefix(notes: string | null | undefined): string | null {
+  if (!notes) return null;
+  const stripped = notes.replace(/^\[FR:[0-9a-fA-F-]{36}\]\s?/, '');
+  return stripped || null;
+}
+
+/** Serialize a sale record for API responses — strips [FR:] prefix from notes. */
+function serializeSaleRecord(record: any): any {
+  return { ...record, notes: stripFrPrefix(record.notes) };
+}
+
+/** Build a Prisma `where` clause from common filter params. */
+function buildFilterWhere(organizationId: string, query: {
+  fromDate?: string;
+  toDate?: string;
+  paymentStatus?: 'pending' | 'partial' | 'paid';
+  flockId?: string;
+  customer?: string;
+}): any {
+  const where: any = { flock: { organizationId } };
+
+  if (query.flockId) {
+    where.flockId = query.flockId;
+  }
+
+  if (query.fromDate || query.toDate) {
+    where.saleDate = {};
+    if (query.fromDate) where.saleDate.gte = new Date(query.fromDate);
+    // Fix toDate boundary: add 1 day and use lt so records on the end date are included
+    if (query.toDate) {
+      const end = new Date(query.toDate);
+      end.setDate(end.getDate() + 1);
+      where.saleDate.lt = end;
+    }
+  }
+
+  if (query.paymentStatus) {
+    where.paymentStatus = query.paymentStatus;
+  }
+
+  if (query.customer) {
+    where.OR = [
+      { customerName: { contains: query.customer, mode: 'insensitive' } },
+      { customerPhone: { contains: query.customer, mode: 'insensitive' } },
+    ];
+  }
+
+  return where;
+}
+
+/** Shared query schema for filter params. */
+const FilterQuerySchema = z.object({
+  fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  paymentStatus: z.enum(['pending', 'partial', 'paid']).optional(),
+  flockId: z.string().uuid().optional(),
+  customer: z.string().max(200).optional(),
+});
+
+/** Enforce payment consistency rules on create/update data.
+ *  On PATCH, if paymentStatus is not provided, the existing record's status
+ *  is used so that amountPaidZmw / totalAmountZmw changes stay consistent. */
+function enforcePaymentRules(
+  data: { paymentStatus?: string; amountPaidZmw?: number; totalAmountZmw?: number },
+  existingTotal?: number,
+  existingStatus?: string,
+): { amountPaidZmw?: number | null } {
+  const total = data.totalAmountZmw ?? existingTotal ?? 0;
+  const status = data.paymentStatus ?? existingStatus;
+
+  if (status === 'paid') {
+    return { amountPaidZmw: total };
+  }
+  if (status === 'pending') {
+    return { amountPaidZmw: 0 };
+  }
+  // For partial or unspecified, leave amountPaidZmw as provided
+  return {};
+}
+
+/** Validate payment consistency — returns error message or null.
+ *  On PATCH, existingStatus is used when paymentStatus is not in the patch. */
+function validatePaymentRules(
+  data: { paymentStatus?: string; amountPaidZmw?: number; totalAmountZmw?: number },
+  existingTotal?: number,
+  existingStatus?: string,
+): string | null {
+  const total = data.totalAmountZmw ?? existingTotal;
+  const status = data.paymentStatus ?? existingStatus;
+
+  if (status === 'partial') {
+    const paid = data.amountPaidZmw;
+    if (paid !== undefined) {
+      if (paid <= 0) {
+        return 'Payment status "partial" requires amountPaidZmw > 0';
+      }
+      if (total !== undefined && paid >= total) {
+        return 'Payment status "partial" requires amountPaidZmw < totalAmountZmw';
+      }
+    }
+  }
+
+  // If amountPaidZmw is being changed on a paid/pending record without a
+  // matching status change, reject — the caller must use enforcePaymentRules.
+  if (status === 'paid' && data.amountPaidZmw !== undefined && data.paymentStatus === undefined) {
+    if (data.amountPaidZmw !== total) {
+      return 'Cannot change amountPaidZmw on a "paid" record — set paymentStatus explicitly or amountPaidZmw equal to totalAmountZmw';
+    }
+  }
+  if (status === 'pending' && data.amountPaidZmw !== undefined && data.paymentStatus === undefined) {
+    if (data.amountPaidZmw !== 0) {
+      return 'Cannot set a non-zero amountPaidZmw on a "pending" record — change paymentStatus to "partial" or "paid" first';
+    }
+  }
+
+  if (status === 'paid' && total !== undefined && data.amountPaidZmw !== undefined && data.amountPaidZmw !== total) {
+    return 'Payment status "paid" requires amountPaidZmw equal to totalAmountZmw (will be auto-set)';
+  }
+
+  return null;
+}
+
 export async function buildSaleRecordModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
   const audit = new AuditService(prisma);
@@ -36,31 +159,32 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
   // GET /all — list all sale records for the user (for sales dashboard)
   app.get('/all', { preHandler: [authenticate] }, async (request) => {
-    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
-    const query = z.object({
-      fromDate: z.string().optional(),
-      toDate: z.string().optional(),
-      paymentStatus: z.enum(['pending', 'partial', 'paid']).optional(),
+    const query = FilterQuerySchema.extend({
       sortBy: z.enum(['saleDate', 'flockName', 'customerName', 'birdCount', 'pricePerBirdZmw', 'totalAmountZmw', 'paymentStatus']).optional(),
       sortDir: z.enum(['asc', 'desc']).optional(),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+      offset: z.coerce.number().int().min(0).default(0),
     }).parse(request.query);
 
-    const where: any = { flock: { organizationId } };
-    if (query.fromDate) where.saleDate = { gte: new Date(query.fromDate) };
-    if (query.toDate) where.saleDate = { ...where.saleDate, lte: new Date(query.toDate) };
-    if (query.paymentStatus) where.paymentStatus = query.paymentStatus;
+    const where = buildFilterWhere(organizationId, query);
 
     const sortBy = query.sortBy ?? 'saleDate';
     const sortDir = query.sortDir ?? 'desc';
 
     // Fields that require post-fetch sorting (relation or computed fields)
     const prismaSortFields = new Set(['saleDate', 'customerName', 'birdCount', 'pricePerBirdZmw', 'totalAmountZmw', 'paymentStatus']);
-    const records = await prisma.saleRecord.findMany({
-      where,
-      include: { flock: { select: { name: true, breed: { select: { name: true } } } } },
-      orderBy: prismaSortFields.has(sortBy) ? { [sortBy]: sortDir } : { saleDate: 'desc' },
-    });
+
+    const [records, total] = await Promise.all([
+      prisma.saleRecord.findMany({
+        where,
+        include: { flock: { select: { name: true, breed: { select: { name: true } } } } },
+        orderBy: prismaSortFields.has(sortBy) ? { [sortBy]: sortDir } : { saleDate: 'desc' },
+        take: query.limit,
+        skip: query.offset,
+      }),
+      prisma.saleRecord.count({ where }),
+    ]);
 
     // Post-fetch sort for flockName (requires relation field)
     if (sortBy === 'flockName') {
@@ -71,21 +195,20 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       });
     }
 
-    return records;
+    return {
+      data: records.map(serializeSaleRecord),
+      total,
+      limit: query.limit,
+      offset: query.offset,
+    };
   });
 
   // GET /dashboard — global sales summary for the sales dashboard
   app.get('/dashboard', { preHandler: [authenticate] }, async (request) => {
-    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
-    const query = z.object({
-      fromDate: z.string().optional(),
-      toDate: z.string().optional(),
-    }).parse(request.query);
+    const query = FilterQuerySchema.parse(request.query);
 
-    const where: any = { flock: { organizationId } };
-    if (query.fromDate) where.saleDate = { gte: new Date(query.fromDate) };
-    if (query.toDate) where.saleDate = { ...where.saleDate, lte: new Date(query.toDate) };
+    const where = buildFilterWhere(organizationId, query);
 
     const totals = await prisma.saleRecord.aggregate({
       where,
@@ -110,11 +233,16 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       take: 10,
     });
 
-    // Daily sales for charting (last 30 days by default)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Daily sales for charting — respect date range if provided, else last 30 days
+    let chartWhere = where;
+    if (!query.fromDate && !query.toDate) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      chartWhere = { ...where, saleDate: { ...where.saleDate, gte: thirtyDaysAgo } };
+    }
+
     const recentSales = await prisma.saleRecord.findMany({
-      where: { ...where, saleDate: { gte: thirtyDaysAgo } },
+      where: chartWhere,
       orderBy: { saleDate: 'asc' },
       select: { saleDate: true, birdCount: true, totalAmountZmw: true },
     });
@@ -149,35 +277,50 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   });
 
   // GET /?flockId=... (optional — returns all user's sales if no flockId)
+  // Supports the same filter params as /all plus pagination.
   app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
-    const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
-    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
+    const query = FilterQuerySchema.extend({
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+      offset: z.coerce.number().int().min(0).default(0),
+      sortBy: z.enum(['saleDate', 'customerName', 'birdCount', 'pricePerBirdZmw', 'totalAmountZmw', 'paymentStatus']).optional(),
+      sortDir: z.enum(['asc', 'desc']).optional(),
+    }).parse(request.query);
 
-    if (flockId) {
+    const where = buildFilterWhere(organizationId, query);
+
+    if (query.flockId) {
       const flock = await prisma.broilerFlock.findFirst({
-        where: { id: flockId, organizationId },
+        where: { id: query.flockId, organizationId },
       });
       if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
-
-      return prisma.saleRecord.findMany({
-        where: { flockId },
-        orderBy: { saleDate: 'desc' },
-      });
     }
 
-    // No flockId — return all sales for the user
-    return prisma.saleRecord.findMany({
-      where: { flock: { organizationId } },
-      include: { flock: { select: { name: true, breed: { select: { name: true } } } } },
-      orderBy: { saleDate: 'desc' },
-    });
+    const sortBy = query.sortBy ?? 'saleDate';
+    const sortDir = query.sortDir ?? 'desc';
+
+    const [records, total] = await Promise.all([
+      prisma.saleRecord.findMany({
+        where,
+        include: query.flockId ? undefined : { flock: { select: { name: true, breed: { select: { name: true } } } } },
+        orderBy: { [sortBy]: sortDir },
+        take: query.limit,
+        skip: query.offset,
+      }),
+      prisma.saleRecord.count({ where }),
+    ]);
+
+    return {
+      data: records.map(serializeSaleRecord),
+      total,
+      limit: query.limit,
+      offset: query.offset,
+    };
   });
 
   // GET /:id
   app.get('/:id', { preHandler: [authenticate] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
-    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
 
     const record = await prisma.saleRecord.findFirst({
@@ -191,7 +334,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     // Strip sensitive fields from documents
     const { _flock, documents, ...safe } = record;
     return {
-      ...safe,
+      ...serializeSaleRecord(safe),
       documents: documents.map((doc: any) => {
         const { filePath: _filePath, storageKey: _storageKey, contentText: _contentText, ...docSafe } = doc;
         return { ...docSafe, downloadUrl: `/api/v1/documents/${doc.id}/download` };
@@ -200,21 +343,19 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   });
 
   // GET /summary?flockId=... (optional — returns global summary if no flockId)
+  // Supports the same filter params as /all.
   app.get('/summary', { preHandler: [authenticate] }, async (request, reply) => {
-    const { flockId } = z.object({ flockId: z.string().uuid().optional() }).parse(request.query);
-    const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
+    const query = FilterQuerySchema.parse(request.query);
 
-    const where = flockId
-      ? { flockId }
-      : { flock: { organizationId } };
-
-    if (flockId) {
+    if (query.flockId) {
       const flock = await prisma.broilerFlock.findFirst({
-        where: { id: flockId, organizationId },
+        where: { id: query.flockId, organizationId },
       });
       if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
     }
+
+    const where = buildFilterWhere(organizationId, query);
 
     const birdSum = await prisma.saleRecord.aggregate({
       where,
@@ -264,29 +405,39 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
-    const description = `Sale: ${data.birdCount} birds${data.customerName ? ' to ' + data.customerName : ''}`;
+    // Validate payment rules
+    const validationError = validatePaymentRules(data);
+    if (validationError) {
+      return reply.status(422).send({ error: 'VALIDATION_ERROR', message: validationError });
+    }
+
+    // Enforce payment consistency
+    const paymentOverrides = enforcePaymentRules(data);
+    const finalData = { ...data, ...paymentOverrides };
+
+    const description = `Sale: ${finalData.birdCount} birds${finalData.customerName ? ' to ' + finalData.customerName : ''}`;
 
     // Create the linked FinancialRecord first so we can store its id in the SaleRecord notes.
     const financialRecord = await prisma.financialRecord.create({
       data: {
         flockId,
-        recordDate: new Date(data.saleDate),
+        recordDate: new Date(finalData.saleDate),
         category: 'sales',
         description,
-        amountZmw: data.totalAmountZmw,
+        amountZmw: finalData.totalAmountZmw,
         isIncome: true,
       },
     });
 
     const notesPrefix = `[FR:${financialRecord.id}]`;
-    const originalNotes = data.notes ? ` ${data.notes}` : '';
+    const originalNotes = finalData.notes ? ` ${finalData.notes}` : '';
 
     const created = await prisma.saleRecord.create({
       data: {
-        ...data,
-        saleDate: new Date(data.saleDate),
+        ...finalData,
+        saleDate: new Date(finalData.saleDate),
         flockId,
-        amountPaidZmw: data.amountPaidZmw ?? null,
+        amountPaidZmw: finalData.amountPaidZmw ?? null,
         notes: `${notesPrefix}${originalNotes}`,
         createdBy: _authUser.userId,
         organizationId,
@@ -296,7 +447,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     // Decrement flock currentCount by birdCount sold
     await prisma.broilerFlock.update({
       where: { id: flockId },
-      data: { currentCount: { decrement: data.birdCount } },
+      data: { currentCount: { decrement: finalData.birdCount } },
     });
 
     await audit.log({
@@ -309,7 +460,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       ipAddress: request.ip,
     });
 
-    return created;
+    return serializeSaleRecord(created);
   });
 
   // PATCH /:id
@@ -327,12 +478,21 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
+    // Validate payment rules (use existing total + status if not being updated)
+    const validationError = validatePaymentRules(data, Number(record.totalAmountZmw), record.paymentStatus);
+    if (validationError) {
+      return reply.status(422).send({ error: 'VALIDATION_ERROR', message: validationError });
+    }
+
+    // Enforce payment consistency
+    const paymentOverrides = enforcePaymentRules(data, Number(record.totalAmountZmw), record.paymentStatus);
+
     // Preserve the [FR:<id>] prefix in notes — clients may strip it for
     // display, so re-prepend it on update to keep the FinancialRecord link.
     const updateData: any = {
       ...data,
+      ...paymentOverrides,
       saleDate: data.saleDate ? new Date(data.saleDate) : undefined,
-      amountPaidZmw: data.amountPaidZmw !== undefined ? data.amountPaidZmw : undefined,
     };
     if (data.notes !== undefined) {
       const existingFrId = parseFinancialRecordId(record.notes);
@@ -347,9 +507,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     });
 
     // If birdCount changed, adjust the flock's currentCount by the delta.
-    // (Create decrements, delete increments; update must apply the difference.)
-    // Enforce the flock-completed lock for non-owners when birdCount changes,
-    // since this mutates the flock's live bird count.
+    // Enforce the flock-completed lock for non-owners when birdCount changes.
     if (data.birdCount !== undefined && data.birdCount !== record.birdCount) {
       if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
       const delta = record.birdCount - data.birdCount; // positive = birds returned to flock
@@ -394,7 +552,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       ipAddress: request.ip,
     });
 
-    return updated;
+    return serializeSaleRecord(updated);
   });
 
   // DELETE /:id

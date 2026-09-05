@@ -1,10 +1,10 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
-import { SaleRecord, SalesDashboardSummary, BroilerFlock } from "@/lib/types";
+import { SaleRecord, SalesDashboardSummary, BroilerFlock, PaginatedSales, SalesFilter, PaymentStatus } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,22 +18,38 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, Paperclip, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
+import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, Paperclip, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronLeft, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
+import { SalesFilterBar } from "@/components/sales/sales-filter-bar";
+
+const PAGE_SIZE = 20;
+
+function buildFilterParams(filter: SalesFilter): string {
+  const params = new URLSearchParams();
+  if (filter.fromDate) params.set("fromDate", filter.fromDate);
+  if (filter.toDate) params.set("toDate", filter.toDate);
+  if (filter.paymentStatus) params.set("paymentStatus", filter.paymentStatus);
+  if (filter.flockId) params.set("flockId", filter.flockId);
+  if (filter.customer) params.set("customer", filter.customer);
+  if (filter.sortBy) { params.set("sortBy", filter.sortBy); params.set("sortDir", filter.sortDir ?? "desc"); }
+  params.set("limit", String(filter.limit ?? PAGE_SIZE));
+  params.set("offset", String(filter.offset ?? 0));
+  return params.toString();
+}
 
 export default function SalesDashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [summary, setSummary] = useState<SalesDashboardSummary | null>(null);
   const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [totalSales, setTotalSales] = useState(0);
   const [flocks, setFlocks] = useState<BroilerFlock[]>([]);
   const [error, setError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<SaleRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<"saleDate" | "flockName" | "customerName" | "birdCount" | "pricePerBirdZmw" | "totalAmountZmw" | "paymentStatus">("saleDate");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [filter, setFilter] = useState<SalesFilter>({ limit: PAGE_SIZE, offset: 0 });
   const [form, setForm] = useState({
     flockId: "",
     saleDate: new Date().toISOString().split("T")[0],
@@ -42,26 +58,29 @@ export default function SalesDashboardPage() {
     birdCount: "",
     avgWeightKg: "",
     pricePerBirdZmw: "",
-    paymentStatus: "pending" as "pending" | "partial" | "paid",
+    paymentStatus: "pending" as PaymentStatus,
     amountPaidZmw: "",
     notes: "",
   });
 
   const canEditSales = user?.role === "owner" || user?.role === "manager" || user?.role === "sales_person";
 
-  const paymentOrder: Record<string, number> = { paid: 0, partial: 1, pending: 2 };
+  const currentPage = Math.floor((filter.offset ?? 0) / PAGE_SIZE) + 1;
+  const totalPages = Math.max(1, Math.ceil(totalSales / PAGE_SIZE));
 
-  function toggleSort(field: typeof sortField) {
-    if (sortField === field) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc");
+  function toggleSort(field: string) {
+    const currentSort = filter.sortBy ?? "saleDate";
+    const currentDir = filter.sortDir ?? "desc";
+    if (currentSort === field) {
+      setFilter({ ...filter, sortBy: field, sortDir: currentDir === "asc" ? "desc" : "asc", offset: 0 });
     } else {
-      setSortField(field);
-      setSortDir(field === "saleDate" ? "desc" : "asc");
+      setFilter({ ...filter, sortBy: field, sortDir: field === "saleDate" ? "desc" : "asc", offset: 0 });
     }
   }
 
-  function SortHeader({ field, label, className }: { field: typeof sortField; label: string; className?: string }) {
-    const isActive = sortField === field;
+  function SortHeader({ field, label, className }: { field: string; label: string; className?: string }) {
+    const isActive = (filter.sortBy ?? "saleDate") === field;
+    const currentDir = filter.sortDir ?? "desc";
     return (
       <th className={`p-2 ${className ?? ""}`}>
         <button
@@ -69,45 +88,24 @@ export default function SalesDashboardPage() {
           className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"}`}
         >
           {label}
-          {isActive && (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+          {isActive && (currentDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
         </button>
       </th>
     );
   }
 
-  const sortedSales = [...sales].sort((a, b) => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    switch (sortField) {
-      case "saleDate":
-        return (new Date(a.saleDate).getTime() - new Date(b.saleDate).getTime()) * dir;
-      case "flockName":
-        return ((a.flock?.name ?? "").localeCompare(b.flock?.name ?? "")) * dir;
-      case "customerName":
-        return ((a.customerName ?? "Walk-in").localeCompare(b.customerName ?? "Walk-in")) * dir;
-      case "birdCount":
-        return (a.birdCount - b.birdCount) * dir;
-      case "pricePerBirdZmw":
-        return (Number(a.pricePerBirdZmw) - Number(b.pricePerBirdZmw)) * dir;
-      case "totalAmountZmw":
-        return (Number(a.totalAmountZmw) - Number(b.totalAmountZmw)) * dir;
-      case "paymentStatus":
-        return ((paymentOrder[a.paymentStatus] ?? 99) - (paymentOrder[b.paymentStatus] ?? 99)) * dir;
-      default:
-        return 0;
-    }
-  });
-
-  function loadData() {
-    apiFetch<SalesDashboardSummary>("/api/v1/sale-records/dashboard")
+  const loadData = useCallback(() => {
+    const params = buildFilterParams(filter);
+    apiFetch<SalesDashboardSummary>(`/api/v1/sale-records/dashboard?${buildFilterParams({ ...filter, limit: undefined, offset: undefined })}`)
       .then(setSummary)
       .catch((err) => setError(err.message));
-    apiFetch<SaleRecord[]>("/api/v1/sale-records/all")
-      .then(setSales)
+    apiFetch<PaginatedSales>(`/api/v1/sale-records/all?${params}`)
+      .then((data) => { setSales(data.data); setTotalSales(data.total); })
       .catch((err) => setError(err.message));
     apiFetch<BroilerFlock[]>("/api/v1/broiler-flocks")
       .then(setFlocks)
       .catch(() => {});
-  }
+  }, [filter]);
 
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
@@ -115,7 +113,7 @@ export default function SalesDashboardPage() {
       router.push("/"); return;
     }
     if (user) loadData();
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, loadData]);
 
   function openCreate() {
     setEditRecord(null);
@@ -157,7 +155,7 @@ export default function SalesDashboardPage() {
       const birdCount = Number(form.birdCount);
       const pricePerBird = Number(form.pricePerBirdZmw);
       const total = birdCount * pricePerBird;
-      const body = {
+      const body: any = {
         flockId: form.flockId,
         saleDate: form.saleDate,
         customerName: form.customerName || undefined,
@@ -167,9 +165,12 @@ export default function SalesDashboardPage() {
         pricePerBirdZmw: pricePerBird,
         totalAmountZmw: total,
         paymentStatus: form.paymentStatus,
-        amountPaidZmw: form.amountPaidZmw ? Number(form.amountPaidZmw) : undefined,
         notes: form.notes || undefined,
       };
+      // Only send amountPaidZmw for partial; API auto-sets for paid/pending
+      if (form.paymentStatus === "partial" && form.amountPaidZmw) {
+        body.amountPaidZmw = Number(form.amountPaidZmw);
+      }
       if (editRecord) {
         await apiFetch(`/api/v1/sale-records/${editRecord.id}`, {
           method: "PATCH",
@@ -200,6 +201,12 @@ export default function SalesDashboardPage() {
     }
   }
 
+  // Auto-fill amountPaidZmw when status is paid
+  const computedTotal = (Number(form.birdCount) || 0) * (Number(form.pricePerBirdZmw) || 0);
+  const effectiveAmountPaid = form.paymentStatus === "paid"
+    ? String(computedTotal)
+    : form.amountPaidZmw;
+
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
 
@@ -220,6 +227,9 @@ export default function SalesDashboardPage() {
       </div>
 
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
+
+      {/* Filter Bar */}
+      <SalesFilterBar filter={filter} onChange={setFilter} flocks={flocks} showFlockFilter={true} />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -279,10 +289,10 @@ export default function SalesDashboardPage() {
 
       {/* Sales Records Table */}
       <Card>
-        <CardHeader><CardTitle>Sale Records ({sales.length})</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Sale Records ({totalSales})</CardTitle></CardHeader>
         <CardContent>
           {sales.length === 0 ? (
-            <p className="text-muted-foreground">No sales recorded yet.</p>
+            <p className="text-muted-foreground">No sales records found for the current filters.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
@@ -300,7 +310,7 @@ export default function SalesDashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedSales.map((s) => (
+                  {sales.map((s) => (
                     <Fragment key={s.id}>
                       <tr className="border-b last:border-0">
                         <td className="p-2">
@@ -360,6 +370,33 @@ export default function SalesDashboardPage() {
               </table>
             </div>
           )}
+
+          {/* Pagination */}
+          {totalSales > PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages} ({totalSales} total)
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={(filter.offset ?? 0) === 0}
+                  onClick={() => setFilter({ ...filter, offset: Math.max(0, (filter.offset ?? 0) - PAGE_SIZE) })}
+                >
+                  <ChevronLeft className="h-4 w-4" /> Prev
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setFilter({ ...filter, offset: (filter.offset ?? 0) + PAGE_SIZE })}
+                >
+                  Next <ChevronRightIcon className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -413,7 +450,7 @@ export default function SalesDashboardPage() {
               <Label>Price per Bird (ZMW)</Label>
               <Input type="number" step="0.01" value={form.pricePerBirdZmw} onChange={(e) => setForm({ ...form, pricePerBirdZmw: e.target.value })} />
               {form.birdCount && form.pricePerBirdZmw && (
-                <p className="text-xs text-muted-foreground mt-1">Total: ZMW {(Number(form.birdCount) * Number(form.pricePerBirdZmw)).toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Total: ZMW {computedTotal.toFixed(2)}</p>
               )}
             </div>
             <div>
@@ -421,19 +458,28 @@ export default function SalesDashboardPage() {
               <select
                 className="w-full border rounded-md p-2 bg-background text-foreground"
                 value={form.paymentStatus}
-                onChange={(e) => setForm({ ...form, paymentStatus: e.target.value as any })}
+                onChange={(e) => setForm({ ...form, paymentStatus: e.target.value as PaymentStatus })}
               >
                 <option value="pending">Pending</option>
                 <option value="partial">Partial</option>
                 <option value="paid">Paid</option>
               </select>
             </div>
-            {form.paymentStatus !== "pending" && (
-              <div>
-                <Label>Amount Paid (ZMW)</Label>
-                <Input type="number" step="0.01" value={form.amountPaidZmw} onChange={(e) => setForm({ ...form, amountPaidZmw: e.target.value })} />
-              </div>
-            )}
+            {/* Always show amount paid; disabled for paid (auto-set) and pending (zero) */}
+            <div>
+              <Label>Amount Paid (ZMW)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={effectiveAmountPaid}
+                onChange={(e) => setForm({ ...form, amountPaidZmw: e.target.value })}
+                disabled={form.paymentStatus === "paid" || form.paymentStatus === "pending"}
+                placeholder={form.paymentStatus === "paid" ? "Auto-set to total" : form.paymentStatus === "pending" ? "0.00" : "Enter amount"}
+              />
+              {form.paymentStatus === "paid" && (
+                <p className="text-xs text-muted-foreground mt-1">Automatically set to total amount</p>
+              )}
+            </div>
             <div>
               <Label>Notes</Label>
               <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />

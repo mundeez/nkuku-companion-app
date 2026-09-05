@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, Fragment } from "react";
+import { useEffect, useState, Fragment, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
-import { BroilerFlock, SaleRecord, SaleRecordSummary, PaymentStatus } from "@/lib/types";
+import { BroilerFlock, SaleRecord, SaleRecordSummary, PaymentStatus, SalesFilter, PaginatedSales } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,11 +18,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Trash2, Pencil, DollarSign, Paperclip } from "lucide-react";
+import { ShoppingCart, Trash2, Pencil, DollarSign, Paperclip, ChevronLeft, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { FlockSubNav } from "@/components/flock-subnav";
 import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
+import { SalesFilterBar } from "@/components/sales/sales-filter-bar";
 
 const paymentStatusOptions: PaymentStatus[] = ["pending", "partial", "paid"];
+const PAGE_SIZE = 20;
 
 function fmtZmw(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -41,6 +43,18 @@ function paymentBadge(status: PaymentStatus) {
   }
 }
 
+function buildFilterParams(flockId: string, filter: SalesFilter): string {
+  const params = new URLSearchParams();
+  params.set("flockId", flockId);
+  if (filter.fromDate) params.set("fromDate", filter.fromDate);
+  if (filter.toDate) params.set("toDate", filter.toDate);
+  if (filter.paymentStatus) params.set("paymentStatus", filter.paymentStatus);
+  if (filter.customer) params.set("customer", filter.customer);
+  params.set("limit", String(filter.limit ?? PAGE_SIZE));
+  params.set("offset", String(filter.offset ?? 0));
+  return params.toString();
+}
+
 export default function SalesPage() {
   const params = useParams();
   const router = useRouter();
@@ -49,11 +63,13 @@ export default function SalesPage() {
 
   const [flock, setFlock] = useState<BroilerFlock | null>(null);
   const [records, setRecords] = useState<SaleRecord[]>([]);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [summary, setSummary] = useState<SaleRecordSummary | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<SalesFilter>({ limit: PAGE_SIZE, offset: 0 });
 
   const [form, setForm] = useState({
     saleDate: new Date().toISOString().split("T")[0],
@@ -71,17 +87,28 @@ export default function SalesPage() {
     user?.role === "owner" || user?.role === "manager" || user?.role === "sales_person";
   const canDeleteSales = user?.role === "owner";
 
-  function loadAll() {
+  const currentPage = Math.floor((filter.offset ?? 0) / PAGE_SIZE) + 1;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
+
+  const loadAll = useCallback(() => {
+    const listParams = buildFilterParams(flockId, filter);
+    const summaryParams = new URLSearchParams();
+    summaryParams.set("flockId", flockId);
+    if (filter.fromDate) summaryParams.set("fromDate", filter.fromDate);
+    if (filter.toDate) summaryParams.set("toDate", filter.toDate);
+    if (filter.paymentStatus) summaryParams.set("paymentStatus", filter.paymentStatus);
+    if (filter.customer) summaryParams.set("customer", filter.customer);
+
     apiFetch<BroilerFlock>(`/api/v1/broiler-flocks/${flockId}`)
       .then(setFlock)
       .catch((err) => setError(err.message));
-    apiFetch<SaleRecord[]>(`/api/v1/sale-records?flockId=${flockId}`)
-      .then(setRecords)
+    apiFetch<PaginatedSales>(`/api/v1/sale-records?${listParams}`)
+      .then((data) => { setRecords(data.data); setTotalRecords(data.total); })
       .catch((err) => setError(err.message));
-    apiFetch<SaleRecordSummary>(`/api/v1/sale-records/summary?flockId=${flockId}`)
+    apiFetch<SaleRecordSummary>(`/api/v1/sale-records/summary?${summaryParams.toString()}`)
       .then(setSummary)
       .catch(() => {});
-  }
+  }, [flockId, filter]);
 
   function resetForm() {
     setForm({
@@ -117,18 +144,25 @@ export default function SalesPage() {
     e.preventDefault();
     setSaving(true);
     try {
+      const birdCount = Number(form.birdCount);
+      const pricePerBird = Number(form.pricePerBirdZmw);
+      const total = birdCount * pricePerBird;
       const body: any = {
         flockId,
         saleDate: form.saleDate,
         customerName: form.customerName || null,
         customerPhone: form.customerPhone || null,
-        birdCount: Number(form.birdCount),
+        birdCount,
         avgWeightKg: form.avgWeightKg ? Number(form.avgWeightKg) : null,
-        pricePerBirdZmw: Number(form.pricePerBirdZmw),
+        pricePerBirdZmw: pricePerBird,
+        totalAmountZmw: total,
         paymentStatus: form.paymentStatus,
-        amountPaidZmw: form.amountPaidZmw ? Number(form.amountPaidZmw) : null,
         notes: form.notes || null,
       };
+      // Only send amountPaidZmw for partial; API auto-sets for paid/pending
+      if (form.paymentStatus === "partial" && form.amountPaidZmw) {
+        body.amountPaidZmw = Number(form.amountPaidZmw);
+      }
       if (editingId) {
         await apiFetch(`/api/v1/sale-records/${editingId}`, {
           method: "PATCH",
@@ -165,13 +199,16 @@ export default function SalesPage() {
       return;
     }
     if (user && flockId) loadAll();
-  }, [user, isLoading, flockId, router]);
+  }, [user, isLoading, flockId, router, loadAll]);
 
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
 
   const computedTotal =
     (Number(form.birdCount) || 0) * (Number(form.pricePerBirdZmw) || 0);
+  const effectiveAmountPaid = form.paymentStatus === "paid"
+    ? String(computedTotal)
+    : form.amountPaidZmw;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -226,6 +263,9 @@ export default function SalesPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Filter Bar (no flock filter — already scoped) */}
+      <SalesFilterBar filter={filter} onChange={setFilter} showFlockFilter={false} />
 
       {/* Add/Edit Sale Form */}
       {canManageSales && (
@@ -322,19 +362,19 @@ export default function SalesPage() {
                   ))}
                 </select>
               </div>
-              {form.paymentStatus === "partial" && (
-                <div>
-                  <Label htmlFor="amountPaidZmw">Amount Paid (ZMW)</Label>
-                  <Input
-                    id="amountPaidZmw"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.amountPaidZmw}
-                    onChange={(e) => setForm({ ...form, amountPaidZmw: e.target.value })}
-                  />
-                </div>
-              )}
+              <div>
+                <Label htmlFor="amountPaidZmw">Amount Paid (ZMW)</Label>
+                <Input
+                  id="amountPaidZmw"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={effectiveAmountPaid}
+                  onChange={(e) => setForm({ ...form, amountPaidZmw: e.target.value })}
+                  disabled={form.paymentStatus === "paid" || form.paymentStatus === "pending"}
+                  placeholder={form.paymentStatus === "paid" ? "Auto-set to total" : form.paymentStatus === "pending" ? "0.00" : "Enter amount"}
+                />
+              </div>
               <div className="md:col-span-3">
                 <Label htmlFor="notes">Notes</Label>
                 <Input
@@ -441,12 +481,39 @@ export default function SalesPage() {
             {records.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                  No sale records yet.
+                  No sale records found for the current filters.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        {totalRecords > PAGE_SIZE && (
+          <div className="flex items-center justify-between p-4 border-t">
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages} ({totalRecords} total)
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={(filter.offset ?? 0) === 0}
+                onClick={() => setFilter({ ...filter, offset: Math.max(0, (filter.offset ?? 0) - PAGE_SIZE) })}
+              >
+                <ChevronLeft className="h-4 w-4" /> Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setFilter({ ...filter, offset: (filter.offset ?? 0) + PAGE_SIZE })}
+              >
+                Next <ChevronRightIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
