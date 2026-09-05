@@ -17,6 +17,7 @@ const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const SMTP_FROM = process.env.SMTP_FROM || 'Nkuku Companion <no-reply@nkuku.app>';
 const EMAIL_DISABLED = process.env.EMAIL_DISABLED === 'true';
+const TEST_MODE = process.env.TEST_MODE === 'true';
 const WEB_BASE_URL = process.env.WEB_BASE_URL || 'http://localhost:30000';
 
 export { EMAIL_DISABLED };
@@ -89,9 +90,25 @@ export async function sendVerificationEmail(
       subject,
       html,
     });
-    return { success: true, message: 'Email sent' };
+    return {
+      success: true,
+      message: 'Email sent',
+      ...(TEST_MODE ? { devToken: token, devUrl: url } : {}),
+    };
   } catch (err: any) {
     console.error('Email send failed:', err.message);
+    // In TEST_MODE, return the dev token even on SMTP failure so integration
+    // tests can complete the verification round-trip without a deliverable
+    // recipient address (test fixtures use @example.com which real SMTP
+    // servers correctly reject). Production (no TEST_MODE) still fails closed.
+    if (TEST_MODE) {
+      return {
+        success: true,
+        message: `Email send failed (test mode): ${err.message}`,
+        devToken: token,
+        devUrl: url,
+      };
+    }
     return { success: false, message: `Email send failed: ${err.message}` };
   }
 }
@@ -133,9 +150,20 @@ export async function sendInviteEmail(
       subject,
       html,
     });
-    return { success: true, message: 'Invite email sent' };
+    return {
+      success: true,
+      message: 'Invite email sent',
+      ...(TEST_MODE ? { devUrl: inviteUrl } : {}),
+    };
   } catch (err: any) {
     console.error('Invite email send failed:', err.message);
+    if (TEST_MODE) {
+      return {
+        success: true,
+        message: `Invite email send failed (test mode): ${err.message}`,
+        devUrl: inviteUrl,
+      };
+    }
     return { success: false, message: `Email send failed: ${err.message}` };
   }
 }

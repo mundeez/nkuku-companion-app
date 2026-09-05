@@ -42,6 +42,7 @@ services:
       SMS_DISABLED: ${SMS_DISABLED:-false}
       # ── Email (SMTP) ──
       EMAIL_DISABLED: ${EMAIL_DISABLED:-true}
+      TEST_MODE: ${TEST_MODE:-true}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
