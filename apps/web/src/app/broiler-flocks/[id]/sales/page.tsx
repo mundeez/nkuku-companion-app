@@ -150,14 +150,14 @@ export default function SalesPage() {
       const body: any = {
         flockId,
         saleDate: form.saleDate,
-        customerName: form.customerName || null,
-        customerPhone: form.customerPhone || null,
+        customerName: form.customerName || undefined,
+        customerPhone: form.customerPhone || undefined,
         birdCount,
-        avgWeightKg: form.avgWeightKg ? Number(form.avgWeightKg) : null,
+        avgWeightKg: form.avgWeightKg ? Number(form.avgWeightKg) : undefined,
         pricePerBirdZmw: pricePerBird,
         totalAmountZmw: total,
         paymentStatus: form.paymentStatus,
-        notes: form.notes || null,
+        notes: form.notes || undefined,
       };
       // Only send amountPaidZmw for partial; API auto-sets for paid/pending
       if (form.paymentStatus === "partial" && form.amountPaidZmw) {

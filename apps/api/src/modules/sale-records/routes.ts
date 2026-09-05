@@ -9,15 +9,15 @@ import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/
 const SaleRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
   saleDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
-  customerName: z.string().max(200).optional(),
-  customerPhone: z.string().max(50).optional(),
+  customerName: z.string().max(200).nullish(),
+  customerPhone: z.string().max(50).nullish(),
   birdCount: z.number().int().positive(),
-  avgWeightKg: z.number().nonnegative().optional(),
+  avgWeightKg: z.number().nonnegative().nullish(),
   pricePerBirdZmw: z.number().nonnegative(),
   totalAmountZmw: z.number().nonnegative(),
   paymentStatus: z.enum(['pending', 'partial', 'paid']).default('pending'),
-  amountPaidZmw: z.number().nonnegative().optional(),
-  notes: z.string().optional(),
+  amountPaidZmw: z.number().nonnegative().nullish(),
+  notes: z.string().nullish(),
 });
 
 const SaleRecordUpdateSchema = SaleRecordCreateSchema.partial().omit({ flockId: true });
