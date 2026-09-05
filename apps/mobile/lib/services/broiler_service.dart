@@ -19,7 +19,6 @@ import 'api_cache.dart';
 import 'api_service.dart';
 import 'connectivity_service.dart';
 import 'offline_cache.dart';
-import 'sync_service.dart';
 
 class BroilerServiceException implements Exception {
   final String message;
@@ -203,6 +202,15 @@ class BroilerService {
 
   static Future<GrowthRecord> updateGrowthRecord(
       String id, GrowthRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'growth_record',
+        operation: 'update',
+        entityId: id,
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/growth-records/$id', data: record.toJson());
     _assertOk(res);
@@ -210,6 +218,15 @@ class BroilerService {
   }
 
   static Future<void> deleteGrowthRecord(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'growth_record',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/growth-records/$id');
     _assertOk(res);
   }
@@ -253,6 +270,15 @@ class BroilerService {
 
   static Future<FeedRecord> updateFeedRecord(
       String id, FeedRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'feed_record',
+        operation: 'update',
+        entityId: id,
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/feed-records/$id', data: record.toJson());
     _assertOk(res);
@@ -260,6 +286,15 @@ class BroilerService {
   }
 
   static Future<void> deleteFeedRecord(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'feed_record',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/feed-records/$id');
     _assertOk(res);
   }
@@ -302,6 +337,15 @@ class BroilerService {
 
   static Future<FeedPurchase> updateFeedPurchase(
       String id, FeedPurchase purchase) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'feed_purchase',
+        operation: 'update',
+        entityId: id,
+        payload: purchase.toJson(),
+      );
+      return purchase;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/feed-purchases/$id', data: purchase.toJson());
     _assertOk(res);
@@ -309,6 +353,15 @@ class BroilerService {
   }
 
   static Future<void> deleteFeedPurchase(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'feed_purchase',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/feed-purchases/$id');
     _assertOk(res);
   }
@@ -352,6 +405,15 @@ class BroilerService {
 
   static Future<WaterRecord> updateWaterRecord(
       String id, WaterRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'water_record',
+        operation: 'update',
+        entityId: id,
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/water-records/$id', data: record.toJson());
     _assertOk(res);
@@ -359,6 +421,15 @@ class BroilerService {
   }
 
   static Future<void> deleteWaterRecord(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'water_record',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/water-records/$id');
     _assertOk(res);
   }
@@ -403,6 +474,15 @@ class BroilerService {
 
   static Future<MortalityEvent> updateMortalityEvent(
       String id, MortalityEvent event) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'mortality_event',
+        operation: 'update',
+        entityId: id,
+        payload: event.toJson(),
+      );
+      return event;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/mortality-events/$id', data: event.toJson());
     _assertOk(res);
@@ -410,6 +490,15 @@ class BroilerService {
   }
 
   static Future<void> deleteMortalityEvent(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'mortality_event',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/mortality-events/$id');
     _assertOk(res);
   }
@@ -456,6 +545,15 @@ class BroilerService {
 
   static Future<VaccinationEvent> updateVaccinationEvent(
       String id, VaccinationEvent event) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'vaccination_event',
+        operation: 'update',
+        entityId: id,
+        payload: event.toJson(),
+      );
+      return event;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/vaccination-events/$id', data: event.toJson());
     _assertOk(res);
@@ -463,6 +561,15 @@ class BroilerService {
   }
 
   static Future<void> deleteVaccinationEvent(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'vaccination_event',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/vaccination-events/$id');
     _assertOk(res);
   }
@@ -508,6 +615,15 @@ class BroilerService {
 
   static Future<FinancialRecord> updateFinancialRecord(
       String id, FinancialRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'financial_record',
+        operation: 'update',
+        entityId: id,
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/financial-records/$id', data: record.toJson());
     _assertOk(res);
@@ -515,6 +631,15 @@ class BroilerService {
   }
 
   static Future<void> deleteFinancialRecord(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'financial_record',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/financial-records/$id');
     _assertOk(res);
   }
@@ -591,6 +716,15 @@ class BroilerService {
 
   static Future<MedicationRecord> updateMedicationRecord(
       String id, MedicationRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'medication_record',
+        operation: 'update',
+        entityId: id,
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/medication-records/$id', data: record.toJson());
     _assertOk(res);
@@ -598,6 +732,15 @@ class BroilerService {
   }
 
   static Future<void> deleteMedicationRecord(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'medication_record',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/medication-records/$id');
     _assertOk(res);
   }
@@ -627,6 +770,15 @@ class BroilerService {
 
   static Future<EnvironmentalRecord> updateEnvironmentalRecord(
       String id, EnvironmentalRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'environmental_record',
+        operation: 'update',
+        entityId: id,
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/environmental-records/$id', data: record.toJson());
     _assertOk(res);
@@ -634,6 +786,15 @@ class BroilerService {
   }
 
   static Future<void> deleteEnvironmentalRecord(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'environmental_record',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res =
         await ApiService.dio.delete('/api/v1/environmental-records/$id');
     _assertOk(res);
@@ -726,6 +887,15 @@ class BroilerService {
 
   static Future<SaleRecord> updateSaleRecord(
       String id, SaleRecord record) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'sale_record',
+        operation: 'update',
+        entityId: id,
+        payload: record.toJson(),
+      );
+      return record;
+    }
     final res = await ApiService.dio
         .patch('/api/v1/sale-records/$id', data: record.toJson());
     _assertOk(res);
@@ -733,6 +903,15 @@ class BroilerService {
   }
 
   static Future<void> deleteSaleRecord(String id) async {
+    if (!ConnectivityService.instance.isOnline) {
+      await OfflineCache.instance.enqueueSync(
+        entityType: 'sale_record',
+        operation: 'delete',
+        entityId: id,
+        payload: {},
+      );
+      return;
+    }
     final res = await ApiService.dio.delete('/api/v1/sale-records/$id');
     _assertOk(res);
   }

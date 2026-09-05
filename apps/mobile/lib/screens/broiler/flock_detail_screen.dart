@@ -1675,7 +1675,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         ? (summary['totalBirdsSold'] ?? summary['total_birds_sold'] ?? 0)
         : _saleRecords.fold(0, (sum, r) => sum + r.birdCount);
     final totalRevenue = summary != null
-        ? double.tryParse((summary['totalRevenueZmw'] ??
+        ? double.tryParse((summary['totalRevenue'] ??
+                    summary['totalRevenueZmw'] ??
                     summary['total_revenue_zmw'] ??
                     0)
                 .toString()) ??
@@ -1744,7 +1745,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                       ? () => _navigateToForm(
                           SaleRecordForm(flockId: widget.flockId, record: r))
                       : null,
-                  onLongPress: AuthService.canManageSales
+                  onLongPress: AuthService.isOwner
                       ? () => _deleteRecord<SaleRecord>(
                             label: 'sale record',
                             record: r,

@@ -116,6 +116,13 @@ class OfflineCache {
     }
   }
 
+  /// Clear cached alerts so the next read fetches fresh data from the API.
+  /// Called after alert mutations (mark read/resolved, delete, generate).
+  Future<void> clearCachedAlerts() async {
+    if (!_initialized) return;
+    await _storage.delete(key: _alertsKey);
+  }
+
   // ── Dashboard summary cache (single JSON blob) ──────────────
 
   Future<void> cacheDashboardSummary(Map<String, dynamic> summary) async {

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'financials/financial_dashboard_screen.dart';
 import 'ledger/ledger_dashboard_screen.dart';
+import 'sales_dashboard_screen.dart';
 
-/// Single bottom-nav entry point for both the P&L-style Financial Dashboard
-/// and the double-entry Ledger, switched via a segmented control. Each inner
+/// Single bottom-nav entry point for the Financial Dashboard, Sales Dashboard,
+/// and double-entry Ledger, switched via a segmented control. Each inner
 /// screen keeps its own AppBar/state; this widget only owns the switcher.
 class FinanceHubScreen extends StatefulWidget {
   const FinanceHubScreen({super.key});
@@ -17,6 +18,7 @@ class _FinanceHubScreenState extends State<FinanceHubScreen> {
 
   static const _pages = [
     FinancialDashboardScreen(),
+    SalesDashboardScreen(),
     LedgerDashboardScreen(),
   ];
 
@@ -40,6 +42,11 @@ class _FinanceHubScreenState extends State<FinanceHubScreen> {
                   ),
                   ButtonSegment(
                     value: 1,
+                    label: Text('Sales'),
+                    icon: Icon(Icons.point_of_sale),
+                  ),
+                  ButtonSegment(
+                    value: 2,
                     label: Text('Ledger'),
                     icon: Icon(Icons.menu_book),
                   ),

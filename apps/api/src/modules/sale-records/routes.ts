@@ -327,14 +327,37 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
+    // Preserve the [FR:<id>] prefix in notes — clients may strip it for
+    // display, so re-prepend it on update to keep the FinancialRecord link.
+    const updateData: any = {
+      ...data,
+      saleDate: data.saleDate ? new Date(data.saleDate) : undefined,
+      amountPaidZmw: data.amountPaidZmw !== undefined ? data.amountPaidZmw : undefined,
+    };
+    if (data.notes !== undefined) {
+      const existingFrId = parseFinancialRecordId(record.notes);
+      updateData.notes = existingFrId
+        ? `[FR:${existingFrId}]${data.notes ? ' ' + data.notes : ''}`
+        : data.notes;
+    }
+
     const updated = await prisma.saleRecord.update({
       where: { id },
-      data: {
-        ...data,
-        saleDate: data.saleDate ? new Date(data.saleDate) : undefined,
-        amountPaidZmw: data.amountPaidZmw !== undefined ? data.amountPaidZmw : undefined,
-      },
+      data: updateData,
     });
+
+    // If birdCount changed, adjust the flock's currentCount by the delta.
+    // (Create decrements, delete increments; update must apply the difference.)
+    // Enforce the flock-completed lock for non-owners when birdCount changes,
+    // since this mutates the flock's live bird count.
+    if (data.birdCount !== undefined && data.birdCount !== record.birdCount) {
+      if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
+      const delta = record.birdCount - data.birdCount; // positive = birds returned to flock
+      await prisma.broilerFlock.update({
+        where: { id: record.flockId },
+        data: { currentCount: { increment: delta } },
+      });
+    }
 
     // Update the linked FinancialRecord if amount or date changed.
     const financialRecordId = parseFinancialRecordId(record.notes);

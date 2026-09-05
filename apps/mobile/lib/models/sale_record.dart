@@ -11,6 +11,7 @@ class SaleRecord {
   final String paymentStatus;
   final double? amountPaidZmw;
   final String? notes;
+  final String? flockName;
 
   SaleRecord({
     required this.id,
@@ -25,6 +26,7 @@ class SaleRecord {
     this.paymentStatus = 'pending',
     this.amountPaidZmw,
     this.notes,
+    this.flockName,
   });
 
   factory SaleRecord.fromJson(Map<String, dynamic> json) {
@@ -46,7 +48,8 @@ class SaleRecord {
       amountPaidZmw: (json['amountPaidZmw'] ?? json['amount_paid_zmw']) != null
           ? double.tryParse((json['amountPaidZmw'] ?? json['amount_paid_zmw']).toString())
           : null,
-      notes: json['notes'],
+      notes: _stripFrPrefix(json['notes']),
+      flockName: json['flock'] is Map ? json['flock']['name'] : null,
     );
   }
 
@@ -79,6 +82,7 @@ class SaleRecord {
     String? paymentStatus,
     double? amountPaidZmw,
     String? notes,
+    String? flockName,
   }) {
     return SaleRecord(
       id: id ?? this.id,
@@ -93,6 +97,21 @@ class SaleRecord {
       paymentStatus: paymentStatus ?? this.paymentStatus,
       amountPaidZmw: amountPaidZmw ?? this.amountPaidZmw,
       notes: notes ?? this.notes,
+      flockName: flockName ?? this.flockName,
     );
   }
+}
+
+/// Strip the internal `[FR:<uuid>]` prefix that the API prepends to sale
+/// record notes for linking to FinancialRecords. Users should never see it.
+String? _stripFrPrefix(dynamic notes) {
+  if (notes == null) return null;
+  final s = notes.toString();
+  // Match [FR:<uuid>] at the start of the string, optionally followed by whitespace
+  final match = RegExp(r'^\[FR:[0-9a-fA-F-]{36}\]\s*').firstMatch(s);
+  if (match != null) {
+    final stripped = s.substring(match.end);
+    return stripped.isEmpty ? null : stripped;
+  }
+  return s;
 }

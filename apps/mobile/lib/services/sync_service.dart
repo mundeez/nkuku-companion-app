@@ -114,6 +114,9 @@ class SyncService {
         if (operation == 'create') {
           final res = await dio.post('/api/v1/growth-records', data: payload);
           _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/growth-records/$entityId', data: payload);
+          _assertOk(res);
         } else if (operation == 'delete') {
           final res = await dio.delete('/api/v1/growth-records/$entityId');
           _assertOk(res);
@@ -123,6 +126,9 @@ class SyncService {
       case 'feed_record':
         if (operation == 'create') {
           final res = await dio.post('/api/v1/feed-records', data: payload);
+          _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/feed-records/$entityId', data: payload);
           _assertOk(res);
         } else if (operation == 'delete') {
           final res = await dio.delete('/api/v1/feed-records/$entityId');
@@ -134,6 +140,9 @@ class SyncService {
         if (operation == 'create') {
           final res = await dio.post('/api/v1/water-records', data: payload);
           _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/water-records/$entityId', data: payload);
+          _assertOk(res);
         } else if (operation == 'delete') {
           final res = await dio.delete('/api/v1/water-records/$entityId');
           _assertOk(res);
@@ -143,6 +152,9 @@ class SyncService {
       case 'mortality_event':
         if (operation == 'create') {
           final res = await dio.post('/api/v1/mortality-events', data: payload);
+          _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/mortality-events/$entityId', data: payload);
           _assertOk(res);
         } else if (operation == 'delete') {
           final res = await dio.delete('/api/v1/mortality-events/$entityId');
@@ -154,6 +166,9 @@ class SyncService {
         if (operation == 'create') {
           final res = await dio.post('/api/v1/vaccination-events', data: payload);
           _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/vaccination-events/$entityId', data: payload);
+          _assertOk(res);
         } else if (operation == 'delete') {
           final res = await dio.delete('/api/v1/vaccination-events/$entityId');
           _assertOk(res);
@@ -163,6 +178,9 @@ class SyncService {
       case 'financial_record':
         if (operation == 'create') {
           final res = await dio.post('/api/v1/financial-records', data: payload);
+          _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/financial-records/$entityId', data: payload);
           _assertOk(res);
         } else if (operation == 'delete') {
           final res = await dio.delete('/api/v1/financial-records/$entityId');
@@ -174,8 +192,24 @@ class SyncService {
         if (operation == 'create') {
           final res = await dio.post('/api/v1/sale-records', data: payload);
           _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/sale-records/$entityId', data: payload);
+          _assertOk(res);
         } else if (operation == 'delete') {
           final res = await dio.delete('/api/v1/sale-records/$entityId');
+          _assertOk(res);
+        }
+        break;
+
+      case 'feed_purchase':
+        if (operation == 'create') {
+          final res = await dio.post('/api/v1/feed-purchases', data: payload);
+          _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/feed-purchases/$entityId', data: payload);
+          _assertOk(res);
+        } else if (operation == 'delete') {
+          final res = await dio.delete('/api/v1/feed-purchases/$entityId');
           _assertOk(res);
         }
         break;
@@ -183,6 +217,9 @@ class SyncService {
       case 'medication_record':
         if (operation == 'create') {
           final res = await dio.post('/api/v1/medication-records', data: payload);
+          _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/medication-records/$entityId', data: payload);
           _assertOk(res);
         } else if (operation == 'delete') {
           final res = await dio.delete('/api/v1/medication-records/$entityId');
@@ -193,6 +230,9 @@ class SyncService {
       case 'environmental_record':
         if (operation == 'create') {
           final res = await dio.post('/api/v1/environmental-records', data: payload);
+          _assertOk(res);
+        } else if (operation == 'update') {
+          final res = await dio.patch('/api/v1/environmental-records/$entityId', data: payload);
           _assertOk(res);
         } else if (operation == 'delete') {
           final res = await dio.delete('/api/v1/environmental-records/$entityId');

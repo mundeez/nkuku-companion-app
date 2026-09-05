@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.27.0-alpha] — 2026-09-05
+
+### Mobile sync & CRUD fixes
+
+### Fixed
+- Fix sale summary field mismatch in mobile flock detail (use `totalRevenue` before `totalRevenueZmw` aliases).
+- Restrict sale record delete to owner-only, matching the API role requirement.
+- Strip the internal `[FR:<id>]` prefix from sale notes in mobile display.
+- Improve `AlertsService` error handling to distinguish network vs server failures.
+- Add cache invalidation after alert mutations to prevent stale alert lists.
+- API: `PATCH /sale-records/:id` now adjusts flock `currentCount` when `birdCount` changes.
+- API: Preserve the `[FR:<id>]` prefix in sale notes on `PATCH` to keep the `FinancialRecord` link.
+- API: Enforce flock-completed lock for non-owners when `birdCount` changes.
+
+### Added
+- New global Sales dashboard screen on mobile (`sales_dashboard_screen.dart`) mirroring the web `/sales` page.
+- Sales tab added to the Finance Hub segmented control.
+- Offline queueing for all `update`/`delete` operations in `BroilerService`.
+- `feed_purchase` entity case and `update` operations for all entity types in `SyncService`.
+- `flockName` field on the mobile `SaleRecord` model.
+- `clearCachedAlerts()` helper in `OfflineCache`.
+
+### Changed
+- `FinanceHubScreen` segmented control now includes a Sales tab.
+
+### Validation
+- API tests: 305/305 pass.
+- API lint: clean.
+- API typecheck/build: clean.
+- Web lint/typecheck/build: clean.
+- Mobile `flutter analyze`: 0 errors.
+- Mobile `flutter test`: 55/55 pass.
+- Docker health: all containers up.
+
+### Version bump
+- `1.26.0-alpha` → `1.27.0-alpha` across root `package.json`, `apps/api/package.json`, `apps/web/package.json`, and `apps/mobile/pubspec.yaml`.
+
 ## [1.26.0-alpha] — 2026-08-31
 
 ### Email/SMTP integration test fix — TEST_MODE support
