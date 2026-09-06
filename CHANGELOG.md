@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.29.0-alpha] — 2026-09-06
+
+### API Performance + Mobile Offline-First Infrastructure
+
+### Added
+- **API**: Global response compression via @fastify/compress (gzip + Brotli).
+- **API**: Global ETag support via @fastify/etag — automatic If-None-Match/304 handling.
+- **API**: Cache-Control headers on all read endpoints (flocks: private max-age=60 swr=300; dashboard/sales: private max-age=30 swr=60).
+- **API**: Optional ?fields= projection on broiler-flock list for lightweight requests (skips expensive aggregation).
+- **Mobile**: Drift database schema v3 — new tables for cached sale records, suppliers, and sync metadata.
+- **Mobile**: OfflineRepository — stale-while-revalidate data access layer over Drift (returns cached data immediately, refreshes in background).
+- **Mobile**: connectivity_plus integration for proactive OS-level connectivity detection (no more waiting for API timeouts).
+- **Mobile**: Sync queue migrated from flutter_secure_storage to Drift/SQLite for reliability.
+- **Mobile**: 5-minute foreground sync timer + sync on app resume + sync on connectivity restoration.
+- **Mobile**: SyncStatusBanner and SyncBadge UI widgets showing offline state and pending sync count.
+- **Mobile**: All 12 entity types support offline CRUD with automatic sync.
+
+### Changed
+- **Mobile**: BroilerService, AlertsService, DashboardService migrated from ApiCache/OfflineCache to OfflineRepository.
+- **Mobile**: ConnectivityService now uses connectivity_plus plugin instead of ping-based detection.
+- **Mobile**: SyncService reads from Drift sync queue instead of secure storage.
+
+### Fixed
+- **API**: sale-records validatePaymentRules/enforcePaymentRules type signatures updated to accept nullish amountPaidZmw/totalAmountZmw.
+- **Security**: Scrubbed hardcoded MinIO root password from infra/minio/setup-nkuku-account.sh usage example.
+- **Security**: Updated pnpm-lock.yaml to include @fastify/compress and @fastify/etag.
+
+### Test Results
+- API: 330 tests pass, lint clean, typecheck clean
+- Mobile: 55 tests pass, analyzer clean (0 errors), debug APK builds successfully
+- Runtime: ETag, 304, Cache-Control, compression, and ?fields= all verified via curl
+
 ## [1.28.0-alpha] — 2026-09-05
 
 ### Sales filtering, pagination, and payment consistency
