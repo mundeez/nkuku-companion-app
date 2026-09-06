@@ -190,3 +190,47 @@ class SyncQueue extends Table {
   IntColumn get retryCount => integer().withDefault(const Constant(0))();
   TextColumn get lastError => text().nullable()();
 }
+
+/// Cached sale records — mirrors SaleRecord from the API.
+@DataClassName('CachedSaleRecord')
+class CachedSaleRecords extends Table {
+  TextColumn get id => text()();
+  TextColumn get flockId => text()();
+  TextColumn get saleDate => text()();
+  IntColumn get birdCount => integer().withDefault(const Constant(0))();
+  RealColumn get avgWeightKg => real().nullable()();
+  RealColumn get pricePerBirdZmw => real().withDefault(const Constant(0))();
+  RealColumn get totalAmountZmw => real().withDefault(const Constant(0))();
+  TextColumn get paymentStatus => text().withDefault(const Constant('pending'))();
+  RealColumn get amountPaidZmw => real().nullable()();
+  TextColumn get customerName => text().nullable()();
+  TextColumn get customerPhone => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Cached suppliers — for offline reference when creating/editing flocks.
+@DataClassName('CachedSupplier')
+class CachedSuppliers extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get contact => text().nullable()();
+  TextColumn get chickenType => text().nullable()();
+  DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Sync metadata — tracks when each entity type was last synced.
+@DataClassName('CachedSyncMetadata')
+class CachedSyncMetadatas extends Table {
+  TextColumn get entityType => text()();
+  DateTimeColumn get lastSyncAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {entityType};
+}

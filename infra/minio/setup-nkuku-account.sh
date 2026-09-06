@@ -11,7 +11,7 @@
 #
 # Usage:
 #   MINIO_ROOT_USER=pom-minio-user \
-#   MINIO_ROOT_PASSWORD='PomMinio@2026!' \
+#   MINIO_ROOT_PASSWORD='<your-minio-root-password>' \
 #   NKUKU_SECRET_KEY='<your-strong-secret-key>' \
 #   bash infra/minio/setup-nkuku-account.sh
 #

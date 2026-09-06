@@ -93,7 +93,7 @@ const FilterQuerySchema = z.object({
  *  On PATCH, if paymentStatus is not provided, the existing record's status
  *  is used so that amountPaidZmw / totalAmountZmw changes stay consistent. */
 function enforcePaymentRules(
-  data: { paymentStatus?: string; amountPaidZmw?: number; totalAmountZmw?: number },
+  data: { paymentStatus?: string; amountPaidZmw?: number | null; totalAmountZmw?: number | null },
   existingTotal?: number,
   existingStatus?: string,
 ): { amountPaidZmw?: number | null } {
@@ -113,7 +113,7 @@ function enforcePaymentRules(
 /** Validate payment consistency — returns error message or null.
  *  On PATCH, existingStatus is used when paymentStatus is not in the patch. */
 function validatePaymentRules(
-  data: { paymentStatus?: string; amountPaidZmw?: number; totalAmountZmw?: number },
+  data: { paymentStatus?: string; amountPaidZmw?: number | null; totalAmountZmw?: number | null },
   existingTotal?: number,
   existingStatus?: string,
 ): string | null {
@@ -122,11 +122,11 @@ function validatePaymentRules(
 
   if (status === 'partial') {
     const paid = data.amountPaidZmw;
-    if (paid !== undefined) {
+    if (paid != null) {
       if (paid <= 0) {
         return 'Payment status "partial" requires amountPaidZmw > 0';
       }
-      if (total !== undefined && paid >= total) {
+      if (total != null && paid >= total) {
         return 'Payment status "partial" requires amountPaidZmw < totalAmountZmw';
       }
     }
@@ -158,8 +158,9 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   const flockLock = checkFlockNotLocked(prisma);
 
   // GET /all — list all sale records for the user (for sales dashboard)
-  app.get('/all', { preHandler: [authenticate] }, async (request) => {
+  app.get('/all', { preHandler: [authenticate] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
+    reply.header('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     const query = FilterQuerySchema.extend({
       sortBy: z.enum(['saleDate', 'flockName', 'customerName', 'birdCount', 'pricePerBirdZmw', 'totalAmountZmw', 'paymentStatus']).optional(),
       sortDir: z.enum(['asc', 'desc']).optional(),
@@ -204,8 +205,9 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   });
 
   // GET /dashboard — global sales summary for the sales dashboard
-  app.get('/dashboard', { preHandler: [authenticate] }, async (request) => {
+  app.get('/dashboard', { preHandler: [authenticate] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
+    reply.header('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     const query = FilterQuerySchema.parse(request.query);
 
     const where = buildFilterWhere(organizationId, query);
@@ -280,6 +282,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   // Supports the same filter params as /all plus pagination.
   app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
+    reply.header('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     const query = FilterQuerySchema.extend({
       limit: z.coerce.number().int().min(1).max(100).default(50),
       offset: z.coerce.number().int().min(0).default(0),
@@ -346,6 +349,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   // Supports the same filter params as /all.
   app.get('/summary', { preHandler: [authenticate] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
+    reply.header('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     const query = FilterQuerySchema.parse(request.query);
 
     if (query.flockId) {

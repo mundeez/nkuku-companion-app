@@ -6,7 +6,6 @@ import '../screens/finance_hub_screen.dart';
 import '../screens/more_screen.dart';
 import '../services/connectivity_service.dart';
 import '../services/sync_service.dart';
-import '../services/offline_cache.dart';
 
 /// Primary bottom navigation. Trimmed to the 5 most-used destinations —
 /// everything else (Vaccine Inventory, Suppliers, Disease Database,
@@ -44,7 +43,6 @@ class _BottomNavShellState extends State<BottomNavShell> {
   }
 
   Future<void> _loadPendingCount() async {
-    await OfflineCache.instance.getPendingSyncsAsync();
     if (mounted) {
       setState(() {
         _pendingSyncs = SyncService.instance.pendingCount;

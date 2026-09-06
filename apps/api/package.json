@@ -21,8 +21,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",
+    "@fastify/compress": "^9.2.0",
     "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^11.3.0",
+    "@fastify/etag": "^6.2.0",
     "@fastify/multipart": "^10.1.1",
     "@fastify/swagger": "^9.8.1",
     "@fastify/swagger-ui": "^6.1.1",

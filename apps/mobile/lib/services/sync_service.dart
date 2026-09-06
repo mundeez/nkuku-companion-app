@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'package:dio/dio.dart';
 import 'api_service.dart';
 import 'connectivity_service.dart';
-import 'offline_cache.dart';
+import 'offline_repository.dart';
 
 /// Processes the sync queue when connectivity is restored.
 ///
@@ -11,6 +12,11 @@ import 'offline_cache.dart';
 /// Failed entries are retried up to 5 times before being auto-skipped.
 /// 4xx validation errors are skipped immediately since they will never
 /// succeed on retry. Skipped items can be cleared by the user.
+///
+/// Uses the Drift/SQLite sync queue (via OfflineRepository) for persistence.
+///
+/// Also runs a periodic background sync every 5 minutes while the app is
+/// foregrounded, and on app resume / connectivity restoration.
 class SyncService {
   static final SyncService _instance = SyncService._();
   static SyncService get instance => _instance;
@@ -18,11 +24,23 @@ class SyncService {
 
   bool _initialized = false;
   bool _syncing = false;
+  int _pendingCount = 0;
+  int _skippedCount = 0;
+  Timer? _periodicTimer;
+  static const _syncInterval = Duration(minutes: 5);
 
   void init() {
     _initialized = true;
     ConnectivityService.instance.addListener(_onConnectivityChanged);
     // Try syncing on startup in case we have pending items.
+    _trySync();
+    // Start periodic foreground sync (every 5 minutes).
+    _periodicTimer?.cancel();
+    _periodicTimer = Timer.periodic(_syncInterval, (_) => _trySync());
+  }
+
+  /// Called when the app resumes (becomes foregrounded).
+  void onAppResume() {
     _trySync();
   }
 
@@ -39,39 +57,43 @@ class SyncService {
     _syncing = true;
 
     try {
-      final pending = await OfflineCache.instance.getPendingSyncsAsync();
-      if (pending.isEmpty) return;
+      final pending = await OfflineRepository.instance.getPendingSyncs();
+      if (pending.isEmpty) {
+        _pendingCount = 0;
+        return;
+      }
 
+      _pendingCount = pending.length;
       log('Sync: processing ${pending.length} pending items', name: 'SyncService');
 
-      // Process from oldest to newest. We iterate over a copy because
-      // the underlying list may change as we remove items.
-      final items = List<Map<String, dynamic>>.from(pending);
-      for (var i = 0; i < items.length; i++) {
-        final entry = items[i];
-        final status = entry['status'];
-        if (status == 'skipped') continue;
+      for (final entry in pending) {
+        if (entry.status != 'pending') {
+          _skippedCount++;
+          continue;
+        }
 
         try {
           await _processEntry(entry);
-          // Remove from queue on success (index 0 since we remove from front).
-          await OfflineCache.instance.removeSync(0);
-          log('Sync: completed ${entry['entityType']}/${entry['operation']}',
+          await OfflineRepository.instance.markSyncDone(entry.id);
+          _pendingCount--;
+          log('Sync: completed ${entry.entityType}/${entry.operation}',
               name: 'SyncService');
         } catch (e) {
-          log('Sync: failed ${entry['entityType']}/${entry['operation']}: $e',
+          log('Sync: failed ${entry.entityType}/${entry.operation}: $e',
               name: 'SyncService');
 
           // 4xx errors are validation failures — skip immediately
           if (e is _ApiException && e.statusCode >= 400 && e.statusCode < 500) {
-            await OfflineCache.instance.skipSync(0, 'Validation error: ${e.message}');
-            log('Sync: skipped ${entry['entityType']}/${entry['operation']} '
+            await OfflineRepository.instance.markSyncFailed(
+                entry.id, 'Validation error: ${e.message}');
+            _skippedCount++;
+            log('Sync: skipped ${entry.entityType}/${entry.operation} '
                 '(4xx validation error)', name: 'SyncService');
             continue;
           }
 
           // Increment retry count; auto-skips after 5 retries.
-          await OfflineCache.instance.incrementRetry(0, e.toString());
+          await OfflineRepository.instance.markSyncFailed(entry.id, e.toString());
 
           // Stop processing on network errors.
           if (e is DioException && _isNetworkError(e)) {
@@ -80,16 +102,19 @@ class SyncService {
           }
         }
       }
+
+      // Clean up completed entries
+      await OfflineRepository.instance.clearDoneSyncs();
     } finally {
       _syncing = false;
     }
   }
 
-  Future<void> _processEntry(Map<String, dynamic> entry) async {
-    final entityType = entry['entityType'] as String;
-    final operation = entry['operation'] as String;
-    final entityId = entry['entityId'] as String?;
-    final payload = entry['payload'] as Map<String, dynamic>;
+  Future<void> _processEntry(dynamic entry) async {
+    final entityType = entry.entityType as String;
+    final operation = entry.operation as String;
+    final entityId = entry.entityId as String?;
+    final payload = jsonDecode(entry.payload as String) as Map<String, dynamic>;
     final dio = ApiService.dio;
 
     switch (entityType) {
@@ -272,10 +297,10 @@ class SyncService {
   }
 
   /// Returns the number of pending sync items.
-  int get pendingCount => OfflineCache.instance.pendingSyncCount;
+  int get pendingCount => _pendingCount;
 
   /// Returns the number of skipped sync items (validation failures / max retries).
-  int get skippedCount => OfflineCache.instance.skippedSyncCount;
+  int get skippedCount => _skippedCount;
 
   /// Manually trigger a sync attempt (e.g. from a UI button).
   Future<void> syncNow() async {
@@ -284,10 +309,14 @@ class SyncService {
 
   /// Clear skipped items from the queue.
   Future<void> clearSkipped() async {
-    await OfflineCache.instance.clearSkippedSyncs();
+    // Clear all failed/skipped entries from the Drift sync queue.
+    await OfflineRepository.instance.clearSkippedSyncs();
+    _skippedCount = 0;
   }
 
   void dispose() {
+    _periodicTimer?.cancel();
+    _periodicTimer = null;
     ConnectivityService.instance.removeListener(_onConnectivityChanged);
   }
 }

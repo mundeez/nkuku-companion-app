@@ -4,8 +4,10 @@ import 'widgets/bottom_nav.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
-import 'services/offline_cache.dart';
+import 'services/connectivity_service.dart';
+import 'services/offline_repository.dart';
 import 'services/sync_service.dart';
+import 'database/app_database.dart';
 import 'providers/theme_provider.dart';
 import 'theme/app_theme.dart';
 
@@ -13,7 +15,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AuthService.init();
   await NotificationService.init();
-  await OfflineCache.instance.init();
+  // Initialize Drift database and offline repository
+  final db = AppDatabase();
+  OfflineRepository.instance.init(db);
+  // Start proactive connectivity monitoring
+  ConnectivityService.instance.init();
   ApiService.setupInterceptors();
   SyncService.instance.init();
   runApp(const NkukuApp());

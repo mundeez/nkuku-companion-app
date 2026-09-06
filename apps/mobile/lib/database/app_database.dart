@@ -18,13 +18,16 @@ part 'app_database.g.dart';
   CachedEnvironmentalRecords,
   CachedAlerts,
   CachedDashboardSummaries,
+  CachedSaleRecords,
+  CachedSuppliers,
+  CachedSyncMetadatas,
   SyncQueue,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -34,6 +37,11 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(cachedEnvironmentalRecords);
             await m.createTable(cachedAlerts);
             await m.createTable(cachedDashboardSummaries);
+          }
+          if (from < 3) {
+            await m.createTable(cachedSaleRecords);
+            await m.createTable(cachedSuppliers);
+            await m.createTable(cachedSyncMetadatas);
           }
         },
       );
@@ -104,6 +112,34 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> clearDoneSyncs() async {
     await (delete(syncQueue)..where((t) => t.status.equals('done'))).go();
+  }
+
+  /// Returns all sync entries with status 'failed' (for the Sync Issues screen).
+  Future<List<SyncQueueEntry>> getFailedSyncs() {
+    return (select(syncQueue)
+          ..where((t) => t.status.equals('failed'))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .get();
+  }
+
+  /// Returns all sync entries with status 'skipped' (for the Sync Issues screen).
+  Future<List<SyncQueueEntry>> getSkippedSyncs() {
+    return (select(syncQueue)
+          ..where((t) => t.status.equals('skipped'))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .get();
+  }
+
+  /// Removes a single sync queue entry by its database [id].
+  Future<void> removeSync(int id) async {
+    await (delete(syncQueue)..where((t) => t.id.equals(id))).go();
+  }
+
+  /// Clears all sync entries with status 'skipped' or 'failed'.
+  Future<void> clearSkippedSyncs() async {
+    await (delete(syncQueue)
+          ..where((t) => t.status.equals('skipped') | t.status.equals('failed')))
+        .go();
   }
 
   // ── Record caches ────────────────────────────
@@ -300,6 +336,53 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  // ── Sale record cache ───────────────────────
+
+  Future<void> upsertSaleRecords(List<CachedSaleRecordsCompanion> entries) async {
+    await batch((b) => b.insertAllOnConflictUpdate(cachedSaleRecords, entries));
+  }
+
+  Future<List<CachedSaleRecord>> getSaleRecords(String flockId) {
+    return (select(cachedSaleRecords)
+          ..where((t) => t.flockId.equals(flockId))
+          ..orderBy([(t) => OrderingTerm.desc(t.saleDate)]))
+        .get();
+  }
+
+  Future<List<CachedSaleRecord>> getAllSaleRecords() {
+    return (select(cachedSaleRecords)
+          ..orderBy([(t) => OrderingTerm.desc(t.saleDate)]))
+        .get();
+  }
+
+  Future<void> deleteSaleRecord(String id) async {
+    await (delete(cachedSaleRecords)..where((t) => t.id.equals(id))).go();
+  }
+
+  // ── Supplier cache ──────────────────────────
+
+  Future<void> upsertSuppliers(List<CachedSuppliersCompanion> entries) async {
+    await batch((b) => b.insertAllOnConflictUpdate(cachedSuppliers, entries));
+  }
+
+  Future<List<CachedSupplier>> getAllSuppliers() => select(cachedSuppliers).get();
+
+  // ── Sync metadata ───────────────────────────
+
+  Future<void> setSyncMetadata(String entityType) async {
+    await into(cachedSyncMetadatas).insertOnConflictUpdate(
+      CachedSyncMetadatasCompanion(
+        entityType: Value(entityType),
+        lastSyncAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  Future<CachedSyncMetadata?> getSyncMetadata(String entityType) {
+    return (select(cachedSyncMetadatas)..where((t) => t.entityType.equals(entityType)))
+        .getSingleOrNull();
+  }
+
   // ── Full cache clear (on logout / "Clear local cache") ────
   /// Clears all cached data. Does NOT clear the sync queue (pending
   /// mutations are never silently discarded — see plan §5.4).
@@ -315,6 +398,9 @@ class AppDatabase extends _$AppDatabase {
     await delete(cachedEnvironmentalRecords).go();
     await delete(cachedAlerts).go();
     await delete(cachedDashboardSummaries).go();
+    await delete(cachedSaleRecords).go();
+    await delete(cachedSuppliers).go();
+    await delete(cachedSyncMetadatas).go();
   }
 
   /// Clears everything including the sync queue (used on logout only,

@@ -11,8 +11,9 @@ export async function buildDashboardModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
   // ── Dashboard Summary ─────────────────────────
-  app.get('/summary', { preHandler: [authenticate] }, async (request) => {
+  app.get('/summary', { preHandler: [authenticate] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
+    reply.header('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     const query = RangeSchema.parse((request.query as any)?.range ?? 'all');
     const rangeDays = RANGE_DAYS[query];
     const rangeStart = rangeDays

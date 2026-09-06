@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
-import '../services/offline_cache.dart';
+import '../services/offline_repository.dart';
+import '../services/sync_service.dart';
 import '../services/api_cache.dart';
 import 'account_settings_screen.dart';
 import 'login_screen.dart';
@@ -36,11 +37,11 @@ class _MoreScreenState extends State<MoreScreen> {
   }
 
   Future<void> _loadSyncCounts() async {
-    await OfflineCache.instance.getPendingSyncsAsync();
+    final pending = await OfflineRepository.instance.pendingSyncCount();
     if (mounted) {
       setState(() {
-        _pendingSyncs = OfflineCache.instance.pendingSyncCount;
-        _skippedSyncs = OfflineCache.instance.skippedSyncCount;
+        _pendingSyncs = pending;
+        _skippedSyncs = SyncService.instance.skippedCount;
       });
     }
   }
@@ -318,7 +319,7 @@ class _MoreScreenState extends State<MoreScreen> {
       ),
     );
     if (confirmed == true) {
-      await OfflineCache.instance.clearLocalCache();
+      await OfflineRepository.instance.clearAllCache();
       ApiCache.clear();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

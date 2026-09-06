@@ -56,43 +56,58 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
   const audit = new AuditService(prisma);
 
-  app.get('/', { preHandler: [authenticate] }, async (request) => {
+  app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
     const query = z.object({
       status: z.enum(['active', 'completed', 'cancelled']).optional(),
       breedId: z.string().uuid().optional(),
+      fields: z.string().optional(),
     }).parse(request.query);
 
     const where: any = { organizationId };
     if (query.status) where.status = query.status;
     if (query.breedId) where.breedId = query.breedId;
 
+    // When ?fields= is specified with only basic fields, skip heavy aggregation
+    const requestedFields = query.fields?.split(',').map(f => f.trim()) ?? null;
+    const isLightRequest = requestedFields !== null &&
+      !requestedFields.some(f => f.startsWith('feedProjection') || f.startsWith('total') || f.startsWith('actual') || f.startsWith('unrealised') || f.startsWith('projected'));
+
     const flocks = await prisma.broilerFlock.findMany({
       where,
       include: {
         breed: true,
-        supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } },
-        financialRecords: { select: { amountZmw: true, isIncome: true, category: true } },
+        supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: isLightRequest ? false : true } },
+        financialRecords: isLightRequest ? { select: { amountZmw: true, isIncome: true, category: true } } : { select: { amountZmw: true, isIncome: true, category: true } },
       },
       orderBy: { startDate: 'desc' },
     });
 
     const today = new Date();
     const flockIds = flocks.map((f: any) => f.id);
+
+    // Skip heavy aggregation for light requests
+    let mortalityByFlock = new Map<string, number>();
+    let mortalityEventsByFlock = new Map<string, any[]>();
+    let purchasesByFlockStage = new Map<string, number>();
+    let feedRecordsByFlock = new Map<string, any[]>();
+    let salesByFlock = new Map<string, any[]>();
+
+    if (!isLightRequest) {
     const mortalitySums = await prisma.mortalityEvent.groupBy({
       by: ['flockId'],
       where: { flockId: { in: flockIds } },
       _sum: { count: true },
     });
-    const mortalityByFlock = new Map(mortalitySums.map((m: any) => [m.flockId, m._sum.count ?? 0]));
+    mortalityByFlock = new Map(mortalitySums.map((m: any) => [m.flockId, m._sum.count ?? 0]));
 
     // Batch-load mortality events with age/date for per-stage mortality adjustment
     const mortalityEvents = await prisma.mortalityEvent.findMany({
       where: { flockId: { in: flockIds } },
       select: { flockId: true, eventDate: true, count: true, ageDays: true },
     });
-    const mortalityEventsByFlock = new Map<string, any[]>();
+    mortalityEventsByFlock = new Map<string, any[]>();
     for (const m of mortalityEvents) {
       const arr = mortalityEventsByFlock.get(m.flockId) ?? [];
       arr.push(m);
@@ -104,7 +119,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       where: { flockId: { in: flockIds } },
       select: { flockId: true, feedStageId: true, bagsPurchased: true },
     });
-    const purchasesByFlockStage = new Map<string, number>();
+    purchasesByFlockStage = new Map<string, number>();
     for (const p of feedPurchases) {
       if (!p.feedStageId) continue;
       const key = `${p.flockId}:${p.feedStageId}`;
@@ -119,7 +134,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       where: { flockId: { in: flockIds } },
       select: { flockId: true, feedType: true, quantityKg: true },
     });
-    const feedRecordsByFlock = new Map<string, any[]>();
+    feedRecordsByFlock = new Map<string, any[]>();
     for (const fr of feedRecords) {
       const arr = feedRecordsByFlock.get(fr.flockId) ?? [];
       arr.push(fr);
@@ -136,11 +151,48 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         amountPaidZmw: true,
       },
     });
-    const salesByFlock = new Map<string, any[]>();
+    salesByFlock = new Map<string, any[]>();
     for (const s of saleRecords) {
       const arr = salesByFlock.get(s.flockId) ?? [];
       arr.push(s);
       salesByFlock.set(s.flockId, arr);
+    }
+    } // end if (!isLightRequest)
+
+    reply.header('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+
+    // When ?fields= is specified, project only the requested fields (light response)
+    if (requestedFields) {
+      return flocks.map((f: any) => {
+        const start = f.startDate ? new Date(f.startDate) : null;
+        const ageDays = start ? Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
+        const totalMortality = Number(mortalityByFlock.get(f.id) ?? 0);
+        const mortalityRate = f.initialCount > 0 ? (totalMortality / f.initialCount) * 100 : 0;
+        const all: Record<string, any> = {
+          id: f.id,
+          name: f.name,
+          breedId: f.breedId,
+          breedName: f.breed?.name,
+          supplierId: f.supplierId,
+          supplierName: f.supplier?.name,
+          startDate: f.startDate,
+          initialCount: f.initialCount,
+          currentCount: f.currentCount,
+          status: f.status,
+          ageDays,
+          totalMortality,
+          mortalityRate,
+          targetWeight: f.targetWeight,
+          targetAge: f.targetAge,
+          housingType: f.housingType,
+          chicksCollected: f.chicksCollected,
+        };
+        const filtered: Record<string, any> = {};
+        for (const field of requestedFields) {
+          if (field in all) filtered[field] = all[field];
+        }
+        return filtered;
+      });
     }
 
     return flocks.map((f: any) => {
@@ -294,6 +346,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       },
     });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+    reply.header('Cache-Control', 'private, max-age=30, stale-while-revalidate=120');
     const today = new Date();
     const start = flock.startDate ? new Date(flock.startDate) : null;
     const ageDays = start ? Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;

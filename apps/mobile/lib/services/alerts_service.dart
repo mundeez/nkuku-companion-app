@@ -2,7 +2,7 @@ import 'dart:developer';
 import 'package:dio/dio.dart';
 import 'api_service.dart';
 import 'connectivity_service.dart';
-import 'offline_cache.dart';
+import 'offline_repository.dart';
 import '../models/alert.dart';
 
 class AlertsService {
@@ -28,14 +28,8 @@ class AlertsService {
       }
       final alerts =
           (res.data as List).map((e) => Alert.fromJson(e)).toList();
-      // Cache alerts for offline visibility (only when no filters are
-      // applied — filtered sets would give an incomplete offline view).
-      if (status == null && severity == null) {
-        final rawList = (res.data as List)
-            .map((e) => e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e as Map))
-            .toList();
-        await OfflineCache.instance.cacheAlerts(rawList);
-      }
+      // The OfflineRepository caches alerts in Drift via its SWR pattern
+      // (getAlerts fetches and caches). No manual cache write needed here.
       ConnectivityService.instance.markOnline();
       return alerts;
     } on DioException catch (e) {
@@ -45,8 +39,19 @@ class AlertsService {
         log('AlertsService: network error, falling back to cache: $e',
             name: 'AlertsService');
         ConnectivityService.instance.markOffline();
-        final cached = await OfflineCache.instance.getCachedAlerts();
-        return cached.map((e) => Alert.fromJson(e)).toList();
+        final cached = await OfflineRepository.instance.getAlerts();
+        return cached.map((a) => Alert.fromJson({
+              'id': a.id,
+              'flockId': a.flockId,
+              'alertType': a.alertType,
+              'title': a.title,
+              'message': a.message,
+              'severity': a.severity,
+              'dueDate': a.dueDate,
+              'isRead': a.isRead,
+              'isResolved': a.isResolved,
+              'createdAt': a.createdAt,
+            })).toList();
       }
       // Re-throw auth/validation/server errors so the screen can display them.
       rethrow;
@@ -108,9 +113,12 @@ class AlertsService {
       bulkAction('delete', ids);
 
   /// Clear the cached alerts so the next read fetches fresh data from the
-  /// API after a mutation.
+  /// API after a mutation. The OfflineRepository uses a stale-while-revalidate
+  /// pattern, so the cache will refresh automatically on the next read.
   static Future<void> _invalidateCache() async {
-    await OfflineCache.instance.clearCachedAlerts();
+    // No-op: OfflineRepository's SWR pattern handles cache freshness.
+    // The next getAlerts() call will return cached data immediately and
+    // refresh in the background.
   }
 
   static bool _isNetworkError(DioException e) {

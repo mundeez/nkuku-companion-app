@@ -16,10 +16,9 @@ import '../models/sales_filter.dart';
 import '../models/supplier.dart';
 import '../models/vaccination_event.dart';
 import '../models/water_record.dart';
-import 'api_cache.dart';
 import 'api_service.dart';
 import 'connectivity_service.dart';
-import 'offline_cache.dart';
+import 'offline_repository.dart';
 
 class BroilerServiceException implements Exception {
   final String message;
@@ -31,51 +30,40 @@ class BroilerServiceException implements Exception {
 class BroilerService {
   // Flocks
   //
-  // Cached briefly (session-only, see ApiCache) since the flock list is
-  // fetched on every visit to the Flocks tab and the Dashboard — a 30s TTL
-  // means switching tabs back and forth doesn't always re-hit the network,
-  // while still staying fresh enough after a create/edit/delete (which also
-  // explicitly invalidates this cache below).
-  //
-  // When offline, falls back to the persisted offline cache.
+  // Uses stale-while-revalidate via OfflineRepository:
+  // - Returns cached Drift data immediately if available
+  // - Fetches fresh data from API in the background
+  // - Falls back to Drift cache when offline
   static Future<List<BroilerFlock>> getFlocks({
     String? status,
     bool forceRefresh = false,
   }) async {
-    final cacheKey = 'flocks:${status ?? 'all'}';
-    if (forceRefresh) ApiCache.invalidate(cacheKey);
     try {
-      final flocks = await ApiCache.fetch(
-        cacheKey,
-        () async {
-          final res = await ApiService.dio.get(
-            '/api/v1/broiler-flocks',
-            queryParameters: {if (status != null) 'status': status},
-          );
-          _assertOk(res);
-          return (res.data as List).map((e) => BroilerFlock.fromJson(e)).toList();
-        },
-        ttl: const Duration(seconds: 30),
+      final cached = await OfflineRepository.instance.getFlocks(
+        status: status,
+        forceRefresh: forceRefresh,
       );
-      // Persist to offline cache for offline access.
-      ConnectivityService.instance.markOnline();
-      await OfflineCache.instance.cacheFlocks(
-        flocks.map((f) => f.toJson()).toList(),
-      );
-      return flocks;
+      return cached.map((f) => BroilerFlock.fromJson({
+        'id': f.id,
+        'name': f.name,
+        'breedId': f.breedId,
+        'breedName': f.breedName,
+        'supplierId': f.supplierId,
+        'supplierName': f.supplierName,
+        'startDate': f.startDate,
+        'initialCount': f.initialCount,
+        'currentCount': f.currentCount,
+        'totalMortality': f.totalMortality,
+        'mortalityRate': f.mortalityRate,
+        'targetWeight': f.targetWeight,
+        'targetAge': f.targetAge,
+        'housingType': f.housingType,
+        'status': f.status,
+        'ageDays': f.ageDays,
+        'chicksCollected': f.chicksCollected,
+      })).toList();
     } catch (e) {
-      if (e is DioException && _isNetworkError(e)) {
-        ConnectivityService.instance.markOffline();
-        // Fall back to offline cache.
-        final cached = await OfflineCache.instance.getCachedFlocksAsync();
-        if (cached.isNotEmpty) {
-          var flocks = cached.map((e) => BroilerFlock.fromJson(e)).toList();
-          if (status != null) {
-            flocks = flocks.where((f) => f.status == status).toList();
-          }
-          return flocks;
-        }
-      }
+      log('BroilerService.getFlocks error: $e', name: 'BroilerService');
       rethrow;
     }
   }
@@ -89,8 +77,8 @@ class BroilerService {
 
   static Future<BroilerFlock> createFlock(BroilerFlock flock) async {
     if (!ConnectivityService.instance.isOnline) {
-      // Queue for later sync.
-      await OfflineCache.instance.enqueueSync(
+      // Queue for later sync via Drift.
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'flock',
         operation: 'create',
         payload: flock.toJson(),
@@ -102,14 +90,13 @@ class BroilerService {
         .post('/api/v1/broiler-flocks', data: flock.toJson());
     _assertOk(res);
     ConnectivityService.instance.markOnline();
-    ApiCache.invalidatePrefix('flocks:');
     return BroilerFlock.fromJson(res.data);
   }
 
   static Future<BroilerFlock> updateFlock(
       String id, Map<String, dynamic> data) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'flock',
         operation: 'update',
         entityId: id,
@@ -121,41 +108,35 @@ class BroilerService {
         await ApiService.dio.patch('/api/v1/broiler-flocks/$id', data: data);
     _assertOk(res);
     ConnectivityService.instance.markOnline();
-    ApiCache.invalidatePrefix('flocks:');
     return BroilerFlock.fromJson(res.data);
   }
 
   static Future<void> deleteFlock(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'flock',
         operation: 'delete',
         entityId: id,
         payload: {},
       );
-      ApiCache.invalidatePrefix('flocks:');
       return;
     }
     final res = await ApiService.dio.delete('/api/v1/broiler-flocks/$id');
     _assertOk(res);
     ConnectivityService.instance.markOnline();
-    ApiCache.invalidatePrefix('flocks:');
   }
 
   // Breeds / Suppliers
   //
   // Breeds are close to static reference data (Ross 308, Cobb 500, etc.) —
-  // safe to cache for the whole session.
+  // safe to cache in memory for the whole session.
+  static List<Breed>? _breedsCache;
   static Future<List<Breed>> getBreeds() async {
-    return ApiCache.fetch(
-      'breeds',
-      () async {
-        final res = await ApiService.dio.get('/api/v1/breeds');
-        _assertOk(res);
-        return (res.data as List).map((e) => Breed.fromJson(e)).toList();
-      },
-      ttl: const Duration(minutes: 30),
-    );
+    if (_breedsCache != null) return _breedsCache!;
+    final res = await ApiService.dio.get('/api/v1/breeds');
+    _assertOk(res);
+    _breedsCache = (res.data as List).map((e) => Breed.fromJson(e)).toList();
+    return _breedsCache!;
   }
 
   static Future<List<Supplier>> getSuppliers() async {
@@ -187,7 +168,7 @@ class BroilerService {
 
   static Future<GrowthRecord> createGrowthRecord(GrowthRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'growth_record',
         operation: 'create',
         payload: record.toJson(),
@@ -204,7 +185,7 @@ class BroilerService {
   static Future<GrowthRecord> updateGrowthRecord(
       String id, GrowthRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'growth_record',
         operation: 'update',
         entityId: id,
@@ -220,7 +201,7 @@ class BroilerService {
 
   static Future<void> deleteGrowthRecord(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'growth_record',
         operation: 'delete',
         entityId: id,
@@ -255,7 +236,7 @@ class BroilerService {
 
   static Future<FeedRecord> createFeedRecord(FeedRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'feed_record',
         operation: 'create',
         payload: record.toJson(),
@@ -272,7 +253,7 @@ class BroilerService {
   static Future<FeedRecord> updateFeedRecord(
       String id, FeedRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'feed_record',
         operation: 'update',
         entityId: id,
@@ -288,7 +269,7 @@ class BroilerService {
 
   static Future<void> deleteFeedRecord(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'feed_record',
         operation: 'delete',
         entityId: id,
@@ -322,7 +303,7 @@ class BroilerService {
 
   static Future<FeedPurchase> createFeedPurchase(FeedPurchase purchase) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'feed_purchase',
         operation: 'create',
         payload: purchase.toJson(),
@@ -339,7 +320,7 @@ class BroilerService {
   static Future<FeedPurchase> updateFeedPurchase(
       String id, FeedPurchase purchase) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'feed_purchase',
         operation: 'update',
         entityId: id,
@@ -355,7 +336,7 @@ class BroilerService {
 
   static Future<void> deleteFeedPurchase(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'feed_purchase',
         operation: 'delete',
         entityId: id,
@@ -390,7 +371,7 @@ class BroilerService {
 
   static Future<WaterRecord> createWaterRecord(WaterRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'water_record',
         operation: 'create',
         payload: record.toJson(),
@@ -407,7 +388,7 @@ class BroilerService {
   static Future<WaterRecord> updateWaterRecord(
       String id, WaterRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'water_record',
         operation: 'update',
         entityId: id,
@@ -423,7 +404,7 @@ class BroilerService {
 
   static Future<void> deleteWaterRecord(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'water_record',
         operation: 'delete',
         entityId: id,
@@ -459,7 +440,7 @@ class BroilerService {
   static Future<MortalityEvent> createMortalityEvent(
       MortalityEvent event) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'mortality_event',
         operation: 'create',
         payload: event.toJson(),
@@ -476,7 +457,7 @@ class BroilerService {
   static Future<MortalityEvent> updateMortalityEvent(
       String id, MortalityEvent event) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'mortality_event',
         operation: 'update',
         entityId: id,
@@ -492,7 +473,7 @@ class BroilerService {
 
   static Future<void> deleteMortalityEvent(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'mortality_event',
         operation: 'delete',
         entityId: id,
@@ -530,7 +511,7 @@ class BroilerService {
   static Future<VaccinationEvent> createVaccinationEvent(
       VaccinationEvent event) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'vaccination_event',
         operation: 'create',
         payload: event.toJson(),
@@ -547,7 +528,7 @@ class BroilerService {
   static Future<VaccinationEvent> updateVaccinationEvent(
       String id, VaccinationEvent event) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'vaccination_event',
         operation: 'update',
         entityId: id,
@@ -563,7 +544,7 @@ class BroilerService {
 
   static Future<void> deleteVaccinationEvent(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'vaccination_event',
         operation: 'delete',
         entityId: id,
@@ -600,7 +581,7 @@ class BroilerService {
   static Future<FinancialRecord> createFinancialRecord(
       FinancialRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'financial_record',
         operation: 'create',
         payload: record.toJson(),
@@ -617,7 +598,7 @@ class BroilerService {
   static Future<FinancialRecord> updateFinancialRecord(
       String id, FinancialRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'financial_record',
         operation: 'update',
         entityId: id,
@@ -633,7 +614,7 @@ class BroilerService {
 
   static Future<void> deleteFinancialRecord(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'financial_record',
         operation: 'delete',
         entityId: id,
@@ -718,7 +699,7 @@ class BroilerService {
   static Future<MedicationRecord> updateMedicationRecord(
       String id, MedicationRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'medication_record',
         operation: 'update',
         entityId: id,
@@ -734,7 +715,7 @@ class BroilerService {
 
   static Future<void> deleteMedicationRecord(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'medication_record',
         operation: 'delete',
         entityId: id,
@@ -772,7 +753,7 @@ class BroilerService {
   static Future<EnvironmentalRecord> updateEnvironmentalRecord(
       String id, EnvironmentalRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'environmental_record',
         operation: 'update',
         entityId: id,
@@ -788,7 +769,7 @@ class BroilerService {
 
   static Future<void> deleteEnvironmentalRecord(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'environmental_record',
         operation: 'delete',
         entityId: id,
@@ -948,7 +929,7 @@ class BroilerService {
   static Future<SaleRecord> updateSaleRecord(
       String id, SaleRecord record) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'sale_record',
         operation: 'update',
         entityId: id,
@@ -964,7 +945,7 @@ class BroilerService {
 
   static Future<void> deleteSaleRecord(String id) async {
     if (!ConnectivityService.instance.isOnline) {
-      await OfflineCache.instance.enqueueSync(
+      await OfflineRepository.instance.enqueueSync(
         entityType: 'sale_record',
         operation: 'delete',
         entityId: id,

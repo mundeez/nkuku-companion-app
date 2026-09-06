@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
+import compress from '@fastify/compress';
+import etag from '@fastify/etag';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -58,6 +60,12 @@ const app = Fastify({
 
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
+
+// ── Compression (gzip/brotli) and ETag (304 Not Modified) ──
+// Registered early so all responses benefit. ETag must be registered
+// before routes so it can intercept If-None-Match headers.
+await app.register(compress, { encodings: ['gzip', 'br'] });
+await app.register(etag);
 
 // Fastify 5 strictly validates the Content-Type header against the body.
 // Bodyless requests (DELETE, GET, HEAD, OPTIONS) from clients often send

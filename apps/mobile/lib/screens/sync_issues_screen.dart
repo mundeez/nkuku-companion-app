@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/offline_cache.dart';
+import '../database/app_database.dart';
+import '../services/offline_repository.dart';
 import '../services/sync_service.dart';
 import '../widgets/empty_state.dart';
 
@@ -29,14 +30,14 @@ class _SyncIssuesScreenState extends State<SyncIssuesScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    // Pending items (status != 'skipped') include 'failed' entries.
-    final pending = await OfflineCache.instance.getPendingSyncsAsync();
-    // Skipped items are stored separately (auto-skipped after 5 retries
-    // or skipped immediately on 4xx validation errors).
-    final skipped = await OfflineCache.instance.getSkippedSyncs();
-    final issues = [
-      ...pending.where((q) => q['status'] == 'failed'),
-      ...skipped,
+    // Failed items (status == 'failed') — includes validation errors and
+    // retryable failures that need attention.
+    final failed = await OfflineRepository.instance.getFailedSyncs();
+    // Skipped items (auto-skipped after 5 retries or 4xx validation errors).
+    final skipped = await OfflineRepository.instance.getSkippedSyncs();
+    final issues = <Map<String, dynamic>>[
+      ...failed.map(_entryToMap),
+      ...skipped.map(_entryToMap),
     ];
     if (mounted) {
       setState(() {
@@ -45,6 +46,18 @@ class _SyncIssuesScreenState extends State<SyncIssuesScreen> {
       });
     }
   }
+
+  /// Converts a Drift SyncQueueEntry to a Map for the UI builders that
+  /// access fields by string key.
+  Map<String, dynamic> _entryToMap(SyncQueueEntry e) => {
+        'id': e.id,
+        'status': e.status,
+        'entityType': e.entityType,
+        'operation': e.operation,
+        'retryCount': e.retryCount,
+        'lastError': e.lastError ?? 'Unknown error',
+        'createdAt': e.createdAt.toIso8601String(),
+      };
 
   Future<void> _retryAll() async {
     setState(() => _syncing = true);
@@ -56,8 +69,9 @@ class _SyncIssuesScreenState extends State<SyncIssuesScreen> {
   }
 
   Future<void> _discardItem(int index) async {
-    // Remove the item from the queue
-    await OfflineCache.instance.removeSync(index);
+    // Remove the item from the queue by its database ID
+    final id = _issues[index]['id'] as int;
+    await OfflineRepository.instance.removeSync(id);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sync item discarded')),
@@ -67,7 +81,7 @@ class _SyncIssuesScreenState extends State<SyncIssuesScreen> {
   }
 
   Future<void> _clearAllSkipped() async {
-    await OfflineCache.instance.clearSkippedSyncs();
+    await SyncService.instance.clearSkipped();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cleared all skipped items')),

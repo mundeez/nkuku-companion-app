@@ -4988,6 +4988,1183 @@ class CachedDashboardSummariesCompanion
   }
 }
 
+class $CachedSaleRecordsTable extends CachedSaleRecords
+    with TableInfo<$CachedSaleRecordsTable, CachedSaleRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedSaleRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _flockIdMeta =
+      const VerificationMeta('flockId');
+  @override
+  late final GeneratedColumn<String> flockId = GeneratedColumn<String>(
+      'flock_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _saleDateMeta =
+      const VerificationMeta('saleDate');
+  @override
+  late final GeneratedColumn<String> saleDate = GeneratedColumn<String>(
+      'sale_date', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _birdCountMeta =
+      const VerificationMeta('birdCount');
+  @override
+  late final GeneratedColumn<int> birdCount = GeneratedColumn<int>(
+      'bird_count', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _avgWeightKgMeta =
+      const VerificationMeta('avgWeightKg');
+  @override
+  late final GeneratedColumn<double> avgWeightKg = GeneratedColumn<double>(
+      'avg_weight_kg', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _pricePerBirdZmwMeta =
+      const VerificationMeta('pricePerBirdZmw');
+  @override
+  late final GeneratedColumn<double> pricePerBirdZmw = GeneratedColumn<double>(
+      'price_per_bird_zmw', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _totalAmountZmwMeta =
+      const VerificationMeta('totalAmountZmw');
+  @override
+  late final GeneratedColumn<double> totalAmountZmw = GeneratedColumn<double>(
+      'total_amount_zmw', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _paymentStatusMeta =
+      const VerificationMeta('paymentStatus');
+  @override
+  late final GeneratedColumn<String> paymentStatus = GeneratedColumn<String>(
+      'payment_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
+  static const VerificationMeta _amountPaidZmwMeta =
+      const VerificationMeta('amountPaidZmw');
+  @override
+  late final GeneratedColumn<double> amountPaidZmw = GeneratedColumn<double>(
+      'amount_paid_zmw', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _customerNameMeta =
+      const VerificationMeta('customerName');
+  @override
+  late final GeneratedColumn<String> customerName = GeneratedColumn<String>(
+      'customer_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _customerPhoneMeta =
+      const VerificationMeta('customerPhone');
+  @override
+  late final GeneratedColumn<String> customerPhone = GeneratedColumn<String>(
+      'customer_phone', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+      'notes', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _cachedAtMeta =
+      const VerificationMeta('cachedAt');
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+      'cached_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        flockId,
+        saleDate,
+        birdCount,
+        avgWeightKg,
+        pricePerBirdZmw,
+        totalAmountZmw,
+        paymentStatus,
+        amountPaidZmw,
+        customerName,
+        customerPhone,
+        notes,
+        cachedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_sale_records';
+  @override
+  VerificationContext validateIntegrity(Insertable<CachedSaleRecord> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('flock_id')) {
+      context.handle(_flockIdMeta,
+          flockId.isAcceptableOrUnknown(data['flock_id']!, _flockIdMeta));
+    } else if (isInserting) {
+      context.missing(_flockIdMeta);
+    }
+    if (data.containsKey('sale_date')) {
+      context.handle(_saleDateMeta,
+          saleDate.isAcceptableOrUnknown(data['sale_date']!, _saleDateMeta));
+    } else if (isInserting) {
+      context.missing(_saleDateMeta);
+    }
+    if (data.containsKey('bird_count')) {
+      context.handle(_birdCountMeta,
+          birdCount.isAcceptableOrUnknown(data['bird_count']!, _birdCountMeta));
+    }
+    if (data.containsKey('avg_weight_kg')) {
+      context.handle(
+          _avgWeightKgMeta,
+          avgWeightKg.isAcceptableOrUnknown(
+              data['avg_weight_kg']!, _avgWeightKgMeta));
+    }
+    if (data.containsKey('price_per_bird_zmw')) {
+      context.handle(
+          _pricePerBirdZmwMeta,
+          pricePerBirdZmw.isAcceptableOrUnknown(
+              data['price_per_bird_zmw']!, _pricePerBirdZmwMeta));
+    }
+    if (data.containsKey('total_amount_zmw')) {
+      context.handle(
+          _totalAmountZmwMeta,
+          totalAmountZmw.isAcceptableOrUnknown(
+              data['total_amount_zmw']!, _totalAmountZmwMeta));
+    }
+    if (data.containsKey('payment_status')) {
+      context.handle(
+          _paymentStatusMeta,
+          paymentStatus.isAcceptableOrUnknown(
+              data['payment_status']!, _paymentStatusMeta));
+    }
+    if (data.containsKey('amount_paid_zmw')) {
+      context.handle(
+          _amountPaidZmwMeta,
+          amountPaidZmw.isAcceptableOrUnknown(
+              data['amount_paid_zmw']!, _amountPaidZmwMeta));
+    }
+    if (data.containsKey('customer_name')) {
+      context.handle(
+          _customerNameMeta,
+          customerName.isAcceptableOrUnknown(
+              data['customer_name']!, _customerNameMeta));
+    }
+    if (data.containsKey('customer_phone')) {
+      context.handle(
+          _customerPhoneMeta,
+          customerPhone.isAcceptableOrUnknown(
+              data['customer_phone']!, _customerPhoneMeta));
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+          _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(_cachedAtMeta,
+          cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedSaleRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedSaleRecord(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      flockId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}flock_id'])!,
+      saleDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sale_date'])!,
+      birdCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}bird_count'])!,
+      avgWeightKg: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}avg_weight_kg']),
+      pricePerBirdZmw: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}price_per_bird_zmw'])!,
+      totalAmountZmw: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}total_amount_zmw'])!,
+      paymentStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payment_status'])!,
+      amountPaidZmw: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}amount_paid_zmw']),
+      customerName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}customer_name']),
+      customerPhone: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}customer_phone']),
+      notes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      cachedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at'])!,
+    );
+  }
+
+  @override
+  $CachedSaleRecordsTable createAlias(String alias) {
+    return $CachedSaleRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedSaleRecord extends DataClass
+    implements Insertable<CachedSaleRecord> {
+  final String id;
+  final String flockId;
+  final String saleDate;
+  final int birdCount;
+  final double? avgWeightKg;
+  final double pricePerBirdZmw;
+  final double totalAmountZmw;
+  final String paymentStatus;
+  final double? amountPaidZmw;
+  final String? customerName;
+  final String? customerPhone;
+  final String? notes;
+  final DateTime cachedAt;
+  const CachedSaleRecord(
+      {required this.id,
+      required this.flockId,
+      required this.saleDate,
+      required this.birdCount,
+      this.avgWeightKg,
+      required this.pricePerBirdZmw,
+      required this.totalAmountZmw,
+      required this.paymentStatus,
+      this.amountPaidZmw,
+      this.customerName,
+      this.customerPhone,
+      this.notes,
+      required this.cachedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['flock_id'] = Variable<String>(flockId);
+    map['sale_date'] = Variable<String>(saleDate);
+    map['bird_count'] = Variable<int>(birdCount);
+    if (!nullToAbsent || avgWeightKg != null) {
+      map['avg_weight_kg'] = Variable<double>(avgWeightKg);
+    }
+    map['price_per_bird_zmw'] = Variable<double>(pricePerBirdZmw);
+    map['total_amount_zmw'] = Variable<double>(totalAmountZmw);
+    map['payment_status'] = Variable<String>(paymentStatus);
+    if (!nullToAbsent || amountPaidZmw != null) {
+      map['amount_paid_zmw'] = Variable<double>(amountPaidZmw);
+    }
+    if (!nullToAbsent || customerName != null) {
+      map['customer_name'] = Variable<String>(customerName);
+    }
+    if (!nullToAbsent || customerPhone != null) {
+      map['customer_phone'] = Variable<String>(customerPhone);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedSaleRecordsCompanion toCompanion(bool nullToAbsent) {
+    return CachedSaleRecordsCompanion(
+      id: Value(id),
+      flockId: Value(flockId),
+      saleDate: Value(saleDate),
+      birdCount: Value(birdCount),
+      avgWeightKg: avgWeightKg == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avgWeightKg),
+      pricePerBirdZmw: Value(pricePerBirdZmw),
+      totalAmountZmw: Value(totalAmountZmw),
+      paymentStatus: Value(paymentStatus),
+      amountPaidZmw: amountPaidZmw == null && nullToAbsent
+          ? const Value.absent()
+          : Value(amountPaidZmw),
+      customerName: customerName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerName),
+      customerPhone: customerPhone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerPhone),
+      notes:
+          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedSaleRecord.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedSaleRecord(
+      id: serializer.fromJson<String>(json['id']),
+      flockId: serializer.fromJson<String>(json['flockId']),
+      saleDate: serializer.fromJson<String>(json['saleDate']),
+      birdCount: serializer.fromJson<int>(json['birdCount']),
+      avgWeightKg: serializer.fromJson<double?>(json['avgWeightKg']),
+      pricePerBirdZmw: serializer.fromJson<double>(json['pricePerBirdZmw']),
+      totalAmountZmw: serializer.fromJson<double>(json['totalAmountZmw']),
+      paymentStatus: serializer.fromJson<String>(json['paymentStatus']),
+      amountPaidZmw: serializer.fromJson<double?>(json['amountPaidZmw']),
+      customerName: serializer.fromJson<String?>(json['customerName']),
+      customerPhone: serializer.fromJson<String?>(json['customerPhone']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'flockId': serializer.toJson<String>(flockId),
+      'saleDate': serializer.toJson<String>(saleDate),
+      'birdCount': serializer.toJson<int>(birdCount),
+      'avgWeightKg': serializer.toJson<double?>(avgWeightKg),
+      'pricePerBirdZmw': serializer.toJson<double>(pricePerBirdZmw),
+      'totalAmountZmw': serializer.toJson<double>(totalAmountZmw),
+      'paymentStatus': serializer.toJson<String>(paymentStatus),
+      'amountPaidZmw': serializer.toJson<double?>(amountPaidZmw),
+      'customerName': serializer.toJson<String?>(customerName),
+      'customerPhone': serializer.toJson<String?>(customerPhone),
+      'notes': serializer.toJson<String?>(notes),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedSaleRecord copyWith(
+          {String? id,
+          String? flockId,
+          String? saleDate,
+          int? birdCount,
+          Value<double?> avgWeightKg = const Value.absent(),
+          double? pricePerBirdZmw,
+          double? totalAmountZmw,
+          String? paymentStatus,
+          Value<double?> amountPaidZmw = const Value.absent(),
+          Value<String?> customerName = const Value.absent(),
+          Value<String?> customerPhone = const Value.absent(),
+          Value<String?> notes = const Value.absent(),
+          DateTime? cachedAt}) =>
+      CachedSaleRecord(
+        id: id ?? this.id,
+        flockId: flockId ?? this.flockId,
+        saleDate: saleDate ?? this.saleDate,
+        birdCount: birdCount ?? this.birdCount,
+        avgWeightKg: avgWeightKg.present ? avgWeightKg.value : this.avgWeightKg,
+        pricePerBirdZmw: pricePerBirdZmw ?? this.pricePerBirdZmw,
+        totalAmountZmw: totalAmountZmw ?? this.totalAmountZmw,
+        paymentStatus: paymentStatus ?? this.paymentStatus,
+        amountPaidZmw:
+            amountPaidZmw.present ? amountPaidZmw.value : this.amountPaidZmw,
+        customerName:
+            customerName.present ? customerName.value : this.customerName,
+        customerPhone:
+            customerPhone.present ? customerPhone.value : this.customerPhone,
+        notes: notes.present ? notes.value : this.notes,
+        cachedAt: cachedAt ?? this.cachedAt,
+      );
+  CachedSaleRecord copyWithCompanion(CachedSaleRecordsCompanion data) {
+    return CachedSaleRecord(
+      id: data.id.present ? data.id.value : this.id,
+      flockId: data.flockId.present ? data.flockId.value : this.flockId,
+      saleDate: data.saleDate.present ? data.saleDate.value : this.saleDate,
+      birdCount: data.birdCount.present ? data.birdCount.value : this.birdCount,
+      avgWeightKg:
+          data.avgWeightKg.present ? data.avgWeightKg.value : this.avgWeightKg,
+      pricePerBirdZmw: data.pricePerBirdZmw.present
+          ? data.pricePerBirdZmw.value
+          : this.pricePerBirdZmw,
+      totalAmountZmw: data.totalAmountZmw.present
+          ? data.totalAmountZmw.value
+          : this.totalAmountZmw,
+      paymentStatus: data.paymentStatus.present
+          ? data.paymentStatus.value
+          : this.paymentStatus,
+      amountPaidZmw: data.amountPaidZmw.present
+          ? data.amountPaidZmw.value
+          : this.amountPaidZmw,
+      customerName: data.customerName.present
+          ? data.customerName.value
+          : this.customerName,
+      customerPhone: data.customerPhone.present
+          ? data.customerPhone.value
+          : this.customerPhone,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedSaleRecord(')
+          ..write('id: $id, ')
+          ..write('flockId: $flockId, ')
+          ..write('saleDate: $saleDate, ')
+          ..write('birdCount: $birdCount, ')
+          ..write('avgWeightKg: $avgWeightKg, ')
+          ..write('pricePerBirdZmw: $pricePerBirdZmw, ')
+          ..write('totalAmountZmw: $totalAmountZmw, ')
+          ..write('paymentStatus: $paymentStatus, ')
+          ..write('amountPaidZmw: $amountPaidZmw, ')
+          ..write('customerName: $customerName, ')
+          ..write('customerPhone: $customerPhone, ')
+          ..write('notes: $notes, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      flockId,
+      saleDate,
+      birdCount,
+      avgWeightKg,
+      pricePerBirdZmw,
+      totalAmountZmw,
+      paymentStatus,
+      amountPaidZmw,
+      customerName,
+      customerPhone,
+      notes,
+      cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedSaleRecord &&
+          other.id == this.id &&
+          other.flockId == this.flockId &&
+          other.saleDate == this.saleDate &&
+          other.birdCount == this.birdCount &&
+          other.avgWeightKg == this.avgWeightKg &&
+          other.pricePerBirdZmw == this.pricePerBirdZmw &&
+          other.totalAmountZmw == this.totalAmountZmw &&
+          other.paymentStatus == this.paymentStatus &&
+          other.amountPaidZmw == this.amountPaidZmw &&
+          other.customerName == this.customerName &&
+          other.customerPhone == this.customerPhone &&
+          other.notes == this.notes &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedSaleRecordsCompanion extends UpdateCompanion<CachedSaleRecord> {
+  final Value<String> id;
+  final Value<String> flockId;
+  final Value<String> saleDate;
+  final Value<int> birdCount;
+  final Value<double?> avgWeightKg;
+  final Value<double> pricePerBirdZmw;
+  final Value<double> totalAmountZmw;
+  final Value<String> paymentStatus;
+  final Value<double?> amountPaidZmw;
+  final Value<String?> customerName;
+  final Value<String?> customerPhone;
+  final Value<String?> notes;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedSaleRecordsCompanion({
+    this.id = const Value.absent(),
+    this.flockId = const Value.absent(),
+    this.saleDate = const Value.absent(),
+    this.birdCount = const Value.absent(),
+    this.avgWeightKg = const Value.absent(),
+    this.pricePerBirdZmw = const Value.absent(),
+    this.totalAmountZmw = const Value.absent(),
+    this.paymentStatus = const Value.absent(),
+    this.amountPaidZmw = const Value.absent(),
+    this.customerName = const Value.absent(),
+    this.customerPhone = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedSaleRecordsCompanion.insert({
+    required String id,
+    required String flockId,
+    required String saleDate,
+    this.birdCount = const Value.absent(),
+    this.avgWeightKg = const Value.absent(),
+    this.pricePerBirdZmw = const Value.absent(),
+    this.totalAmountZmw = const Value.absent(),
+    this.paymentStatus = const Value.absent(),
+    this.amountPaidZmw = const Value.absent(),
+    this.customerName = const Value.absent(),
+    this.customerPhone = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        flockId = Value(flockId),
+        saleDate = Value(saleDate);
+  static Insertable<CachedSaleRecord> custom({
+    Expression<String>? id,
+    Expression<String>? flockId,
+    Expression<String>? saleDate,
+    Expression<int>? birdCount,
+    Expression<double>? avgWeightKg,
+    Expression<double>? pricePerBirdZmw,
+    Expression<double>? totalAmountZmw,
+    Expression<String>? paymentStatus,
+    Expression<double>? amountPaidZmw,
+    Expression<String>? customerName,
+    Expression<String>? customerPhone,
+    Expression<String>? notes,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (flockId != null) 'flock_id': flockId,
+      if (saleDate != null) 'sale_date': saleDate,
+      if (birdCount != null) 'bird_count': birdCount,
+      if (avgWeightKg != null) 'avg_weight_kg': avgWeightKg,
+      if (pricePerBirdZmw != null) 'price_per_bird_zmw': pricePerBirdZmw,
+      if (totalAmountZmw != null) 'total_amount_zmw': totalAmountZmw,
+      if (paymentStatus != null) 'payment_status': paymentStatus,
+      if (amountPaidZmw != null) 'amount_paid_zmw': amountPaidZmw,
+      if (customerName != null) 'customer_name': customerName,
+      if (customerPhone != null) 'customer_phone': customerPhone,
+      if (notes != null) 'notes': notes,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedSaleRecordsCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? flockId,
+      Value<String>? saleDate,
+      Value<int>? birdCount,
+      Value<double?>? avgWeightKg,
+      Value<double>? pricePerBirdZmw,
+      Value<double>? totalAmountZmw,
+      Value<String>? paymentStatus,
+      Value<double?>? amountPaidZmw,
+      Value<String?>? customerName,
+      Value<String?>? customerPhone,
+      Value<String?>? notes,
+      Value<DateTime>? cachedAt,
+      Value<int>? rowid}) {
+    return CachedSaleRecordsCompanion(
+      id: id ?? this.id,
+      flockId: flockId ?? this.flockId,
+      saleDate: saleDate ?? this.saleDate,
+      birdCount: birdCount ?? this.birdCount,
+      avgWeightKg: avgWeightKg ?? this.avgWeightKg,
+      pricePerBirdZmw: pricePerBirdZmw ?? this.pricePerBirdZmw,
+      totalAmountZmw: totalAmountZmw ?? this.totalAmountZmw,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      amountPaidZmw: amountPaidZmw ?? this.amountPaidZmw,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      notes: notes ?? this.notes,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (flockId.present) {
+      map['flock_id'] = Variable<String>(flockId.value);
+    }
+    if (saleDate.present) {
+      map['sale_date'] = Variable<String>(saleDate.value);
+    }
+    if (birdCount.present) {
+      map['bird_count'] = Variable<int>(birdCount.value);
+    }
+    if (avgWeightKg.present) {
+      map['avg_weight_kg'] = Variable<double>(avgWeightKg.value);
+    }
+    if (pricePerBirdZmw.present) {
+      map['price_per_bird_zmw'] = Variable<double>(pricePerBirdZmw.value);
+    }
+    if (totalAmountZmw.present) {
+      map['total_amount_zmw'] = Variable<double>(totalAmountZmw.value);
+    }
+    if (paymentStatus.present) {
+      map['payment_status'] = Variable<String>(paymentStatus.value);
+    }
+    if (amountPaidZmw.present) {
+      map['amount_paid_zmw'] = Variable<double>(amountPaidZmw.value);
+    }
+    if (customerName.present) {
+      map['customer_name'] = Variable<String>(customerName.value);
+    }
+    if (customerPhone.present) {
+      map['customer_phone'] = Variable<String>(customerPhone.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedSaleRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('flockId: $flockId, ')
+          ..write('saleDate: $saleDate, ')
+          ..write('birdCount: $birdCount, ')
+          ..write('avgWeightKg: $avgWeightKg, ')
+          ..write('pricePerBirdZmw: $pricePerBirdZmw, ')
+          ..write('totalAmountZmw: $totalAmountZmw, ')
+          ..write('paymentStatus: $paymentStatus, ')
+          ..write('amountPaidZmw: $amountPaidZmw, ')
+          ..write('customerName: $customerName, ')
+          ..write('customerPhone: $customerPhone, ')
+          ..write('notes: $notes, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedSuppliersTable extends CachedSuppliers
+    with TableInfo<$CachedSuppliersTable, CachedSupplier> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedSuppliersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _contactMeta =
+      const VerificationMeta('contact');
+  @override
+  late final GeneratedColumn<String> contact = GeneratedColumn<String>(
+      'contact', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _chickenTypeMeta =
+      const VerificationMeta('chickenType');
+  @override
+  late final GeneratedColumn<String> chickenType = GeneratedColumn<String>(
+      'chicken_type', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _cachedAtMeta =
+      const VerificationMeta('cachedAt');
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+      'cached_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, name, contact, chickenType, cachedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_suppliers';
+  @override
+  VerificationContext validateIntegrity(Insertable<CachedSupplier> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('contact')) {
+      context.handle(_contactMeta,
+          contact.isAcceptableOrUnknown(data['contact']!, _contactMeta));
+    }
+    if (data.containsKey('chicken_type')) {
+      context.handle(
+          _chickenTypeMeta,
+          chickenType.isAcceptableOrUnknown(
+              data['chicken_type']!, _chickenTypeMeta));
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(_cachedAtMeta,
+          cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedSupplier map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedSupplier(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      contact: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}contact']),
+      chickenType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}chicken_type']),
+      cachedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at'])!,
+    );
+  }
+
+  @override
+  $CachedSuppliersTable createAlias(String alias) {
+    return $CachedSuppliersTable(attachedDatabase, alias);
+  }
+}
+
+class CachedSupplier extends DataClass implements Insertable<CachedSupplier> {
+  final String id;
+  final String name;
+  final String? contact;
+  final String? chickenType;
+  final DateTime cachedAt;
+  const CachedSupplier(
+      {required this.id,
+      required this.name,
+      this.contact,
+      this.chickenType,
+      required this.cachedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || contact != null) {
+      map['contact'] = Variable<String>(contact);
+    }
+    if (!nullToAbsent || chickenType != null) {
+      map['chicken_type'] = Variable<String>(chickenType);
+    }
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedSuppliersCompanion toCompanion(bool nullToAbsent) {
+    return CachedSuppliersCompanion(
+      id: Value(id),
+      name: Value(name),
+      contact: contact == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contact),
+      chickenType: chickenType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(chickenType),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedSupplier.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedSupplier(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      contact: serializer.fromJson<String?>(json['contact']),
+      chickenType: serializer.fromJson<String?>(json['chickenType']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'contact': serializer.toJson<String?>(contact),
+      'chickenType': serializer.toJson<String?>(chickenType),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedSupplier copyWith(
+          {String? id,
+          String? name,
+          Value<String?> contact = const Value.absent(),
+          Value<String?> chickenType = const Value.absent(),
+          DateTime? cachedAt}) =>
+      CachedSupplier(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        contact: contact.present ? contact.value : this.contact,
+        chickenType: chickenType.present ? chickenType.value : this.chickenType,
+        cachedAt: cachedAt ?? this.cachedAt,
+      );
+  CachedSupplier copyWithCompanion(CachedSuppliersCompanion data) {
+    return CachedSupplier(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      contact: data.contact.present ? data.contact.value : this.contact,
+      chickenType:
+          data.chickenType.present ? data.chickenType.value : this.chickenType,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedSupplier(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('contact: $contact, ')
+          ..write('chickenType: $chickenType, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, contact, chickenType, cachedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedSupplier &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.contact == this.contact &&
+          other.chickenType == this.chickenType &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedSuppliersCompanion extends UpdateCompanion<CachedSupplier> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> contact;
+  final Value<String?> chickenType;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedSuppliersCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.contact = const Value.absent(),
+    this.chickenType = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedSuppliersCompanion.insert({
+    required String id,
+    required String name,
+    this.contact = const Value.absent(),
+    this.chickenType = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        name = Value(name);
+  static Insertable<CachedSupplier> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? contact,
+    Expression<String>? chickenType,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (contact != null) 'contact': contact,
+      if (chickenType != null) 'chicken_type': chickenType,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedSuppliersCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? name,
+      Value<String?>? contact,
+      Value<String?>? chickenType,
+      Value<DateTime>? cachedAt,
+      Value<int>? rowid}) {
+    return CachedSuppliersCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      contact: contact ?? this.contact,
+      chickenType: chickenType ?? this.chickenType,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (contact.present) {
+      map['contact'] = Variable<String>(contact.value);
+    }
+    if (chickenType.present) {
+      map['chicken_type'] = Variable<String>(chickenType.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedSuppliersCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('contact: $contact, ')
+          ..write('chickenType: $chickenType, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedSyncMetadatasTable extends CachedSyncMetadatas
+    with TableInfo<$CachedSyncMetadatasTable, CachedSyncMetadata> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedSyncMetadatasTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _entityTypeMeta =
+      const VerificationMeta('entityType');
+  @override
+  late final GeneratedColumn<String> entityType = GeneratedColumn<String>(
+      'entity_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _lastSyncAtMeta =
+      const VerificationMeta('lastSyncAt');
+  @override
+  late final GeneratedColumn<DateTime> lastSyncAt = GeneratedColumn<DateTime>(
+      'last_sync_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [entityType, lastSyncAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_sync_metadatas';
+  @override
+  VerificationContext validateIntegrity(Insertable<CachedSyncMetadata> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('entity_type')) {
+      context.handle(
+          _entityTypeMeta,
+          entityType.isAcceptableOrUnknown(
+              data['entity_type']!, _entityTypeMeta));
+    } else if (isInserting) {
+      context.missing(_entityTypeMeta);
+    }
+    if (data.containsKey('last_sync_at')) {
+      context.handle(
+          _lastSyncAtMeta,
+          lastSyncAt.isAcceptableOrUnknown(
+              data['last_sync_at']!, _lastSyncAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {entityType};
+  @override
+  CachedSyncMetadata map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedSyncMetadata(
+      entityType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}entity_type'])!,
+      lastSyncAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}last_sync_at']),
+    );
+  }
+
+  @override
+  $CachedSyncMetadatasTable createAlias(String alias) {
+    return $CachedSyncMetadatasTable(attachedDatabase, alias);
+  }
+}
+
+class CachedSyncMetadata extends DataClass
+    implements Insertable<CachedSyncMetadata> {
+  final String entityType;
+  final DateTime? lastSyncAt;
+  const CachedSyncMetadata({required this.entityType, this.lastSyncAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['entity_type'] = Variable<String>(entityType);
+    if (!nullToAbsent || lastSyncAt != null) {
+      map['last_sync_at'] = Variable<DateTime>(lastSyncAt);
+    }
+    return map;
+  }
+
+  CachedSyncMetadatasCompanion toCompanion(bool nullToAbsent) {
+    return CachedSyncMetadatasCompanion(
+      entityType: Value(entityType),
+      lastSyncAt: lastSyncAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncAt),
+    );
+  }
+
+  factory CachedSyncMetadata.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedSyncMetadata(
+      entityType: serializer.fromJson<String>(json['entityType']),
+      lastSyncAt: serializer.fromJson<DateTime?>(json['lastSyncAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'entityType': serializer.toJson<String>(entityType),
+      'lastSyncAt': serializer.toJson<DateTime?>(lastSyncAt),
+    };
+  }
+
+  CachedSyncMetadata copyWith(
+          {String? entityType,
+          Value<DateTime?> lastSyncAt = const Value.absent()}) =>
+      CachedSyncMetadata(
+        entityType: entityType ?? this.entityType,
+        lastSyncAt: lastSyncAt.present ? lastSyncAt.value : this.lastSyncAt,
+      );
+  CachedSyncMetadata copyWithCompanion(CachedSyncMetadatasCompanion data) {
+    return CachedSyncMetadata(
+      entityType:
+          data.entityType.present ? data.entityType.value : this.entityType,
+      lastSyncAt:
+          data.lastSyncAt.present ? data.lastSyncAt.value : this.lastSyncAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedSyncMetadata(')
+          ..write('entityType: $entityType, ')
+          ..write('lastSyncAt: $lastSyncAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(entityType, lastSyncAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedSyncMetadata &&
+          other.entityType == this.entityType &&
+          other.lastSyncAt == this.lastSyncAt);
+}
+
+class CachedSyncMetadatasCompanion extends UpdateCompanion<CachedSyncMetadata> {
+  final Value<String> entityType;
+  final Value<DateTime?> lastSyncAt;
+  final Value<int> rowid;
+  const CachedSyncMetadatasCompanion({
+    this.entityType = const Value.absent(),
+    this.lastSyncAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedSyncMetadatasCompanion.insert({
+    required String entityType,
+    this.lastSyncAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : entityType = Value(entityType);
+  static Insertable<CachedSyncMetadata> custom({
+    Expression<String>? entityType,
+    Expression<DateTime>? lastSyncAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (entityType != null) 'entity_type': entityType,
+      if (lastSyncAt != null) 'last_sync_at': lastSyncAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedSyncMetadatasCompanion copyWith(
+      {Value<String>? entityType,
+      Value<DateTime?>? lastSyncAt,
+      Value<int>? rowid}) {
+    return CachedSyncMetadatasCompanion(
+      entityType: entityType ?? this.entityType,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (entityType.present) {
+      map['entity_type'] = Variable<String>(entityType.value);
+    }
+    if (lastSyncAt.present) {
+      map['last_sync_at'] = Variable<DateTime>(lastSyncAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedSyncMetadatasCompanion(')
+          ..write('entityType: $entityType, ')
+          ..write('lastSyncAt: $lastSyncAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SyncQueueTable extends SyncQueue
     with TableInfo<$SyncQueueTable, SyncQueueEntry> {
   @override
@@ -5514,6 +6691,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CachedAlertsTable cachedAlerts = $CachedAlertsTable(this);
   late final $CachedDashboardSummariesTable cachedDashboardSummaries =
       $CachedDashboardSummariesTable(this);
+  late final $CachedSaleRecordsTable cachedSaleRecords =
+      $CachedSaleRecordsTable(this);
+  late final $CachedSuppliersTable cachedSuppliers =
+      $CachedSuppliersTable(this);
+  late final $CachedSyncMetadatasTable cachedSyncMetadatas =
+      $CachedSyncMetadatasTable(this);
   late final $SyncQueueTable syncQueue = $SyncQueueTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -5530,6 +6713,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         cachedEnvironmentalRecords,
         cachedAlerts,
         cachedDashboardSummaries,
+        cachedSaleRecords,
+        cachedSuppliers,
+        cachedSyncMetadatas,
         syncQueue
       ];
 }
@@ -7991,6 +9177,616 @@ typedef $$CachedDashboardSummariesTableProcessedTableManager
         ),
         CachedDashboardSummary,
         PrefetchHooks Function()>;
+typedef $$CachedSaleRecordsTableCreateCompanionBuilder
+    = CachedSaleRecordsCompanion Function({
+  required String id,
+  required String flockId,
+  required String saleDate,
+  Value<int> birdCount,
+  Value<double?> avgWeightKg,
+  Value<double> pricePerBirdZmw,
+  Value<double> totalAmountZmw,
+  Value<String> paymentStatus,
+  Value<double?> amountPaidZmw,
+  Value<String?> customerName,
+  Value<String?> customerPhone,
+  Value<String?> notes,
+  Value<DateTime> cachedAt,
+  Value<int> rowid,
+});
+typedef $$CachedSaleRecordsTableUpdateCompanionBuilder
+    = CachedSaleRecordsCompanion Function({
+  Value<String> id,
+  Value<String> flockId,
+  Value<String> saleDate,
+  Value<int> birdCount,
+  Value<double?> avgWeightKg,
+  Value<double> pricePerBirdZmw,
+  Value<double> totalAmountZmw,
+  Value<String> paymentStatus,
+  Value<double?> amountPaidZmw,
+  Value<String?> customerName,
+  Value<String?> customerPhone,
+  Value<String?> notes,
+  Value<DateTime> cachedAt,
+  Value<int> rowid,
+});
+
+class $$CachedSaleRecordsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedSaleRecordsTable> {
+  $$CachedSaleRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get flockId => $composableBuilder(
+      column: $table.flockId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get saleDate => $composableBuilder(
+      column: $table.saleDate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get birdCount => $composableBuilder(
+      column: $table.birdCount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get avgWeightKg => $composableBuilder(
+      column: $table.avgWeightKg, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get pricePerBirdZmw => $composableBuilder(
+      column: $table.pricePerBirdZmw,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get totalAmountZmw => $composableBuilder(
+      column: $table.totalAmountZmw,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get paymentStatus => $composableBuilder(
+      column: $table.paymentStatus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get amountPaidZmw => $composableBuilder(
+      column: $table.amountPaidZmw, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get customerName => $composableBuilder(
+      column: $table.customerName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get customerPhone => $composableBuilder(
+      column: $table.customerPhone, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CachedSaleRecordsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedSaleRecordsTable> {
+  $$CachedSaleRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get flockId => $composableBuilder(
+      column: $table.flockId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get saleDate => $composableBuilder(
+      column: $table.saleDate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get birdCount => $composableBuilder(
+      column: $table.birdCount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get avgWeightKg => $composableBuilder(
+      column: $table.avgWeightKg, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get pricePerBirdZmw => $composableBuilder(
+      column: $table.pricePerBirdZmw,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get totalAmountZmw => $composableBuilder(
+      column: $table.totalAmountZmw,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get paymentStatus => $composableBuilder(
+      column: $table.paymentStatus,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get amountPaidZmw => $composableBuilder(
+      column: $table.amountPaidZmw,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get customerName => $composableBuilder(
+      column: $table.customerName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get customerPhone => $composableBuilder(
+      column: $table.customerPhone,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CachedSaleRecordsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedSaleRecordsTable> {
+  $$CachedSaleRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get flockId =>
+      $composableBuilder(column: $table.flockId, builder: (column) => column);
+
+  GeneratedColumn<String> get saleDate =>
+      $composableBuilder(column: $table.saleDate, builder: (column) => column);
+
+  GeneratedColumn<int> get birdCount =>
+      $composableBuilder(column: $table.birdCount, builder: (column) => column);
+
+  GeneratedColumn<double> get avgWeightKg => $composableBuilder(
+      column: $table.avgWeightKg, builder: (column) => column);
+
+  GeneratedColumn<double> get pricePerBirdZmw => $composableBuilder(
+      column: $table.pricePerBirdZmw, builder: (column) => column);
+
+  GeneratedColumn<double> get totalAmountZmw => $composableBuilder(
+      column: $table.totalAmountZmw, builder: (column) => column);
+
+  GeneratedColumn<String> get paymentStatus => $composableBuilder(
+      column: $table.paymentStatus, builder: (column) => column);
+
+  GeneratedColumn<double> get amountPaidZmw => $composableBuilder(
+      column: $table.amountPaidZmw, builder: (column) => column);
+
+  GeneratedColumn<String> get customerName => $composableBuilder(
+      column: $table.customerName, builder: (column) => column);
+
+  GeneratedColumn<String> get customerPhone => $composableBuilder(
+      column: $table.customerPhone, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedSaleRecordsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CachedSaleRecordsTable,
+    CachedSaleRecord,
+    $$CachedSaleRecordsTableFilterComposer,
+    $$CachedSaleRecordsTableOrderingComposer,
+    $$CachedSaleRecordsTableAnnotationComposer,
+    $$CachedSaleRecordsTableCreateCompanionBuilder,
+    $$CachedSaleRecordsTableUpdateCompanionBuilder,
+    (
+      CachedSaleRecord,
+      BaseReferences<_$AppDatabase, $CachedSaleRecordsTable, CachedSaleRecord>
+    ),
+    CachedSaleRecord,
+    PrefetchHooks Function()> {
+  $$CachedSaleRecordsTableTableManager(
+      _$AppDatabase db, $CachedSaleRecordsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedSaleRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedSaleRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedSaleRecordsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> flockId = const Value.absent(),
+            Value<String> saleDate = const Value.absent(),
+            Value<int> birdCount = const Value.absent(),
+            Value<double?> avgWeightKg = const Value.absent(),
+            Value<double> pricePerBirdZmw = const Value.absent(),
+            Value<double> totalAmountZmw = const Value.absent(),
+            Value<String> paymentStatus = const Value.absent(),
+            Value<double?> amountPaidZmw = const Value.absent(),
+            Value<String?> customerName = const Value.absent(),
+            Value<String?> customerPhone = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedSaleRecordsCompanion(
+            id: id,
+            flockId: flockId,
+            saleDate: saleDate,
+            birdCount: birdCount,
+            avgWeightKg: avgWeightKg,
+            pricePerBirdZmw: pricePerBirdZmw,
+            totalAmountZmw: totalAmountZmw,
+            paymentStatus: paymentStatus,
+            amountPaidZmw: amountPaidZmw,
+            customerName: customerName,
+            customerPhone: customerPhone,
+            notes: notes,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String flockId,
+            required String saleDate,
+            Value<int> birdCount = const Value.absent(),
+            Value<double?> avgWeightKg = const Value.absent(),
+            Value<double> pricePerBirdZmw = const Value.absent(),
+            Value<double> totalAmountZmw = const Value.absent(),
+            Value<String> paymentStatus = const Value.absent(),
+            Value<double?> amountPaidZmw = const Value.absent(),
+            Value<String?> customerName = const Value.absent(),
+            Value<String?> customerPhone = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedSaleRecordsCompanion.insert(
+            id: id,
+            flockId: flockId,
+            saleDate: saleDate,
+            birdCount: birdCount,
+            avgWeightKg: avgWeightKg,
+            pricePerBirdZmw: pricePerBirdZmw,
+            totalAmountZmw: totalAmountZmw,
+            paymentStatus: paymentStatus,
+            amountPaidZmw: amountPaidZmw,
+            customerName: customerName,
+            customerPhone: customerPhone,
+            notes: notes,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CachedSaleRecordsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $CachedSaleRecordsTable,
+    CachedSaleRecord,
+    $$CachedSaleRecordsTableFilterComposer,
+    $$CachedSaleRecordsTableOrderingComposer,
+    $$CachedSaleRecordsTableAnnotationComposer,
+    $$CachedSaleRecordsTableCreateCompanionBuilder,
+    $$CachedSaleRecordsTableUpdateCompanionBuilder,
+    (
+      CachedSaleRecord,
+      BaseReferences<_$AppDatabase, $CachedSaleRecordsTable, CachedSaleRecord>
+    ),
+    CachedSaleRecord,
+    PrefetchHooks Function()>;
+typedef $$CachedSuppliersTableCreateCompanionBuilder = CachedSuppliersCompanion
+    Function({
+  required String id,
+  required String name,
+  Value<String?> contact,
+  Value<String?> chickenType,
+  Value<DateTime> cachedAt,
+  Value<int> rowid,
+});
+typedef $$CachedSuppliersTableUpdateCompanionBuilder = CachedSuppliersCompanion
+    Function({
+  Value<String> id,
+  Value<String> name,
+  Value<String?> contact,
+  Value<String?> chickenType,
+  Value<DateTime> cachedAt,
+  Value<int> rowid,
+});
+
+class $$CachedSuppliersTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedSuppliersTable> {
+  $$CachedSuppliersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get contact => $composableBuilder(
+      column: $table.contact, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get chickenType => $composableBuilder(
+      column: $table.chickenType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CachedSuppliersTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedSuppliersTable> {
+  $$CachedSuppliersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get contact => $composableBuilder(
+      column: $table.contact, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get chickenType => $composableBuilder(
+      column: $table.chickenType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+      column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CachedSuppliersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedSuppliersTable> {
+  $$CachedSuppliersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get contact =>
+      $composableBuilder(column: $table.contact, builder: (column) => column);
+
+  GeneratedColumn<String> get chickenType => $composableBuilder(
+      column: $table.chickenType, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedSuppliersTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CachedSuppliersTable,
+    CachedSupplier,
+    $$CachedSuppliersTableFilterComposer,
+    $$CachedSuppliersTableOrderingComposer,
+    $$CachedSuppliersTableAnnotationComposer,
+    $$CachedSuppliersTableCreateCompanionBuilder,
+    $$CachedSuppliersTableUpdateCompanionBuilder,
+    (
+      CachedSupplier,
+      BaseReferences<_$AppDatabase, $CachedSuppliersTable, CachedSupplier>
+    ),
+    CachedSupplier,
+    PrefetchHooks Function()> {
+  $$CachedSuppliersTableTableManager(
+      _$AppDatabase db, $CachedSuppliersTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedSuppliersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedSuppliersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedSuppliersTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String?> contact = const Value.absent(),
+            Value<String?> chickenType = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedSuppliersCompanion(
+            id: id,
+            name: name,
+            contact: contact,
+            chickenType: chickenType,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            Value<String?> contact = const Value.absent(),
+            Value<String?> chickenType = const Value.absent(),
+            Value<DateTime> cachedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedSuppliersCompanion.insert(
+            id: id,
+            name: name,
+            contact: contact,
+            chickenType: chickenType,
+            cachedAt: cachedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CachedSuppliersTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $CachedSuppliersTable,
+    CachedSupplier,
+    $$CachedSuppliersTableFilterComposer,
+    $$CachedSuppliersTableOrderingComposer,
+    $$CachedSuppliersTableAnnotationComposer,
+    $$CachedSuppliersTableCreateCompanionBuilder,
+    $$CachedSuppliersTableUpdateCompanionBuilder,
+    (
+      CachedSupplier,
+      BaseReferences<_$AppDatabase, $CachedSuppliersTable, CachedSupplier>
+    ),
+    CachedSupplier,
+    PrefetchHooks Function()>;
+typedef $$CachedSyncMetadatasTableCreateCompanionBuilder
+    = CachedSyncMetadatasCompanion Function({
+  required String entityType,
+  Value<DateTime?> lastSyncAt,
+  Value<int> rowid,
+});
+typedef $$CachedSyncMetadatasTableUpdateCompanionBuilder
+    = CachedSyncMetadatasCompanion Function({
+  Value<String> entityType,
+  Value<DateTime?> lastSyncAt,
+  Value<int> rowid,
+});
+
+class $$CachedSyncMetadatasTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedSyncMetadatasTable> {
+  $$CachedSyncMetadatasTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get entityType => $composableBuilder(
+      column: $table.entityType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastSyncAt => $composableBuilder(
+      column: $table.lastSyncAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CachedSyncMetadatasTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedSyncMetadatasTable> {
+  $$CachedSyncMetadatasTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get entityType => $composableBuilder(
+      column: $table.entityType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastSyncAt => $composableBuilder(
+      column: $table.lastSyncAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CachedSyncMetadatasTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedSyncMetadatasTable> {
+  $$CachedSyncMetadatasTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get entityType => $composableBuilder(
+      column: $table.entityType, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSyncAt => $composableBuilder(
+      column: $table.lastSyncAt, builder: (column) => column);
+}
+
+class $$CachedSyncMetadatasTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CachedSyncMetadatasTable,
+    CachedSyncMetadata,
+    $$CachedSyncMetadatasTableFilterComposer,
+    $$CachedSyncMetadatasTableOrderingComposer,
+    $$CachedSyncMetadatasTableAnnotationComposer,
+    $$CachedSyncMetadatasTableCreateCompanionBuilder,
+    $$CachedSyncMetadatasTableUpdateCompanionBuilder,
+    (
+      CachedSyncMetadata,
+      BaseReferences<_$AppDatabase, $CachedSyncMetadatasTable,
+          CachedSyncMetadata>
+    ),
+    CachedSyncMetadata,
+    PrefetchHooks Function()> {
+  $$CachedSyncMetadatasTableTableManager(
+      _$AppDatabase db, $CachedSyncMetadatasTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedSyncMetadatasTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedSyncMetadatasTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedSyncMetadatasTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> entityType = const Value.absent(),
+            Value<DateTime?> lastSyncAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedSyncMetadatasCompanion(
+            entityType: entityType,
+            lastSyncAt: lastSyncAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String entityType,
+            Value<DateTime?> lastSyncAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CachedSyncMetadatasCompanion.insert(
+            entityType: entityType,
+            lastSyncAt: lastSyncAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CachedSyncMetadatasTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $CachedSyncMetadatasTable,
+    CachedSyncMetadata,
+    $$CachedSyncMetadatasTableFilterComposer,
+    $$CachedSyncMetadatasTableOrderingComposer,
+    $$CachedSyncMetadatasTableAnnotationComposer,
+    $$CachedSyncMetadatasTableCreateCompanionBuilder,
+    $$CachedSyncMetadatasTableUpdateCompanionBuilder,
+    (
+      CachedSyncMetadata,
+      BaseReferences<_$AppDatabase, $CachedSyncMetadatasTable,
+          CachedSyncMetadata>
+    ),
+    CachedSyncMetadata,
+    PrefetchHooks Function()>;
 typedef $$SyncQueueTableCreateCompanionBuilder = SyncQueueCompanion Function({
   Value<int> id,
   required String entityType,
@@ -8261,6 +10057,12 @@ class $AppDatabaseManager {
   $$CachedDashboardSummariesTableTableManager get cachedDashboardSummaries =>
       $$CachedDashboardSummariesTableTableManager(
           _db, _db.cachedDashboardSummaries);
+  $$CachedSaleRecordsTableTableManager get cachedSaleRecords =>
+      $$CachedSaleRecordsTableTableManager(_db, _db.cachedSaleRecords);
+  $$CachedSuppliersTableTableManager get cachedSuppliers =>
+      $$CachedSuppliersTableTableManager(_db, _db.cachedSuppliers);
+  $$CachedSyncMetadatasTableTableManager get cachedSyncMetadatas =>
+      $$CachedSyncMetadatasTableTableManager(_db, _db.cachedSyncMetadatas);
   $$SyncQueueTableTableManager get syncQueue =>
       $$SyncQueueTableTableManager(_db, _db.syncQueue);
 }
