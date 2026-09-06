@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.30.0-alpha] — 2026-09-06
+
+### Web Offline-First + Sync Polish
+
+### Added
+- **Web**: @tanstack/react-query with IndexedDB persistence via idb-keyval — query cache survives page reloads while offline.
+- **Web**: QueryProvider with 24h cache persistence (financial/ledger data excluded from caching).
+- **Web**: OfflineMutationQueue — IndexedDB-backed mutation queue with automatic replay on connectivity restoration.
+- **Web**: SyncStatusIndicator — fixed-position banner showing offline state and pending mutation count.
+- **Web**: Reusable query/mutation hooks: useFlocks, useFlock, useDashboardSummary, useAlerts, useSales, useSalesDashboard, useSalesSummary, useCreateFlock, useUpdateFlock, useDeleteFlock, useCreateSale, useUpdateSale, useDeleteSale, useQueryCache.
+- **Web**: Optimistic updates on flock create/update/delete mutations with automatic rollback on error.
+- **Mobile**: SyncService now tracks lastSyncAt timestamp and isSyncing state.
+- **Mobile**: SyncStatusBanner enhanced with syncing spinner indicator and "last synced" relative timestamp.
+
+### Changed
+- **Web**: Dashboard page migrated from manual useState+useEffect+apiFetch to useApiQuery hook.
+- **Web**: Broiler-flocks list page migrated to useFlocks/useCreateFlock/useUpdateFlock/useDeleteFlock hooks.
+- **Web**: Broiler-flocks detail page migrated to useFlock + useApiQuery hooks for all entity types.
+- **Web**: Root layout wraps app with QueryProvider and SyncStatusIndicator.
+
+### Test Results
+- API: 330 tests pass, lint clean, typecheck clean
+- Mobile: 55 tests pass, analyzer clean (0 errors), release APK builds (68.5MB)
+- Web: Next.js production build succeeds, container runs (HTTP 200)
+
 ## [1.29.0-alpha] — 2026-09-06
 
 ### API Performance + Mobile Offline-First Infrastructure
