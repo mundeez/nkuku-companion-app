@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/api/client";
+import { useApiQuery } from "@/lib/api/hooks";
 import { DashboardSummary } from "@/lib/types";
 import { AdSlot } from "@/components/ads/AdSlot";
 import {
@@ -78,25 +78,18 @@ const alertTypeLabels: Record<string, string> = {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const [data, setData] = useState<DashboardSummary | null>(null);
-  const [error, setError] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>("all");
 
-  const fetchData = useCallback((range: DateRange) => {
-    apiFetch<DashboardSummary>(`/api/v1/dashboard/summary?range=${range}`)
-      .then(setData)
-      .catch((err) => setError(err.message));
-  }, []);
+  const { data, error, isLoading: dataLoading } = useApiQuery<DashboardSummary>(
+    `/api/v1/dashboard/summary?range=${dateRange}`,
+    { staleTime: 30 * 1000 }
+  );
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login");
-      return;
     }
-    if (user) {
-      fetchData(dateRange);
-    }
-  }, [user, isLoading, router, dateRange, fetchData]);
+  }, [user, isLoading, router]);
 
   const dashboardSkeleton = (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -118,8 +111,8 @@ export default function DashboardPage() {
 
   if (isLoading) return dashboardSkeleton;
   if (!user) return null;
-  if (error) return <div className="p-8 text-destructive">{error}</div>;
-  if (!data) return dashboardSkeleton;
+  if (error) return <div className="p-8 text-destructive">{(error as Error).message}</div>;
+  if (dataLoading || !data) return dashboardSkeleton;
 
   const k = data.kpis;
   const hasFinancials = k.totalRevenue > 0 || k.totalCost > 0;

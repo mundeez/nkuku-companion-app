@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
+import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
+import { useFlock, useUpdateFlock, useApiQuery, useApiMutation } from "@/lib/api/hooks";
 import { BroilerFlock, GrowthRecord, FeedRecord, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,141 +42,141 @@ export default function FlockDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { addToast } = useToast();
   const flockId = params.id as string;
 
-  const [flock, setFlock] = useState<BroilerFlock | null>(null);
-  const [ageDays, setAgeDays] = useState(0);
-  const [growthRecords, setGrowthRecords] = useState<GrowthRecord[]>([]);
-  const [feedRecords, setFeedRecords] = useState<FeedRecord[]>([]);
-  const [waterRecords, setWaterRecords] = useState<WaterRecord[]>([]);
-  const [mortalityEvents, setMortalityEvents] = useState<MortalityEvent[]>([]);
-  const [vaccinationEvents, setVaccinationEvents] = useState<VaccinationEvent[]>([]);
-  const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [error, setError] = useState("");
+  const { data: flockData, isLoading: flockLoading, error: flockError, refetch: refetchFlock } = useFlock(flockId);
+  const flock = flockData as BroilerFlock | undefined;
+  const { data: growthRecords = [], refetch: refetchGrowth } = useApiQuery<GrowthRecord[]>(
+    `/api/v1/growth-records?flockId=${flockId}`,
+    { enabled: !!flockId }
+  );
+  const { data: feedRecords = [], refetch: refetchFeed } = useApiQuery<FeedRecord[]>(
+    `/api/v1/feed-records?flockId=${flockId}`,
+    { enabled: !!flockId }
+  );
+  const { data: waterRecords = [], refetch: refetchWater } = useApiQuery<WaterRecord[]>(
+    `/api/v1/water-records?flockId=${flockId}`,
+    { enabled: !!flockId }
+  );
+  const { data: mortalityEvents = [], refetch: refetchMortality } = useApiQuery<MortalityEvent[]>(
+    `/api/v1/mortality-events?flockId=${flockId}`,
+    { enabled: !!flockId }
+  );
+  const { data: vaccinationEvents = [], refetch: refetchVaccination } = useApiQuery<VaccinationEvent[]>(
+    `/api/v1/vaccination-events?flockId=${flockId}`,
+    { enabled: !!flockId }
+  );
+  const { data: financialRecords = [], refetch: refetchFinancial } = useApiQuery<FinancialRecord[]>(
+    `/api/v1/financial-records?flockId=${flockId}`,
+    { enabled: !!flockId }
+  );
+  const { data: suppliers = [], refetch: refetchSuppliers } = useApiQuery<Supplier[]>("/api/v1/suppliers");
+
+  const updateFlock = useUpdateFlock();
+  const completeFlockMutation = useApiMutation("POST", {
+    invalidatePaths: ["/api/v1/broiler-flocks", "/api/v1/dashboard/summary"],
+  });
+
+  const [localError, setLocalError] = useState("");
+  const error = flockError?.message || localError;
   const [activeTab, setActiveTab] = useState("overview");
 
   const [editCollectionOpen, setEditCollectionOpen] = useState(false);
   const [collectionForm, setCollectionForm] = useState({ chicksCollected: false, collectionDate: "" });
   const [editNotesOpen, setEditNotesOpen] = useState(false);
   const [notesForm, setNotesForm] = useState("");
-  const [saving, setSaving] = useState(false);
   const [projectedSalePrice, setProjectedSalePrice] = useState<string>("");
-  const [savingSalePrice, setSavingSalePrice] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
-  const [completing, setCompleting] = useState(false);
   const [completeWarning, setCompleteWarning] = useState<string | null>(null);
 
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
 
-  function loadAll() {
-    // Batch all independent fetches into a single coordinated flow so the
-    // browser fires them concurrently and we apply one state update per
-    // endpoint. Each endpoint is isolated via allSettled so a single failure
-    // (e.g. suppliers) doesn't block the rest.
-    const flockP = apiFetch<any>(`/api/v1/broiler-flocks/${flockId}`);
-    const growthP = apiFetch<GrowthRecord[]>(`/api/v1/growth-records?flockId=${flockId}`);
-    const feedP = apiFetch<FeedRecord[]>(`/api/v1/feed-records?flockId=${flockId}`);
-    const waterP = apiFetch<WaterRecord[]>(`/api/v1/water-records?flockId=${flockId}`);
-    const mortalityP = apiFetch<MortalityEvent[]>(`/api/v1/mortality-events?flockId=${flockId}`);
-    const vaccinationP = apiFetch<VaccinationEvent[]>(`/api/v1/vaccination-events?flockId=${flockId}`);
-    const financialP = apiFetch<FinancialRecord[]>(`/api/v1/financial-records?flockId=${flockId}`);
-    const suppliersP = apiFetch<Supplier[]>("/api/v1/suppliers");
+  const saving = updateFlock.isPending;
+  const savingSalePrice = updateFlock.isPending;
+  const completing = completeFlockMutation.isPending;
 
-    Promise.allSettled([
-      flockP, growthP, feedP, waterP, mortalityP, vaccinationP, financialP, suppliersP,
-    ]).then(([flockRes, growthRes, feedRes, waterRes, mortalityRes, vaccRes, finRes, supRes]) => {
-      if (flockRes.status === "fulfilled") {
-        const d = flockRes.value;
-        setFlock(d);
-        setProjectedSalePrice(d.salePriceZmw != null ? String(d.salePriceZmw) : "");
-        setAgeDays(d.startDate ? Math.floor((new Date().getTime() - new Date(d.startDate).getTime()) / 86400000) : -1);
-      } else {
-        setError(flockRes.reason?.message || "Failed to load flock");
-      }
-      if (growthRes.status === "fulfilled") setGrowthRecords(growthRes.value);
-      if (feedRes.status === "fulfilled") setFeedRecords(feedRes.value);
-      if (waterRes.status === "fulfilled") setWaterRecords(waterRes.value);
-      if (mortalityRes.status === "fulfilled") setMortalityEvents(mortalityRes.value);
-      if (vaccRes.status === "fulfilled") setVaccinationEvents(vaccRes.value);
-      if (finRes.status === "fulfilled") setFinancialRecords(finRes.value);
-      if (supRes.status === "fulfilled") setSuppliers(supRes.value);
-    });
+  const ageDays = flock?.startDate
+    ? Math.floor((new Date().getTime() - new Date(flock.startDate).getTime()) / 86400000)
+    : -1;
+
+  useEffect(() => {
+    if (flock) {
+      setProjectedSalePrice(flock.salePriceZmw != null ? String(flock.salePriceZmw) : "");
+    }
+  }, [flock]);
+
+  function refetchAll() {
+    refetchFlock();
+    refetchGrowth();
+    refetchFeed();
+    refetchWater();
+    refetchMortality();
+    refetchVaccination();
+    refetchFinancial();
+    refetchSuppliers();
   }
 
   async function saveCollectionStatus() {
-    setSaving(true);
     try {
-      await apiFetch(`/api/v1/broiler-flocks/${flockId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
+      await updateFlock.mutateAsync({
+        path: `/api/v1/broiler-flocks/${flockId}`,
+        body: {
           chicksCollected: collectionForm.chicksCollected,
           collectionDate: collectionForm.chicksCollected ? collectionForm.collectionDate : null,
-        }),
+        },
       });
+      addToast("Collection status updated.", "success");
       setEditCollectionOpen(false);
-      loadAll();
     } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setSaving(false);
+      addToast(e.message || "Failed to update collection status.", "error");
     }
   }
 
   async function saveQualityNotes() {
-    setSaving(true);
     try {
-      await apiFetch(`/api/v1/broiler-flocks/${flockId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ chickQualityNotes: notesForm || null }),
+      await updateFlock.mutateAsync({
+        path: `/api/v1/broiler-flocks/${flockId}`,
+        body: { chickQualityNotes: notesForm || null },
       });
+      addToast("Quality notes saved.", "success");
       setEditNotesOpen(false);
-      loadAll();
     } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setSaving(false);
+      addToast(e.message || "Failed to save notes.", "error");
     }
   }
 
   async function saveProjectedSalePrice() {
     const parsed = parseFloat(projectedSalePrice);
     if (projectedSalePrice !== "" && (isNaN(parsed) || parsed < 0)) {
-      alert("Please enter a valid projected sales amount per bird.");
+      addToast("Please enter a valid projected sales amount per bird.", "error");
       return;
     }
-    setSavingSalePrice(true);
     try {
-      await apiFetch(`/api/v1/broiler-flocks/${flockId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ salePriceZmw: projectedSalePrice === "" ? null : parsed }),
+      await updateFlock.mutateAsync({
+        path: `/api/v1/broiler-flocks/${flockId}`,
+        body: { salePriceZmw: projectedSalePrice === "" ? null : parsed },
       });
-      loadAll();
+      addToast("Sale price updated.", "success");
     } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setSavingSalePrice(false);
+      addToast(e.message || "Failed to update sale price.", "error");
     }
   }
 
   async function handleCompleteFlock() {
-    setCompleting(true);
     try {
-      const result = await apiFetch<any>(`/api/v1/broiler-flocks/${flockId}/complete`, {
-        method: "POST",
-      });
+      const result = await completeFlockMutation.mutateAsync({
+        path: `/api/v1/broiler-flocks/${flockId}/complete`,
+      }) as any;
       setCompleteOpen(false);
       setCompleteWarning(null);
-      if (result.warnings?.message) {
-        setError(result.warnings.message);
+      if (result?.warnings?.message) {
+        setLocalError(result.warnings.message);
       } else {
-        setError("");
+        setLocalError("");
       }
-      loadAll();
     } catch (e: any) {
-      setError(e.message || "Failed to complete flock.");
-    } finally {
-      setCompleting(false);
+      setLocalError(e.message || "Failed to complete flock.");
     }
   }
 
@@ -194,8 +196,7 @@ export default function FlockDetailPage() {
 
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
-    if (user && flockId) loadAll();
-  }, [user, isLoading, flockId, router]);
+  }, [isLoading, user, router]);
 
   function getStatusBadge(status: string, chicksCollected?: boolean) {
     if (status === "active" && !chicksCollected) {
@@ -228,7 +229,7 @@ export default function FlockDetailPage() {
     </div>
   );
 
-  if (isLoading) return detailSkeleton;
+  if (isLoading || flockLoading) return detailSkeleton;
   if (!user) return null;
   if (!flock) return detailSkeleton;
 
@@ -647,12 +648,12 @@ export default function FlockDetailPage() {
           </Dialog>
         </TabsContent>
 
-        <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} breedId={flock?.breedId} startDate={flock?.startDate} /></TabsContent>
-        <TabsContent value="feed"><SimpleRecordTab flockId={flockId} records={feedRecords} type="feed" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} suppliers={suppliers} /></TabsContent>
-        <TabsContent value="water"><SimpleRecordTab flockId={flockId} records={waterRecords} type="water" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
-        <TabsContent value="mortality"><SimpleRecordTab flockId={flockId} records={mortalityEvents} type="mortality" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
-        <TabsContent value="vaccination"><SimpleRecordTab flockId={flockId} records={vaccinationEvents} type="vaccination" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
-        <TabsContent value="financial"><SimpleRecordTab flockId={flockId} records={financialRecords} type="financial" onRefresh={loadAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} breedId={flock?.breedId} startDate={flock?.startDate} /></TabsContent>
+        <TabsContent value="feed"><SimpleRecordTab flockId={flockId} records={feedRecords} type="feed" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} suppliers={suppliers} /></TabsContent>
+        <TabsContent value="water"><SimpleRecordTab flockId={flockId} records={waterRecords} type="water" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="mortality"><SimpleRecordTab flockId={flockId} records={mortalityEvents} type="mortality" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="vaccination"><SimpleRecordTab flockId={flockId} records={vaccinationEvents} type="vaccination" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="financial"><SimpleRecordTab flockId={flockId} records={financialRecords} type="financial" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
       </Tabs>
 
       {/* Complete Flock Confirmation Dialog */}

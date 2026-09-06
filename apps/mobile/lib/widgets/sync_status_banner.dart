@@ -18,12 +18,16 @@ class SyncStatusBanner extends StatefulWidget {
 class _SyncStatusBannerState extends State<SyncStatusBanner> {
   bool _isOnline = true;
   int _pendingCount = 0;
+  bool _isSyncing = false;
+  DateTime? _lastSyncAt;
 
   @override
   void initState() {
     super.initState();
     _isOnline = ConnectivityService.instance.isOnline;
     _pendingCount = SyncService.instance.pendingCount;
+    _isSyncing = SyncService.instance.isSyncing;
+    _lastSyncAt = SyncService.instance.lastSyncAt;
     ConnectivityService.instance.addListener(_onChanged);
   }
 
@@ -38,13 +42,25 @@ class _SyncStatusBannerState extends State<SyncStatusBanner> {
       setState(() {
         _isOnline = ConnectivityService.instance.isOnline;
         _pendingCount = SyncService.instance.pendingCount;
+        _isSyncing = SyncService.instance.isSyncing;
+        _lastSyncAt = SyncService.instance.lastSyncAt;
       });
     }
   }
 
+  String _formatLastSync(DateTime? time) {
+    if (time == null) return '';
+    final diff = DateTime.now().difference(time);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_isOnline && _pendingCount == 0) {
+    // Show nothing when online, no pending, and not syncing
+    if (_isOnline && _pendingCount == 0 && !_isSyncing) {
       return const SizedBox.shrink();
     }
 
@@ -82,14 +98,33 @@ class _SyncStatusBannerState extends State<SyncStatusBanner> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.sync, size: 16, color: colorScheme.onTertiaryContainer),
+          if (_isSyncing)
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Icon(Icons.sync, size: 16, color: colorScheme.onTertiaryContainer),
           const SizedBox(width: 8),
           Text(
-            'Syncing $_pendingCount change${_pendingCount == 1 ? '' : 's'}...',
+            _isSyncing
+                ? 'Syncing $_pendingCount change${_pendingCount == 1 ? '' : 's'}...'
+                : '$_pendingCount change${_pendingCount == 1 ? '' : 's'} queued',
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onTertiaryContainer,
             ),
           ),
+          if (_lastSyncAt != null && !_isSyncing) ...[
+            const SizedBox(width: 8),
+            Text(
+              '· last synced ${_formatLastSync(_lastSyncAt)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onTertiaryContainer.withValues(alpha: 0.7),
+                fontSize: 11,
+              ),
+            ),
+          ],
         ],
       ),
     );

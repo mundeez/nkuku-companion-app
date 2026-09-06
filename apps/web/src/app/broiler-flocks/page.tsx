@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
+import { useFlocks, useCreateFlock, useUpdateFlock, useDeleteFlock, useApiQuery } from "@/lib/api/hooks";
 import { BroilerFlock, Breed, Supplier } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,11 +59,15 @@ export default function BroilerFlocksPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { addToast } = useToast();
-  const [flocks, setFlocks] = useState<BroilerFlock[]>([]);
-  const [breeds, setBreeds] = useState<Breed[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const { data: flocksData = [], isLoading: flocksLoading, error: flocksError } = useFlocks();
+  const { data: breeds = [], error: breedsError } = useApiQuery<Breed[]>("/api/v1/breeds");
+  const { data: suppliers = [], error: suppliersError } = useApiQuery<Supplier[]>("/api/v1/suppliers");
+  const flocks = flocksData as BroilerFlock[];
+  const createFlock = useCreateFlock();
+  const updateFlock = useUpdateFlock();
+  const deleteFlock = useDeleteFlock();
+
+  const error = flocksError?.message || breedsError?.message || suppliersError?.message || "";
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -70,37 +75,16 @@ export default function BroilerFlocksPage() {
   const [editingFlock, setEditingFlock] = useState<BroilerFlock | null>(null);
   const [deletingFlock, setDeletingFlock] = useState<BroilerFlock | null>(null);
   const [form, setForm] = useState<FlockFormData>(emptyForm);
-  const [formLoading, setFormLoading] = useState(false);
+  const formLoading = createFlock.isPending || updateFlock.isPending || deleteFlock.isPending;
 
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
   const canDelete = user?.role === "owner";
 
-  function loadData() {
-    apiFetch<BroilerFlock[]>("/api/v1/broiler-flocks")
-      .then(setFlocks)
-      .catch((err) => setError(err.message));
-    apiFetch<Breed[]>("/api/v1/breeds")
-      .then(setBreeds)
-      .catch((err) => setError(err.message));
-    apiFetch<Supplier[]>("/api/v1/suppliers")
-      .then(setSuppliers)
-      .catch((err) => setError(err.message));
-  }
-
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login");
-      return;
     }
-    if (user) loadData();
-  }, [user, isLoading, router]);
-
-  useEffect(() => {
-    if (success) {
-      const t = setTimeout(() => setSuccess(""), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [success]);
+  }, [isLoading, user, router]);
 
   function openEdit(flock: BroilerFlock) {
     setEditingFlock(flock);
@@ -186,61 +170,41 @@ export default function BroilerFlocksPage() {
   }
 
   async function handleCreate() {
-    setFormLoading(true);
     try {
-      await apiFetch<BroilerFlock>("/api/v1/broiler-flocks", {
-        method: "POST",
-        body: JSON.stringify(prepareFlockBody(form)),
-      });
+      await createFlock.mutateAsync({ path: "/api/v1/broiler-flocks", body: prepareFlockBody(form) });
       addToast("Flock created successfully.", "success");
       setCreateOpen(false);
       setForm(emptyForm);
-      loadData();
     } catch (err: any) {
       addToast(err.message || "Failed to create flock.", "error");
-    } finally {
-      setFormLoading(false);
     }
   }
 
   async function handleUpdate() {
     if (!editingFlock) return;
-    setFormLoading(true);
     try {
-      await apiFetch<BroilerFlock>(`/api/v1/broiler-flocks/${editingFlock.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(prepareFlockBody(form)),
-      });
+      await updateFlock.mutateAsync({ path: `/api/v1/broiler-flocks/${editingFlock.id}`, body: prepareFlockBody(form) });
       addToast("Flock updated successfully.", "success");
       setEditOpen(false);
       setEditingFlock(null);
-      loadData();
     } catch (err: any) {
       addToast(err.message || "Failed to update flock.", "error");
-    } finally {
-      setFormLoading(false);
     }
   }
 
   async function handleDelete() {
     if (!deletingFlock) return;
-    setFormLoading(true);
     try {
-      await apiFetch<{ deleted: boolean }>(`/api/v1/broiler-flocks/${deletingFlock.id}`, {
-        method: "DELETE",
-      });
+      await deleteFlock.mutateAsync({ path: `/api/v1/broiler-flocks/${deletingFlock.id}` });
       addToast("Flock deleted successfully.", "success");
       setDeleteOpen(false);
       setDeletingFlock(null);
-      loadData();
     } catch (err: any) {
       addToast(err.message || "Failed to delete flock.", "error");
-    } finally {
-      setFormLoading(false);
     }
   }
 
-  if (isLoading) {
+  if (isLoading || flocksLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
@@ -282,11 +246,6 @@ export default function BroilerFlocksPage() {
       {error && (
         <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
           {error}
-        </div>
-      )}
-      {success && (
-        <div className="mb-4 p-4 rounded-lg bg-green-100 text-green-800 text-sm">
-          {success}
         </div>
       )}
 

@@ -26,8 +26,14 @@ class SyncService {
   bool _syncing = false;
   int _pendingCount = 0;
   int _skippedCount = 0;
+  DateTime? _lastSyncAt;
   Timer? _periodicTimer;
   static const _syncInterval = Duration(minutes: 5);
+
+  /// The last time a sync cycle completed (null if never synced).
+  DateTime? get lastSyncAt => _lastSyncAt;
+  /// Whether a sync cycle is currently running.
+  bool get isSyncing => _syncing;
 
   void init() {
     _initialized = true;
@@ -60,6 +66,7 @@ class SyncService {
       final pending = await OfflineRepository.instance.getPendingSyncs();
       if (pending.isEmpty) {
         _pendingCount = 0;
+        _lastSyncAt = DateTime.now();
         return;
       }
 
@@ -105,6 +112,7 @@ class SyncService {
 
       // Clean up completed entries
       await OfflineRepository.instance.clearDoneSyncs();
+      _lastSyncAt = DateTime.now();
     } finally {
       _syncing = false;
     }
