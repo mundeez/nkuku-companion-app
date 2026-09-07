@@ -45,6 +45,12 @@ class $CachedFlocksTable extends CachedFlocks
   late final GeneratedColumn<String> supplierName = GeneratedColumn<String>(
       'supplier_name', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _orderDateMeta =
+      const VerificationMeta('orderDate');
+  @override
+  late final GeneratedColumn<String> orderDate = GeneratedColumn<String>(
+      'order_date', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _startDateMeta =
       const VerificationMeta('startDate');
   @override
@@ -137,6 +143,7 @@ class $CachedFlocksTable extends CachedFlocks
         breedName,
         supplierId,
         supplierName,
+        orderDate,
         startDate,
         initialCount,
         currentCount,
@@ -190,6 +197,10 @@ class $CachedFlocksTable extends CachedFlocks
           _supplierNameMeta,
           supplierName.isAcceptableOrUnknown(
               data['supplier_name']!, _supplierNameMeta));
+    }
+    if (data.containsKey('order_date')) {
+      context.handle(_orderDateMeta,
+          orderDate.isAcceptableOrUnknown(data['order_date']!, _orderDateMeta));
     }
     if (data.containsKey('start_date')) {
       context.handle(_startDateMeta,
@@ -274,6 +285,8 @@ class $CachedFlocksTable extends CachedFlocks
           .read(DriftSqlType.string, data['${effectivePrefix}supplier_id']),
       supplierName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}supplier_name']),
+      orderDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}order_date']),
       startDate: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}start_date']),
       initialCount: attachedDatabase.typeMapping
@@ -314,6 +327,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
   final String? breedName;
   final String? supplierId;
   final String? supplierName;
+  final String? orderDate;
   final String? startDate;
   final int initialCount;
   final int currentCount;
@@ -333,6 +347,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
       this.breedName,
       this.supplierId,
       this.supplierName,
+      this.orderDate,
       this.startDate,
       required this.initialCount,
       required this.currentCount,
@@ -359,6 +374,9 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
     }
     if (!nullToAbsent || supplierName != null) {
       map['supplier_name'] = Variable<String>(supplierName);
+    }
+    if (!nullToAbsent || orderDate != null) {
+      map['order_date'] = Variable<String>(orderDate);
     }
     if (!nullToAbsent || startDate != null) {
       map['start_date'] = Variable<String>(startDate);
@@ -403,6 +421,9 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
       supplierName: supplierName == null && nullToAbsent
           ? const Value.absent()
           : Value(supplierName),
+      orderDate: orderDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(orderDate),
       startDate: startDate == null && nullToAbsent
           ? const Value.absent()
           : Value(startDate),
@@ -442,6 +463,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
       breedName: serializer.fromJson<String?>(json['breedName']),
       supplierId: serializer.fromJson<String?>(json['supplierId']),
       supplierName: serializer.fromJson<String?>(json['supplierName']),
+      orderDate: serializer.fromJson<String?>(json['orderDate']),
       startDate: serializer.fromJson<String?>(json['startDate']),
       initialCount: serializer.fromJson<int>(json['initialCount']),
       currentCount: serializer.fromJson<int>(json['currentCount']),
@@ -466,6 +488,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
       'breedName': serializer.toJson<String?>(breedName),
       'supplierId': serializer.toJson<String?>(supplierId),
       'supplierName': serializer.toJson<String?>(supplierName),
+      'orderDate': serializer.toJson<String?>(orderDate),
       'startDate': serializer.toJson<String?>(startDate),
       'initialCount': serializer.toJson<int>(initialCount),
       'currentCount': serializer.toJson<int>(currentCount),
@@ -488,6 +511,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
           Value<String?> breedName = const Value.absent(),
           Value<String?> supplierId = const Value.absent(),
           Value<String?> supplierName = const Value.absent(),
+          Value<String?> orderDate = const Value.absent(),
           Value<String?> startDate = const Value.absent(),
           int? initialCount,
           int? currentCount,
@@ -508,6 +532,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
         supplierId: supplierId.present ? supplierId.value : this.supplierId,
         supplierName:
             supplierName.present ? supplierName.value : this.supplierName,
+        orderDate: orderDate.present ? orderDate.value : this.orderDate,
         startDate: startDate.present ? startDate.value : this.startDate,
         initialCount: initialCount ?? this.initialCount,
         currentCount: currentCount ?? this.currentCount,
@@ -537,6 +562,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
       supplierName: data.supplierName.present
           ? data.supplierName.value
           : this.supplierName,
+      orderDate: data.orderDate.present ? data.orderDate.value : this.orderDate,
       startDate: data.startDate.present ? data.startDate.value : this.startDate,
       initialCount: data.initialCount.present
           ? data.initialCount.value
@@ -574,6 +600,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
           ..write('breedName: $breedName, ')
           ..write('supplierId: $supplierId, ')
           ..write('supplierName: $supplierName, ')
+          ..write('orderDate: $orderDate, ')
           ..write('startDate: $startDate, ')
           ..write('initialCount: $initialCount, ')
           ..write('currentCount: $currentCount, ')
@@ -598,6 +625,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
       breedName,
       supplierId,
       supplierName,
+      orderDate,
       startDate,
       initialCount,
       currentCount,
@@ -620,6 +648,7 @@ class CachedFlock extends DataClass implements Insertable<CachedFlock> {
           other.breedName == this.breedName &&
           other.supplierId == this.supplierId &&
           other.supplierName == this.supplierName &&
+          other.orderDate == this.orderDate &&
           other.startDate == this.startDate &&
           other.initialCount == this.initialCount &&
           other.currentCount == this.currentCount &&
@@ -641,6 +670,7 @@ class CachedFlocksCompanion extends UpdateCompanion<CachedFlock> {
   final Value<String?> breedName;
   final Value<String?> supplierId;
   final Value<String?> supplierName;
+  final Value<String?> orderDate;
   final Value<String?> startDate;
   final Value<int> initialCount;
   final Value<int> currentCount;
@@ -661,6 +691,7 @@ class CachedFlocksCompanion extends UpdateCompanion<CachedFlock> {
     this.breedName = const Value.absent(),
     this.supplierId = const Value.absent(),
     this.supplierName = const Value.absent(),
+    this.orderDate = const Value.absent(),
     this.startDate = const Value.absent(),
     this.initialCount = const Value.absent(),
     this.currentCount = const Value.absent(),
@@ -682,6 +713,7 @@ class CachedFlocksCompanion extends UpdateCompanion<CachedFlock> {
     this.breedName = const Value.absent(),
     this.supplierId = const Value.absent(),
     this.supplierName = const Value.absent(),
+    this.orderDate = const Value.absent(),
     this.startDate = const Value.absent(),
     this.initialCount = const Value.absent(),
     this.currentCount = const Value.absent(),
@@ -704,6 +736,7 @@ class CachedFlocksCompanion extends UpdateCompanion<CachedFlock> {
     Expression<String>? breedName,
     Expression<String>? supplierId,
     Expression<String>? supplierName,
+    Expression<String>? orderDate,
     Expression<String>? startDate,
     Expression<int>? initialCount,
     Expression<int>? currentCount,
@@ -725,6 +758,7 @@ class CachedFlocksCompanion extends UpdateCompanion<CachedFlock> {
       if (breedName != null) 'breed_name': breedName,
       if (supplierId != null) 'supplier_id': supplierId,
       if (supplierName != null) 'supplier_name': supplierName,
+      if (orderDate != null) 'order_date': orderDate,
       if (startDate != null) 'start_date': startDate,
       if (initialCount != null) 'initial_count': initialCount,
       if (currentCount != null) 'current_count': currentCount,
@@ -748,6 +782,7 @@ class CachedFlocksCompanion extends UpdateCompanion<CachedFlock> {
       Value<String?>? breedName,
       Value<String?>? supplierId,
       Value<String?>? supplierName,
+      Value<String?>? orderDate,
       Value<String?>? startDate,
       Value<int>? initialCount,
       Value<int>? currentCount,
@@ -768,6 +803,7 @@ class CachedFlocksCompanion extends UpdateCompanion<CachedFlock> {
       breedName: breedName ?? this.breedName,
       supplierId: supplierId ?? this.supplierId,
       supplierName: supplierName ?? this.supplierName,
+      orderDate: orderDate ?? this.orderDate,
       startDate: startDate ?? this.startDate,
       initialCount: initialCount ?? this.initialCount,
       currentCount: currentCount ?? this.currentCount,
@@ -804,6 +840,9 @@ class CachedFlocksCompanion extends UpdateCompanion<CachedFlock> {
     }
     if (supplierName.present) {
       map['supplier_name'] = Variable<String>(supplierName.value);
+    }
+    if (orderDate.present) {
+      map['order_date'] = Variable<String>(orderDate.value);
     }
     if (startDate.present) {
       map['start_date'] = Variable<String>(startDate.value);
@@ -856,6 +895,7 @@ class CachedFlocksCompanion extends UpdateCompanion<CachedFlock> {
           ..write('breedName: $breedName, ')
           ..write('supplierId: $supplierId, ')
           ..write('supplierName: $supplierName, ')
+          ..write('orderDate: $orderDate, ')
           ..write('startDate: $startDate, ')
           ..write('initialCount: $initialCount, ')
           ..write('currentCount: $currentCount, ')
@@ -6728,6 +6768,7 @@ typedef $$CachedFlocksTableCreateCompanionBuilder = CachedFlocksCompanion
   Value<String?> breedName,
   Value<String?> supplierId,
   Value<String?> supplierName,
+  Value<String?> orderDate,
   Value<String?> startDate,
   Value<int> initialCount,
   Value<int> currentCount,
@@ -6750,6 +6791,7 @@ typedef $$CachedFlocksTableUpdateCompanionBuilder = CachedFlocksCompanion
   Value<String?> breedName,
   Value<String?> supplierId,
   Value<String?> supplierName,
+  Value<String?> orderDate,
   Value<String?> startDate,
   Value<int> initialCount,
   Value<int> currentCount,
@@ -6791,6 +6833,9 @@ class $$CachedFlocksTableFilterComposer
 
   ColumnFilters<String> get supplierName => $composableBuilder(
       column: $table.supplierName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get orderDate => $composableBuilder(
+      column: $table.orderDate, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get startDate => $composableBuilder(
       column: $table.startDate, builder: (column) => ColumnFilters(column));
@@ -6858,6 +6903,9 @@ class $$CachedFlocksTableOrderingComposer
   ColumnOrderings<String> get supplierName => $composableBuilder(
       column: $table.supplierName,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get orderDate => $composableBuilder(
+      column: $table.orderDate, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get startDate => $composableBuilder(
       column: $table.startDate, builder: (column) => ColumnOrderings(column));
@@ -6929,6 +6977,9 @@ class $$CachedFlocksTableAnnotationComposer
   GeneratedColumn<String> get supplierName => $composableBuilder(
       column: $table.supplierName, builder: (column) => column);
 
+  GeneratedColumn<String> get orderDate =>
+      $composableBuilder(column: $table.orderDate, builder: (column) => column);
+
   GeneratedColumn<String> get startDate =>
       $composableBuilder(column: $table.startDate, builder: (column) => column);
 
@@ -6998,6 +7049,7 @@ class $$CachedFlocksTableTableManager extends RootTableManager<
             Value<String?> breedName = const Value.absent(),
             Value<String?> supplierId = const Value.absent(),
             Value<String?> supplierName = const Value.absent(),
+            Value<String?> orderDate = const Value.absent(),
             Value<String?> startDate = const Value.absent(),
             Value<int> initialCount = const Value.absent(),
             Value<int> currentCount = const Value.absent(),
@@ -7019,6 +7071,7 @@ class $$CachedFlocksTableTableManager extends RootTableManager<
             breedName: breedName,
             supplierId: supplierId,
             supplierName: supplierName,
+            orderDate: orderDate,
             startDate: startDate,
             initialCount: initialCount,
             currentCount: currentCount,
@@ -7040,6 +7093,7 @@ class $$CachedFlocksTableTableManager extends RootTableManager<
             Value<String?> breedName = const Value.absent(),
             Value<String?> supplierId = const Value.absent(),
             Value<String?> supplierName = const Value.absent(),
+            Value<String?> orderDate = const Value.absent(),
             Value<String?> startDate = const Value.absent(),
             Value<int> initialCount = const Value.absent(),
             Value<int> currentCount = const Value.absent(),
@@ -7061,6 +7115,7 @@ class $$CachedFlocksTableTableManager extends RootTableManager<
             breedName: breedName,
             supplierId: supplierId,
             supplierName: supplierName,
+            orderDate: orderDate,
             startDate: startDate,
             initialCount: initialCount,
             currentCount: currentCount,

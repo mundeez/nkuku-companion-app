@@ -6,6 +6,7 @@ import '../services/broiler_service.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/sales_filter_sheet.dart';
+import '../widgets/sale_detail_sheet.dart';
 import 'broiler/records/sale_record_form.dart';
 
 /// Global sales dashboard — mirrors the web app's `/sales` page.
@@ -148,6 +149,8 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                       const SizedBox(height: 16),
                       _buildPaymentBreakdown(),
                       const SizedBox(height: 16),
+                      _buildSortBar(),
+                      const SizedBox(height: 8),
                       _buildSalesList(),
                     ],
                   ),
@@ -337,6 +340,61 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     );
   }
 
+  Widget _buildSortBar() {
+    final sortFields = <(String, String)>[
+      ('saleDate', 'Date'),
+      ('flockName', 'Flock'),
+      ('customerName', 'Customer'),
+      ('birdCount', 'Birds'),
+      ('pricePerBirdZmw', 'Price'),
+      ('totalAmountZmw', 'Total'),
+      ('paymentStatus', 'Payment'),
+    ];
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: sortFields.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (ctx, i) {
+          final field = sortFields[i].$1;
+          final label = sortFields[i].$2;
+          final isActive = _filter.sortBy == field;
+          return FilterChip(
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label),
+                if (isActive) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    _filter.sortDir == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
+                    size: 14,
+                  ),
+                ],
+              ],
+            ),
+            selected: isActive,
+            onSelected: (_) {
+              setState(() {
+                if (isActive) {
+                  // Toggle direction
+                  _filter = _filter.copyWith(
+                    sortDir: _filter.sortDir == 'asc' ? 'desc' : 'asc',
+                  );
+                } else {
+                  // New sort field, default to desc
+                  _filter = _filter.copyWith(sortBy: field, sortDir: 'desc');
+                }
+              });
+              _load();
+            },
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildSalesList() {
     if (_sales.isEmpty) {
       return const Center(
@@ -383,8 +441,13 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     final statusColor = r.paymentStatus == 'paid'
         ? Colors.green
         : r.paymentStatus == 'partial'
-            ? Colors.orange
-            : Colors.grey;
+            ? Colors.amber
+            : Colors.red;
+    final total = r.totalAmountZmw;
+    final paid = r.amountPaidZmw ?? 0;
+    final remaining = total - paid;
+    final pct = total > 0 ? (paid / total).clamp(0.0, 1.0) : 0.0;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
@@ -398,74 +461,112 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
             if (r.customerName != null && r.customerName!.isNotEmpty)
               Text('Customer: ${r.customerName}'),
             Text(
-                '${r.birdCount} birds · ZMW ${r.pricePerBirdZmw.toStringAsFixed(2)}/bird · Total: ZMW ${r.totalAmountZmw.toStringAsFixed(2)}'),
-            if (r.amountPaidZmw != null && r.paymentStatus != 'pending')
-              Text('Paid: ZMW ${r.amountPaidZmw!.toStringAsFixed(2)}',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: r.paymentStatus == 'paid'
-                          ? Colors.green
-                          : Colors.orange)),
+                '${r.birdCount} birds · ZMW ${r.pricePerBirdZmw.toStringAsFixed(2)}/bird · Total: ZMW ${total.toStringAsFixed(2)}'),
             if (r.avgWeightKg != null)
               Text('Avg weight: ${r.avgWeightKg} kg'),
+            const SizedBox(height: 8),
+            // Payment progress bar
+            Row(
+              children: [
+                Icon(Icons.circle, size: 8, color: statusColor),
+                const SizedBox(width: 4),
+                Text(
+                  r.paymentStatus[0].toUpperCase() + r.paymentStatus.substring(1),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: statusColor),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: pct,
+                backgroundColor: Colors.grey.shade200,
+                color: statusColor,
+                minHeight: 6,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              r.paymentStatus == 'paid'
+                  ? 'ZMW ${total.toStringAsFixed(2)} fully paid'
+                  : r.paymentStatus == 'partial'
+                      ? 'ZMW ${paid.toStringAsFixed(2)} / ${total.toStringAsFixed(2)} (${remaining.toStringAsFixed(2)} remaining)'
+                      : 'ZMW ${total.toStringAsFixed(2)} unpaid',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
           ],
         ),
-        trailing: Chip(
-          label: Text(
-            r.paymentStatus,
-            style: TextStyle(fontSize: 10, color: statusColor),
-          ),
-          backgroundColor: statusColor.withAlpha(30),
-        ),
-        onTap: AuthService.canManageSales
-            ? () async {
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        SaleRecordForm(flockId: r.flockId, record: r),
-                  ),
-                );
-                if (result == true) _load();
-              }
-            : null,
-        onLongPress: AuthService.isOwner
-            ? () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Delete sale record?'),
-                    content: Text(
-                        'Delete sale on ${r.saleDate.toIso8601String().split('T').first} (${r.birdCount} birds)?'),
-                    actions: [
-                      TextButton(
-                          onPressed: () =>
-                              Navigator.pop(ctx, false),
-                          child: const Text('Cancel')),
-                      TextButton(
-                          onPressed: () =>
-                              Navigator.pop(ctx, true),
-                          child: const Text('Delete',
-                              style:
-                                  TextStyle(color: Colors.red))),
-                    ],
-                  ),
-                );
-                if (confirmed != true) return;
-                try {
-                  await BroilerService.deleteSaleRecord(r.id);
-                  _load();
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text('Delete failed: $e'),
-                          backgroundColor: Colors.red),
-                    );
+        trailing: r.paymentStatus == 'paid'
+            ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+            : r.paymentStatus == 'partial'
+                ? Icon(Icons.pending_actions, color: Colors.amber.shade700, size: 20)
+                : const Icon(Icons.hourglass_empty, color: Colors.red, size: 20),
+        onTap: () => SaleDetailSheet.show(
+          context,
+          sale: r,
+          onEdit: AuthService.canManageSales
+              ? () async {
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          SaleRecordForm(flockId: r.flockId, record: r),
+                    ),
+                  );
+                  if (result == true) {
+                    _load();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Sale updated'), duration: Duration(seconds: 2)),
+                      );
+                    }
                   }
                 }
-              }
-            : null,
+              : null,
+          onDelete: AuthService.isOwner
+              ? () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete sale record?'),
+                      content: Text(
+                          'Delete sale on ${r.saleDate.toIso8601String().split('T').first} (${r.birdCount} birds)?'),
+                      actions: [
+                        TextButton(
+                            onPressed: () =>
+                                Navigator.pop(ctx, false),
+                            child: const Text('Cancel')),
+                        TextButton(
+                            onPressed: () =>
+                                Navigator.pop(ctx, true),
+                            child: const Text('Delete',
+                                style:
+                                    TextStyle(color: Colors.red))),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
+                  try {
+                    await BroilerService.deleteSaleRecord(r.id);
+                    _load();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Sale deleted'), duration: Duration(seconds: 2)),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('Delete failed: $e'),
+                            backgroundColor: Colors.red),
+                      );
+                    }
+                  }
+                }
+              : null,
+        ),
       ),
     );
   }
@@ -514,7 +615,14 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           builder: (_) => SaleRecordForm(flockId: selectedFlock.id),
         ),
       );
-      if (result == true) _load();
+      if (result == true) {
+        _load();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Sale saved'), duration: Duration(seconds: 2)),
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

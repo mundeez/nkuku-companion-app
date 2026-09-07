@@ -105,7 +105,8 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
     _selectedSupplierId = flock.supplierId;
     _housingType = flock.housingType;
     _chicksCollected = flock.chicksCollected ?? false;
-    _startDate = DateTime.parse(flock.startDate ?? DateTime.now().toIso8601String());
+    // Use orderDate for the date picker (falls back to startDate for older flocks)
+    _startDate = DateTime.parse(flock.orderDate ?? flock.startDate ?? DateTime.now().toIso8601String());
     if (flock.collectionDate != null) {
       _collectionDate = DateTime.tryParse(flock.collectionDate!);
     }
@@ -142,7 +143,11 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
         id: widget.flock?.id ?? '',
         name: _nameController.text.trim(),
         breedId: _selectedBreedId!,
-        startDate: _startDate.toIso8601String().split('T').first,
+        // The API requires `orderDate` (when the flock was ordered).
+        // `startDate` is derived by the API from `collectionDate` when
+        // chicksCollected is true, so we don't send it on create.
+        orderDate: _startDate.toIso8601String().split('T').first,
+        startDate: widget.flock?.startDate,
         initialCount: int.parse(_initialCountController.text),
         currentCount: widget.flock?.currentCount ?? int.parse(_initialCountController.text),
         targetWeight: double.tryParse(_targetWeightController.text),
@@ -226,7 +231,7 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
                     const SizedBox(height: 12),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Start date'),
+                      title: const Text('Order date'),
                       subtitle: Text(_startDate.toIso8601String().split('T').first),
                       trailing: const Icon(Icons.calendar_today),
                       onTap: _pickStartDate,

@@ -50,6 +50,7 @@ class BroilerService {
         'breedName': f.breedName,
         'supplierId': f.supplierId,
         'supplierName': f.supplierName,
+        'orderDate': f.orderDate,
         'startDate': f.startDate,
         'initialCount': f.initialCount,
         'currentCount': f.currentCount,
@@ -76,54 +77,76 @@ class BroilerService {
   }
 
   static Future<BroilerFlock> createFlock(BroilerFlock flock) async {
-    if (!ConnectivityService.instance.isOnline) {
-      // Queue for later sync via Drift.
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'flock',
-        operation: 'create',
-        payload: flock.toJson(),
-      );
-      // Return a temporary local copy so the UI can proceed.
-      return flock.copyWith(id: 'pending_${DateTime.now().millisecondsSinceEpoch}');
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/broiler-flocks', data: flock.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return BroilerFlock.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'flock',
+          operation: 'create',
+          payload: flock.toJson(),
+        );
+        return flock.copyWith(id: 'pending_${DateTime.now().millisecondsSinceEpoch}');
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .post('/api/v1/broiler-flocks', data: flock.toJson());
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
-    return BroilerFlock.fromJson(res.data);
   }
 
   static Future<BroilerFlock> updateFlock(
       String id, Map<String, dynamic> data) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'flock',
-        operation: 'update',
-        entityId: id,
-        payload: data,
-      );
-      return BroilerFlock.fromJson({'id': id, ...data});
+    try {
+      final res =
+          await ApiService.dio.patch('/api/v1/broiler-flocks/$id', data: data);
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return BroilerFlock.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'flock',
+          operation: 'update',
+          entityId: id,
+          payload: data,
+        );
+        return BroilerFlock.fromJson({'id': id, ...data});
+      }
+      rethrow;
     }
-    final res =
-        await ApiService.dio.patch('/api/v1/broiler-flocks/$id', data: data);
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
-    return BroilerFlock.fromJson(res.data);
   }
 
   static Future<void> deleteFlock(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'flock',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/broiler-flocks/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'flock',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/broiler-flocks/$id');
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
   }
 
   // Breeds / Suppliers
@@ -167,50 +190,76 @@ class BroilerService {
   }
 
   static Future<GrowthRecord> createGrowthRecord(GrowthRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'growth_record',
-        operation: 'create',
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/growth-records', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return GrowthRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'growth_record',
+          operation: 'create',
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .post('/api/v1/growth-records', data: record.toJson());
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
-    return GrowthRecord.fromJson(res.data);
   }
 
   static Future<GrowthRecord> updateGrowthRecord(
       String id, GrowthRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'growth_record',
-        operation: 'update',
-        entityId: id,
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/growth-records/$id', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return GrowthRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'growth_record',
+          operation: 'update',
+          entityId: id,
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/growth-records/$id', data: record.toJson());
-    _assertOk(res);
-    return GrowthRecord.fromJson(res.data);
   }
 
   static Future<void> deleteGrowthRecord(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'growth_record',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/growth-records/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'growth_record',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/growth-records/$id');
-    _assertOk(res);
   }
 
   // Feed records
@@ -235,50 +284,76 @@ class BroilerService {
   }
 
   static Future<FeedRecord> createFeedRecord(FeedRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'feed_record',
-        operation: 'create',
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/feed-records', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return FeedRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'feed_record',
+          operation: 'create',
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .post('/api/v1/feed-records', data: record.toJson());
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
-    return FeedRecord.fromJson(res.data);
   }
 
   static Future<FeedRecord> updateFeedRecord(
       String id, FeedRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'feed_record',
-        operation: 'update',
-        entityId: id,
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/feed-records/$id', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return FeedRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'feed_record',
+          operation: 'update',
+          entityId: id,
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/feed-records/$id', data: record.toJson());
-    _assertOk(res);
-    return FeedRecord.fromJson(res.data);
   }
 
   static Future<void> deleteFeedRecord(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'feed_record',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/feed-records/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'feed_record',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/feed-records/$id');
-    _assertOk(res);
   }
 
   // Feed purchases (procurement — matches web app flow)
@@ -302,50 +377,76 @@ class BroilerService {
   }
 
   static Future<FeedPurchase> createFeedPurchase(FeedPurchase purchase) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'feed_purchase',
-        operation: 'create',
-        payload: purchase.toJson(),
-      );
-      return purchase;
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/feed-purchases', data: purchase.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return FeedPurchase.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'feed_purchase',
+          operation: 'create',
+          payload: purchase.toJson(),
+        );
+        return purchase;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .post('/api/v1/feed-purchases', data: purchase.toJson());
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
-    return FeedPurchase.fromJson(res.data);
   }
 
   static Future<FeedPurchase> updateFeedPurchase(
       String id, FeedPurchase purchase) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'feed_purchase',
-        operation: 'update',
-        entityId: id,
-        payload: purchase.toJson(),
-      );
-      return purchase;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/feed-purchases/$id', data: purchase.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return FeedPurchase.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'feed_purchase',
+          operation: 'update',
+          entityId: id,
+          payload: purchase.toJson(),
+        );
+        return purchase;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/feed-purchases/$id', data: purchase.toJson());
-    _assertOk(res);
-    return FeedPurchase.fromJson(res.data);
   }
 
   static Future<void> deleteFeedPurchase(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'feed_purchase',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/feed-purchases/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'feed_purchase',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/feed-purchases/$id');
-    _assertOk(res);
   }
 
   // Water records
@@ -370,50 +471,76 @@ class BroilerService {
   }
 
   static Future<WaterRecord> createWaterRecord(WaterRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'water_record',
-        operation: 'create',
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/water-records', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return WaterRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'water_record',
+          operation: 'create',
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .post('/api/v1/water-records', data: record.toJson());
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
-    return WaterRecord.fromJson(res.data);
   }
 
   static Future<WaterRecord> updateWaterRecord(
       String id, WaterRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'water_record',
-        operation: 'update',
-        entityId: id,
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/water-records/$id', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return WaterRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'water_record',
+          operation: 'update',
+          entityId: id,
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/water-records/$id', data: record.toJson());
-    _assertOk(res);
-    return WaterRecord.fromJson(res.data);
   }
 
   static Future<void> deleteWaterRecord(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'water_record',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/water-records/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'water_record',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/water-records/$id');
-    _assertOk(res);
   }
 
   // Mortality events
@@ -439,50 +566,76 @@ class BroilerService {
 
   static Future<MortalityEvent> createMortalityEvent(
       MortalityEvent event) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'mortality_event',
-        operation: 'create',
-        payload: event.toJson(),
-      );
-      return event;
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/mortality-events', data: event.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return MortalityEvent.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'mortality_event',
+          operation: 'create',
+          payload: event.toJson(),
+        );
+        return event;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .post('/api/v1/mortality-events', data: event.toJson());
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
-    return MortalityEvent.fromJson(res.data);
   }
 
   static Future<MortalityEvent> updateMortalityEvent(
       String id, MortalityEvent event) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'mortality_event',
-        operation: 'update',
-        entityId: id,
-        payload: event.toJson(),
-      );
-      return event;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/mortality-events/$id', data: event.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return MortalityEvent.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'mortality_event',
+          operation: 'update',
+          entityId: id,
+          payload: event.toJson(),
+        );
+        return event;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/mortality-events/$id', data: event.toJson());
-    _assertOk(res);
-    return MortalityEvent.fromJson(res.data);
   }
 
   static Future<void> deleteMortalityEvent(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'mortality_event',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/mortality-events/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'mortality_event',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/mortality-events/$id');
-    _assertOk(res);
   }
 
   // Vaccination events
@@ -510,50 +663,76 @@ class BroilerService {
 
   static Future<VaccinationEvent> createVaccinationEvent(
       VaccinationEvent event) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'vaccination_event',
-        operation: 'create',
-        payload: event.toJson(),
-      );
-      return event;
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/vaccination-events', data: event.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return VaccinationEvent.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'vaccination_event',
+          operation: 'create',
+          payload: event.toJson(),
+        );
+        return event;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .post('/api/v1/vaccination-events', data: event.toJson());
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
-    return VaccinationEvent.fromJson(res.data);
   }
 
   static Future<VaccinationEvent> updateVaccinationEvent(
       String id, VaccinationEvent event) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'vaccination_event',
-        operation: 'update',
-        entityId: id,
-        payload: event.toJson(),
-      );
-      return event;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/vaccination-events/$id', data: event.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return VaccinationEvent.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'vaccination_event',
+          operation: 'update',
+          entityId: id,
+          payload: event.toJson(),
+        );
+        return event;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/vaccination-events/$id', data: event.toJson());
-    _assertOk(res);
-    return VaccinationEvent.fromJson(res.data);
   }
 
   static Future<void> deleteVaccinationEvent(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'vaccination_event',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/vaccination-events/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'vaccination_event',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/vaccination-events/$id');
-    _assertOk(res);
   }
 
   // Financial records
@@ -580,50 +759,76 @@ class BroilerService {
 
   static Future<FinancialRecord> createFinancialRecord(
       FinancialRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'financial_record',
-        operation: 'create',
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/financial-records', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return FinancialRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'financial_record',
+          operation: 'create',
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .post('/api/v1/financial-records', data: record.toJson());
-    _assertOk(res);
-    ConnectivityService.instance.markOnline();
-    return FinancialRecord.fromJson(res.data);
   }
 
   static Future<FinancialRecord> updateFinancialRecord(
       String id, FinancialRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'financial_record',
-        operation: 'update',
-        entityId: id,
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/financial-records/$id', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return FinancialRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'financial_record',
+          operation: 'update',
+          entityId: id,
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/financial-records/$id', data: record.toJson());
-    _assertOk(res);
-    return FinancialRecord.fromJson(res.data);
   }
 
   static Future<void> deleteFinancialRecord(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'financial_record',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/financial-records/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'financial_record',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/financial-records/$id');
-    _assertOk(res);
   }
 
   // Bulk delete records
@@ -698,33 +903,51 @@ class BroilerService {
 
   static Future<MedicationRecord> updateMedicationRecord(
       String id, MedicationRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'medication_record',
-        operation: 'update',
-        entityId: id,
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/medication-records/$id', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return MedicationRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'medication_record',
+          operation: 'update',
+          entityId: id,
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/medication-records/$id', data: record.toJson());
-    _assertOk(res);
-    return MedicationRecord.fromJson(res.data);
   }
 
   static Future<void> deleteMedicationRecord(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'medication_record',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/medication-records/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'medication_record',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/medication-records/$id');
-    _assertOk(res);
   }
 
   // Environmental records
@@ -752,34 +975,52 @@ class BroilerService {
 
   static Future<EnvironmentalRecord> updateEnvironmentalRecord(
       String id, EnvironmentalRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'environmental_record',
-        operation: 'update',
-        entityId: id,
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/environmental-records/$id', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return EnvironmentalRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'environmental_record',
+          operation: 'update',
+          entityId: id,
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/environmental-records/$id', data: record.toJson());
-    _assertOk(res);
-    return EnvironmentalRecord.fromJson(res.data);
   }
 
   static Future<void> deleteEnvironmentalRecord(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'environmental_record',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res =
+          await ApiService.dio.delete('/api/v1/environmental-records/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'environmental_record',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res =
-        await ApiService.dio.delete('/api/v1/environmental-records/$id');
-    _assertOk(res);
   }
 
   // Flock tasks
@@ -920,41 +1161,76 @@ class BroilerService {
   }
 
   static Future<SaleRecord> createSaleRecord(SaleRecord record) async {
-    final res = await ApiService.dio
-        .post('/api/v1/sale-records', data: record.toJson());
-    _assertOk(res);
-    return SaleRecord.fromJson(res.data);
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/sale-records', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return SaleRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'sale_record',
+          operation: 'create',
+          payload: record.toJson(),
+        );
+        return record.copyWith(id: 'pending_${DateTime.now().millisecondsSinceEpoch}');
+      }
+      rethrow;
+    }
   }
 
   static Future<SaleRecord> updateSaleRecord(
       String id, SaleRecord record) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'sale_record',
-        operation: 'update',
-        entityId: id,
-        payload: record.toJson(),
-      );
-      return record;
+    try {
+      final res = await ApiService.dio
+          .patch('/api/v1/sale-records/$id', data: record.toJson());
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+      return SaleRecord.fromJson(res.data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'sale_record',
+          operation: 'update',
+          entityId: id,
+          payload: record.toJson(),
+        );
+        return record;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio
-        .patch('/api/v1/sale-records/$id', data: record.toJson());
-    _assertOk(res);
-    return SaleRecord.fromJson(res.data);
   }
 
   static Future<void> deleteSaleRecord(String id) async {
-    if (!ConnectivityService.instance.isOnline) {
-      await OfflineRepository.instance.enqueueSync(
-        entityType: 'sale_record',
-        operation: 'delete',
-        entityId: id,
-        payload: {},
-      );
-      return;
+    try {
+      final res = await ApiService.dio.delete('/api/v1/sale-records/$id');
+      _assertOk(res);
+      ConnectivityService.instance.markOnline();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        ConnectivityService.instance.markOffline();
+        await OfflineRepository.instance.enqueueSync(
+          entityType: 'sale_record',
+          operation: 'delete',
+          entityId: id,
+          payload: {},
+        );
+        return;
+      }
+      rethrow;
     }
-    final res = await ApiService.dio.delete('/api/v1/sale-records/$id');
-    _assertOk(res);
   }
 
   // Documents

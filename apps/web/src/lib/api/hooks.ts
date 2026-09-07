@@ -29,17 +29,19 @@ export function useApiQuery<T = unknown>(
     enabled: options?.enabled ?? true,
     staleTime: isExcluded(path) ? 0 : (options?.staleTime ?? 60 * 1000),
     refetchInterval: options?.refetchInterval,
-    // Ledger/financials: always refetch on mount
-    refetchOnMount: isExcluded(path) ? "always" : false,
+    // Always refetch on mount — shows cached data immediately while
+    // refreshing in the background. Ledger/financials always refetch.
+    refetchOnMount: true,
   });
 }
 
 /**
  * Generic mutation hook with offline queue support.
- * When offline, mutations are enqueued in IndexedDB and replayed
- * when connectivity is restored.
+ * When online, mutations hit the API immediately and return the real response.
+ * When a network error occurs (offline), the mutation is enqueued in IndexedDB
+ * and replayed when connectivity is restored.
  *
- * Supports optimistic updates via the `onMutate` option.
+ * Supports optimistic updates via the `optimisticUpdate` option.
  */
 export function useApiMutation<T = unknown, V = unknown>(
   method: "POST" | "PATCH" | "DELETE",
@@ -60,17 +62,31 @@ export function useApiMutation<T = unknown, V = unknown>(
 
   return useMutation<T, Error, { path: string; body?: V }>({
     mutationFn: async ({ path, body }) => {
-      // Check if we're online
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        // Queue for later
-        await enqueueMutation(method, path, body);
-        // Return a placeholder — the UI can show "queued" state
-        return { queued: true } as unknown as T;
+      try {
+        // Always try the API first — when online this returns the real response
+        return await apiFetch<T>(path, {
+          method,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+      } catch (e: any) {
+        // Only queue if this is a network error (fetch failed), not a 4xx/5xx
+        // Network errors are TypeError (fetch failed) or have no status code
+        const isNetworkError =
+          e instanceof TypeError ||
+          e?.status === undefined ||
+          e?.message?.includes("fetch") ||
+          e?.message?.includes("Network Error") ||
+          e?.name === "TypeError";
+
+        if (isNetworkError) {
+          // Queue for later replay
+          await enqueueMutation(method, path, body);
+          // Return a placeholder so the mutation resolves
+          return { queued: true } as unknown as T;
+        }
+        // Re-throw validation/server errors so the UI can handle them
+        throw e;
       }
-      return apiFetch<T>(path, {
-        method,
-        body: body ? JSON.stringify(body) : undefined,
-      });
     },
     onMutate: async (variables) => {
       // Optimistic update
@@ -96,13 +112,20 @@ export function useApiMutation<T = unknown, V = unknown>(
       options?.onError?.(error, variables.body as V);
     },
     onSuccess: (data, variables) => {
-      // Invalidate relevant queries
+      // Invalidate relevant queries to refresh from server.
+      // Use predicate matching so that "/api/v1/sale-records" invalidates
+      // all queries whose key starts with that path (e.g. "/api/v1/sale-records/all?...").
       if (options?.invalidatePaths) {
         for (const p of options.invalidatePaths) {
-          queryClient.invalidateQueries({ queryKey: [p] });
+          queryClient.invalidateQueries({
+            predicate: (query) => {
+              const key = query.queryKey?.[0];
+              return typeof key === "string" && key.startsWith(p);
+            },
+          });
         }
       }
-      // Also invalidate the path itself (for list updates)
+      // Also invalidate the exact mutation path
       queryClient.invalidateQueries({ queryKey: [variables.path] });
       options?.onSuccess?.(data, variables.body as V);
     },

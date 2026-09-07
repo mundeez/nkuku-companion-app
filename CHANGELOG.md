@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.30.1-alpha] — 2026-09-07
+
+### Mobile Flock Fixes + Sales UX Improvements
+
+### Fixed
+- **Mobile**: Flock list now loads correctly when Prisma `Decimal` fields are serialized as strings.
+  - `OfflineRepository` cache refresh methods now use safe `_toDouble`, `_toInt`, and `_toIntOrNull` helpers for `targetWeight`, `chickPriceZmw`, and other numeric fields.
+  - Prevents `NoSuchMethodError` (`String has no toDouble()`) from silently falling back to an empty cache.
+- **Mobile**: Flock creation now sends `orderDate` instead of `startDate`, matching the API contract.
+  - Updated the flock form field label to "Order date".
+  - Added `orderDate` column to the `CachedFlocks` Drift table and migrated the local database to schema v4.
+
+### Changed
+- **Web**: Sales dashboard rows now show a two-line payment status with a progress bar, amounts paid/remaining, and color-coded status.
+- **Web**: Added a `SaleDetailDrawer` that slides in to display full sale details, payment breakdown, customer info, notes, and attachments.
+- **Web**: Sales list rows are now clickable and open the detail drawer; edit/delete actions remain available to authorized users.
+- **Web**: Alerts page migrated to `useApiQuery` and `useApiMutation` hooks for consistent offline-first behavior.
+- **Web**: `useApiQuery` / `useApiMutation` hooks refined — always refetch on mount, retry once, and only queue network/TypeError failures for replay.
+- **Mobile**: Sales dashboard updated to match the new payment-status UX and detail sheet (`sale_detail_sheet.dart`).
+
 ## [1.30.0-alpha] — 2026-09-06
 
 ### Web Offline-First + Sync Polish

@@ -1,9 +1,11 @@
 "use client";
 
-import { Fragment, useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
+import { useApiQuery, useApiMutation, useFlocks } from "@/lib/api/hooks";
 import { SaleRecord, SalesDashboardSummary, BroilerFlock, PaginatedSales, SalesFilter, PaymentStatus } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,9 +20,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, Paperclip, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronLeft, ChevronRight as ChevronRightIcon } from "lucide-react";
-import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
+import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, ChevronLeft, ChevronRight as ChevronRightIcon, ArrowUp, ArrowDown } from "lucide-react";
 import { SalesFilterBar } from "@/components/sales/sales-filter-bar";
+import { SaleDetailDrawer } from "@/components/sales/sale-detail-drawer";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
@@ -40,15 +43,10 @@ function buildFilterParams(filter: SalesFilter): string {
 export default function SalesDashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const [summary, setSummary] = useState<SalesDashboardSummary | null>(null);
-  const [sales, setSales] = useState<SaleRecord[]>([]);
-  const [totalSales, setTotalSales] = useState(0);
-  const [flocks, setFlocks] = useState<BroilerFlock[]>([]);
-  const [error, setError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<SaleRecord | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+  const [drawerSale, setDrawerSale] = useState<SaleRecord | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [filter, setFilter] = useState<SalesFilter>({ limit: PAGE_SIZE, offset: 0 });
   const [form, setForm] = useState({
     flockId: "",
@@ -62,6 +60,54 @@ export default function SalesDashboardPage() {
     amountPaidZmw: "",
     notes: "",
   });
+
+  // Build query paths from filter
+  const dashboardPath = `/api/v1/sale-records/dashboard?${buildFilterParams({ ...filter, limit: undefined, offset: undefined })}`;
+  const salesPath = `/api/v1/sale-records/all?${buildFilterParams(filter)}`;
+
+  // TanStack Query hooks — cached, auto-refreshing, offline-first
+  // Low staleTime so invalidation triggers immediate refetch after CRUD
+  const { data: summary, error: summaryError } = useApiQuery<SalesDashboardSummary>(dashboardPath, { staleTime: 5 * 1000 });
+  const { data: salesData, error: salesError } = useApiQuery<PaginatedSales>(salesPath, { staleTime: 5 * 1000 });
+  const { data: flocksData = [] } = useFlocks();
+
+  const flocks = flocksData as BroilerFlock[];
+  const sales = salesData?.data ?? [];
+  const totalSales = salesData?.total ?? 0;
+  const error = summaryError?.message || salesError?.message || "";
+
+  // QueryClient for explicit refetch after mutations
+  const queryClient = useQueryClient();
+
+  // Mutations — invalidate and refetch all sales-related queries
+  const createSale = useApiMutation("POST", {
+    invalidatePaths: ["/api/v1/sale-records", "/api/v1/sale-records/dashboard", "/api/v1/sale-records/summary", "/api/v1/dashboard/summary"],
+    onSuccess: () => {
+      queryClient.refetchQueries({ predicate: (q) => {
+        const k = q.queryKey?.[0] as string;
+        return typeof k === "string" && (k.startsWith("/api/v1/sale-records") || k.startsWith("/api/v1/dashboard"));
+      }});
+    },
+  });
+  const updateSale = useApiMutation("PATCH", {
+    invalidatePaths: ["/api/v1/sale-records", "/api/v1/sale-records/dashboard", "/api/v1/sale-records/summary"],
+    onSuccess: () => {
+      queryClient.refetchQueries({ predicate: (q) => {
+        const k = q.queryKey?.[0] as string;
+        return typeof k === "string" && (k.startsWith("/api/v1/sale-records") || k.startsWith("/api/v1/dashboard"));
+      }});
+    },
+  });
+  const deleteSale = useApiMutation("DELETE", {
+    invalidatePaths: ["/api/v1/sale-records", "/api/v1/sale-records/dashboard", "/api/v1/sale-records/summary"],
+    onSuccess: () => {
+      queryClient.refetchQueries({ predicate: (q) => {
+        const k = q.queryKey?.[0] as string;
+        return typeof k === "string" && (k.startsWith("/api/v1/sale-records") || k.startsWith("/api/v1/dashboard"));
+      }});
+    },
+  });
+  const saving = createSale.isPending || updateSale.isPending || deleteSale.isPending;
 
   const canEditSales = user?.role === "owner" || user?.role === "manager" || user?.role === "sales_person";
 
@@ -94,26 +140,12 @@ export default function SalesDashboardPage() {
     );
   }
 
-  const loadData = useCallback(() => {
-    const params = buildFilterParams(filter);
-    apiFetch<SalesDashboardSummary>(`/api/v1/sale-records/dashboard?${buildFilterParams({ ...filter, limit: undefined, offset: undefined })}`)
-      .then(setSummary)
-      .catch((err) => setError(err.message));
-    apiFetch<PaginatedSales>(`/api/v1/sale-records/all?${params}`)
-      .then((data) => { setSales(data.data); setTotalSales(data.total); })
-      .catch((err) => setError(err.message));
-    apiFetch<BroilerFlock[]>("/api/v1/broiler-flocks")
-      .then(setFlocks)
-      .catch(() => {});
-  }, [filter]);
-
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
     if (user && !["owner", "manager", "sales_person"].includes(user.role)) {
       router.push("/"); return;
     }
-    if (user) loadData();
-  }, [user, isLoading, router, loadData]);
+  }, [user, isLoading, router]);
 
   function openCreate() {
     setEditRecord(null);
@@ -150,7 +182,6 @@ export default function SalesDashboardPage() {
   }
 
   async function handleSave() {
-    setSaving(true);
     try {
       const birdCount = Number(form.birdCount);
       const pricePerBird = Number(form.pricePerBirdZmw);
@@ -172,30 +203,20 @@ export default function SalesDashboardPage() {
         body.amountPaidZmw = Number(form.amountPaidZmw);
       }
       if (editRecord) {
-        await apiFetch(`/api/v1/sale-records/${editRecord.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        });
+        await updateSale.mutateAsync({ path: `/api/v1/sale-records/${editRecord.id}`, body });
       } else {
-        await apiFetch("/api/v1/sale-records", {
-          method: "POST",
-          body: JSON.stringify(body),
-        });
+        await createSale.mutateAsync({ path: "/api/v1/sale-records", body });
       }
       setCreateOpen(false);
-      loadData();
     } catch (e: any) {
       alert(e.message);
-    } finally {
-      setSaving(false);
     }
   }
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this sale record? This will restore the bird count to the flock.")) return;
     try {
-      await apiFetch(`/api/v1/sale-records/${id}`, { method: "DELETE" });
-      loadData();
+      await deleteSale.mutateAsync({ path: `/api/v1/sale-records/${id}` });
     } catch (e: any) {
       alert(e.message);
     }
@@ -298,48 +319,58 @@ export default function SalesDashboardPage() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b text-left">
-                    <th className="p-2 w-8"></th>
                     <SortHeader field="saleDate" label="Date" />
                     <SortHeader field="flockName" label="Flock" />
                     <SortHeader field="customerName" label="Customer" />
                     <SortHeader field="birdCount" label="Birds" />
                     <SortHeader field="pricePerBirdZmw" label="Price/Bird" />
                     <SortHeader field="totalAmountZmw" label="Total" />
-                    <SortHeader field="paymentStatus" label="Payment" />
+                    <SortHeader field="paymentStatus" label="Payment" className="min-w-[160px]" />
                     {canEditSales && <th className="p-2">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {sales.map((s) => (
-                    <Fragment key={s.id}>
-                      <tr className="border-b last:border-0">
-                        <td className="p-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() => setExpandedSaleId(expandedSaleId === s.id ? null : s.id)}
-                          >
-                            {expandedSaleId === s.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          </Button>
-                        </td>
+                  {sales.map((s) => {
+                    const paid = Number(s.amountPaidZmw ?? 0);
+                    const total = Number(s.totalAmountZmw);
+                    const remaining = total - paid;
+                    const pctPaid = total > 0 ? (paid / total) * 100 : 0;
+                    const statusColor = s.paymentStatus === "paid" ? "bg-green-500" : s.paymentStatus === "partial" ? "bg-amber-500" : "bg-red-500";
+                    const barColor = s.paymentStatus === "paid" ? "bg-green-500" : s.paymentStatus === "partial" ? "bg-amber-500" : "bg-red-500";
+
+                    return (
+                      <tr
+                        key={s.id}
+                        className="border-b last:border-0 cursor-pointer hover:bg-muted/30 transition-colors"
+                        onClick={() => { setDrawerSale(s); setDrawerOpen(true); }}
+                      >
                         <td className="p-2">{new Date(s.saleDate).toLocaleDateString()}</td>
                         <td className="p-2">{s.flock?.name || "-"}</td>
                         <td className="p-2">{s.customerName || "Walk-in"}</td>
                         <td className="p-2">{s.birdCount}</td>
                         <td className="p-2">ZMW {Number(s.pricePerBirdZmw).toFixed(2)}</td>
-                        <td className="p-2 font-medium">ZMW {Number(s.totalAmountZmw).toFixed(2)}</td>
-                        <td className="p-2">
-                          <Badge variant={s.paymentStatus === "paid" ? "default" : s.paymentStatus === "partial" ? "secondary" : "outline"}>
-                            {s.paymentStatus}
-                          </Badge>
+                        <td className="p-2 font-medium">ZMW {total.toFixed(2)}</td>
+                        <td className="p-2 min-w-[160px]" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className={cn("h-2 w-2 rounded-full", statusColor)} />
+                              <span className="text-xs font-medium capitalize">{s.paymentStatus}</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                              <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${pctPaid}%` }} />
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>ZMW {paid.toFixed(2)}</span>
+                              <span>ZMW {total.toFixed(2)}</span>
+                            </div>
+                            {s.paymentStatus === "partial" && (
+                              <span className="text-xs text-amber-600 font-medium">ZMW {remaining.toFixed(2)} remaining</span>
+                            )}
+                          </div>
                         </td>
                         {canEditSales && (
-                          <td className="p-2">
+                          <td className="p-2" onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => setExpandedSaleId(expandedSaleId === s.id ? null : s.id)} title="Attachments">
-                                <Paperclip className="h-3 w-3" />
-                              </Button>
                               <Button variant="ghost" size="sm" onClick={() => openEdit(s)}>
                                 <Pencil className="h-3 w-3" />
                               </Button>
@@ -352,20 +383,8 @@ export default function SalesDashboardPage() {
                           </td>
                         )}
                       </tr>
-                      {expandedSaleId === s.id && (
-                        <tr className="border-b">
-                          <td colSpan={canEditSales ? 9 : 8} className="p-2 bg-muted/30">
-                            <AttachmentPanel
-                              saleRecordId={s.id}
-                              title={`Attachments — ${s.customerName || "Walk-in"} sale`}
-                              canManage={canEditSales}
-                              canDelete={user?.role === "owner" || user?.role === "manager"}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -493,6 +512,17 @@ export default function SalesDashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Sale Detail Drawer */}
+      <SaleDetailDrawer
+        sale={drawerSale}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onEdit={(s) => openEdit(s)}
+        onDelete={(s) => handleDelete(s.id)}
+        canEdit={canEditSales}
+        canDelete={user?.role === "owner"}
+      />
     </div>
   );
 }

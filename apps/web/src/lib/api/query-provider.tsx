@@ -36,17 +36,19 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
             gcTime: 30 * 60 * 1000,
             // Retry: 1 attempt on failure (don't hammer when offline)
             retry: 1,
-            // Don't refetch on mount if data is fresh
-            refetchOnMount: false,
+            // Always refetch on mount — shows cached data immediately
+            // while refreshing in the background. This ensures data is
+            // always fresh when navigating to a page.
+            refetchOnMount: true,
             // Refetch when window regains focus (if stale)
             refetchOnWindowFocus: true,
-            // Don't refetch when offline
+            // Use offlineFirst so cached data is returned when offline
             networkMode: "offlineFirst",
           },
           mutations: {
-            // Mutations are queued when offline (see offline-mutation-queue.ts)
+            // Mutations always try the API; our catch block handles queuing
             retry: 0,
-            networkMode: "offlineFirst",
+            networkMode: "always",
           },
         },
       })

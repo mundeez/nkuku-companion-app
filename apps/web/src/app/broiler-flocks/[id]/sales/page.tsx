@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, Fragment, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
-import { apiFetch } from "@/lib/api/client";
+import { useApiQuery, useApiMutation, useFlock } from "@/lib/api/hooks";
 import { BroilerFlock, SaleRecord, SaleRecordSummary, PaymentStatus, SalesFilter, PaginatedSales } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,30 +18,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Trash2, Pencil, DollarSign, Paperclip, ChevronLeft, ChevronRight as ChevronRightIcon } from "lucide-react";
+import { ShoppingCart, Trash2, Pencil, DollarSign, ChevronLeft, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { FlockSubNav } from "@/components/flock-subnav";
-import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 import { SalesFilterBar } from "@/components/sales/sales-filter-bar";
+import { SaleDetailDrawer } from "@/components/sales/sale-detail-drawer";
+import { cn } from "@/lib/utils";
 
 const paymentStatusOptions: PaymentStatus[] = ["pending", "partial", "paid"];
 const PAGE_SIZE = 20;
 
 function fmtZmw(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function paymentBadge(status: PaymentStatus) {
-  switch (status) {
-    case "paid":
-      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Paid</Badge>;
-    case "partial":
-      return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Partial</Badge>;
-    case "pending":
-      return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Pending</Badge>;
-    default:
-      return <Badge variant="outline">{status}</Badge>;
-  }
 }
 
 function buildFilterParams(flockId: string, filter: SalesFilter): string {
@@ -61,14 +49,9 @@ export default function SalesPage() {
   const { user, isLoading } = useAuth();
   const flockId = params.id as string;
 
-  const [flock, setFlock] = useState<BroilerFlock | null>(null);
-  const [records, setRecords] = useState<SaleRecord[]>([]);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [summary, setSummary] = useState<SaleRecordSummary | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [drawerSale, setDrawerSale] = useState<SaleRecord | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [filter, setFilter] = useState<SalesFilter>({ limit: PAGE_SIZE, offset: 0 });
 
   const [form, setForm] = useState({
@@ -87,28 +70,61 @@ export default function SalesPage() {
     user?.role === "owner" || user?.role === "manager" || user?.role === "sales_person";
   const canDeleteSales = user?.role === "owner";
 
+  // Query paths derived from the current filter
+  const salesPath = `/api/v1/sale-records?${buildFilterParams(flockId, filter)}`;
+  const summarySearchParams = new URLSearchParams();
+  summarySearchParams.set("flockId", flockId);
+  if (filter.fromDate) summarySearchParams.set("fromDate", filter.fromDate);
+  if (filter.toDate) summarySearchParams.set("toDate", filter.toDate);
+  if (filter.paymentStatus) summarySearchParams.set("paymentStatus", filter.paymentStatus);
+  if (filter.customer) summarySearchParams.set("customer", filter.customer);
+  const summaryPath = `/api/v1/sale-records/summary?${summarySearchParams.toString()}`;
+
+  const queryEnabled = !!user && !!flockId;
+
+  const flockQuery = useFlock(flockId);
+  const salesQuery = useApiQuery<PaginatedSales>(salesPath, { enabled: queryEnabled, staleTime: 5 * 1000 });
+  const summaryQuery = useApiQuery<SaleRecordSummary>(summaryPath, { enabled: queryEnabled, staleTime: 5 * 1000 });
+
+  const queryClient = useQueryClient();
+
+  const createSale = useApiMutation("POST", {
+    invalidatePaths: ["/api/v1/sale-records", "/api/v1/sale-records/summary", "/api/v1/broiler-flocks"],
+    onSuccess: () => {
+      queryClient.refetchQueries({ predicate: (q) => {
+        const k = q.queryKey?.[0] as string;
+        return typeof k === "string" && (k.startsWith("/api/v1/sale-records") || k.startsWith("/api/v1/broiler-flocks"));
+      }});
+    },
+  });
+  const updateSale = useApiMutation("PATCH", {
+    invalidatePaths: ["/api/v1/sale-records", "/api/v1/sale-records/summary", "/api/v1/broiler-flocks"],
+    onSuccess: () => {
+      queryClient.refetchQueries({ predicate: (q) => {
+        const k = q.queryKey?.[0] as string;
+        return typeof k === "string" && (k.startsWith("/api/v1/sale-records") || k.startsWith("/api/v1/broiler-flocks"));
+      }});
+    },
+  });
+  const deleteSale = useApiMutation("DELETE", {
+    invalidatePaths: ["/api/v1/sale-records", "/api/v1/sale-records/summary", "/api/v1/broiler-flocks"],
+    onSuccess: () => {
+      queryClient.refetchQueries({ predicate: (q) => {
+        const k = q.queryKey?.[0] as string;
+        return typeof k === "string" && (k.startsWith("/api/v1/sale-records") || k.startsWith("/api/v1/broiler-flocks"));
+      }});
+    },
+  });
+
+  const flock = (flockQuery.data as BroilerFlock | undefined) ?? null;
+  const records = salesQuery.data?.data ?? [];
+  const totalRecords = salesQuery.data?.total ?? 0;
+  const summary = summaryQuery.data ?? null;
+  const saving = createSale.isPending || updateSale.isPending;
+  const error = flockQuery.error?.message || salesQuery.error?.message || "";
+
   const currentPage = Math.floor((filter.offset ?? 0) / PAGE_SIZE) + 1;
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
-
-  const loadAll = useCallback(() => {
-    const listParams = buildFilterParams(flockId, filter);
-    const summaryParams = new URLSearchParams();
-    summaryParams.set("flockId", flockId);
-    if (filter.fromDate) summaryParams.set("fromDate", filter.fromDate);
-    if (filter.toDate) summaryParams.set("toDate", filter.toDate);
-    if (filter.paymentStatus) summaryParams.set("paymentStatus", filter.paymentStatus);
-    if (filter.customer) summaryParams.set("customer", filter.customer);
-
-    apiFetch<BroilerFlock>(`/api/v1/broiler-flocks/${flockId}`)
-      .then(setFlock)
-      .catch((err) => setError(err.message));
-    apiFetch<PaginatedSales>(`/api/v1/sale-records?${listParams}`)
-      .then((data) => { setRecords(data.data); setTotalRecords(data.total); })
-      .catch((err) => setError(err.message));
-    apiFetch<SaleRecordSummary>(`/api/v1/sale-records/summary?${summaryParams.toString()}`)
-      .then(setSummary)
-      .catch(() => {});
-  }, [flockId, filter]);
 
   function resetForm() {
     setForm({
@@ -142,7 +158,6 @@ export default function SalesPage() {
 
   async function saveRecord(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
     try {
       const birdCount = Number(form.birdCount);
       const pricePerBird = Number(form.pricePerBirdZmw);
@@ -164,30 +179,20 @@ export default function SalesPage() {
         body.amountPaidZmw = Number(form.amountPaidZmw);
       }
       if (editingId) {
-        await apiFetch(`/api/v1/sale-records/${editingId}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        });
+        await updateSale.mutateAsync({ path: `/api/v1/sale-records/${editingId}`, body });
       } else {
-        await apiFetch(`/api/v1/sale-records`, {
-          method: "POST",
-          body: JSON.stringify(body),
-        });
+        await createSale.mutateAsync({ path: "/api/v1/sale-records", body });
       }
       resetForm();
-      loadAll();
     } catch (e: any) {
       alert(e.message);
-    } finally {
-      setSaving(false);
     }
   }
 
   async function deleteRecord(id: string) {
     if (!confirm("Delete this sale record?")) return;
     try {
-      await apiFetch(`/api/v1/sale-records/${id}`, { method: "DELETE" });
-      loadAll();
+      await deleteSale.mutateAsync({ path: `/api/v1/sale-records/${id}` });
     } catch (e: any) {
       alert(e.message);
     }
@@ -196,10 +201,8 @@ export default function SalesPage() {
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login");
-      return;
     }
-    if (user && flockId) loadAll();
-  }, [user, isLoading, flockId, router, loadAll]);
+  }, [user, isLoading, router]);
 
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
@@ -409,16 +412,24 @@ export default function SalesPage() {
               <TableHead>Avg Weight</TableHead>
               <TableHead>Price/Bird</TableHead>
               <TableHead>Total</TableHead>
-              <TableHead>Payment Status</TableHead>
+              <TableHead className="min-w-[160px]">Payment Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {records.map((r) => (
-              <Fragment key={r.id}>
+            {records.map((r) => {
+              const paid = Number(r.amountPaidZmw ?? 0);
+              const total = Number(r.totalAmountZmw);
+              const remaining = total - paid;
+              const pctPaid = total > 0 ? (paid / total) * 100 : 0;
+              const statusColor = r.paymentStatus === "paid" ? "bg-green-500" : r.paymentStatus === "partial" ? "bg-amber-500" : "bg-red-500";
+              const barColor = r.paymentStatus === "paid" ? "bg-green-500" : r.paymentStatus === "partial" ? "bg-amber-500" : "bg-red-500";
+
+              return (
                 <TableRow
-                  className={`cursor-pointer hover:bg-muted/30 ${selectedSaleId === r.id ? "bg-muted/50" : ""}`}
-                  onClick={() => setSelectedSaleId(selectedSaleId === r.id ? null : r.id)}
+                  key={r.id}
+                  className="cursor-pointer hover:bg-muted/30 transition-colors"
+                  onClick={() => { setDrawerSale(r); setDrawerOpen(true); }}
                 >
                   <TableCell>{new Date(r.saleDate).toLocaleDateString()}</TableCell>
                   <TableCell className="font-medium">
@@ -431,23 +442,30 @@ export default function SalesPage() {
                   <TableCell>{r.avgWeightKg ? `${r.avgWeightKg} kg` : "—"}</TableCell>
                   <TableCell>{fmtZmw(r.pricePerBirdZmw)}</TableCell>
                   <TableCell className="font-semibold">{fmtZmw(r.totalAmountZmw)}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-col gap-1">
-                      {paymentBadge(r.paymentStatus)}
-                      {r.paymentStatus === "partial" && r.amountPaidZmw != null && (
-                        <span className="text-xs text-muted-foreground">
-                          Paid: {fmtZmw(r.amountPaidZmw)}
-                        </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn("h-2 w-2 rounded-full", statusColor)} />
+                        <span className="text-xs font-medium capitalize">{r.paymentStatus}</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                        <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${pctPaid}%` }} />
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{fmtZmw(paid)}</span>
+                        <span>{fmtZmw(total)}</span>
+                      </div>
+                      {r.paymentStatus === "partial" && (
+                        <span className="text-xs text-amber-600 font-medium">{fmtZmw(remaining)} remaining</span>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Paperclip className="h-4 w-4 inline text-muted-foreground mr-1" />
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     {canManageSales && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => { e.stopPropagation(); startEdit(r); }}
+                        onClick={() => startEdit(r)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -457,27 +475,15 @@ export default function SalesPage() {
                         variant="ghost"
                         size="sm"
                         className="text-destructive"
-                        onClick={(e) => { e.stopPropagation(); deleteRecord(r.id); }}
+                        onClick={() => deleteRecord(r.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
                   </TableCell>
                 </TableRow>
-                {selectedSaleId === r.id && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="p-0">
-                      <AttachmentPanel
-                        saleRecordId={r.id}
-                        title={`Attachments — ${r.customerName || "Sale"}`}
-                        canManage={canManageSales}
-                        canDelete={canDeleteSales}
-                      />
-                    </TableCell>
-                  </TableRow>
-                )}
-              </Fragment>
-            ))}
+              );
+            })}
             {records.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
@@ -515,6 +521,17 @@ export default function SalesPage() {
           </div>
         )}
       </div>
+
+      {/* Sale Detail Drawer */}
+      <SaleDetailDrawer
+        sale={drawerSale}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onEdit={(r) => startEdit(r)}
+        onDelete={(r) => deleteRecord(r.id)}
+        canEdit={canManageSales}
+        canDelete={canDeleteSales}
+      />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { apiFetch } from "@/lib/api/client";
+import { useApiQuery, useApiMutation } from "@/lib/api/hooks";
 import { Alert } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,32 +14,37 @@ import { Bell, CheckCircle, Clock, AlertTriangle, Info, RefreshCw, Trash2, Check
 export default function AlertsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filter, setFilter] = useState<"all" | "open" | "resolved">("open");
-  const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkAction, setBulkAction] = useState(false);
 
   const canDelete = user?.role === "owner" || user?.role === "manager";
 
-  function loadAlerts() {
-    setLoading(true);
-    const status = filter === "all" ? "" : `?status=${filter}`;
-    apiFetch<Alert[]>(`/api/v1/alerts${status}`)
-      .then(setAlerts)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }
+  const status = filter === "all" ? "" : `?status=${filter}`;
+  const alertsPath = `/api/v1/alerts${status}`;
+  const { data: alerts = [], isLoading: loading, isFetching, refetch } = useApiQuery<Alert[]>(
+    alertsPath,
+    { enabled: !!user }
+  );
+
+  const mutateAlert = useApiMutation("PATCH", {
+    invalidatePaths: ["/api/v1/alerts"],
+  });
+
+  const generateAlert = useApiMutation("POST", {
+    invalidatePaths: ["/api/v1/alerts"],
+  });
+
+  const bulkAlert = useApiMutation("POST", {
+    invalidatePaths: ["/api/v1/alerts"],
+  });
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login");
       return;
     }
-    if (user) loadAlerts();
-  }, [user, isLoading, router, filter]);
+  }, [user, isLoading, router]);
 
   // Clear selection when filter changes
   useEffect(() => {
@@ -48,11 +53,7 @@ export default function AlertsPage() {
 
   async function handleResolve(alertId: string) {
     try {
-      await apiFetch(`/api/v1/alerts/${alertId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ isResolved: true }),
-      });
-      loadAlerts();
+      await mutateAlert.mutateAsync({ path: `/api/v1/alerts/${alertId}`, body: { isResolved: true } });
     } catch (err: any) {
       setError(err.message);
     }
@@ -60,25 +61,17 @@ export default function AlertsPage() {
 
   async function handleRead(alertId: string) {
     try {
-      await apiFetch(`/api/v1/alerts/${alertId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ isRead: true }),
-      });
-      loadAlerts();
+      await mutateAlert.mutateAsync({ path: `/api/v1/alerts/${alertId}`, body: { isRead: true } });
     } catch (err: any) {
       setError(err.message);
     }
   }
 
   async function handleGenerate() {
-    setGenerating(true);
     try {
-      await apiFetch("/api/v1/alerts/generate", { method: "POST", body: JSON.stringify({}) });
-      loadAlerts();
+      await generateAlert.mutateAsync({ path: "/api/v1/alerts/generate", body: {} });
     } catch (err: any) {
       setError(err.message);
-    } finally {
-      setGenerating(false);
     }
   }
 
@@ -111,18 +104,11 @@ export default function AlertsPage() {
       if (!confirm(`Delete ${ids.length} alert(s)? This cannot be undone.`)) return;
     }
 
-    setBulkAction(true);
     try {
-      await apiFetch(`/api/v1/alerts/bulk`, {
-        method: "POST",
-        body: JSON.stringify({ action, ids }),
-      });
+      await bulkAlert.mutateAsync({ path: `/api/v1/alerts/bulk`, body: { action, ids } });
       clearSelection();
-      loadAlerts();
     } catch (err: any) {
       setError(err.message);
-    } finally {
-      setBulkAction(false);
     }
   }
 
@@ -153,6 +139,8 @@ export default function AlertsPage() {
   const resolvedCount = alerts.filter((a) => a.isResolved).length;
   const selectedCount = selectedIds.size;
   const allSelected = selectedCount === alerts.length && alerts.length > 0;
+  const generating = generateAlert.isPending;
+  const bulkAction = bulkAlert.isPending;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -164,8 +152,8 @@ export default function AlertsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadAlerts} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={loading || isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${loading || isFetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button size="sm" onClick={handleGenerate} disabled={generating}>

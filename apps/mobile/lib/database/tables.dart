@@ -9,6 +9,7 @@ class CachedFlocks extends Table {
   TextColumn get breedName => text().nullable()();
   TextColumn get supplierId => text().nullable()();
   TextColumn get supplierName => text().nullable()();
+  TextColumn get orderDate => text().nullable()();
   TextColumn get startDate => text().nullable()();
   IntColumn get initialCount => integer().withDefault(const Constant(0))();
   IntColumn get currentCount => integer().withDefault(const Constant(0))();
