@@ -154,6 +154,8 @@ export default function BroilerFlocksPage() {
         return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>;
       case "completed":
         return <Badge variant="secondary">Completed</Badge>;
+      case "sold":
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Sold</Badge>;
       case "cancelled":
         return <Badge variant="destructive">Cancelled</Badge>;
       default:
@@ -791,6 +793,7 @@ export default function BroilerFlocksPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="sold">Sold</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>

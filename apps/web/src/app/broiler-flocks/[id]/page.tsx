@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -180,6 +181,24 @@ export default function FlockDetailPage() {
     }
   }
 
+  async function handleStatusChange(status: string) {
+    if (!flock || status === flock.status) return;
+    const body: any = { status };
+    if (status === "sold") {
+      body.soldDate = flock.soldDate ?? new Date().toISOString().split("T")[0];
+    }
+    try {
+      await updateFlock.mutateAsync({
+        path: `/api/v1/broiler-flocks/${flockId}`,
+        body,
+      });
+      addToast(`Flock status updated to ${status}.`, "success");
+      refetchFlock();
+    } catch (e: any) {
+      addToast(e.message || "Failed to update status.", "error");
+    }
+  }
+
   function openCompleteDialog() {
     const outstanding = flock?.totalOutstandingPayments ?? 0;
     if (outstanding > 0) {
@@ -205,6 +224,7 @@ export default function FlockDetailPage() {
     switch (status) {
       case "active": return <Badge className="bg-green-100 text-green-800">Active</Badge>;
       case "completed": return <Badge variant="secondary">Completed</Badge>;
+      case "sold": return <Badge className="bg-blue-100 text-blue-800">Sold</Badge>;
       case "cancelled": return <Badge variant="destructive">Cancelled</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
@@ -276,6 +296,19 @@ export default function FlockDetailPage() {
             <CheckCircle className="h-4 w-4 mr-2" />
             Complete Flock
           </Button>
+        )}
+        {user?.role === "owner" && (
+          <Select value={flock.status} onValueChange={handleStatusChange}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="sold">Sold</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
         )}
       </div>
 
