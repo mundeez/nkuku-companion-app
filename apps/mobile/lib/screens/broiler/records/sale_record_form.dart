@@ -28,7 +28,8 @@ class _SaleRecordFormState extends State<SaleRecordForm> {
   String _paymentStatus = 'pending';
   bool _saving = false;
   String? _error;
-
+  bool _overrideWithdrawal = false;
+  final bool _isAdmin = AuthService.isOwner;
   final _paymentStatuses = ['pending', 'partial', 'paid'];
   List<MedicationRecord> _medicationRecords = [];
   bool _loadingMeds = true;
@@ -106,10 +107,12 @@ class _SaleRecordFormState extends State<SaleRecordForm> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final active = _activeWithdrawals;
-    if (active.isNotEmpty) {
-      final product = active.map((m) => m.productName).join(', ');
+    if (active.isNotEmpty && !_overrideWithdrawal) {
+      final blocked = active.map((m) => '${m.productName}: ${m.withdrawalDate!.toIso8601String().split('T').first}').join(', ');
       setState(() {
-        _error = 'Cannot record this sale: $product withdrawal period(s) end after $_saleDate. Withdrawal ends on ${active.map((m) => '${m.productName}: ${m.withdrawalDate!.toIso8601String().split('T').first}').join(', ')}.';
+        _error = _isAdmin
+            ? 'Active withdrawal periods: $blocked. Enable admin override to proceed.'
+            : 'Cannot record this sale: active medication withdrawal period(s) — $blocked. Contact the owner for an override.';
       });
       return;
     }
@@ -208,6 +211,19 @@ class _SaleRecordFormState extends State<SaleRecordForm> {
                           '${m.productName}: wait until ${m.withdrawalDate!.toIso8601String().split('T').first}',
                           style: const TextStyle(color: Colors.red),
                         )),
+                        if (_isAdmin) ...[
+                          const SizedBox(height: 8),
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            title: const Text(
+                              'Admin override: record sale anyway',
+                              style: TextStyle(fontWeight: FontWeight.w500, color: Colors.red),
+                            ),
+                            value: _overrideWithdrawal,
+                            onChanged: (v) => setState(() => _overrideWithdrawal = v ?? false),
+                          ),
+                        ],
                       ],
                     ),
                   ),
