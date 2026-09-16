@@ -30,6 +30,14 @@ class _MedicationRecordFormState extends State<MedicationRecordForm> {
   bool _saving = false;
   String? _error;
 
+  DateTime? get _computedWithdrawalDate {
+    final days = int.tryParse(_withdrawalController.text);
+    if (_endDate == null || days == null) return null;
+    return _endDate!.add(Duration(days: days));
+  }
+
+  bool get _requiresWithdrawal => _category == 'antibiotic' || _category == 'coccidiostat' || _category == 'anthelmintic';
+
   final _categories = [
     'antibiotic', 'coccidiostat', 'electrolyte', 'vitamin', 'probiotic', 'acidifier', 'phytogenic', 'other',
   ];
@@ -164,14 +172,39 @@ class _MedicationRecordFormState extends State<MedicationRecordForm> {
                 title: const Text('End date (optional)'),
                 subtitle: Text(_endDate?.toIso8601String().split('T').first ?? 'Not set'),
                 trailing: const Icon(Icons.calendar_today),
-                onTap: () => _pickDate(_endDate ?? DateTime.now(), (d) => _endDate = d),
+                onTap: () => _pickDate(_endDate ?? DateTime.now(), (d) {
+                  if (d.isBefore(_startDate)) {
+                    setState(() => _error = 'End date cannot be before start date');
+                    return;
+                  }
+                  setState(() { _endDate = d; _error = null; });
+                }),
               ),
               TextFormField(
                 controller: _withdrawalController,
                 decoration: const InputDecoration(labelText: 'Withdrawal days (optional)'),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onChanged: (_) => setState(() {}),
               ),
+              if (_requiresWithdrawal) ...[
+                const SizedBox(height: 8),
+                if (_withdrawalController.text.trim().isEmpty)
+                  const Text(
+                    'Warning: antibiotics, coccidiostats and dewormers need a withdrawal period.',
+                    style: TextStyle(color: Colors.orange),
+                  )
+                else if (_computedWithdrawalDate != null)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      'Withdrawal until: ${_computedWithdrawalDate!.toIso8601String().split('T').first}',
+                      style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: const Text('Do not slaughter or sell birds before this date.'),
+                    leading: const Icon(Icons.warning_amber, color: Colors.orange),
+                  ),
+              ],
               const SizedBox(height: 12),
               TextFormField(
                 controller: _costController,

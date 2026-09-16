@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.30.4-alpha] — 2026-09-16
+
+### Flock Data Cleanup and Mobile Safety/Validation
+
+#### Added
+- **Mobile**: Computed medication withdrawal date display and a warning when antibiotics, coccidiostats, or dewormers are recorded without a withdrawal period.
+  - `apps/mobile/lib/screens/broiler/records/medication_record_form.dart`
+- **Mobile**: Sale record form now blocks sales that fall within an active medication withdrawal period and surfaces an active-withdrawal warning card.
+  - `apps/mobile/lib/screens/broiler/records/sale_record_form.dart`
+- **Mobile**: Twice-daily environmental logging reminder on the flock detail screen when no readings have been logged for the current day.
+  - `apps/mobile/lib/screens/broiler/flock_detail_screen.dart`
+- **Reference data**: Added a `Ross 308 Spot-to-Whole-House Transition` lighting/temperature schedule.
+- **Flock A - August 2026**: Added Fowl Pox vaccination due on 2026-09-21 (day 28, wing-web stab).
+
+#### Changed
+- **Flock master data cleanup**: deleted 32 test flocks and 30 orphaned financial/journal records.
+- Updated 3 real flocks' statuses, housing types, and target age/weight parameters.
+- Normalised vaccination names across existing vaccination events.
+
+#### Operations / Data corrections
+- Database corrections applied directly via SQL (no schema changes): flock statuses, vaccination records, and lighting/temperature schedule.
+- Updated `PLAN-flock-management-corrections.md` with the reviewed implementation plan.
+
+#### Validation
+- Mobile: 55/55 tests passed, analyzer clean, release APK built successfully (68.8 MB).
+- API health: `{"status":"ok"}`.
+- Web health: HTTP 200.
+
 ## [1.30.1-alpha] — 2026-09-07
 
 ### Mobile Flock Fixes + Sales UX Improvements

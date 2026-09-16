@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../models/medication_record.dart';
 import '../../../models/sale_record.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/broiler_service.dart';
@@ -29,6 +30,8 @@ class _SaleRecordFormState extends State<SaleRecordForm> {
   String? _error;
 
   final _paymentStatuses = ['pending', 'partial', 'paid'];
+  List<MedicationRecord> _medicationRecords = [];
+  bool _loadingMeds = true;
 
   @override
   void initState() {
@@ -45,7 +48,32 @@ class _SaleRecordFormState extends State<SaleRecordForm> {
       _saleDate = r.saleDate;
       _paymentStatus = _paymentStatuses.contains(r.paymentStatus) ? r.paymentStatus : 'pending';
     }
+    _loadMedications();
   }
+
+  Future<void> _loadMedications() async {
+    try {
+      final meds = await BroilerService.getMedicationRecords(widget.flockId);
+      if (!mounted) return;
+      setState(() {
+        _medicationRecords = meds;
+        _loadingMeds = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingMeds = false;
+      });
+    }
+  }
+
+  List<MedicationRecord> get _activeWithdrawals {
+    return _medicationRecords.where((m) {
+      if (m.withdrawalDate == null) return false;
+      return m.withdrawalDate!.isAfter(_saleDate);
+    }).toList();
+  }
+
 
   @override
   void dispose() {
@@ -77,6 +105,14 @@ class _SaleRecordFormState extends State<SaleRecordForm> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final active = _activeWithdrawals;
+    if (active.isNotEmpty) {
+      final product = active.map((m) => m.productName).join(', ');
+      setState(() {
+        _error = 'Cannot record this sale: $product withdrawal period(s) end after $_saleDate. Withdrawal ends on ${active.map((m) => '${m.productName}: ${m.withdrawalDate!.toIso8601String().split('T').first}').join(', ')}.';
+      });
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -149,6 +185,34 @@ class _SaleRecordFormState extends State<SaleRecordForm> {
                 trailing: const Icon(Icons.calendar_today),
                 onTap: _pickDate,
               ),
+              if (_loadingMeds)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_activeWithdrawals.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Card(
+                  color: Colors.red.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Active medication withdrawal periods',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                        ),
+                        const SizedBox(height: 4),
+                        ..._activeWithdrawals.map((m) => Text(
+                          '${m.productName}: wait until ${m.withdrawalDate!.toIso8601String().split('T').first}',
+                          style: const TextStyle(color: Colors.red),
+                        )),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               TextFormField(
                 controller: _customerNameController,
                 decoration: const InputDecoration(labelText: 'Customer name (optional)'),

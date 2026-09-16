@@ -1477,18 +1477,48 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
 
           // Logged records section header
           if (adjustedIndex == 1) {
+            final today = DateTime.now();
+            final todaysRecords = _environmentalRecords.where((r) {
+              final d = r.recordDate;
+              return d.year == today.year && d.month == today.month && d.day == today.day;
+            }).toList();
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Expanded(
-                    child: Text('Logged Readings',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Logged Readings',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                      if (_environmentalRecords.isEmpty)
+                        const Text('None yet',
+                            style: TextStyle(color: Colors.grey)),
+                    ],
                   ),
-                  if (_environmentalRecords.isEmpty)
-                    const Text('None yet',
-                        style: TextStyle(color: Colors.grey)),
+                  if (todaysRecords.isEmpty)
+                    Card(
+                      color: Colors.orange.shade50,
+                      margin: const EdgeInsets.only(top: 8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.notifications_active, color: Colors.orange),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Reminder: log environmental readings twice daily (morning & evening).',
+                                style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             );
