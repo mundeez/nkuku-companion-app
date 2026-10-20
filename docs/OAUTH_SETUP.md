@@ -24,14 +24,14 @@ After obtaining credentials, add them to your `.env` file and restart the API co
    - User type: **External** (or Internal if you have a Google Workspace)
    - App name: `Nkuku Companion`
    - Support email: your email
-   - Authorized domains: `nkuku.deeztechnology.solutions` (your production domain)
+   - Authorized domains: `nkuku.zeendeefood.solutions` (your production domain)
    - Scopes: `email`, `profile`, `openid`
    - Save and continue
 4. Go to **Credentials** → **Create Credentials** → **OAuth client ID**:
    - Application type: **Web application** (for web OAuth) AND **Android/iOS** (for mobile)
    - **Web**: Authorized redirect URIs:
      - `http://localhost:30000/api/v1/auth/social/callback` (dev)
-     - `https://nkuku.deeztechnology.solutions/api/v1/auth/social/callback` (prod)
+     - `https://nkuku.zeendeefood.solutions/api/v1/auth/social/callback` (prod)
    - **Android**: Package name from `android/app/build.gradle.kts` (`applicationId`)
    - **iOS**: Bundle ID from Xcode project
 5. Copy the **Client ID** and **Client Secret**
@@ -67,11 +67,11 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 4. Add product: **Facebook Login**
 5. Go to **Settings** → **Basic**:
    - Copy **App ID** and **App Secret**
-   - Privacy Policy URL: `https://nkuku.deeztechnology.solutions/privacy`
-   - App Domains: `nkuku.deeztechnology.solutions`
+   - Privacy Policy URL: `https://nkuku.zeendeefood.solutions/privacy`
+   - App Domains: `nkuku.zeendeefood.solutions`
 6. Go to **Facebook Login** → **Settings**:
    - Valid OAuth Redirect URIs:
-     - `https://nkuku.deeztechnology.solutions/api/v1/auth/social/callback`
+     - `https://nkuku.zeendeefood.solutions/api/v1/auth/social/callback`
    - Client OAuth Login: **Yes**
 7. Go to **App Review** → toggle **Live** (requires verified business)
 
@@ -120,7 +120,7 @@ FACEBOOK_APP_SECRET=your-app-secret
 5. Configure Service ID (for web login):
    - Create a new **Services ID** (e.g. `com.deeztechnology.nkuku.web`)
    - Enable **Sign in with Apple**
-   - Return URLs: `https://nkuku.deeztechnology.solutions/api/v1/auth/social/callback`
+   - Return URLs: `https://nkuku.zeendeefood.solutions/api/v1/auth/social/callback`
 
 ### Environment Variables
 ```env
@@ -154,7 +154,7 @@ your-key-content-here
 2. Name: `Nkuku Companion`
 3. Supported account types: **Accounts in any organizational directory and personal Microsoft accounts**
 4. Redirect URI (Web):
-   - `https://nkuku.deeztechnology.solutions/api/v1/auth/social/callback`
+   - `https://nkuku.zeendeefood.solutions/api/v1/auth/social/callback`
 5. After creation, note the **Application (client) ID**
 6. Go to **Certificates & secrets** → **New client secret**:
    - Copy the **Value** (not the Secret ID)

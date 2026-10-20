@@ -26,7 +26,7 @@ Broiler chicken production management application for the Zambian market.
 - **Primary Currency:** ZMW (Zambian Kwacha)
 - **Feed Transition:** User-configurable (default: Day 11 for Ross 308)
 - **Vaccination:** Dual schedules (Standard Botswana + Ross 308 Comprehensive)
-- **Deployment Target:** nkuku.deeztechnology.solutions
+- **Deployment Target:** nkuku.zeendeefood.solutions
 
 ## Technology Stack
 

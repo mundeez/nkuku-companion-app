@@ -29,7 +29,7 @@ class _AcceptInviteScreenState extends State<AcceptInviteScreen> {
   }
 
   /// Extracts the token value from either a raw token string or a full
-  /// invite URL (e.g. https://nkuku.deeztechnology.solutions/accept-invite?token=abc123).
+  /// invite URL (e.g. https://nkuku.zeendeefood.solutions/accept-invite?token=abc123).
   String _extractToken(String input) {
     if (input.contains('token=')) {
       final uri = Uri.parse(input);

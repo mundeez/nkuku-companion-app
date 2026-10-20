@@ -6,7 +6,7 @@
         </trust-anchors>
     </base-config>
     <domain-config>
-        <domain includeSubdomains="true">nkuku.deeztechnology.solutions</domain>
+        <domain includeSubdomains="true">nkuku.zeendeefood.solutions</domain>
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

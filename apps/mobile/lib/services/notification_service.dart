@@ -50,10 +50,10 @@ class NotificationService {
 
   /// Start SSE subscription to ntfy after user logs in.
   ///
-  /// [ntfyBaseUrl] — base URL of the ntfy server, e.g. https://ntfy.deeztechnology.solutions
+  /// [ntfyBaseUrl] — base URL of the ntfy server, e.g. https://ntfy.zeendeefood.solutions
   /// [topic]       — ntfy topic to subscribe to (default: nkuku-alerts)
   static void startListening({
-    String ntfyBaseUrl = 'https://ntfy.deeztechnology.solutions',
+    String ntfyBaseUrl = 'https://ntfy.zeendeefood.solutions',
     String topic = 'nkuku-alerts',
   }) {
     stop(); // cancel any existing subscription

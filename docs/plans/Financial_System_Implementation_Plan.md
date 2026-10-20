@@ -1959,13 +1959,13 @@ describe('Audit trail', () => {
 
 ### Documentation
 - `AGENTS.md` updated with all new module paths, test commands, SMTP config notes
-- `Financial_System_Implementation_Plan.md` v1.1 committed alongside code
+- `docs/plans/Financial_System_Implementation_Plan.md` v1.1 committed alongside code
 
 ### Breaking Changes
 None.
 
 ### What's Next
-Full Double-Entry Bookkeeping (see `Double_Entry_Bookkeeping_Implementation_Plan.md`)
+Full Double-Entry Bookkeeping (see `docs/plans/Double_Entry_Bookkeeping_Implementation_Plan.md`)
 ```
 
 ---

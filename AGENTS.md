@@ -211,11 +211,11 @@ At each milestone conclusion:
 3. `git tag vX.Y.Z-phase-N` and push
 4. Create GitHub Release with auto-generated notes
 
-## Production Deployment at nkuku.deeztechnology.solutions
+## Production Deployment at nkuku.zeendeefood.solutions
 
 ### Prerequisites
 - VPS with Docker + Docker Compose installed
-- ISPConfig managing the domain `nkuku.deeztechnology.solutions`
+- ISPConfig managing the domain `nkuku.zeendeefood.solutions`
 - Git cloned to `/var/www/nkuku` (or your preferred path)
 
 ### Step 1 — Environment
@@ -239,14 +239,14 @@ curl -s http://127.0.0.1:30000 | head -c 100
 
 ### Step 4 — ISPConfig Nginx Directives
 In ISPConfig:
-1. Go to **Sites** → `nkuku.deeztechnology.solutions`
+1. Go to **Sites** → `nkuku.zeendeefood.solutions`
 2. Open the **Options** tab
 3. Paste the contents of `infra/ispconfig/nginx-directives.conf` into the **nginx Directives** field
 4. Save and wait for ISPConfig to rewrite the vhost (or run `ispconfig_update.sh`)
 
 ### Step 5 — SSL (Let's Encrypt)
 In ISPConfig:
-1. Go to **Sites** → `nkuku.deeztechnology.solutions` → **SSL**
+1. Go to **Sites** → `nkuku.zeendeefood.solutions` → **SSL**
 2. Enable **SSL** and **Let's Encrypt**
 3. Save — ISPConfig will request and install the certificate automatically
 
@@ -268,7 +268,7 @@ flutter build ios --debug --dart-define=APP_API_BASE_URL=http://localhost:30001
 **Production build**
 ```bash
 cd apps/mobile
-flutter build apk --release --dart-define=APP_API_BASE_URL=https://nkuku.deeztechnology.solutions
+flutter build apk --release --dart-define=APP_API_BASE_URL=https://nkuku.zeendeefood.solutions
 ```
 
 ### Updates (subsequent deploys)

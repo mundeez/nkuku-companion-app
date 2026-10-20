@@ -1,7 +1,7 @@
 # Nkuku Companion App — Double-Entry Bookkeeping Implementation Plan
 
 **Version:** 1.0 · **Date:** 2026-06-26  
-**Prerequisite:** `Financial_System_Implementation_Plan.md` v1.1 fully implemented (v0.8.0 tagged)  
+**Prerequisite:** `docs/plans/Financial_System_Implementation_Plan.md` v1.1 fully implemented (v0.8.0 tagged)  
 **Target release:** v1.0.0 (production-stable)  
 **Platforms:** Fastify/Prisma API · Next.js 14 Web · Flutter 3.x Mobile
 

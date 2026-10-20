@@ -55,7 +55,7 @@ export function getBrandingConfig(): BrandingConfig {
     faviconUrl: env("BRAND_FAVICON_URL", ""),
     supportEmail: env("BRAND_SUPPORT_EMAIL", "support@nkuku.app"),
     supportPhone: env("BRAND_SUPPORT_PHONE", ""),
-    websiteUrl: env("BRAND_WEBSITE_URL", "https://nkuku.deeztechnology.solutions"),
+    websiteUrl: env("BRAND_WEBSITE_URL", "https://nkuku.zeendeefood.solutions"),
     isWhiteLabel: env("BRAND_WHITE_LABEL", "false").toLowerCase() === "true",
     licenseKey: env("LICENSE_KEY", ""),
     licensedTo: env("LICENSED_TO", ""),

@@ -1,7 +1,7 @@
 # Nkuku Companion App — Operational-to-Financial Integration Plan
 
 **Version:** 1.0 · **Date:** 2026-06-27  
-**Prerequisite:** `Financial_System_Implementation_Plan.md` v0.3.2-alpha fully implemented  
+**Prerequisite:** `docs/plans/Financial_System_Implementation_Plan.md` v0.3.2-alpha fully implemented  
 **Target release:** v0.4.0-alpha  
 **Platforms:** Fastify/Prisma API · Next.js 14 Web · Flutter 3.x Mobile
 

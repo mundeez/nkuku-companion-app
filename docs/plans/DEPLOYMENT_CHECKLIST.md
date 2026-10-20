@@ -90,7 +90,7 @@ curl -s http://127.0.0.1:30001/api/v1/diseases -H "Authorization: Bearer $TOKEN"
 - [ ] HTTPS working
 
 ### Step 9: Frontend Verification
-- [ ] Login page loads at `https://nkuku.deeztechnology.solutions`
+- [ ] Login page loads at `https://nkuku.zeendeefood.solutions`
 - [ ] Can authenticate with owner credentials
 - [ ] Dashboard shows broiler stats
 - [ ] Can navigate to /broiler-flocks

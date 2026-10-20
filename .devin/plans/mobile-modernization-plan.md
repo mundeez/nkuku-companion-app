@@ -4,7 +4,7 @@ Status: **Complete — all 5 phases implemented and released (v1.15.6-alpha thro
 Owner: Devin
 Scope: `apps/mobile` (primary), `apps/web` + `apps/api` (performance only)
 Related prior work: `navbar-redesign-plan.md` (web navbar redesign, released as v1.15.4-alpha)
-Related prior planning: `Mobile_Web_Gap_Analysis_and_Implementation_Plan.md` (originally
+Related prior planning: `docs/plans/Mobile_Web_Gap_Analysis_and_Implementation_Plan.md` (originally
 placeholdered "Milestone M3-7 — Offline Sync" with no defined scope; this plan now
 gives it a concrete design and folds it in as Phase 4 — see §7.4)
 

@@ -123,7 +123,7 @@ export default function PricingPage() {
 
       <p className="text-center text-sm text-muted-foreground mt-10">
         Need multi-site management, white-label branding, or a custom SLA?{" "}
-        <a href="mailto:sales@nkuku.deeztechnology.solutions" className="underline">
+        <a href="mailto:nkuku@zeendeefood.solutions" className="underline">
           Talk to us about Enterprise
         </a>
         .

@@ -676,4 +676,4 @@ Phases 2 and 3 can run in parallel since they're on different platforms, but the
 
 ---
 
-*This plan is written to file at `PLAN-offline-sync.md`. No implementation has started. Awaiting your approval and answers to the questions above.*
+*This plan is written to file at `docs/plans/PLAN-offline-sync.md`. No implementation has started. Awaiting your approval and answers to the questions above.*
