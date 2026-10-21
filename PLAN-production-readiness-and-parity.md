@@ -106,7 +106,7 @@ Only `sale-records`, `journal`, `ledger` support server-side `limit/offset`, `so
 
 Each milestone ends with the standard `phase-closeout` (rebuild → full tests → tag → release). Tags: `v1.31.0-alpha` … then `v2.0.0-rc.N` → `v2.0.0`.
 
-### P-1 — Domain cutover + repo hygiene  *(small)*
+### P-1 ✅ *(done)* — Domain cutover + repo hygiene  *(small)*
 - Commit the 7-file `zeendeefood.solutions` rename; grep for any remaining `deeztechnology` in code/docs/compose/`infra/`.
 - Delete 8 `*.bak-premove` files and the stray `{apps/` directory; move the 13 APKs out of the repo (they're gitignored but on disk) to `~/DevWorkz/nkuku-releases/`; move historical plan `.md` files into `docs/plans/` (keep `AGENTS.md`, `README.md`, `CHANGELOG.md`, this file in root).
 - ISPConfig: new vhost(s) for `nkuku.` and `ntfy.zeendeefood.solutions`, paste `infra/ispconfig/nginx-directives.conf`, enable Let's Encrypt; 301 from old domain for a transition window.
@@ -114,21 +114,21 @@ Each milestone ends with the standard `phase-closeout` (rebuild → full tests �
 - Rebuild release APK with new `APP_API_BASE_URL`; verify Android `network_security_config.xml`.
 - **Verify:** `curl https://nkuku.zeendeefood.solutions/health`; login on web + mobile; ntfy test publish.
 
-### P-2 — Prisma migrations baseline + safe startup  *(medium, highest-risk item in the plan)*
+### P-2 ✅ *(done)* — Prisma migrations baseline + safe startup  *(medium, highest-risk item in the plan)*
 - Generate a **baseline migration** from the live prod schema (`prisma migrate diff --from-empty --to-schema-datamodel … --script` → `migrations/0_baseline/migration.sql`), append the hand-written SQL (`journal-immutability.sql`, `documents-search.sql`, `multi-tenancy-foundation.sql` where still applicable) as subsequent migrations, then `prisma migrate resolve --applied 0_baseline` on prod and dev DBs.
 - Change prod `CMD` to `prisma migrate deploy && node dist/main.js` — **remove `db seed` from startup**; make seeding an explicit, idempotent `pnpm db:seed` run only on fresh installs. Compile TS in the Docker build (`pnpm build`), drop `tsx` from the runtime image.
 - Fix `infra/scripts/migrate.sh` (currently calls `migrate dev`).
 - Document the new flow in `AGENTS.md`; add a CI check that fails if `schema.prisma` changes without a migration.
 - **Verify:** fresh `docker compose up` from empty volume reaches `/health`; prod `migrate deploy` is a no-op after resolve; `prisma migrate diff` between prod DB and schema is empty.
 
-### P-3 — CI/CD, backups, observability  *(medium)*
+### P-3 ✅ *(done)* — CI/CD, backups, observability  *(medium)*
 - **GitHub Actions:** `ci.yml` — API lint/typecheck/vitest (Postgres + Redis service containers), web lint/typecheck/build, mobile `flutter analyze` + `flutter test`; `release.yml` on tag — build images, build signed AAB (keystore from GH secrets), attach artifacts to the GitHub Release.
 - **Backups:** add a `pg-backup` sidecar (e.g. `prodrigestivill/postgres-backup-local`) with daily dumps, 14-day retention, `rclone`/MinIO off-box copy; weekly MinIO bucket mirror; a documented + tested **restore drill**.
 - **Observability:** Sentry (API via `@sentry/node`, web via `@sentry/nextjs`, mobile via `sentry_flutter`); pino structured logs already present → ship to a file with rotation; `/health` extended to check DB, Redis, MinIO, ClamAV; external uptime ping (UptimeRobot/Better Stack) on `/health` and web root → ntfy alert.
 - `fastify-helmet` security headers if not already present; confirm rate limits on `/auth/*`, `/billing/webhook`.
 - **Verify:** CI green on a no-op PR; backup file appears + restore into a scratch DB passes integration tests; Sentry receives a test event from all three apps.
 
-### P-4 — Payment provider abstraction + Lenco adapter + dunning  *(medium)*
+### P-4 ✅ *(done)* — Payment provider abstraction + Lenco adapter + dunning  *(medium)*
 - Extract `PaymentProvider` interface; move Flutterwave into `providers/flutterwave.ts`; add `providers/lenco.ts` (collections/mobile-money, verify, webhook signature) and a `providers/mock.ts` for tests. Router by org currency (env-overridable `BILLING_PROVIDER_ZMW=lenco`).
 - Webhook routes per provider: `/billing/webhook/:provider`. Idempotency on `providerRef` (unique already) — add a `PaymentEvent` dedupe on `(provider, providerTxnId)`.
 - **Dunning:** cron sends reminder (email + ntfy push) at T-7, T-1, T+1, T+5 of `currentPeriodEnd`; "Pay now" deep-link to the invoice's `paymentLink`; owner-visible banner on web + mobile when `past_due`.
@@ -136,13 +136,13 @@ Each milestone ends with the standard `phase-closeout` (rebuild → full tests �
 - Integration tests: provider router, Lenco webhook verify, dunning schedule, idempotent double-webhook.
 - **Verify:** Lenco sandbox E2E: subscribe → prompt → webhook → `active`; failed payment → `past_due` → reminders → suspend after 7 days; Flutterwave path still green.
 
-### P-5 — Deprecated financial-engine removal + legal pages  *(medium)*
+### P-5 ✅ *(done)* — Deprecated financial-engine removal + legal pages  *(medium)*
 - Web: migrate `/financials/{income-statement,balance-sheet,cash-flow}` to `/api/v1/ledger/*` (or redirect to `/ledger/*`); migrate `/financials` dashboard KPIs and overheads to ledger-backed endpoints; delete `financial-engine` API module + scheduler once zero clients remain (keep `ScheduledReport` feature, re-point to ledger).
 - Mobile: same for the 6 refs (`financials/*_screen.dart`).
 - **Legal pages** (web, public, also served as in-app webviews on mobile): `/terms`, `/privacy`, `/refund-policy`, `/data-protection` (DPO contact, Zambia DPA rights, data-location disclosure as accepted in §0). Link from signup consent, footer, Play/App Store listings. *Copy to be supplied/reviewed by the user — engineering provides structure + placeholders.*
 - **Verify:** `grep -r financial-engine apps/` → 0; statements on web/mobile match `/ledger` numbers for a seeded org; legal routes 200 unauthenticated.
 
-### P-6 — Data-residency prep (no move)  *(small)*
+### P-6 ✅ *(done)* — Data-residency prep (no move)  *(small)*
 - Per-tenant **data export** endpoint (owner-only; JSON + CSV zip of all org-scoped tables + documents manifest) — also satisfies DPA "right to portability".
 - Per-tenant **delete** (soft-delete with 30-day purge job) — DPA "right to erasure".
 - Make `docker-compose.prod.yml` fully portable (no host-specific `shared-net`/`pom-minio` assumptions; MinIO as its own service with env switch) so a Zambia-hosted replica is a `git clone && docker compose up`.
@@ -152,24 +152,24 @@ Each milestone ends with the standard `phase-closeout` (rebuild → full tests �
 
 ## 4. Workstream B — Web/Mobile parity (ships after P-2/P-3 are green)
 
-### M-1 — API list-endpoint standardisation  *(medium; unblocks everything below)*
+### M-1 ✅ *(done)* — API list-endpoint standardisation  *(medium; unblocks everything below)*
 - Shared `ListQuerySchema` (`q`, `limit`≤100, `offset`, `sortBy`, `sortDir`, `fromDate`, `toDate`) + `buildListWhere` helper (reuse the `sale-records` pattern).
 - Apply to: `broiler-flocks` (q on name/breed/supplier; filter `status[]`, `breedId`, `housingType`, `chicksCollected`), `alerts` (q on message/flock; filter `severity[]`, `status`, `type`), `suppliers` (q on name/contact), `vaccine-inventory` (q on vaccine name/batch; filter `status`, `expiringWithinDays`), `users`/`organizations/members` (q on name/email; filter role), `journal` (q on description/entryNumber), `sale-records` (ensure `customer` search covers name+phone — already does; add `sortBy=customer`).
 - Response shape `{ data, total, limit, offset }` **behind a `?paginated=1` flag for one release** to avoid breaking the offline caches, then flip default and remove the flag (both clients updated in the same release — same approach as v1.28).
 - Postgres indexes: `pg_trgm` GIN on `broiler_flocks.name`, `suppliers.name`, `alerts.message`, `journal_entries.description`, `users.email/name`.
 - Integration tests per endpoint (search hit/miss, pagination bounds, sort stability, org isolation).
 
-### M-2 — Sales filter parity + UX audit  *(small/medium)*
+### M-2 ✅ *(done)* — Sales filter parity + UX audit  *(small/medium)*
 - **Mobile per-flock Sales tab:** reuse `SalesFilterSheet` + `SalesFilter` model with `flockId` pinned; add sort (date/amount/customer/payment status), active-filter chips, load-more; KPIs reflect filtered set (as web does).
 - **Audit (both platforms), fix what fails:** date-range inclusive bounds, filter persistence across tab switches, clear-all resets pagination, debounce on customer search, empty states, filter state survives offline reload, KPI/list consistency, sort indicator visible, URL-encoded filter state on web (shareable/bookmarkable).
 - Widget tests for the sheet; Playwright spec for web filter bar.
 
-### M-3 — Search everywhere  *(medium)*
+### M-3 ✅ *(done)* — Search everywhere  *(medium)*
 - **Web:** reusable `ListToolbar` (search input + filter popover + sort select + pagination) used on `/broiler-flocks`, `/alerts`, `/suppliers`, `/vaccine-inventory`, `/users`, `/ledger/journal`; URL-synced state.
 - **Mobile:** reusable `SearchFilterBar` widget (AppBar search + filter bottom-sheet + sort) on `FlocksScreen`, `AlertsScreen`, `SuppliersScreen`, `VaccineInventoryScreen`, `UsersScreen`, `JournalListScreen`; offline: search falls back to local Drift `LIKE` over cached rows with a "showing cached results" hint.
 - Customer lookup: typeahead on sale form (web + mobile) hitting `sale-records?customer=` distinct names/phones.
 
-### M-4 — Mobile billing awareness + auth parity  *(medium; required before store launch)*
+### M-4 ✅ *(done)* — Mobile billing awareness + auth parity  *(medium; required before store launch)*
 - `BillingService` (`GET /billing/subscription`); **Plan card** in `AccountSettingsScreen` (plan, status, period end, usage vs limits, `past_due` warning).
 - Global Dio interceptor: 402 `PLAN_LIMIT_REACHED` → `UpgradeSheet` (what limit, which plan unlocks it) → "Manage on web" opens `WEB_BASE_URL/pricing` via `url_launcher`.
 - **Store switch:** `--dart-define=STORE=ios` hides prices and the external link, showing only "Manage your subscription on the web" text (Apple 3.1.1/3.1.3 risk acknowledged in §5.3). `STORE=android` (and sideloaded builds) show the tappable "Upgrade on the web" link to `/pricing`.
@@ -177,7 +177,7 @@ Each milestone ends with the standard `phase-closeout` (rebuild → full tests �
 - Suspended-org handling: read-only banner + CTA instead of generic errors.
 - Widget tests: 402 → sheet; plan card renders each status.
 
-### M-5 — Reporting parity: ledger date ranges + share/export  *(small)*
+### M-5 ✅ *(done)* — Reporting parity: ledger date ranges + share/export  *(small)*
 - Mobile: date-range pickers on trial balance / income statement / balance sheet / cash flow / account ledger (match web); share CSV/PDF via `share_plus` (gated by `csv_pdf_export` feature like web).
 - Web: nothing new; confirm `csv_pdf_export` gating is enforced server-side on `/ledger/export/*`.
 
@@ -187,7 +187,7 @@ Each milestone ends with the standard `phase-closeout` (rebuild → full tests �
 
 **Current behaviour (verified):** `apps/web/src/app/page.tsx` *is* the dashboard; unauthenticated visitors to `/` are bounced to `/login` (`page.tsx:90`); every post-login redirect targets `/` (19 `push("/")` sites); `Navbar` already renders nothing when there is no user; `BrandingProvider` supplies `appName`/`tagline`/`logoUrl`/`primaryColor` for white-label tenants; `public/og-image.png`, `logo.svg`, `site.webmanifest` already exist.
 
-### C-1 — Route split: `/` public, `/dashboard` app  *(small)*
+### C-1 ✅ *(done)* — Route split: `/` public, `/dashboard` app  *(small)*
 - Move `app/page.tsx` → `app/dashboard/page.tsx` (+ `loading.tsx`); replace all `router.push("/")` / `href="/"` app-internal targets with `/dashboard` (login, signup, accept-invite, social callbacks, billing callback, navbar logo, auth-provider logout stays `/login`).
 - Introduce Next.js **route groups**: `app/(marketing)/` with its own lightweight layout (public header: logo, Features, Pricing, Docs, Login, "Start free" CTA; footer: legal links from P-5, contact, © ) and `app/(app)/` keeping the existing layout chain (`AuthProvider` → `UpgradePromptProvider` → `QueryProvider` → `Navbar` → `SyncStatusIndicator`). `/login`, `/signup`, `/accept-invite`, `/forgot-password`, `/reset-password`, `/pricing`, `/docs/*`, and the P-5 legal pages move under `(marketing)` so they share the public chrome. Behaviour of every page is unchanged — only the wrapping layout differs.
 - Authenticated users visiting `/` **see the marketing page with a "Go to dashboard" button** (standard SaaS pattern) rather than an auto-redirect — avoids loops and lets logged-in users reach pricing/docs.
@@ -195,7 +195,7 @@ Each milestone ends with the standard `phase-closeout` (rebuild → full tests �
 - Mobile: no change (`WEB_BASE_URL/pricing` deep-link from M-4 still valid). API email templates: invite/reset links already target `/accept-invite` and `/reset-password` — verify none link to `/`.
 - **Verify:** Playwright: anonymous `/` → 200 marketing (no redirect); anonymous `/dashboard` → `/login`; login → lands on `/dashboard`; `NEXT_PUBLIC_MARKETING_ENABLED=false` → `/` redirects; `grep -rn 'push("/")' src` → 0 app-internal hits.
 
-### C-2 — Marketing page content & SEO  *(medium)*
+### C-2 ✅ *(done)* — Marketing page content & SEO  *(medium)*
 Single long-form page at `/` (SSG, no client data fetching except the pricing block), sections in order:
 1. **Hero** — headline + sub-headline (draft: *"Run a profitable broiler farm from your phone"* / *"Track every flock, feed bag, bird sold and kwacha — online or offline — built for Zambian and Southern African farmers"*), primary CTA "Start free" → `/signup`, secondary "Sign in" → `/login`; store badges (Play/App Store) wired to real listing URLs once live, hidden until then; hero screenshot (web dashboard + mobile side-by-side).
 2. **Problem → outcome strip** — three cards: *know your real cost per bird*, *stop losses early (mortality, FCR, withdrawal periods)*, *get paid and keep the books straight*.
