@@ -9,7 +9,7 @@
  *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
  */
 
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 
 const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
@@ -22,9 +22,9 @@ const WEB_BASE_URL = process.env.WEB_BASE_URL || 'http://localhost:30000';
 
 export { EMAIL_DISABLED };
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 
-function getTransporter(): nodemailer.Transporter {
+function getTransporter(): Transporter {
   if (!transporter && !EMAIL_DISABLED && SMTP_HOST) {
     transporter = nodemailer.createTransport({
       host: SMTP_HOST,

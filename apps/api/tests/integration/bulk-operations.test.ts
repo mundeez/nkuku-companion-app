@@ -71,7 +71,7 @@ describe('Bulk Operations API', () => {
             method: 'POST',
             body: JSON.stringify({
               flockId,
-              alertType: 'custom',
+              alertType: 'environmental',
               title: `Bulk Test Alert ${i}`,
               message: 'Test alert for bulk operations',
               severity: 'info',

@@ -7,6 +7,7 @@ import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temp
 
 function publishNtfy(topic: string, title: string, message: string, priority: 'default' | 'urgent') {
   const baseUrl = process.env.NTFY_BASE_URL || 'http://ntfy';
+  const token = process.env.NTFY_AUTH_TOKEN || '';
   fetch(`${baseUrl}/${topic}`, {
     method: 'POST',
     headers: {
@@ -14,6 +15,7 @@ function publishNtfy(topic: string, title: string, message: string, priority: 'd
       'Title': title,
       'Priority': priority,
       'Tags': 'bell',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: message,
   }).catch((err) => {

@@ -58,6 +58,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.zeendeefood.solutions}
       NTFY_DEFAULT_TOPIC: ${NTFY_DEFAULT_TOPIC:-nkuku-alerts}
+      NTFY_AUTH_TOKEN: ${NTFY_AUTH_TOKEN:-}
       # ── S3 / MinIO object storage ──
       S3_ENDPOINT: ${S3_ENDPOINT:-http://pom-minio:9000}
       S3_REGION: ${S3_REGION:-us-east-1}
@@ -125,6 +126,10 @@ services:
       NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.zeendeefood.solutions}
       NTFY_CACHE_FILE: "/var/cache/ntfy/cache.db"
       NTFY_ATTACHMENT_CACHE_DIR: "/var/cache/ntfy/attachments"
+      # Access control: deny everything by default; anonymous read is granted
+      # per-topic via `ntfy access` and the API publishes with a bearer token.
+      NTFY_AUTH_FILE: "/var/cache/ntfy/auth.db"
+      NTFY_AUTH_DEFAULT_ACCESS: "deny-all"
     volumes:
       - ntfy_data:/var/cache/ntfy
     healthcheck:

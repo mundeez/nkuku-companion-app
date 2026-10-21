@@ -252,6 +252,17 @@ In ISPConfig:
 
 The directives already include `X-Forwarded-Proto` so the backend correctly detects HTTPS.
 
+### DNS, ntfy host and ISPConfig automation (verified 2026-10-21)
+- Public DNS for `zeendeefood.solutions` is at GoDaddy. The API PAT lives in `~/.config/devin/godaddy.env`
+  (single raw token). Use `Authorization: Bearer <token>` against `https://api.godaddy.com/v1/domains/zeendeefood.solutions/records`
+  — the legacy `sso-key` header style returns 401 for PAT tokens. Add records with
+  `PATCH .../records` and a JSON array body.
+- `ntfy.zeendeefood.solutions` is ISPConfig site id 16 (proxies to `127.0.0.1:30085`), Let's Encrypt enabled.
+- ISPConfig remote API helper: `php ~/.godaddy_devin/ispc-api.php <function> '<json>'`
+  (e.g. `sites_web_domain_get '{"primary_id":16}'`, `sites_web_domain_update '{"client_id":0,"primary_id":16,"params":{...}}'`).
+  ISPConfig's cron applies changes within ~60 s; LE certs land in `/var/www/clients/client1/web<N>/ssl/`.
+- Release APKs are archived outside the repo in `~/DevWorkz/nkuku-releases/`.
+
 ### Step 6 — Mobile APK for Production
 The API base URL is set at build time via `--dart-define=APP_API_BASE_URL=...`. No source edit is required.
 
