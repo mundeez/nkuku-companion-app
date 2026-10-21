@@ -150,6 +150,27 @@ services:
       - nkuku_public
     restart: unless-stopped
 
+  # ─── MinIO (self-contained deployments only) ────────────
+  # Prod currently uses the shared pom-minio host (S3_ENDPOINT env). For a
+  # standalone/self-contained deploy, start with:
+  #   docker compose -f docker-compose.prod.yml --profile self-contained up -d
+  # and set S3_ENDPOINT=http://minio:9000 in .env. The bundled postgres in
+  # this file covers the DB likewise (DATABASE_URL → postgres:5432).
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-40-07Z
+    profiles: ["self-contained"]
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "127.0.0.1:30090:9000"
+    networks:
+      - nkuku_internal
+    restart: unless-stopped
+
   # ─── ClamAV (virus scanning for document uploads) ────────
   clamav:
     image: clamav/clamav-debian@sha256:741e6c447241220e0792a901befcaec1d55a755c5097fc9cd88d7fd8be251a5c
@@ -173,6 +194,7 @@ volumes:
   redis_data:
   ntfy_data:
   clamav_data:
+  minio_data:
 
 networks:
   nkuku_internal:

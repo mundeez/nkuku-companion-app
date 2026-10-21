@@ -139,6 +139,11 @@ model Organization {
   // Demo orgs (e.g. "Nkuku Demo Farm") are excluded from admin MRR/churn
   // metrics and billing cron — fictional data for marketing/screenshots.
   isDemo    Boolean  @default(false) @map("is_demo")
+  // Soft-delete (DPA right-to-erasure): owner requests deletion → deletedAt
+  // set and isActive=false; purgeAfter = deletedAt + 30 days, at which the
+  // daily purge job hard-deletes all org data.
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  purgeAfter DateTime? @map("purge_after") @db.Timestamptz(6)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

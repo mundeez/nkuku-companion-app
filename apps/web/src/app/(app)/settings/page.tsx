@@ -8,16 +8,20 @@ import { apiFetch } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign, CreditCard } from "lucide-react";
+import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign, CreditCard, Download, Trash2 } from "lucide-react";
 import { AccountSettings } from "@/components/auth/account-settings";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [breeds, setBreeds] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [orgName, setOrgName] = useState("");
+  const [confirmName, setConfirmName] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -28,8 +32,10 @@ export default function SettingsPage() {
       Promise.all([
         apiFetch("/api/v1/breeds"),
         apiFetch("/api/v1/vaccination-events").catch(() => []),
-      ]).then(([b]) => {
+        apiFetch<{ name: string }>("/api/v1/organizations/me").catch(() => null),
+      ]).then(([b, , org]) => {
         setBreeds(b);
+        if (org) setOrgName(org.name);
         setLoading(false);
       }).catch(() => setLoading(false));
     }
@@ -39,6 +45,23 @@ export default function SettingsPage() {
   if (!user) return null;
 
   const primaryBreed = breeds.find((b: any) => b.isPrimary);
+
+  const handleDeleteOrg = async () => {
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      await apiFetch("/api/v1/organizations/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmName }),
+      });
+      await logout();
+      router.push("/login");
+    } catch (err: any) {
+      setDeleteError(err.message === "CONFIRMATION_MISMATCH" ? "Organization name does not match." : err.message);
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -194,6 +217,66 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Data & Privacy — owner only */}
+      {user.role === "owner" && (
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4">Data &amp; Privacy</h2>
+          <div className="grid gap-6 max-w-2xl">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Download className="h-5 w-5" />
+                  Export your data
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Download a complete copy of your organization&apos;s data (flocks, records, ledger, documents metadata) as a gzip&apos;d JSON archive.
+                </p>
+                <a href="/api/v1/organizations/export" download>
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-1" /> Download export
+                  </Button>
+                </a>
+              </CardContent>
+            </Card>
+
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base text-destructive">
+                  <Trash2 className="h-5 w-5" />
+                  Delete organization
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Permanently delete <span className="font-medium">{orgName}</span> and all its data. The organization is deactivated immediately and all data is erased after 30 days. This cannot be undone.
+                </p>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Type the organization name <span className="font-mono font-medium">{orgName}</span> to confirm:
+                </p>
+                <input
+                  type="text"
+                  value={confirmName}
+                  onChange={(e) => setConfirmName(e.target.value)}
+                  placeholder={orgName}
+                  className="w-full max-w-sm px-3 py-2 rounded-md border border-input bg-background text-sm mb-3"
+                />
+                {deleteError && <p className="text-sm text-destructive mb-3">{deleteError}</p>}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={confirmName !== orgName || !orgName || deleting}
+                  onClick={handleDeleteOrg}
+                >
+                  {deleting ? "Deleting…" : "Delete organization"}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

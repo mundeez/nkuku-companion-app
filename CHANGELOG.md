@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.43.0-alpha] — 2026-10-21
+
+### P-6 + store launch — data residency, tenant lifecycle, release pipeline
+- **Tenant export** — `GET /api/v1/organizations/export` (owner-only):
+  gzip'd JSON of all org-scoped tables — flocks + all flock records, sales,
+  journal entries + lines, ledger balances, suppliers, batches, documents
+  metadata, subscriptions/invoices, members, member user identities (no
+  password hashes). DPA data portability.
+- **Tenant soft-delete + purge** — `POST /api/v1/organizations/delete`
+  (owner-only, org-name confirmation) sets `deletedAt`/`purgeAfter`(+30d)
+  and deactivates the org; `authenticate` now rejects org-inactive tokens
+  immediately. Daily 01:30 purge cron hard-deletes all org data in FK-safe
+  order, removes S3 objects, deactivates orphaned member users, and
+  temporarily disables journal immutability rules to remove those rows.
+- **Web Settings → Data & Privacy** (owner-only): export download button +
+  delete-organization danger zone with name confirmation.
+- **Portable compose**: bundled `minio` service behind `self-contained`
+  profile — a fresh host needs no external Postgres/MinIO.
+- **`release.yml`** — on `v*` tags: signed AAB + release APK (keystore via
+  repo secrets, `versionCode` = run number), artifacts attached to the
+  GitHub release; unsigned iOS build check on `macos-14`.
+- Docs: `docs/RUNBOOK-tenant-migration.md`, `docs/STORE-LAUNCH.md`
+  (Play Data Safety + iOS strict-mode posture documented).
+- Migration `20261022000000_org_soft_delete` applied on prod.
+- Verified: signed AAB builds locally (54.4 MB); api tsc + 68/68 unit
+  tests; web tsc clean.
+
 ## [1.42.0-alpha] — 2026-10-21
 
 ### M-5 — Ledger parity: date ranges, mobile export, role gating

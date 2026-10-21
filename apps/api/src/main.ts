@@ -293,6 +293,19 @@ cron.schedule('0 1 * * *', async () => {
   }
 });
 
+// ── Start daily tenant purge cron ────────
+// Hard-deletes organizations whose 30-day soft-delete grace has passed
+// (P-6 right-to-erasure). Runs after the billing cron.
+import { purgeExpiredOrganizations } from './modules/organizations/lifecycle.service.js';
+cron.schedule('30 1 * * *', async () => {
+  try {
+    const { purged } = await purgeExpiredOrganizations(prisma);
+    if (purged.length) app.log.info(`[PurgeCron] Purged organizations: ${purged.join(', ')}`);
+  } catch (err: any) {
+    app.log.error('[PurgeCron] Failed:', err.message);
+  }
+});
+
 // ── Start server ─────────────────────────
 const port = parseInt(process.env.PORT || '3001', 10);
 const host = process.env.HOST || '0.0.0.0';

@@ -1403,6 +1403,17 @@ export async function authenticate(request: any, reply: any) {
       if (!user || !user.isActive) {
         return reply.status(401).send({ error: 'INVALID_TOKEN' });
       }
+      // Deleted/deactivated organizations reject immediately — otherwise
+      // members' short-lived access tokens keep working until expiry.
+      if (payload.organizationId) {
+        const org = await prisma.organization.findUnique({
+          where: { id: payload.organizationId },
+          select: { isActive: true, deletedAt: true },
+        });
+        if (!org || !org.isActive || org.deletedAt) {
+          return reply.status(401).send({ error: 'ORGANIZATION_INACTIVE' });
+        }
+      }
     }
 
     // NOTE: organizationId is trusted from the JWT (re-derived fresh at

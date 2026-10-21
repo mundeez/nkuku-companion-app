@@ -5,6 +5,7 @@ import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { checkUserLimit } from '../../core/billing/feature-gate.js';
 import { sendInviteEmail } from '../../core/security/email.service.js';
+import { exportOrganization, requestDeletion } from './lifecycle.service.js';
 
 const OrgUpdateSchema = z.object({
   name: z.string().min(1).max(150).optional(),
@@ -140,5 +141,30 @@ export async function buildOrganizationModule(app: FastifyInstance) {
     if (!invite) return reply.status(404).send({ error: 'NOT_FOUND' });
     await prisma.invite.delete({ where: { id } });
     return { revoked: true };
+  });
+
+  // GET /api/v1/organizations/export — full tenant data export (owner only).
+  // gzip'd JSON of every org-scoped table; satisfies DPA data portability.
+  app.get('/export', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
+    const { buffer, filename } = await exportOrganization(prisma, organizationId);
+    reply.header('Content-Type', 'application/gzip');
+    reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+    return reply.send(buffer);
+  });
+
+  // POST /api/v1/organizations/delete — soft-delete the org (owner only).
+  // Requires the exact org name as confirmation. Data is purged by cron
+  // after 30 days; the org is deactivated immediately.
+  app.post('/delete', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const organizationId = getOrganizationId(request);
+    const { confirmName } = z.object({ confirmName: z.string() }).parse(request.body);
+    const org = await prisma.organization.findUnique({ where: { id: organizationId } });
+    if (!org) return reply.status(404).send({ error: 'NOT_FOUND' });
+    if (org.name !== confirmName) {
+      return reply.status(400).send({ error: 'CONFIRMATION_MISMATCH' });
+    }
+    const updated = await requestDeletion(prisma, organizationId);
+    return { deleted: true, purgeAfter: updated.purgeAfter };
   });
 }
