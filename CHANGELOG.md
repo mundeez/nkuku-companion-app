@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.39.0-alpha] — 2026-10-21
+
+### C-2 — Marketing site + Umami + demo org flag
+- `/` is now a full 10-section static marketing page (hero, trust strip,
+  feature grid, how-it-works, screenshots, pricing preview, mobile, security
+  cards, FAQ, final CTA) — screenshot slots are placeholders until the demo
+  org data is populated.
+- Umami analytics wired via `NEXT_PUBLIC_UMAMI_SRC` + `NEXT_PUBLIC_UMAMI_WEBSITE_ID`
+  (build-arg'd through the web Dockerfile; absent = no script, zero cost).
+- `Organization.isDemo` flag (migration applied on prod): demo orgs are
+  excluded from billing cron (trials/suspend/invoices), admin metrics
+  (counts, MRR, revenue, failed payments), and admin org lists.
+- "Nkuku Demo Farm" created on prod as `is_demo=true`, owned by
+  `nkuku@zeendeefood.solutions` (password placeholder — reset via
+  forgot-password before first login).
+
 ## [1.38.0-alpha] — 2026-10-21
 
 ### P-5 — Deprecated financial-engine removal + legal pages

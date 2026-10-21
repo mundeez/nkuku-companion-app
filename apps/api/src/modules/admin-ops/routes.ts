@@ -60,13 +60,13 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
       users,
       activeFlocks,
     ] = await Promise.all([
-      prisma.organization.count(),
-      prisma.subscription.count({ where: { status: 'active' } }),
-      prisma.subscription.count({ where: { status: 'past_due' } }),
-      prisma.subscription.count({ where: { status: 'suspended' } }),
-      prisma.subscription.count({ where: { status: 'cancelled' } }),
+      prisma.organization.count({ where: { isDemo: false } }),
+      prisma.subscription.count({ where: { status: 'active', organization: { isDemo: false } } }),
+      prisma.subscription.count({ where: { status: 'past_due', organization: { isDemo: false } } }),
+      prisma.subscription.count({ where: { status: 'suspended', organization: { isDemo: false } } }),
+      prisma.subscription.count({ where: { status: 'cancelled', organization: { isDemo: false } } }),
       prisma.invoice.findMany({
-        where: { status: 'paid' },
+        where: { status: 'paid', organization: { isDemo: false } },
         select: { amountPaid: true, currency: true, paidAt: true },
       }),
       prisma.user.count(),
@@ -75,7 +75,7 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
 
     // MRR: sum of active subscription amounts (monthly equivalent)
     const activeSubs = await prisma.subscription.findMany({
-      where: { status: 'active' },
+      where: { status: 'active', organization: { isDemo: false } },
       select: { planCode: true, billingCycle: true, currentPeriodStart: true },
     });
 
@@ -97,6 +97,7 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
 
     // Recent organizations (last 10)
     const recentOrganizations = await prisma.organization.findMany({
+      where: { isDemo: false },
       take: 10,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -143,9 +144,10 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
     const pageSize = Math.min(100, Math.max(1, parseInt(query.pageSize ?? '20', 10)));
     const search = query.search as string | undefined;
 
-    const where = search
-      ? { OR: [{ name: { contains: search, mode: 'insensitive' } }, { planCode: { contains: search, mode: 'insensitive' } }] }
-      : {};
+    const where: any = { isDemo: false };
+    if (search) {
+      where.OR = [{ name: { contains: search, mode: 'insensitive' } }, { planCode: { contains: search, mode: 'insensitive' } }];
+    }
 
     const [orgs, total] = await Promise.all([
       prisma.organization.findMany({
@@ -230,7 +232,7 @@ export async function buildAdminOpsModule(app: FastifyInstance) {
   // ── Failed payments (past_due + suspended) ─
   app.get('/failed-payments', { preHandler: [authenticate, requirePlatformAdmin] }, async () => {
     const subs = await prisma.subscription.findMany({
-      where: { status: { in: ['past_due', 'suspended'] } },
+      where: { status: { in: ['past_due', 'suspended'] }, organization: { isDemo: false } },
       include: {
         organization: {
           select: { id: true, name: true, planCode: true, country: true },

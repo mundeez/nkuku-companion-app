@@ -400,6 +400,7 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
     where: {
       status: 'trialing',
       trialEndsAt: { lt: now },
+      organization: { isDemo: false },
     },
   });
   for (const sub of expiredTrials) {
@@ -415,6 +416,7 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
     where: {
       status: 'past_due',
       updatedAt: { lt: addDays(now, -GRACE_PERIOD_DAYS) },
+      organization: { isDemo: false },
     },
   });
   for (const sub of pastDue) {
@@ -441,6 +443,7 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
       status: 'active',
       planCode: { not: 'free' },
       currentPeriodEnd: { lt: now },
+      organization: { isDemo: false },
     },
   });
   for (const sub of activeSubs) {

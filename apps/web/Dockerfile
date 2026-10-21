@@ -30,6 +30,11 @@ COPY apps/web/public ./public
 # before `pnpm run build` for the flag to take effect.
 ARG NEXT_PUBLIC_MARKETING_ENABLED=true
 ENV NEXT_PUBLIC_MARKETING_ENABLED=${NEXT_PUBLIC_MARKETING_ENABLED}
+# Umami analytics — baked into the build when provided (empty = off)
+ARG NEXT_PUBLIC_UMAMI_SRC=
+ENV NEXT_PUBLIC_UMAMI_SRC=${NEXT_PUBLIC_UMAMI_SRC}
+ARG NEXT_PUBLIC_UMAMI_WEBSITE_ID=
+ENV NEXT_PUBLIC_UMAMI_WEBSITE_ID=${NEXT_PUBLIC_UMAMI_WEBSITE_ID}
 
 # Copy reference docs into public so they can be viewed in the app
 COPY docs ./public/docs

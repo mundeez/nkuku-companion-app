@@ -136,6 +136,9 @@ model Organization {
   currency  String   @default("ZMW") @map("currency") @db.Char(3)
   planCode  String   @default("free") @map("plan_code") @db.VarChar(30)
   isActive  Boolean  @default(true) @map("is_active")
+  // Demo orgs (e.g. "Nkuku Demo Farm") are excluded from admin MRR/churn
+  // metrics and billing cron — fictional data for marketing/screenshots.
+  isDemo    Boolean  @default(false) @map("is_demo")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
