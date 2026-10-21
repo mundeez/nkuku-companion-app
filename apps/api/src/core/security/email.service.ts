@@ -167,3 +167,63 @@ export async function sendInviteEmail(
     return { success: false, message: `Email send failed: ${err.message}` };
   }
 }
+
+/**
+ * Send a dunning/billing reminder email for an open invoice.
+ * kind: 'upcoming' (T-7) | 'due_tomorrow' (T-1) | 'overdue' (T+1) | 'final' (T+5)
+ */
+export async function sendBillingReminderEmail(
+  to: string,
+  params: {
+    invoiceNumber: string;
+    amountDue: number;
+    currency: string;
+    dueDate: Date;
+    daysOverdue: number;
+    paymentLink?: string | null;
+    kind: 'upcoming' | 'due_tomorrow' | 'overdue' | 'final';
+  },
+): Promise<SendEmailResult> {
+  const { invoiceNumber, amountDue, currency, dueDate, daysOverdue, paymentLink, kind } = params;
+  const amount = `${currency} ${amountDue.toFixed(2)}`;
+  const dueStr = dueDate.toISOString().slice(0, 10);
+  const payUrl = paymentLink || `${WEB_BASE_URL}/billing`;
+
+  const lines: Record<typeof kind, [string, string]> = {
+    upcoming: [
+      `Invoice ${invoiceNumber} due ${dueStr} — Nkuku Companion`,
+      `<p>A reminder that invoice <strong>${invoiceNumber}</strong> for <strong>${amount}</strong> is due on <strong>${dueStr}</strong>.</p>`,
+    ],
+    due_tomorrow: [
+      `Invoice ${invoiceNumber} is due tomorrow — Nkuku Companion`,
+      `<p>Invoice <strong>${invoiceNumber}</strong> for <strong>${amount}</strong> is due tomorrow (<strong>${dueStr}</strong>). Please pay to keep your plan active.</p>`,
+    ],
+    overdue: [
+      `Payment overdue — invoice ${invoiceNumber} — Nkuku Companion`,
+      `<p>Invoice <strong>${invoiceNumber}</strong> for <strong>${amount}</strong> was due on <strong>${dueStr}</strong> (${daysOverdue} day(s) overdue). Your plan will be suspended if it remains unpaid.</p>`,
+    ],
+    final: [
+      `Final notice — invoice ${invoiceNumber} — Nkuku Companion`,
+      `<p><strong>Final reminder:</strong> invoice <strong>${invoiceNumber}</strong> for <strong>${amount}</strong> is ${daysOverdue} days overdue. Your subscription will be suspended and downgraded to the free plan shortly.</p>`,
+    ],
+  };
+  const [subject, intro] = lines[kind];
+  const html = `${intro}
+    <p><a href="${payUrl}">Pay now</a></p>
+    <p>Or open your billing page: ${WEB_BASE_URL}/billing</p>
+    <p>— Nkuku Companion Team</p>`;
+
+  if (EMAIL_DISABLED || !SMTP_HOST) {
+    console.log(`[EMAIL DISABLED] To: ${to} | Subject: ${subject} | URL: ${payUrl}`);
+    return { success: true, message: 'Email logged (EMAIL_DISABLED=true)', devUrl: payUrl };
+  }
+
+  try {
+    const t = getTransporter();
+    await t.sendMail({ from: SMTP_FROM, to, subject, html });
+    return { success: true, message: 'Reminder email sent' };
+  } catch (err: any) {
+    console.error('Billing reminder send failed:', err.message);
+    return { success: false, message: `Email send failed: ${err.message}` };
+  }
+}

@@ -6,13 +6,9 @@
 import type { PrismaClient } from '@prisma/client';
 import { PLANS, getPlan, getPlanPrice, type PlanCode } from './plans.js';
 import { getAddon, getAddonPrice, type AddonCode } from './addons.js';
-import {
-  initiateCheckout,
-  verifyTransaction,
-  generateTxRef,
-  verifyWebhookSignature,
-  isMockMode,
-} from './flutterwave.service.js';
+import { generateTxRef, verifyWebhookSignature, isMockMode } from './flutterwave.service.js';
+import { getProvider, providerForCurrency, allProvidersMock } from './providers/index.js';
+import { sendBillingReminderEmail } from '../security/email.service.js';
 
 const TRIAL_DAYS = 14;
 const GRACE_PERIOD_DAYS = 7; // past_due → suspended after 7 days
@@ -109,9 +105,11 @@ export async function subscribeToPlan(prisma: PrismaClient, params: {
   customerEmail: string;
   customerName?: string;
   customerPhone?: string;
+  /** Mobile-money operator for push collections (lenco): mtn|airtel|zamtel */
+  momoOperator?: string;
   redirectUrl: string;
 }): Promise<{ subscription: any; invoice: any; checkout: any }> {
-  const { organizationId, planCode, billingCycle, customerEmail, customerName, customerPhone, redirectUrl } = params;
+  const { organizationId, planCode, billingCycle, customerEmail, customerName, customerPhone, momoOperator, redirectUrl } = params;
 
   const plan = getPlan(planCode);
   if (!plan) throw new Error('INVALID_PLAN');
@@ -151,6 +149,14 @@ export async function subscribeToPlan(prisma: PrismaClient, params: {
     trialEndsAt: addDays(periodStart, TRIAL_DAYS),
   });
 
+  // Pick the provider for this org's currency. Lenco (ZMW) needs a phone +
+  // momo operator for push collection — fall back to flutterwave's hosted
+  // checkout when those aren't supplied.
+  let provider = providerForCurrency(currency);
+  if (provider.name === 'lenco' && (!customerPhone || !momoOperator)) {
+    provider = getProvider('flutterwave');
+  }
+
   // Generate invoice
   const invoiceNumber = generateInvoiceNumber();
   const txRef = generateTxRef();
@@ -169,18 +175,20 @@ export async function subscribeToPlan(prisma: PrismaClient, params: {
       periodStart,
       periodEnd,
       dueDate: addDays(periodStart, INVOICE_DUE_DAYS),
+      provider: provider.name,
       providerRef: txRef,
     },
   });
 
   // Initiate checkout
-  const checkout = await initiateCheckout({
+  const checkout = await provider.initiateCheckout({
     txRef,
     amount,
     currency,
     customerEmail,
     customerName,
     customerPhone,
+    momoOperator,
     redirectUrl: `${redirectUrl}?invoice_id=${invoice.id}`,
     meta: {
       invoice_id: invoice.id,
@@ -270,8 +278,9 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
     return { success: true, invoice, message: 'Invoice already paid' };
   }
 
-  // Verify with Flutterwave
-  const verification = await verifyTransaction(txRef, txnId);
+  // Verify with the provider that owns this invoice
+  const provider = getProvider(invoice.provider);
+  const verification = await provider.verifyTransaction(txRef, txnId);
 
   // Cross-check: the verified tx_ref must match the invoice's providerRef
   if (verification.txRef && verification.txRef !== txRef) {
@@ -282,9 +291,9 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
   await prisma.paymentEvent.create({
     data: {
       invoiceId: invoice.id,
-      provider: 'flutterwave',
+      provider: provider.name,
       providerRef: txRef,
-      providerTxnId: verification.flwTxRef || txnId || null,
+      providerTxnId: verification.providerTxRef || txnId || null,
       amount: verification.amount || invoice.amountDue,
       currency: invoice.currency,
       status: verification.status,
@@ -294,7 +303,7 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
 
   if (verification.success) {
     // Verify the payment amount matches the invoice amount (unless mock mode, where amount is 0)
-    if (!isMockMode && verification.amount > 0) {
+    if (!provider.isMock && verification.amount > 0) {
       const invoiceAmount = Number(invoice.amountDue);
       if (Math.abs(verification.amount - invoiceAmount) > 0.01) {
         return { success: false, invoice, message: `Amount mismatch: expected ${invoiceAmount}, got ${verification.amount}` };
@@ -321,7 +330,7 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
         where: { id: sub.id },
         data: {
           status: 'active',
-          provider: 'flutterwave',
+          provider: provider.name,
           providerRef: txRef,
           currentPeriodStart: invoice.periodStart,
           currentPeriodEnd: invoice.periodEnd,
@@ -378,11 +387,13 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
   invoicesGenerated: number;
   subscriptionsSuspended: number;
   trialsExpired: number;
+  remindersSent: number;
 }> {
   const now = new Date();
   let invoicesGenerated = 0;
   let subscriptionsSuspended = 0;
   let trialsExpired = 0;
+  let remindersSent_ = 0;
 
   // 1. Expire trials — move trialing subscriptions with past trialEndsAt to past_due
   const expiredTrials = await prisma.subscription.findMany({
@@ -456,8 +467,9 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
       : getAddonPrice(sub.planCode as AddonCode, org.currency);
     const txRef = generateTxRef();
     const invoiceNumber = generateInvoiceNumber();
+    const provider = providerForCurrency(org.currency);
 
-    await prisma.invoice.create({
+    const invoice = await prisma.invoice.create({
       data: {
         organizationId: org.id,
         subscriptionId: sub.id,
@@ -471,6 +483,7 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
         periodStart,
         periodEnd,
         dueDate: addDays(now, INVOICE_DUE_DAYS),
+        provider: provider.name,
         providerRef: txRef,
       },
     });
@@ -484,10 +497,77 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
       },
     });
 
+    // Initiate a checkout for the renewal invoice so the dunning emails can
+    // carry a working payment link instead of a dead invoice.
+    const contact = await getOrgBillingContact(prisma, org.id);
+    if (contact?.email) {
+      const checkout = await provider.initiateCheckout({
+        txRef,
+        amount,
+        currency: org.currency,
+        customerEmail: contact.email,
+        customerName: contact.name,
+        customerPhone: contact.phone,
+        redirectUrl: `${process.env.WEB_BASE_URL || 'http://localhost:30000'}/billing/callback?invoice_id=${invoice.id}`,
+        meta: { invoice_id: invoice.id, organization_id: org.id, plan_code: sub.planCode, billing_cycle: sub.billingCycle },
+      });
+      if (checkout.success && checkout.paymentLink) {
+        await prisma.invoice.update({ where: { id: invoice.id }, data: { paymentLink: checkout.paymentLink } });
+      }
+    }
+
     invoicesGenerated++;
   }
 
-  return { invoicesGenerated, subscriptionsSuspended, trialsExpired };
+  // 4. Dunning — remind on open invoices at T-7, T-1 (before due) and
+  // T+1, T+5 (past due). remindersSent is a bitmask so each sends once.
+  const openInvoices = await prisma.invoice.findMany({
+    where: { status: 'open' },
+  });
+  const DAY = 86_400_000;
+  for (const inv of openInvoices) {
+    const daysUntilDue = (inv.dueDate.getTime() - now.getTime()) / DAY;
+    let bit = 0;
+    let kind: 'upcoming' | 'due_tomorrow' | 'overdue' | 'final' | null = null;
+    if (daysUntilDue <= 7 && daysUntilDue > 1 && !(inv.remindersSent & 1)) { bit = 1; kind = 'upcoming'; }
+    else if (daysUntilDue <= 1 && daysUntilDue > -1 && !(inv.remindersSent & 2)) { bit = 2; kind = 'due_tomorrow'; }
+    else if (daysUntilDue <= -1 && daysUntilDue > -5 && !(inv.remindersSent & 4)) { bit = 4; kind = 'overdue'; }
+    else if (daysUntilDue <= -5 && !(inv.remindersSent & 8)) { bit = 8; kind = 'final'; }
+    if (!bit || !kind) continue;
+
+    const contact = await getOrgBillingContact(prisma, inv.organizationId);
+    if (!contact?.email) continue;
+    await sendBillingReminderEmail(contact.email, {
+      invoiceNumber: inv.invoiceNumber,
+      amountDue: Number(inv.amountDue),
+      currency: inv.currency,
+      dueDate: inv.dueDate,
+      daysOverdue: Math.max(0, Math.ceil(-daysUntilDue)),
+      paymentLink: inv.paymentLink,
+      kind,
+    });
+    await prisma.invoice.update({
+      where: { id: inv.id },
+      data: { remindersSent: inv.remindersSent | bit, lastReminderAt: now },
+    });
+    remindersSent_++;
+  }
+
+  return { invoicesGenerated, subscriptionsSuspended, trialsExpired, remindersSent: remindersSent_ };
+}
+
+/** Primary billing contact: the org owner's user record. */
+async function getOrgBillingContact(prisma: PrismaClient, organizationId: string) {
+  const member = await prisma.organizationMember.findFirst({
+    where: { organizationId, role: 'owner' },
+    include: { user: true },
+  });
+  if (!member?.user) return null;
+  return {
+    email: member.user.email,
+    name: member.user.name || undefined,
+    phone: member.user.phone || undefined,
+  };
 }
 
 // ── Helpers ──

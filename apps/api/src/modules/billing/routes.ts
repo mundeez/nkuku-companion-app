@@ -10,13 +10,16 @@ import {
   processPaymentEvent,
   verifyPaymentRedirect,
 } from '../../core/billing/billing.service.js';
-import { verifyWebhookSignature, isMockMode } from '../../core/billing/flutterwave.service.js';
+import { verifyWebhookSignature } from '../../core/billing/flutterwave.service.js';
+import { allProvidersMock } from '../../core/billing/providers/index.js';
 import { getPlanLimitsForOrg, shouldShowAds } from '../../core/billing/feature-gate.js';
 import { ADDONS, hasActiveAddon, subscribeToAddon, cancelAddon, type AddonCode } from '../../core/billing/addons.js';
 
 const SubscribeSchema = z.object({
   planCode: z.enum(['free', 'grower', 'business']),
   billingCycle: z.enum(['monthly', 'cycle_3mo', 'annual']).default('monthly'),
+  // Mobile-money operator for ZMW push collections (lenco provider)
+  momoOperator: z.enum(['mtn', 'airtel', 'zamtel']).optional(),
   redirectUrl: z.string().url().optional(),
 });
 
@@ -162,6 +165,7 @@ export async function buildBillingModule(app: FastifyInstance) {
         customerEmail: user.email || '',
         customerName: user.name || undefined,
         customerPhone: user.phone || undefined,
+        momoOperator: body.momoOperator,
         redirectUrl,
       });
 
@@ -288,7 +292,7 @@ export async function buildBillingModule(app: FastifyInstance) {
   // ── GET /dev/mock-pay — dev-only endpoint to simulate a successful payment ──
   // Only available when FLUTTERWAVE_SECRET_KEY is not set (mock mode)
   app.get('/dev/mock-pay', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
-    if (!isMockMode) {
+    if (!allProvidersMock) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 

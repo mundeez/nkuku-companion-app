@@ -250,8 +250,11 @@ model Invoice {
   periodEnd        DateTime      @map("period_end") @db.Timestamptz(6)
   dueDate          DateTime      @map("due_date") @db.Timestamptz(6)
   paidAt           DateTime?     @map("paid_at") @db.Timestamptz(6)
-  providerRef      String?       @unique @map("provider_ref") @db.VarChar(100) // Flutterwave tx ref
-  paymentLink      String?       @map("payment_link") @db.Text // Flutterwave checkout URL
+  provider         String        @default("flutterwave") @db.VarChar(30) // flutterwave | lenco | dpo
+  providerRef      String?       @unique @map("provider_ref") @db.VarChar(100) // provider tx ref
+  paymentLink      String?       @map("payment_link") @db.Text // provider checkout URL
+  remindersSent    Int           @default(0) @map("reminders_sent") // dunning bitmask: 1=T-7, 2=T-1, 4=T+1, 8=T+5
+  lastReminderAt   DateTime?     @map("last_reminder_at") @db.Timestamptz(6)
   createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 

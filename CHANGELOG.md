@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.35.0-alpha] — 2026-10-21
+
+### P-4 — Payment provider abstraction + dunning
+- New `PaymentProvider` interface (`apps/api/src/core/billing/providers/`) with
+  three adapters: **flutterwave** (existing, fallback), **lenco** (ZMW
+  mobile-money push collections via Lenco/Broadpay API), **dpo** (DPO Pay
+  hosted checkout + tokenisation for BWP).
+- Currency-based routing with credential-aware fallback: ZMW → lenco, BWP →
+  dpo, everything else → flutterwave; unconfigured providers fall back to
+  flutterwave so an org is never stranded without a way to pay.
+- ZMW orgs with a phone + operator (mtn/airtel/zamtel) get a mobile-money
+  push collection instead of a redirect; missing details fall back to
+  Flutterwave hosted checkout.
+- `Invoice.provider` records which provider owns each invoice; webhooks and
+  payment verification resolve the provider from the invoice, not a global.
+- Dunning: open invoices trigger reminder emails at T-7 / T-1 / T+1 / T+5
+  relative to due date, each sent exactly once via a `remindersSent` bitmask
+  + `lastReminderAt`; reminders include the invoice payment link.
+- `sendBillingReminderEmail` in the email service (EMAIL_DISABLED-safe).
+- `POST /plans/:code/subscribe` accepts optional `momoOperator`; mock-pay
+  endpoint now gated on ALL providers being in mock mode.
+- Migration `20261021140000_billing_provider_dunning` adds `provider`,
+  `remindersSent`, `lastReminderAt` to `invoices` (applied to prod).
+- 12 new unit tests covering provider routing, mock checkout, and verification.
+
 ## [1.34.0-alpha] — 2026-10-21
 
 ### P-3: CI, backups, observability
