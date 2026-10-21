@@ -1,6 +1,6 @@
 {
   "name": "api",
-  "version": "1.33.0-alpha",
+  "version": "1.34.0-alpha",
   "private": true,
   "description": "Nkuku Companion API — Fastify + Prisma + PostgreSQL",
   "scripts": {
@@ -29,6 +29,7 @@
     "@fastify/swagger": "^9.8.1",
     "@fastify/swagger-ui": "^6.1.2",
     "@prisma/client": "^5.8.0",
+    "@sentry/node": "^11.8.0",
     "bcryptjs": "^2.4.3",
     "clamscan": "^2.4.0",
     "csv-stringify": "^6.4.6",

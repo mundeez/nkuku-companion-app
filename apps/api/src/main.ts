@@ -49,9 +49,20 @@ import { buildAdModule } from './modules/ads/routes.js';
 import { buildAdCampaignModule } from './modules/ad-campaigns/routes.js';
 import { buildAdminOpsModule } from './modules/admin-ops/routes.js';
 import { ensureBucket } from './core/storage/storage.service.js';
+import { getS3Client, getS3Bucket } from './core/storage/s3-client.js';
 import { SchedulerService } from './core/financial-engine/scheduler.service.js';
 import { DailyRecalculationService } from './core/financial-engine/daily-recalculation.service.js';
 import cron from 'node-cron';
+import * as Sentry from '@sentry/node';
+
+// Sentry is a no-op unless SENTRY_DSN is set (safe to leave unset in dev).
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE || 0),
+  });
+}
 
 const prisma = new PrismaClient();
 const app = Fastify({
@@ -165,6 +176,13 @@ app.setErrorHandler((err: any, request: any, reply: any) => {
       message: err.errors?.[0]?.message || 'Invalid request',
     });
   }
+  // Report unexpected (5xx-class) errors to Sentry; client errors are noise.
+  const status = err?.statusCode ?? 500;
+  if (status >= 500 && process.env.SENTRY_DSN) {
+    Sentry.captureException(err, {
+      tags: { path: request?.url, method: request?.method },
+    });
+  }
   // Let Fastify handle other errors (including its own 404 for not-found routes)
   reply.send(err);
 });
@@ -210,7 +228,37 @@ await app.register(buildAdCampaignModule, { prefix: '/api/v1/ad-campaigns' });
 await app.register(buildAdminOpsModule, { prefix: '/api/v1/admin' });
 
 // ── Health check ─────────────────────────
-app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+// Shallow: process is up. Deep: verifies DB, Redis, S3 reachability.
+// GET /health        → always 200 if the process serves (load-balancer probe)
+// GET /health?deep=1 → 200 ok / 503 degraded with per-check results
+app.get('/health', async (req, reply) => {
+  const base = { status: 'ok', timestamp: new Date().toISOString() };
+  if (!(req.query as any)?.deep) return base;
+
+  const check = async (fn: () => Promise<unknown>) => {
+    try {
+      await Promise.race([
+        fn(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
+      ]);
+      return 'ok';
+    } catch {
+      return 'fail';
+    }
+  };
+
+  const [db, redisHealth, s3] = await Promise.all([
+    check(() => prisma.$queryRaw`SELECT 1`),
+    check(() => (redis ? redis.ping() : Promise.reject(new Error('no redis')))),
+    check(async () => {
+      const { HeadBucketCommand } = await import('@aws-sdk/client-s3');
+      await getS3Client().send(new HeadBucketCommand({ Bucket: getS3Bucket() }));
+    }),
+  ]);
+
+  const ok = db === 'ok' && redisHealth === 'ok' && s3 === 'ok';
+  return reply.status(ok ? 200 : 503).send({ ...base, status: ok ? 'ok' : 'degraded', checks: { db, redis: redisHealth, s3 } });
+});
 
 // ── Start scheduled report cron ──────────
 const scheduler = new SchedulerService(prisma);

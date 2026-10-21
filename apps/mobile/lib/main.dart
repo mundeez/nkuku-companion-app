@@ -10,6 +10,10 @@ import 'services/sync_service.dart';
 import 'database/app_database.dart';
 import 'providers/theme_provider.dart';
 import 'theme/app_theme.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+
+// Sentry is a no-op when APP_SENTRY_DSN is empty (dev/debug builds).
+const _sentryDsn = String.fromEnvironment('APP_SENTRY_DSN', defaultValue: '');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +26,16 @@ void main() async {
   ConnectivityService.instance.init();
   ApiService.setupInterceptors();
   SyncService.instance.init();
-  runApp(const NkukuApp());
+  if (_sentryDsn.isEmpty) {
+    runApp(const NkukuApp());
+  } else {
+    await SentryFlutter.init(
+      (options) => options
+        ..dsn = _sentryDsn
+        ..tracesSampleRate = 0.0,
+      appRunner: () => runApp(const NkukuApp()),
+    );
+  }
 }
 
 class NkukuApp extends StatefulWidget {

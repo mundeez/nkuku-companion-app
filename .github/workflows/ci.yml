@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CI: true
+
+jobs:
+  api:
+    name: API (lint, typecheck, unit + integration)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: nkuku_user
+          POSTGRES_PASSWORD: dev_password_change_me
+          POSTGRES_DB: nkuku_db
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nkuku_user -d nkuku_db"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 8.15.0 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Prisma generate + migrate (schema + SQL extras)
+        working-directory: apps/api
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://nkuku_user:dev_password_change_me@localhost:5432/nkuku_db
+      - name: Lint
+        working-directory: apps/api
+        run: pnpm run lint
+      - name: Typecheck
+        working-directory: apps/api
+        run: pnpm run typecheck
+      - name: Unit tests
+        working-directory: apps/api
+        run: pnpm run test:unit
+        env:
+          DATABASE_URL: postgresql://nkuku_user:dev_password_change_me@localhost:5432/nkuku_db
+      - name: Seed + start API for integration tests
+        working-directory: apps/api
+        run: |
+          npx prisma db seed
+          DATABASE_URL="$DATABASE_URL" AUTH_RATE_LIMIT=0 TEST_MODE=true EMAIL_DISABLED=true \
+            JWT_SECRET=ci-test-secret REDIS_URL="" npx tsx src/main.ts &
+          for i in $(seq 1 60); do curl -sf http://localhost:3001/health && break || sleep 2; done
+        env:
+          DATABASE_URL: postgresql://nkuku_user:dev_password_change_me@localhost:5432/nkuku_db
+      - name: Integration tests
+        working-directory: apps/api
+        run: pnpm run test:integration
+        env:
+          DATABASE_URL: postgresql://nkuku_user:dev_password_change_me@localhost:5432/nkuku_db
+          TEST_MODE: "true"
+
+  web:
+    name: Web (lint, typecheck, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 8.15.0 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        working-directory: apps/web
+        run: pnpm run lint
+      - name: Typecheck
+        working-directory: apps/web
+        run: pnpm run typecheck
+      - name: Build
+        working-directory: apps/web
+        run: pnpm run build
+
+  mobile:
+    name: Mobile (analyze + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Pub get
+        working-directory: apps/mobile
+        run: flutter pub get
+      - name: Analyze
+        working-directory: apps/mobile
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Tests
+        working-directory: apps/mobile
+        run: flutter test

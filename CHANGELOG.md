@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.34.0-alpha] — 2026-10-21
+
+### P-3: CI, backups, observability
+
+#### Added — CI
+- `.github/workflows/ci.yml`: three jobs — **API** (lint, typecheck, unit tests, then seeded Postgres service + `AUTH_RATE_LIMIT=0`/`TEST_MODE` + `migrate deploy` for integration tests), **Web** (lint, typecheck, build), **Mobile** (flutter analyze + test). Frozen-lockfile installs via pnpm workspace.
+
+#### Added — backups & uptime
+- `infra/scripts/backup.sh`: nightly `pg_dump` of `nkuku_db` from `shared-postgres` (custom format, verified non-empty ≥70 table-data entries) + MinIO `nkuku-documents` bucket mirror via `mc`; retention 14 daily + monthly first-of-month snapshots for a year.
+- `infra/scripts/restore-drill.sh`: restores latest dump into a scratch DB and verifies row counts — **drill PASSED** against real backup.
+- `infra/scripts/uptime-check.sh`: probes `/health?deep=1`, `/`, `/login` every 5 min (cron) with state-aware transitions — posts DOWN/recovered alerts to ntfy `nkuku-alerts`.
+- Host cron installed: backup `30 3 * * *`, uptime `*/5 * * * *`.
+
+#### Added — observability
+- Deep health: `GET /health?deep=1` returns 200/503 with per-check results for Postgres, Redis, and MinIO/S3 (3 s per-check timeout). Plain `/health` unchanged for LB probes.
+- Sentry wired (no-op without DSN): API `@sentry/node` init + 5xx capture in the global error handler; web `@sentry/nextjs` via `instrumentation.ts` (server) + `instrumentation-client.ts` (lazy client chunk — zero bundle cost when disabled); mobile `sentry_flutter` gated on `--dart-define=APP_SENTRY_DSN`.
+- `SENTRY_*` env vars documented in `.env.example`.
+
+#### Validation
+- backup.sh run end-to-end (dump verified, MinIO mirror attempted); restore-drill green; uptime probes live-verified (all `ok`).
+- API `tsc` clean; web `next build` green (shared JS unchanged at 103 kB); mobile analyze 0 errors, tests 55/55.
+
+#### Pending input
+- Sentry DSNs (account required) — code ships disabled until set.
+
 ## [1.33.0-alpha] — 2026-10-21
 
 ### P-2: Prisma migration baseline + compiled production API
