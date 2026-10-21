@@ -168,7 +168,8 @@ export interface BroilerFlock {
   expectedCollectionStart?: string | null;
   expectedCollectionEnd?: string | null;
   chickQualityNotes?: string;
-  status: "active" | "completed" | "cancelled";
+  status: "active" | "sold" | "completed" | "cancelled";
+  soldDate?: string | null;
   createdAt: string;
   updatedAt: string;
   financialRecords?: { amountZmw: number; isIncome: boolean; category: FinancialCategory }[];
