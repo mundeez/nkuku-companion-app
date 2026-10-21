@@ -29,9 +29,9 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
   Future<void> _load() async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final summaryRes = await ApiService.dio.get('/api/v1/financial-engine/summary');
-      final trendRes = await ApiService.dio.get('/api/v1/financial-engine/monthly-trend?year=${DateTime.now().year}');
-      final projRes = await ApiService.dio.get('/api/v1/financial-engine/projections');
+      final summaryRes = await ApiService.dio.get('/api/v1/ledger/summary');
+      final trendRes = await ApiService.dio.get('/api/v1/ledger/monthly-trend?year=${DateTime.now().year}');
+      final projRes = await ApiService.dio.get('/api/v1/ledger/projections');
       if (!mounted) return;
       setState(() {
         _summary = summaryRes.data;

@@ -11,7 +11,7 @@ import { del } from "idb-keyval";
 import { idbPersister, CACHE_KEY } from "./idb-persister";
 
 // Paths excluded from caching — financial data must always be fresh.
-const EXCLUDED_PATHS = ["/api/v1/ledger", "/api/v1/financials"];
+const EXCLUDED_PATHS = ["/api/v1/ledger", "/api/v1/financial-records"];
 
 function isExcluded(path: string): boolean {
   return EXCLUDED_PATHS.some((p) => path.startsWith(p));

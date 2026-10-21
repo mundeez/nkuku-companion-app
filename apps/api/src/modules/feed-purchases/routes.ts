@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Decimal } from 'decimal.js';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
-import { AuditService } from '../../core/financial-engine/audit.service.js';
+import { AuditService } from '../../core/finance/audit.service.js';
 import { JournalEngine } from '../../core/double-entry/journal.engine.js';
 import { AutoPostService } from '../../core/double-entry/auto-post.service.js';
 import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';

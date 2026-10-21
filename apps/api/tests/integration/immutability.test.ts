@@ -108,40 +108,6 @@ describe('Milestone G — Immutability & Compliance', () => {
     });
   });
 
-  // ── Deprecation Headers on v0.8.0 Financial Engine ──────
-
-  describe('Deprecation headers on financial-engine endpoints', () => {
-    it('includes Deprecation header on /api/v1/financial-engine/summary', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/summary`, {
-        headers: authHeaders(token),
-      });
-      expect(res.headers.get('deprecation')).toBe('true');
-      expect(res.headers.get('sunset')).toContain('2027');
-      expect(res.headers.get('link')).toContain('successor-version');
-    });
-
-    it('includes Deprecation header on /api/v1/financial-engine/income-statement', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/income-statement`, {
-        headers: authHeaders(token),
-      });
-      expect(res.headers.get('deprecation')).toBe('true');
-    });
-
-    it('includes Deprecation header on /api/v1/financial-engine/balance-sheet', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/balance-sheet`, {
-        headers: authHeaders(token),
-      });
-      expect(res.headers.get('deprecation')).toBe('true');
-    });
-
-    it('includes Deprecation header on /api/v1/financial-engine/cash-flow', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/cash-flow`, {
-        headers: authHeaders(token),
-      });
-      expect(res.headers.get('deprecation')).toBe('true');
-    });
-  });
-
   // ── Double-Entry Ledger Endpoints (No Deprecation) ──────
 
   describe('Double-entry ledger endpoints have NO deprecation headers', () => {

@@ -36,7 +36,7 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
   Future<void> _load() async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final res = await ApiService.dio.get('/api/v1/financial-engine/overheads');
+      final res = await ApiService.dio.get('/api/v1/ledger/overheads');
       if (!mounted) return;
       setState(() {
         _overheads = res.data;
@@ -54,7 +54,7 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
   Future<void> _create() async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ApiService.dio.post('/api/v1/financial-engine/overheads', data: {
+      await ApiService.dio.post('/api/v1/ledger/overheads', data: {
         ..._form,
         'amountZmw': double.parse(_form['amountZmw']!),
       });
@@ -76,7 +76,7 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
   Future<void> _delete(String id) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ApiService.dio.delete('/api/v1/financial-engine/overheads/$id');
+      await ApiService.dio.delete('/api/v1/ledger/overheads/$id');
       if (!mounted) return;
       _load();
     } catch (e) {

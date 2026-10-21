@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { UnifiedFinancialService } from '../../src/core/financial-engine/unified-financial.service.js';
-import { FinancialStatementService } from '../../src/core/financial-engine/statements.service.js';
+import { UnifiedFinancialService } from '../../src/core/finance/unified-financial.service.js';
+import { FinancialStatementService } from '../../src/core/finance/statements.service.js';
 import Decimal from 'decimal.js';
 
 const prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });

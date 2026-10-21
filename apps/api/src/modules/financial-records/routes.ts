@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
-import { AuditService } from '../../core/financial-engine/audit.service.js';
+import { AuditService } from '../../core/finance/audit.service.js';
 import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 

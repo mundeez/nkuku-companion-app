@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Decimal } from 'decimal.js';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
-import { AuditService } from '../../core/financial-engine/audit.service.js';
+import { AuditService } from '../../core/finance/audit.service.js';
 import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 
 const SaleRecordCreateSchema = z.object({

@@ -91,7 +91,7 @@ describe('Audit Log Cross-Tenant Isolation', () => {
   });
 
   it('second org can see its own audit log entries', async () => {
-    const res = await api('/api/v1/financial-engine/audit-log', secondOrgToken);
+    const res = await api('/api/v1/ledger/audit-log', secondOrgToken);
     expect(res.status).toBe(200);
     expect(res.data.items).toBeDefined();
     expect(res.data.items.length).toBeGreaterThan(0);
@@ -103,7 +103,7 @@ describe('Audit Log Cross-Tenant Isolation', () => {
 
   it('default org cannot see second org audit entries', async () => {
     // Get default org's audit log
-    const res = await api('/api/v1/financial-engine/audit-log', ownerToken);
+    const res = await api('/api/v1/ledger/audit-log', ownerToken);
     expect(res.status).toBe(200);
     expect(res.data.items).toBeDefined();
 
@@ -117,7 +117,7 @@ describe('Audit Log Cross-Tenant Isolation', () => {
   });
 
   it('all audit entries returned to default org belong to default org', async () => {
-    const res = await api('/api/v1/financial-engine/audit-log', ownerToken);
+    const res = await api('/api/v1/ledger/audit-log', ownerToken);
     expect(res.status).toBe(200);
 
     // Get the default org ID from the user

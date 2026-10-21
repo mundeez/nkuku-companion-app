@@ -4,7 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
-import { AuditService } from '../../core/financial-engine/audit.service.js';
+import { AuditService } from '../../core/finance/audit.service.js';
 import { putObject, getObject, deleteObject, buildStorageKey } from '../../core/storage/storage.service.js';
 import { scanBuffer } from '../../core/security/clamav.service.js';
 import { extractAndStore } from '../../core/documents/text-extraction.service.js';

@@ -63,7 +63,7 @@ describe('Financial Engine API', () => {
 
   describe('Unified Summary', () => {
     it('returns summary with revenue, cost, and profit', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/summary`, {
+      const res = await fetch(`${API_URL}/api/v1/ledger/summary`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(res.status).toBe(200);
@@ -76,7 +76,7 @@ describe('Financial Engine API', () => {
     });
 
     it('filters summary by date range', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/summary?startDate=2026-01-01&endDate=2026-12-31`, {
+      const res = await fetch(`${API_URL}/api/v1/ledger/summary?startDate=2026-01-01&endDate=2026-12-31`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(res.status).toBe(200);
@@ -86,56 +86,9 @@ describe('Financial Engine API', () => {
     });
   });
 
-  describe('Income Statement', () => {
-    it('returns income statement structure', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/income-statement`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.revenue).toBeDefined();
-      expect(data.cogs).toBeDefined();
-      expect(typeof data.grossProfit).toBe('number');
-      expect(typeof data.grossMargin).toBe('number');
-      expect(data.operatingExpenses).toBeDefined();
-      expect(typeof data.netProfit).toBe('number');
-      expect(typeof data.netMargin).toBe('number');
-    });
-  });
-
-  describe('Balance Sheet', () => {
-    it('returns balance sheet structure', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/balance-sheet`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.assets).toBeDefined();
-      expect(data.liabilities).toBeDefined();
-      expect(data.equity).toBeDefined();
-      expect(typeof data.totalLiabilitiesAndEquity).toBe('number');
-    });
-  });
-
-  describe('Cash Flow', () => {
-    it('returns cash flow statement structure', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/cash-flow`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.operating).toBeDefined();
-      expect(data.investing).toBeDefined();
-      expect(data.financing).toBeDefined();
-      expect(typeof data.netChange).toBe('number');
-      expect(typeof data.openingBalance).toBe('number');
-      expect(typeof data.closingBalance).toBe('number');
-    });
-  });
-
   describe('Monthly Trend', () => {
     it('returns monthly trend for a year', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/monthly-trend?year=2026`, {
+      const res = await fetch(`${API_URL}/api/v1/ledger/monthly-trend?year=2026`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(res.status).toBe(200);
@@ -151,7 +104,7 @@ describe('Financial Engine API', () => {
 
   describe('Flock Profitability', () => {
     it('returns flock profitability ranking', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/flock-profitability`, {
+      const res = await fetch(`${API_URL}/api/v1/ledger/flock-profitability`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(res.status).toBe(200);
@@ -167,7 +120,7 @@ describe('Financial Engine API', () => {
 
   describe('CSV Export', () => {
     it('exports income statement as CSV', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/export/income-statement?format=csv`, {
+      const res = await fetch(`${API_URL}/api/v1/ledger/export/income-statement?format=csv`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(res.status).toBe(200);
@@ -178,7 +131,7 @@ describe('Financial Engine API', () => {
     });
 
     it('exports balance sheet as CSV', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/export/balance-sheet?format=csv`, {
+      const res = await fetch(`${API_URL}/api/v1/ledger/export/balance-sheet?format=csv`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(res.status).toBe(200);
@@ -187,7 +140,7 @@ describe('Financial Engine API', () => {
     });
 
     it('exports cash flow as CSV', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/export/cash-flow?format=csv`, {
+      const res = await fetch(`${API_URL}/api/v1/ledger/export/cash-flow?format=csv`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(res.status).toBe(200);
@@ -198,7 +151,7 @@ describe('Financial Engine API', () => {
 
   describe('Scheduled Reports', () => {
     it('creates and lists a scheduled report', async () => {
-      const createRes = await fetch(`${API_URL}/api/v1/financial-engine/scheduled-reports`, {
+      const createRes = await fetch(`${API_URL}/api/v1/ledger/scheduled-reports`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -214,7 +167,7 @@ describe('Financial Engine API', () => {
       const created = await createRes.json();
       expect(created.name).toBe('Monthly Income Test');
 
-      const listRes = await fetch(`${API_URL}/api/v1/financial-engine/scheduled-reports`, {
+      const listRes = await fetch(`${API_URL}/api/v1/ledger/scheduled-reports`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(listRes.status).toBe(200);
@@ -223,7 +176,7 @@ describe('Financial Engine API', () => {
       expect(list.some((r: any) => r.id === created.id)).toBe(true);
 
       // Clean up
-      await fetch(`${API_URL}/api/v1/financial-engine/scheduled-reports/${created.id}`, {
+      await fetch(`${API_URL}/api/v1/ledger/scheduled-reports/${created.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -232,7 +185,7 @@ describe('Financial Engine API', () => {
 
   describe('Audit Log', () => {
     it('returns audit log with pagination', async () => {
-      const res = await fetch(`${API_URL}/api/v1/financial-engine/audit-log`, {
+      const res = await fetch(`${API_URL}/api/v1/ledger/audit-log`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(res.status).toBe(200);

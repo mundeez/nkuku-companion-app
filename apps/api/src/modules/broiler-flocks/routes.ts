@@ -6,7 +6,7 @@ import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temp
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { checkFlockLimit } from '../../core/billing/feature-gate.js';
 import { calculateItemsRequired } from '../../core/calculation-engine/index.js';
-import { AuditService } from '../../core/financial-engine/audit.service.js';
+import { AuditService } from '../../core/finance/audit.service.js';
 import { ListQuerySchema, searchWhere, dateRange, orderBy } from '../../core/list-query.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));

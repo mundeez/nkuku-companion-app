@@ -40,9 +40,6 @@ export function Navbar() {
             ? [{ href: "/sales", label: "Sales" }]
             : []),
           ...(role === "owner" || role === "manager" || role === "viewer"
-            ? [{ href: "/financials", label: "Financials" }]
-            : []),
-          ...(role === "owner" || role === "manager" || role === "viewer"
             ? [{ href: "/ledger", label: "Ledger" }]
             : []),
           { href: "/billing", label: "Billing" },

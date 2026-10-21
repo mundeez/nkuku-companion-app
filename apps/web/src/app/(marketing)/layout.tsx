@@ -7,10 +7,10 @@ const NAV_LINKS = [
 ];
 
 const FOOTER_LINKS = [
-  // Legal pages are added in P-5; these hrefs become live routes then.
   { href: "/legal/terms", label: "Terms" },
   { href: "/legal/privacy", label: "Privacy" },
   { href: "/legal/refunds", label: "Refunds" },
+  { href: "/legal/dpa", label: "DPA" },
 ];
 
 export default function MarketingLayout({

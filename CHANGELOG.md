@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.38.0-alpha] — 2026-10-21
+
+### P-5 — Deprecated financial-engine removal + legal pages
+- API: `/api/v1/financial-engine/*` is gone. `modules/financial-engine` →
+  `modules/finance` mounted under `/api/v1/ledger`; core services renamed
+  `core/financial-engine` → `core/finance` (all imports updated). Duplicate
+  statement endpoints + `/periods/close` dropped — `/api/v1/ledger/*` is the
+  single financial API surface. Kept under ledger: `/summary`,
+  `/monthly-trend`, `/flock-profitability`, `/audit-log`, `/export/*`,
+  `/scheduled-reports*`, `/overheads*`, `/projections*`.
+- Web: `/financials` and statement pages now redirect to `/ledger/*`
+  (meta-refresh, static). Overheads, scheduled-reports and audit-log pages
+  moved to `/ledger/{overheads,scheduled-reports,audit-log}` re-pointed at
+  the new endpoints; navbar "Financials" item removed.
+- Mobile: financial dashboard + overheads re-pointed to `/api/v1/ledger/*`.
+- Legal pages live at `/legal/{terms,privacy,refunds,dpa}` (static,
+  unauthenticated) + linked from the marketing footer — unblocks store
+  submissions and merchant-account reviews.
+- Tests: renamed + re-pointed integration/unit suites; removed the
+  deprecation-header block (feature deleted). `grep financial-engine apps/`
+  → 0 code refs.
+
 ## [1.37.0-alpha] — 2026-10-21
 
 ### M-2 — Per-flock sales filtering on mobile

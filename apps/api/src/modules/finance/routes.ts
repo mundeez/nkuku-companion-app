@@ -1,17 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
-import { UnifiedFinancialService } from '../../core/financial-engine/unified-financial.service.js';
-import { FinancialStatementService } from '../../core/financial-engine/statements.service.js';
-import { AuditService } from '../../core/financial-engine/audit.service.js';
-import { ReportGenerationService } from '../../core/financial-engine/report-generation.service.js';
-import { SchedulerService } from '../../core/financial-engine/scheduler.service.js';
-import { OverheadAllocationService } from '../../core/financial-engine/overhead-allocation.service.js';
-import { HarvestProjectionService } from '../../core/financial-engine/harvest-projection.service.js';
+import { UnifiedFinancialService } from '../../core/finance/unified-financial.service.js';
+import { FinancialStatementService } from '../../core/finance/statements.service.js';
+import { AuditService } from '../../core/finance/audit.service.js';
+import { ReportGenerationService } from '../../core/finance/report-generation.service.js';
+import { SchedulerService } from '../../core/finance/scheduler.service.js';
+import { OverheadAllocationService } from '../../core/finance/overhead-allocation.service.js';
+import { HarvestProjectionService } from '../../core/finance/harvest-projection.service.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
-export async function buildFinancialEngineModule(app: FastifyInstance) {
+export async function buildFinanceModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
   const unified = new UnifiedFinancialService(prisma);
   const statements = new FinancialStatementService(prisma);
@@ -20,15 +20,6 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
   const scheduler = new SchedulerService(prisma);
   const overheads = new OverheadAllocationService(prisma);
   const projections = new HarvestProjectionService(prisma);
-
-  // ── DEPRECATION NOTICE ─────────────────────
-  // v0.8.0 single-entry financial engine is superseded by v0.9.3+ double-entry GAAP statements.
-  // Successor endpoints: /api/v1/ledger/income-statement, /balance-sheet, /cash-flow
-  app.addHook('onRequest', async (_request, reply) => {
-    reply.header('Deprecation', 'true');
-    reply.header('Sunset', 'Sun, 01 Jan 2027 00:00:00 GMT');
-    reply.header('Link', '</api/v1/ledger/income-statement>; rel="successor-version"');
-  });
 
   // ── UNIFIED SUMMARY ──────────────────────
   app.get('/summary', { preHandler: [authenticate] }, async (request) => {
@@ -40,53 +31,6 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
     }).parse(request.query);
 
     return unified.getUnifiedSummary({
-      startDate: query.startDate ? new Date(query.startDate) : undefined,
-      endDate: query.endDate ? new Date(query.endDate) : undefined,
-      flockIds: query.flockIds ? query.flockIds.split(',') : undefined,
-      userId: _authUser.userId,
-    });
-  });
-
-  // ── INCOME STATEMENT ───────────────────────
-  app.get('/income-statement', { preHandler: [authenticate] }, async (request) => {
-    const _authUser = (request as any).authUser;
-    const query = z.object({
-      startDate: dateOrIso.optional(),
-      endDate: dateOrIso.optional(),
-      flockIds: z.string().optional(),
-    }).parse(request.query);
-
-    return statements.getIncomeStatement({
-      startDate: query.startDate ? new Date(query.startDate) : undefined,
-      endDate: query.endDate ? new Date(query.endDate) : undefined,
-      flockIds: query.flockIds ? query.flockIds.split(',') : undefined,
-      userId: _authUser.userId,
-    });
-  });
-
-  // ── BALANCE SHEET ──────────────────────────
-  app.get('/balance-sheet', { preHandler: [authenticate] }, async (request) => {
-    const _authUser = (request as any).authUser;
-    const query = z.object({
-      asOfDate: dateOrIso.optional(),
-    }).parse(request.query);
-
-    return statements.getBalanceSheet(
-      query.asOfDate ? new Date(query.asOfDate) : new Date(),
-      _authUser.userId,
-    );
-  });
-
-  // ── CASH FLOW ──────────────────────────────
-  app.get('/cash-flow', { preHandler: [authenticate] }, async (request) => {
-    const _authUser = (request as any).authUser;
-    const query = z.object({
-      startDate: dateOrIso.optional(),
-      endDate: dateOrIso.optional(),
-      flockIds: z.string().optional(),
-    }).parse(request.query);
-
-    return statements.getCashFlow({
       startDate: query.startDate ? new Date(query.startDate) : undefined,
       endDate: query.endDate ? new Date(query.endDate) : undefined,
       flockIds: query.flockIds ? query.flockIds.split(',') : undefined,
@@ -112,39 +56,6 @@ export async function buildFinancialEngineModule(app: FastifyInstance) {
       page: query.page,
       limit: query.limit,
     }, _authUser.organizationId);
-  });
-
-  // ── PERIOD CLOSE ───────────────────────────
-  app.post('/periods/close', { preHandler: [authenticate, requireRole('owner')] }, async (request) => {
-    const _authUser = (request as any).authUser;
-    const body = z.object({
-      label: z.string().min(1).max(20),
-      periodType: z.enum(['monthly', 'quarterly', 'annual']),
-      startDate: dateOrIso,
-      endDate: dateOrIso,
-    }).parse(request.body);
-
-    const period = await prisma.financialPeriod.create({
-      data: {
-        label: body.label,
-        periodType: body.periodType,
-        startDate: new Date(body.startDate),
-        endDate: new Date(body.endDate),
-        isClosed: true,
-        closedAt: new Date(),
-      },
-    });
-
-    await audit.log({
-      organizationId: _authUser.organizationId,
-      userId: _authUser.userId,
-      entityType: 'FinancialPeriod',
-      entityId: period.id,
-      action: 'period_close',
-      newState: period,
-    });
-
-    return period;
   });
 
   // ── MONTHLY TREND ──────────────────────────
