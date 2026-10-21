@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/social_login_buttons.dart';
+import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -224,6 +225,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     obscureText: _obscurePassword,
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ForgotPasswordScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text('Forgot password?'),
+                    ),
                   ),
                 ],
 

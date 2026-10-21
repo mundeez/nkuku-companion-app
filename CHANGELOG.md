@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.41.0-alpha] — 2026-10-21
+
+### M-4 — Mobile billing awareness + forgot password
+- **Plan card** on the mobile More/Settings screen: current plan name,
+  billing status, and flocks/users usage vs. limits (∞ for unlimited),
+  served by a new `BillingService` reading `GET /api/v1/billing/subscription`.
+- **402 → upgrade sheet**: `ApiService` gains a Dio interceptor that detects
+  HTTP 402 (plan-limit) responses globally and surfaces a bottom sheet with
+  the server message and a usage bar — instead of a raw error. Guarded so
+  parallel requests don't stack sheets.
+- **Store-posture flag** `--dart-define=APP_STORE_MODE=strict|link`
+  (default `link`): `strict` (iOS review posture) renders "Manage your plan
+  on the web" as plain text; `link` renders a tappable "Upgrade on the web"
+  button that opens the web `/billing` page via url_launcher. Web URL is
+  derived from `APP_API_BASE_URL`.
+- **Forgot password**: "Forgot password?" link on the login screen → new
+  `forgot_password_screen.dart` → `POST /api/v1/account/password/reset`
+  → always shows "check your email" (anti-enumeration). Reset itself stays
+  on the web `/reset-password` page the emailed link opens.
+- Validated: `flutter analyze` 0 errors (unchanged baseline), 55/55 tests,
+  release APK builds (71.8 MB).
+
 ## [1.40.0-alpha] — 2026-10-21
 
 ### M-3 — Search toolbars across web + mobile

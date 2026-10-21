@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/theme_provider.dart';
+import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/billing_service.dart';
+import '../services/billing_url.dart';
 import '../services/offline_repository.dart';
 import '../services/sync_service.dart';
 import '../services/api_cache.dart';
@@ -29,11 +33,37 @@ class MoreScreen extends StatefulWidget {
 class _MoreScreenState extends State<MoreScreen> {
   int _pendingSyncs = 0;
   int _skippedSyncs = 0;
+  SubscriptionInfo? _subscription;
+  bool _subscriptionLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _loadSyncCounts();
+    _loadSubscription();
+  }
+
+  Future<void> _loadSubscription() async {
+    final sub = await BillingService.getSubscription();
+    if (mounted) {
+      setState(() {
+        _subscription = sub;
+        _subscriptionLoaded = true;
+      });
+    }
+  }
+
+  /// Opens the web billing page. Only used in `link` store mode — in
+  /// `strict` mode the Plan tile is not tappable at all.
+  Future<void> _openBillingOnWeb() async {
+    try {
+      await launchUrl(
+        Uri.parse(ApiService.billingUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      // No browser available / launch failed — nothing useful to do.
+    }
   }
 
   Future<void> _loadSyncCounts() async {
@@ -81,6 +111,39 @@ class _MoreScreenState extends State<MoreScreen> {
               MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
             ),
           ),
+          const Divider(),
+
+          // Plan section — current subscription, usage vs limits, and
+          // billing status. In `link` store mode the tile opens the web
+          // billing page; in `strict` mode it is display-only.
+          SectionHeader(title: 'Plan'),
+          if (!_subscriptionLoaded)
+            const ListTile(
+              leading: Icon(Icons.workspace_premium_outlined),
+              title: Text('Subscription'),
+              subtitle: Text('Loading…'),
+            )
+          else if (_subscription == null)
+            const ListTile(
+              leading: Icon(Icons.workspace_premium_outlined),
+              title: Text('Subscription'),
+              subtitle: Text('Could not load plan info'),
+            )
+          else
+            ListTile(
+              leading: const Icon(Icons.workspace_premium_outlined),
+              title: Text('${_subscription!.planName} plan'),
+              subtitle: Text(
+                'Status: ${_subscription!.status} • '
+                'Flocks: ${_subscription!.activeFlocks}/'
+                '${_limitLabel(_subscription!.maxActiveFlocks)} • '
+                'Users: ${_subscription!.users}/'
+                '${_limitLabel(_subscription!.maxUsers)}',
+              ),
+              trailing:
+                  appStoreModeStrict ? null : const Icon(Icons.open_in_new),
+              onTap: appStoreModeStrict ? null : _openBillingOnWeb,
+            ),
           const Divider(),
 
           // Production section
@@ -328,6 +391,9 @@ class _MoreScreenState extends State<MoreScreen> {
       _loadSyncCounts();
     }
   }
+
+  /// Display label for a plan limit — the API uses -1 for "unlimited".
+  static String _limitLabel(int max) => max < 0 ? '∞' : '$max';
 
   String _themeLabel(AppThemeMode mode) {
     switch (mode) {

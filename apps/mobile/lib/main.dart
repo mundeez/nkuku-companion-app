@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'widgets/bottom_nav.dart';
+import 'widgets/upgrade_sheet.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
@@ -55,6 +56,7 @@ class _NkukuAppState extends State<NkukuApp> {
     _themeProvider.addListener(_onThemeChanged);
     AuthService.addAuthStateListener(_onAuthChanged);
     ApiService.onAuthFailure = _onAuthFailure;
+    ApiService.onPlanLimitReached = _onPlanLimitReached;
     if (AuthService.isLoggedIn) {
       NotificationService.startListening();
     }
@@ -84,11 +86,21 @@ class _NkukuAppState extends State<NkukuApp> {
     }
   }
 
+  /// HTTP 402 (plan limit reached) from any API call — show the upgrade
+  /// bottom sheet over whatever screen issued the request.
+  void _onPlanLimitReached(PlanLimitInfo info) {
+    final ctx = ApiService.navigatorKey.currentContext;
+    if (ctx != null) {
+      UpgradeSheet.show(ctx, info);
+    }
+  }
+
   @override
   void dispose() {
     _themeProvider.removeListener(_onThemeChanged);
     AuthService.removeAuthStateListener(_onAuthChanged);
     ApiService.onAuthFailure = null;
+    ApiService.onPlanLimitReached = null;
     super.dispose();
   }
 
@@ -98,6 +110,7 @@ class _NkukuAppState extends State<NkukuApp> {
       provider: _themeProvider,
       child: MaterialApp(
         title: 'Nkuku Companion',
+        navigatorKey: ApiService.navigatorKey,
         debugShowCheckedModeBanner: false,
         themeMode: _themeProvider.flutterThemeMode,
         theme: AppTheme.light,
