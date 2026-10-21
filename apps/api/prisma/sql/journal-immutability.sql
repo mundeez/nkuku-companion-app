@@ -21,15 +21,32 @@ CREATE OR REPLACE RULE no_delete_journal_lines AS
 
 -- ── CHECK CONSTRAINTS ───────────────────────────────
 -- A journal line must have exactly one of debit or credit (not both, not neither)
-ALTER TABLE journal_lines ADD CONSTRAINT IF NOT EXISTS one_side_only
-  CHECK (
-    (debit_zmw IS NOT NULL AND credit_zmw IS NULL) OR
-    (debit_zmw IS NULL AND credit_zmw IS NOT NULL)
-  );
+-- Postgres has no "ADD CONSTRAINT IF NOT EXISTS"; use a DO block.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'journal_lines'::regclass AND conname = 'one_side_only'
+  ) THEN
+    ALTER TABLE journal_lines ADD CONSTRAINT one_side_only
+      CHECK (
+        (debit_zmw IS NOT NULL AND credit_zmw IS NULL) OR
+        (debit_zmw IS NULL AND credit_zmw IS NOT NULL)
+      );
+  END IF;
+END $$;
 
 -- Amounts cannot be negative
-ALTER TABLE journal_lines ADD CONSTRAINT IF NOT EXISTS amounts_nonneg
-  CHECK (
-    (debit_zmw IS NULL OR debit_zmw >= 0) AND
-    (credit_zmw IS NULL OR credit_zmw >= 0)
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'journal_lines'::regclass AND conname = 'amounts_nonneg'
+  ) THEN
+    ALTER TABLE journal_lines ADD CONSTRAINT amounts_nonneg
+      CHECK (
+        (debit_zmw IS NULL OR debit_zmw >= 0) AND
+        (credit_zmw IS NULL OR credit_zmw >= 0)
+      );
+  END IF;
+END $$;

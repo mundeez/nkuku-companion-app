@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.33.0-alpha] — 2026-10-21
+
+### P-2: Prisma migration baseline + compiled production API
+
+#### Changed — database
+- **Real Prisma migrations**: baseline `prisma/migrations/20261021000000_init` generated from the full schema (1638-line DDL) with `documents-search.sql` and `journal-immutability.sql` folded in — fresh DBs get search_vector, GIN index, immutability rules and CHECK constraints via `migrate deploy` alone.
+- Baseline marked applied on production via `migrate resolve --applied` (zero-drift verified: `migrate diff` prod-vs-migrated-scratch → empty, after creating the missing `sale_records_organization_id_customer_name_idx` on prod).
+- `prisma db push` is retired — AGENTS.md documents the `migrate dev`/`migrate diff` workflow.
+- `journal-immutability.sql` CHECK constraints rewritten with valid `DO $$` blocks (the previous `ADD CONSTRAINT IF NOT EXISTS` is not valid Postgres and would fail on fresh application).
+
+#### Changed — production runtime
+- Prod API now runs **compiled TypeScript** (`node dist/main.js`): `pnpm run build` (tsc) added to the Dockerfile base stage; prod CMD/compose command updated.
+- **`prisma db seed` removed from prod boot** (it ran on every start); seed is now manual via `node dist/db/seeds/main.js` in prod images (tsx not installed).
+
+#### Ops
+- Pre-change prod backup: `~/.godaddy_devin/backups/p2-baseline/nkuku-pre-p2-v1.dump` (custom format, verified via `pg_restore --list`). NOTE: prod DB lives on `shared-postgres`, not the bundled postgres container — corrected a misleading near-empty dump of the wrong DB.
+
+#### Validation
+- `migrate deploy` on a fresh scratch DB → clean; prod ↔ migrated-scratch `migrate diff` → empty.
+- Prod api recreated: `migrate deploy` no-op at boot, server on `node dist/main.js`, `/health` 200 live.
+- `tsc` build passes in Docker production stage; `prisma` CLI confirmed present in prod image.
+
 ## [1.32.0-alpha] — 2026-10-21
 
 ### C-1: Route split — public marketing group + authenticated app group

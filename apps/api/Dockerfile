@@ -20,6 +20,12 @@ RUN pnpm install --filter api
 WORKDIR /workspace/apps/api
 RUN npx prisma generate
 
+# Compile TypeScript in the base stage (dev deps incl. typescript present);
+# dist/ is inherited by every stage built FROM base.
+COPY apps/api/src ./src
+COPY apps/api/tsconfig.json ./
+RUN pnpm run build
+
 # ── Production stage ─────────────────────
 # Reinstall with --prod to prune dev dependencies (vitest, eslint, etc.)
 FROM base AS production
@@ -28,11 +34,8 @@ RUN pnpm install --filter api --prod
 WORKDIR /workspace/apps/api
 RUN npx prisma generate
 
-COPY apps/api/src ./src
-COPY apps/api/tsconfig.json ./
-
 EXPOSE 3001
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npx tsx src/main.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
 
 # ── Development stage ────────────────────
 FROM base AS development

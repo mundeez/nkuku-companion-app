@@ -99,7 +99,9 @@ services:
       - nkuku_public
       - shared-net
     restart: unless-stopped
-    command: ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npx tsx src/main.ts"]
+    # Migrations are real (P-2 baseline). Seed is NOT run on boot — seed
+    # manually when needed: docker compose exec api npx prisma db seed
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
 
   web:
     build:
