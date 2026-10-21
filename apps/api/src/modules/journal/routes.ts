@@ -24,6 +24,9 @@ const ListQuerySchema = z.object({
   toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   sourceType: z.string().optional(),
   accountCode: z.string().optional(),
+  q: z.string().trim().max(200).optional(),
+  sortBy: z.enum(['entryDate', 'entryNumber', 'createdAt']).optional(),
+  sortDir: z.enum(['asc', 'desc']).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -43,13 +46,17 @@ export async function buildJournalModule(app: FastifyInstance) {
       if (q.toDate) where.entryDate.lte = new Date(q.toDate);
     }
     if (q.sourceType) where.sourceType = q.sourceType;
+    if (q.q) {
+      const contains = { contains: q.q, mode: 'insensitive' as const };
+      where.OR = [{ description: contains }, { entryNumber: contains }];
+    }
 
     const entries = await prisma.journalEntry.findMany({
       where,
       include: {
         lines: { include: { account: true } },
       },
-      orderBy: { entryDate: 'desc' },
+      orderBy: q.sortBy ? { [q.sortBy]: q.sortDir || 'asc' } : { entryDate: 'desc' },
       take: q.limit,
       skip: q.offset,
     });

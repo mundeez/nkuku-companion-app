@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.36.0-alpha] — 2026-10-21
+
+### M-1 — List API standardisation + search infrastructure
+- New shared `list-query` helper (`src/core/list-query.ts`): `q`, `limit`,
+  `offset`, `sortBy`, `sortDir`, `fromDate`, `toDate` — all optional so
+  existing clients get identical responses until they opt in (M-2/M-3).
+- Search fields: flocks (name, breed), alerts (title, message, flock),
+  suppliers (name, contact), users (name, email), vaccine inventory (name,
+  disease, supplier, batch number + expiry range), sale records (customer,
+  phone, notes), journal (description, entry number + sortBy).
+- Search uses case-insensitive contains; migration
+  `20261021180000_list_search_trgm` adds `pg_trgm` + 12 GIN trigram
+  indexes (applied to prod) so ILIKE %q% stays fast on large tables.
+- sortBy is allowlist-gated per endpoint; unknown values keep the prior
+  default ordering (no injection, no broken queries).
+- Verified against prod DB: all OR/`is` where shapes execute; api rebuilt
+  and healthy.
+
 ## [1.35.0-alpha] — 2026-10-21
 
 ### P-4 — Payment provider abstraction + dunning

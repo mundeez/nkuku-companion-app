@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { ListQuerySchema, searchWhere, dateRange, orderBy } from '../../core/list-query.js';
 import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
 
@@ -42,7 +43,7 @@ export async function buildAlertModule(app: FastifyInstance) {
     const query = z.object({
       status: z.enum(['open', 'resolved']).optional(),
       severity: z.enum(['info', 'warning', 'critical']).optional(),
-    }).parse(request.query);
+    }).extend(ListQuerySchema.shape).parse(request.query);
 
     const where: any = {
       flock: { organizationId },
@@ -51,14 +52,18 @@ export async function buildAlertModule(app: FastifyInstance) {
     if (query.status === 'open') where.isResolved = false;
     if (query.status === 'resolved') where.isResolved = true;
     if (query.severity) where.severity = query.severity;
+    const qOr = searchWhere(query.q, ['title', 'message', 'flock.name']);
+    if (qOr) where.OR = qOr;
+    dateRange(where, 'dueDate', query.fromDate, query.toDate);
 
     return prisma.alert.findMany({
       where,
       include: { flock: { select: { name: true } } },
-      orderBy: [
+      orderBy: orderBy(query.sortBy, query.sortDir, ['dueDate', 'severity', 'createdAt', 'title'], [
         { isResolved: 'asc' },
         { dueDate: 'asc' },
-      ],
+      ]),
+      ...(query.limit ? { take: query.limit, skip: query.offset } : {}),
     });
   });
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { ListQuerySchema, searchWhere, orderBy } from '../../core/list-query.js';
 
 const UserCreateSchema = z.object({
   email: z.string().email(),
@@ -31,12 +32,18 @@ export async function buildUserModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
   // GET /api/v1/users — members of the caller's organization only
+  // Supports ?q= (name/email), limit/offset, sortBy=name|email|createdAt
   app.get('/', { preHandler: [authenticate, requireRole('owner')] }, async (request) => {
     const organizationId = getOrganizationId(request);
+    const query = ListQuerySchema.parse(request.query);
+    const where: any = { organizationId };
+    const qOr = searchWhere(query.q, ['user.name', 'user.email']);
+    if (qOr) where.OR = qOr;
     const members = await prisma.organizationMember.findMany({
-      where: { organizationId },
+      where,
       include: { user: { select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true, updatedAt: true } } },
-      orderBy: { user: { name: 'asc' } },
+      orderBy: orderBy(query.sortBy, query.sortDir, ['user.name', 'user.email', 'createdAt'], { user: { name: 'asc' } }),
+      ...(query.limit ? { take: query.limit, skip: query.offset } : {}),
     });
     return members.map((m: any) => m.user);
   });

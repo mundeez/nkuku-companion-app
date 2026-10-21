@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
+import { ListQuerySchema, searchWhere, dateRange, orderBy } from '../../core/list-query.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -19,17 +20,23 @@ const VaccineInventoryCreateSchema = z.object({
 export async function buildVaccineInventoryModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
+  // Supports ?q= (name/disease/supplier/batchNumber), fromDate/toDate on
+  // expiryDate, limit/offset, sortBy=name|expiryDate|status|quantityDoses
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const query = z.object({
       status: z.enum(['available', 'in_use', 'expired', 'depleted']).optional(),
-    }).parse(request.query);
+    }).extend(ListQuerySchema.shape).parse(request.query);
 
     const where: any = {};
     if (query.status) where.status = query.status;
+    const qOr = searchWhere(query.q, ['name', 'disease', 'supplier', 'batchNumber']);
+    if (qOr) where.OR = qOr;
+    dateRange(where, 'expiryDate', query.fromDate, query.toDate);
 
     return prisma.vaccineInventory.findMany({
       where,
-      orderBy: [{ status: 'asc' }, { expiryDate: 'asc' }],
+      orderBy: orderBy(query.sortBy, query.sortDir, ['name', 'expiryDate', 'status', 'quantityDoses'], [{ status: 'asc' }, { expiryDate: 'asc' }]),
+      ...(query.limit ? { take: query.limit, skip: query.offset } : {}),
     });
   });
 

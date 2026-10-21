@@ -48,6 +48,7 @@ function buildFilterWhere(organizationId: string, query: {
   paymentStatus?: 'pending' | 'partial' | 'paid';
   flockId?: string;
   customer?: string;
+  q?: string;
 }): any {
   const where: any = { flock: { organizationId } };
 
@@ -77,6 +78,12 @@ function buildFilterWhere(organizationId: string, query: {
     ];
   }
 
+  // Standard ?q= search across customer + notes (M-1)
+  if (query.q) {
+    const contains = { contains: query.q, mode: 'insensitive' as const };
+    where.AND = [...(where.AND || []), { OR: [{ customerName: contains }, { customerPhone: contains }, { notes: contains }] }];
+  }
+
   return where;
 }
 
@@ -87,6 +94,7 @@ const FilterQuerySchema = z.object({
   paymentStatus: z.enum(['pending', 'partial', 'paid']).optional(),
   flockId: z.string().uuid().optional(),
   customer: z.string().max(200).optional(),
+  q: z.string().max(200).optional(),
 });
 
 /** Enforce payment consistency rules on create/update data.

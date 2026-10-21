@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
+import { ListQuerySchema, searchWhere, orderBy } from '../../core/list-query.js';
 
 const SupplierCreateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -24,13 +25,18 @@ const SupplierUpdateSchema = z.object({
 export async function buildSupplierModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
-  // GET /api/v1/suppliers
+  // GET /api/v1/suppliers — supports ?q= (name/contact), limit/offset, sortBy
   app.get('/', { preHandler: [authenticate] }, async (request) => {
     const organizationId = getOrganizationId(request);
+    const query = ListQuerySchema.parse(request.query);
+    const where: any = { organizationId };
+    const qOr = searchWhere(query.q, ['name', 'contact']);
+    if (qOr) where.OR = qOr;
     return prisma.supplier.findMany({
-      where: { organizationId },
+      where,
       include: { feedStages: { orderBy: { sortOrder: 'asc' } } },
-      orderBy: { name: 'asc' },
+      orderBy: orderBy(query.sortBy, query.sortDir, ['name', 'createdAt'], { name: 'asc' }),
+      ...(query.limit ? { take: query.limit, skip: query.offset } : {}),
     });
   });
 

@@ -7,6 +7,7 @@ import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { checkFlockLimit } from '../../core/billing/feature-gate.js';
 import { calculateItemsRequired } from '../../core/calculation-engine/index.js';
 import { AuditService } from '../../core/financial-engine/audit.service.js';
+import { ListQuerySchema, searchWhere, dateRange, orderBy } from '../../core/list-query.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -63,11 +64,14 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       status: z.enum(['active', 'completed', 'cancelled']).optional(),
       breedId: z.string().uuid().optional(),
       fields: z.string().optional(),
-    }).parse(request.query);
+    }).extend(ListQuerySchema.shape).parse(request.query);
 
     const where: any = { organizationId };
     if (query.status) where.status = query.status;
     if (query.breedId) where.breedId = query.breedId;
+    const qOr = searchWhere(query.q, ['name', 'breed.name']);
+    if (qOr) where.OR = qOr;
+    dateRange(where, 'startDate', query.fromDate, query.toDate);
 
     // When ?fields= is specified with only basic fields, skip heavy aggregation
     const requestedFields = query.fields?.split(',').map(f => f.trim()) ?? null;
@@ -81,7 +85,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: isLightRequest ? false : true } },
         financialRecords: isLightRequest ? { select: { amountZmw: true, isIncome: true, category: true } } : { select: { amountZmw: true, isIncome: true, category: true } },
       },
-      orderBy: { startDate: 'desc' },
+      orderBy: orderBy(query.sortBy, query.sortDir, ['name', 'startDate', 'status', 'initialBirdCount'], { startDate: 'desc' }),
+      ...(query.limit ? { take: query.limit, skip: query.offset } : {}),
     });
 
     const today = new Date();
