@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.37.0-alpha] — 2026-10-21
+
+### M-2 — Per-flock sales filtering on mobile
+- Flock detail → Sales tab now has a filter button (badge with active-count)
+  opening the shared `SalesFilterSheet` with the flock picker hidden —
+  date range, payment status, customer search, and sort field/direction.
+- Active filters render as removable chips plus a one-tap Clear; empty
+  state distinguishes "no records" from "no records match filters".
+- Reuses `BroilerService.getSaleRecords/getSaleRecordSummary(flockId,
+  filter:)` — the server-side filtering landed in M-1.
+- Verified: flutter analyze 0 errors (baseline infos only), 55/55 tests.
+
 ## [1.36.0-alpha] — 2026-10-21
 
 ### M-1 — List API standardisation + search infrastructure

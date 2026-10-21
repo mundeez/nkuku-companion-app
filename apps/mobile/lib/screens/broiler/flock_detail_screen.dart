@@ -11,6 +11,7 @@ import '../../models/growth_record.dart';
 import '../../models/medication_record.dart';
 import '../../models/mortality_event.dart';
 import '../../models/sale_record.dart';
+import '../../models/sales_filter.dart';
 import '../../models/vaccination_event.dart';
 import '../../models/water_record.dart';
 import '../../services/api_service.dart';
@@ -18,6 +19,7 @@ import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
 import '../../widgets/flock_charts.dart';
 import '../../widgets/record_card.dart';
+import '../../widgets/sales_filter_sheet.dart';
 import '../../widgets/skeleton.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/summary_card.dart';
@@ -104,6 +106,10 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   List<EnvironmentalRecord> _environmentalRecords = [];
   List<SaleRecord> _saleRecords = [];
   Map<String, dynamic>? _saleSummary;
+  // M-2: per-flock sales filtering/sorting — SalesFilterSheet with the
+  // flock picker hidden (flockId is pinned by getSaleRecords).
+  SalesFilter _salesFilter = const SalesFilter(limit: 100);
+  bool _salesLoading = false;
   List<DocumentRecord> _documents = [];
   List<PerformanceTarget> _breedTargets = [];
 
@@ -1700,6 +1706,114 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     );
   }
 
+  /// Re-fetch this flock's sale records + summary with the active filter.
+  Future<void> _reloadSales() async {
+    setState(() => _salesLoading = true);
+    try {
+      final result = await BroilerService.getSaleRecords(widget.flockId,
+          filter: _salesFilter);
+      final summary = await BroilerService.getSaleRecordSummary(widget.flockId,
+          filter: _salesFilter);
+      if (!mounted) return;
+      setState(() {
+        _saleRecords = result.items;
+        _saleSummary = summary;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to filter sales: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _salesLoading = false);
+    }
+  }
+
+  Future<void> _openSalesFilter() async {
+    final result = await SalesFilterSheet.show(
+      context,
+      currentFilter: _salesFilter,
+      showFlockFilter: false, // flock is pinned by this screen
+    );
+    if (result != null && mounted) {
+      setState(() => _salesFilter = result.copyWith(offset: 0));
+      await _reloadSales();
+    }
+  }
+
+  Widget _buildSalesFilterRow() {
+    final f = _salesFilter;
+    final chips = <Widget>[
+      if (f.fromDate != null)
+        _filterChip('From ${f.fromDate!.toIso8601String().split('T').first}',
+            () => _applySalesFilter(f.copyWith(clearFromDate: true))),
+      if (f.toDate != null)
+        _filterChip('To ${f.toDate!.toIso8601String().split('T').first}',
+            () => _applySalesFilter(f.copyWith(clearToDate: true))),
+      if (f.paymentStatus != null && f.paymentStatus!.isNotEmpty)
+        _filterChip('Status: ${f.paymentStatus}',
+            () => _applySalesFilter(f.copyWith(clearPaymentStatus: true))),
+      if (f.customerQuery != null && f.customerQuery!.isNotEmpty)
+        _filterChip('Customer: ${f.customerQuery}',
+            () => _applySalesFilter(f.copyWith(clearCustomerQuery: true))),
+      if (f.sortBy != null)
+        _filterChip('Sort: ${f.sortBy} ${f.sortDir ?? 'desc'}',
+            () => _applySalesFilter(f.copyWith(sortBy: '', sortDir: ''))),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Badge(
+              isLabelVisible: f.activeCount > 0,
+              label: Text('${f.activeCount}'),
+              child: IconButton(
+                icon: const Icon(Icons.filter_list),
+                tooltip: 'Filter sales',
+                onPressed: _openSalesFilter,
+              ),
+            ),
+            if (_salesLoading)
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            const Spacer(),
+            if (f.activeCount > 0)
+              TextButton(
+                onPressed: () =>
+                    _applySalesFilter(const SalesFilter(limit: 100)),
+                child: const Text('Clear'),
+              ),
+          ],
+        ),
+        if (chips.isNotEmpty)
+          Wrap(spacing: 8, runSpacing: 4, children: chips),
+      ],
+    );
+  }
+
+  Widget _filterChip(String label, VoidCallback onDeleted) {
+    return Chip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      deleteIcon: const Icon(Icons.close, size: 16),
+      onDeleted: onDeleted,
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  void _applySalesFilter(SalesFilter f) {
+    setState(() => _salesFilter = f.copyWith(
+        sortBy: f.sortBy?.isEmpty == true ? null : f.sortBy,
+        sortDir: f.sortDir?.isEmpty == true ? null : f.sortDir));
+    _reloadSales();
+  }
+
   Widget _buildSalesTab() {
     final summary = _saleSummary;
     final totalBirdsSold = summary != null
@@ -1738,11 +1852,15 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             ],
           ),
           const SizedBox(height: 12),
+          _buildSalesFilterRow(),
+          const SizedBox(height: 8),
           if (_saleRecords.isEmpty)
-            const Center(
+            Center(
                 child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('No sale records yet.')))
+                    padding: const EdgeInsets.all(24),
+                    child: Text(_salesFilter.hasActiveFilters
+                        ? 'No sale records match the active filters.'
+                        : 'No sale records yet.')))
           else
             ..._saleRecords.reversed.map((r) {
               final statusColor = r.paymentStatus == 'paid'
