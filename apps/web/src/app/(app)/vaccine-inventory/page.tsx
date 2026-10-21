@@ -97,7 +97,7 @@ export default function VaccineInventoryPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" size="sm" onClick={() => router.push("/")}>
+        <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Dashboard
         </Button>
         <div>

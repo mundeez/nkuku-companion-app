@@ -82,7 +82,7 @@ export default function SignupPage() {
         consent: true,
       });
       refreshUser();
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: any) {
       const code = err.message || "Signup failed";
       const friendly: Record<string, string> = {
@@ -134,7 +134,7 @@ export default function SignupPage() {
         consent: true,
       });
       refreshUser();
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: any) {
       const code = err.message || "Verification failed";
       const friendly: Record<string, string> = {
@@ -361,7 +361,7 @@ export default function SignupPage() {
             <SocialLoginButtons
               onSuccess={() => {
                 refreshUser();
-                router.push("/");
+                router.push("/dashboard");
                 router.refresh();
               }}
               onNeedsSignup={(data) => setSocialSignup(data)}

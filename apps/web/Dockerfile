@@ -26,6 +26,11 @@ RUN pnpm install
 COPY apps/web/src ./src
 COPY apps/web/public ./public
 
+# NEXT_PUBLIC_* vars are inlined at build time. ARG must be declared
+# before `pnpm run build` for the flag to take effect.
+ARG NEXT_PUBLIC_MARKETING_ENABLED=true
+ENV NEXT_PUBLIC_MARKETING_ENABLED=${NEXT_PUBLIC_MARKETING_ENABLED}
+
 # Copy reference docs into public so they can be viewed in the app
 COPY docs ./public/docs
 RUN pnpm run build

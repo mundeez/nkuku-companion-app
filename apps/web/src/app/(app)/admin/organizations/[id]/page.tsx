@@ -54,7 +54,7 @@ export default function AdminOrgDetailPage() {
 
   useEffect(() => {
     if (!isLoading && (!user || !user.isPlatformAdmin)) {
-      router.push("/");
+      router.push("/dashboard");
     }
   }, [user, isLoading, router]);
 

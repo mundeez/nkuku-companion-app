@@ -106,6 +106,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       target: production
+      args:
+        # Inlined into the client bundle at build time. Set to "false"
+        # for white-label/self-hosted deployments ("/" → /login).
+        NEXT_PUBLIC_MARKETING_ENABLED: ${NEXT_PUBLIC_MARKETING_ENABLED:-true}
     environment:
       NODE_ENV: production
       # Empty = same-origin API calls (nginx routes /api to backend)

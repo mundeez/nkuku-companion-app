@@ -98,7 +98,7 @@ export function Navbar() {
           {/* Logo + desktop nav */}
           <div className="flex items-center gap-4 lg:gap-8">
             <Link
-              href="/"
+              href="/dashboard"
               className="flex items-center gap-2 shrink-0"
               aria-label="Nkuku Home"
             >

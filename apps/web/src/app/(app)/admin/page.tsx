@@ -83,7 +83,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (!isLoading && (!user || !user.isPlatformAdmin)) {
-      router.push("/");
+      router.push("/dashboard");
     }
   }, [user, isLoading, router]);
 

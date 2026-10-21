@@ -62,7 +62,7 @@ export function SocialSignupForm({
         currency,
         consent: true,
       });
-      router.push("/");
+      router.push("/dashboard");
       router.refresh();
     } catch (err: any) {
       setError(err.message || "Failed to create account");

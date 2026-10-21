@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.32.0-alpha] — 2026-10-21
+
+### C-1: Route split — public marketing group + authenticated app group
+
+#### Changed
+- Next.js route groups introduced: `app/(app)/` hosts all authenticated routes; `app/(marketing)/` hosts `/` (landing), `/login`, `/signup`, `/accept-invite`, `/forgot-password`, `/reset-password`, `/pricing`, `/docs/*`.
+- The former dashboard at `/` moved to `/dashboard`. All 19 `router.push("/")` / `replace("/")` sites and the navbar logo now target `/dashboard`.
+- App-only providers (`QueryProvider`, `UpgradePromptProvider`, `Navbar`, `SyncStatusIndicator`) moved from the root layout into `app/(app)/layout.tsx` — public routes no longer load QueryClient/IndexedDB machinery.
+- New `app/(marketing)/layout.tsx`: public header (logo, Features/Pricing/Docs, Log in, Start free) + footer with legal-link placeholders and contact email.
+
+#### Added
+- Public landing page at `/` (static, ~109 kB first load): hero, 3-feature strip. Full 10-section marketing page lands in C-2.
+- Logged-in visitors to `/` see a "Go to dashboard" CTA instead of an automatic redirect.
+- `NEXT_PUBLIC_MARKETING_ENABLED=false` (build-time, Docker `ARG` + compose arg) makes `/` redirect to `/login` for white-label/self-hosted deployments; documented in `.env.example`.
+
+#### Fixed
+- `reset-password` page: `useSearchParams()` now wrapped in `<Suspense>` (was masked while the whole tree was dynamic; required once the page became statically prerendered under `(marketing)`).
+
+#### Validation
+- `tsc --noEmit` clean; `next lint` warnings only (pre-existing `<img>` / exhaustive-deps); `next build` green — all 41 routes generated, `/` static.
+- Smoke-tested via `next start`: `/`, `/dashboard`, `/login`, `/pricing` → 200; marketing chrome present on `/`, absent app navbar.
+
 ## [1.31.0-alpha] — 2026-10-21
 
 ### P-1: Production domain cutover (zeendeefood.solutions) + infrastructure hardening

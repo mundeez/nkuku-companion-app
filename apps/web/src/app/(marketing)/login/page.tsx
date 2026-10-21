@@ -55,7 +55,7 @@ export default function LoginPage() {
         return;
       }
       refreshUser();
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
@@ -88,7 +88,7 @@ export default function LoginPage() {
     try {
       await loginWithOtp(phone, otp);
       refreshUser();
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "OTP verification failed");
     } finally {
@@ -104,7 +104,7 @@ export default function LoginPage() {
     try {
       await verifyOtp(phone, otp, "new_device");
       refreshUser();
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "OTP verification failed");
     } finally {
@@ -266,7 +266,7 @@ export default function LoginPage() {
               <SocialLoginButtons
                 onSuccess={() => {
                   refreshUser();
-                  router.push("/");
+                  router.push("/dashboard");
                   router.refresh();
                 }}
                 onNeedsSignup={(data) => setSocialSignup(data)}

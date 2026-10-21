@@ -48,7 +48,7 @@ function AcceptInviteContent() {
         consent: true,
       });
       refreshUser();
-      router.push("/");
+      router.push("/dashboard");
     } catch (err: any) {
       const code = err.message || "Failed to accept invite";
       const friendly: Record<string, string> = {

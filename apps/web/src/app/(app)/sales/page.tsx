@@ -143,7 +143,7 @@ export default function SalesDashboardPage() {
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
     if (user && !["owner", "manager", "sales_person"].includes(user.role)) {
-      router.push("/"); return;
+      router.push("/dashboard"); return;
     }
   }, [user, isLoading, router]);
 

@@ -4,11 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/toast-provider";
-import { Navbar } from "@/components/navbar";
-import { UpgradePromptProvider } from "@/components/billing/upgrade-prompt-provider";
 import { BrandingProvider } from "@/components/branding-provider";
-import { QueryProvider } from "@/lib/api/query-provider";
-import { SyncStatusIndicator } from "@/components/sync-status-indicator";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -49,15 +45,7 @@ export default function RootLayout({
         <AuthProvider>
           <BrandingProvider>
             <ThemeProvider>
-              <ToastProvider>
-                <UpgradePromptProvider>
-                  <QueryProvider>
-                    <Navbar />
-                    <main className="min-h-screen bg-muted/30">{children}</main>
-                    <SyncStatusIndicator />
-                  </QueryProvider>
-                </UpgradePromptProvider>
-              </ToastProvider>
+              <ToastProvider>{children}</ToastProvider>
             </ThemeProvider>
           </BrandingProvider>
         </AuthProvider>

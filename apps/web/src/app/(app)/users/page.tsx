@@ -108,7 +108,7 @@ export default function UsersPage() {
     }
     if (user) {
       if (user.role !== "owner") {
-        router.push("/");
+        router.push("/dashboard");
         return;
       }
       loadUsers();
