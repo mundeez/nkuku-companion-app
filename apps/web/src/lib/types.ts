@@ -640,6 +640,7 @@ export interface SalesFilter {
   paymentStatus?: PaymentStatus;
   flockId?: string;
   customer?: string;
+  q?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
   limit?: number;

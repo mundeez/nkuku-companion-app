@@ -3,6 +3,7 @@ import '../../models/flock.dart';
 import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/search_bar.dart';
 import '../../widgets/skeleton.dart';
 import 'flock_detail_screen.dart';
 import 'flock_form_screen.dart';
@@ -18,6 +19,7 @@ class _FlocksScreenState extends State<FlocksScreen> {
   List<BroilerFlock> _flocks = [];
   bool _loading = true;
   String? _error;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -31,7 +33,10 @@ class _FlocksScreenState extends State<FlocksScreen> {
       _error = null;
     });
     try {
-      final flocks = await BroilerService.getFlocks(forceRefresh: forceRefresh);
+      final flocks = await BroilerService.getFlocks(
+        q: _searchQuery,
+        forceRefresh: forceRefresh,
+      );
       if (!mounted) return;
       setState(() {
         _flocks = flocks;
@@ -136,7 +141,20 @@ class _FlocksScreenState extends State<FlocksScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: RefreshIndicator(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: DebouncedSearchBar(
+              hintText: 'Search flocks by name or breed...',
+              onChanged: (query) {
+                _searchQuery = query;
+                _loadFlocks();
+              },
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
         onRefresh: () => _loadFlocks(forceRefresh: true),
         child: _loading
             ? const SkeletonList()
@@ -154,10 +172,12 @@ class _FlocksScreenState extends State<FlocksScreen> {
                     ),
                   )
                 : _flocks.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: EmptyState(
                           icon: Icons.egg_alt_outlined,
-                          message: 'No flocks yet. Tap + to create one.',
+                          message: _searchQuery.isNotEmpty
+                              ? 'No results match your search'
+                              : 'No flocks yet. Tap + to create one.',
                         ),
                       )
                     : ListView.builder(
@@ -317,6 +337,9 @@ class _FlocksScreenState extends State<FlocksScreen> {
                           );
                         },
                       ),
+            ),
+          ),
+        ],
       ),
     );
   }

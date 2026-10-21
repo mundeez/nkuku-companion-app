@@ -7,10 +7,11 @@ import '../models/alert.dart';
 
 class AlertsService {
   static Future<List<Alert>> getAlerts(
-      {String? status, String? severity}) async {
+      {String? status, String? severity, String? q}) async {
     final params = <String, String>{};
     if (status != null) params['status'] = status;
     if (severity != null) params['severity'] = severity;
+    if (q != null && q.isNotEmpty) params['q'] = q;
     try {
       final res = await ApiService.dio.get(
         '/api/v1/alerts',
@@ -40,7 +41,16 @@ class AlertsService {
             name: 'AlertsService');
         ConnectivityService.instance.markOffline();
         final cached = await OfflineRepository.instance.getAlerts();
-        return cached.map((a) => Alert.fromJson({
+        // Honour the active search term against the cached fields so the
+        // offline fallback doesn't show unfiltered results.
+        final needle = q?.toLowerCase();
+        return cached
+            .where((a) =>
+                needle == null ||
+                needle.isEmpty ||
+                a.title.toLowerCase().contains(needle) ||
+                a.message.toLowerCase().contains(needle))
+            .map((a) => Alert.fromJson({
               'id': a.id,
               'flockId': a.flockId,
               'alertType': a.alertType,

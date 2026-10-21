@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Pencil, Trash2, Plus, X, AlertTriangle, GripVertical, History } from "lucide-react";
+import { SearchInput } from "@/components/search-input";
 import {
   DndContext,
   closestCenter,
@@ -186,6 +187,7 @@ export default function SuppliersPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [feedTemplate, setFeedTemplate] = useState<SupplierCategoryTemplate | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -224,10 +226,16 @@ export default function SuppliersPage() {
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
   const canDelete = user?.role === "owner";
 
-  function loadSuppliers() {
-    apiFetch<Supplier[]>("/api/v1/suppliers")
+  function loadSuppliers(q: string = searchQuery) {
+    const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+    apiFetch<Supplier[]>(`/api/v1/suppliers${qs}`)
       .then(setSuppliers)
       .catch((err) => setError(err.message));
+  }
+
+  function handleSearch(q: string) {
+    setSearchQuery(q);
+    loadSuppliers(q);
   }
 
   function loadFeedTemplate() {
@@ -599,6 +607,12 @@ export default function SuppliersPage() {
         </div>
       )}
 
+      <SearchInput
+        placeholder="Search suppliers…"
+        onSearch={handleSearch}
+        className="mb-4 max-w-sm"
+      />
+
       <Tabs value={activeCategory} onValueChange={setActiveCategory} className="mb-6">
         <TabsList>
           <TabsTrigger value="feed">Feed & Chicks</TabsTrigger>
@@ -610,6 +624,11 @@ export default function SuppliersPage() {
 
         <TabsContent value="feed">
           <div className="grid gap-6">
+            {suppliers.length === 0 && (
+              <p className="text-muted-foreground">
+                {searchQuery ? "No results match your search" : "No suppliers found."}
+              </p>
+            )}
             {suppliers.map((supplier) => {
               const missingItems = getMissingTemplateItems(supplier);
               const sortedStages = getSortedStages(supplier);

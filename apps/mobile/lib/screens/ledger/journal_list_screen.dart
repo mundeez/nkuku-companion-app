@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/ledger_service.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/search_bar.dart';
 import 'journal_detail_screen.dart';
 import 'journal_entry_form_screen.dart';
 
@@ -18,6 +19,7 @@ class _JournalListScreenState extends State<JournalListScreen> {
   String? _sourceType;
   String? _fromDate;
   String? _toDate;
+  String _searchQuery = '';
 
   static const _sourceLabels = {
     'manual': 'Manual',
@@ -42,6 +44,7 @@ class _JournalListScreenState extends State<JournalListScreen> {
         sourceType: _sourceType,
         fromDate: _fromDate,
         toDate: _toDate,
+        q: _searchQuery,
       );
       setState(() { _entries = entries; _loading = false; });
     } catch (e) {
@@ -113,7 +116,20 @@ class _JournalListScreenState extends State<JournalListScreen> {
           ),
         ],
       ),
-      body: _loading
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: DebouncedSearchBar(
+              hintText: 'Search description or entry number...',
+              onChanged: (query) {
+                _searchQuery = query;
+                _load();
+              },
+            ),
+          ),
+          Expanded(
+            child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Column(
@@ -127,7 +143,13 @@ class _JournalListScreenState extends State<JournalListScreen> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: _entries.isEmpty
-                      ? const Center(child: Text('No journal entries found'))
+                      ? Center(
+                          child: Text(
+                            _searchQuery.isNotEmpty
+                                ? 'No results match your search'
+                                : 'No journal entries found',
+                          ),
+                        )
                       : ListView.builder(
                           itemCount: _entries.length,
                           itemBuilder: (context, i) {
@@ -194,6 +216,9 @@ class _JournalListScreenState extends State<JournalListScreen> {
                           },
                         ),
                 ),
+          ),
+        ],
+      ),
       floatingActionButton: AuthService.canEdit
           ? FloatingActionButton(
               onPressed: () async {

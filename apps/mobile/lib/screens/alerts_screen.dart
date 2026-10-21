@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/alert.dart';
 import '../services/alerts_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/search_bar.dart';
 import '../widgets/skeleton.dart';
 
 class AlertsScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
   String? _error;
   String? _statusFilter; // null=all, 'open', 'resolved'
   String? _severityFilter; // null=all, 'info', 'warning', 'critical'
+  String _searchQuery = '';
   bool _generating = false;
   // Bulk selection
   bool _selectMode = false;
@@ -38,6 +40,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
       final alerts = await AlertsService.getAlerts(
         status: _statusFilter,
         severity: _severityFilter,
+        q: _searchQuery,
       );
       setState(() {
         _alerts = alerts;
@@ -526,6 +529,17 @@ class _AlertsScreenState extends State<AlertsScreen> {
       appBar: _selectMode ? selectAppBar : normalAppBar,
       body: Column(
         children: [
+          if (!_selectMode)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: DebouncedSearchBar(
+                hintText: 'Search alerts...',
+                onChanged: (query) {
+                  _searchQuery = query;
+                  _load();
+                },
+              ),
+            ),
           if (!_selectMode) _buildFilterChips(),
           if (!_selectMode) const Divider(height: 1),
           Expanded(
@@ -545,15 +559,20 @@ class _AlertsScreenState extends State<AlertsScreen> {
                         ),
                       )
                     : _alerts.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.notifications_none,
+                                const Icon(Icons.notifications_none,
                                     size: 64, color: Colors.grey),
-                                SizedBox(height: 12),
-                                Text('No alerts',
-                                    style: TextStyle(color: Colors.grey)),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _searchQuery.isNotEmpty
+                                      ? 'No results match your search'
+                                      : 'No alerts',
+                                  style:
+                                      const TextStyle(color: Colors.grey),
+                                ),
                               ],
                             ),
                           )

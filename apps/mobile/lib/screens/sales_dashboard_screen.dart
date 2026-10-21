@@ -4,6 +4,7 @@ import '../models/sales_filter.dart';
 import '../services/auth_service.dart';
 import '../services/broiler_service.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/search_bar.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/sales_filter_sheet.dart';
 import '../widgets/sale_detail_sheet.dart';
@@ -26,6 +27,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   bool _loading = true;
   bool _loadingMore = false;
   String? _error;
+  String _searchQuery = '';
   SalesFilter _filter = const SalesFilter(limit: 20, offset: 0);
   final List<Map<String, dynamic>> _flocks = [];
 
@@ -58,8 +60,10 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
       _error = null;
     });
     try {
-      final dashboardData = await BroilerService.getSalesDashboard(filter: _filter);
-      final allSalesResult = await BroilerService.getAllSales(filter: _filter);
+      final dashboardData =
+          await BroilerService.getSalesDashboard(filter: _filter, q: _searchQuery);
+      final allSalesResult =
+          await BroilerService.getAllSales(filter: _filter, q: _searchQuery);
       if (mounted) {
         setState(() {
           _summary = dashboardData;
@@ -83,7 +87,8 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     setState(() => _loadingMore = true);
     try {
       final nextFilter = _filter.copyWith(offset: _sales.length);
-      final result = await BroilerService.getAllSales(filter: nextFilter);
+      final result =
+          await BroilerService.getAllSales(filter: nextFilter, q: _searchQuery);
       if (mounted) {
         setState(() {
           _sales.addAll(result.items);
@@ -125,7 +130,20 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
-      body: _loading
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: DebouncedSearchBar(
+              hintText: 'Search customer, phone, notes...',
+              onChanged: (query) {
+                _searchQuery = query;
+                _load();
+              },
+            ),
+          ),
+          Expanded(
+            child: _loading
           ? const SkeletonList()
           : _error != null
               ? Center(
@@ -155,6 +173,9 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                     ],
                   ),
                 ),
+          ),
+        ],
+      ),
       floatingActionButton: AuthService.canManageSales
           ? FloatingActionButton(
               onPressed: _navigateToCreate,
@@ -397,16 +418,21 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
 
   Widget _buildSalesList() {
     if (_sales.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              Icon(Icons.point_of_sale_outlined, size: 64, color: Colors.grey),
-              SizedBox(height: 12),
-              Text('No sale records found for the current filters.',
-                  style: TextStyle(color: Colors.grey),
-                  textAlign: TextAlign.center),
+              const Icon(Icons.point_of_sale_outlined,
+                  size: 64, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(
+                _searchQuery.isNotEmpty
+                    ? 'No results match your search'
+                    : 'No sale records found for the current filters.',
+                style: const TextStyle(color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
         ),

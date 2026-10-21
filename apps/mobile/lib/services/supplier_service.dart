@@ -17,8 +17,11 @@ class SupplierService {
     throw SupplierServiceException('Request failed with status $status');
   }
 
-  static Future<List<Supplier>> getAll() async {
-    final res = await ApiService.dio.get('/api/v1/suppliers');
+  static Future<List<Supplier>> getAll({String? q}) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/suppliers',
+      queryParameters: {if (q != null && q.isNotEmpty) 'q': q},
+    );
     _assertOk(res);
     return (res.data as List).map((e) => Supplier.fromJson(e)).toList();
   }

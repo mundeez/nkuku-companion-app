@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/supplier.dart';
 import '../services/auth_service.dart';
 import '../services/supplier_service.dart';
+import '../widgets/search_bar.dart';
 
 class SuppliersScreen extends StatefulWidget {
   const SuppliersScreen({super.key});
@@ -15,6 +16,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   List<Supplier> _suppliers = [];
   bool _loading = true;
   String? _error;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -28,7 +30,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       _error = null;
     });
     try {
-      final suppliers = await SupplierService.getAll();
+      final suppliers = await SupplierService.getAll(q: _searchQuery);
       if (!mounted) return;
       setState(() {
         _suppliers = suppliers;
@@ -161,8 +163,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         itemCount: _suppliers.isEmpty ? 1 : _suppliers.length,
         itemBuilder: (context, index) {
           if (_suppliers.isEmpty) {
-            return const ListTile(
-              title: Text('No suppliers yet'),
+            return ListTile(
+              title: Text(
+                _searchQuery.isNotEmpty
+                    ? 'No results match your search'
+                    : 'No suppliers yet',
+              ),
             );
           }
           final supplier = _suppliers[index];
@@ -195,7 +201,21 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ),
         ],
       ),
-      body: _buildBody(canEdit, canDelete),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: DebouncedSearchBar(
+              hintText: 'Search suppliers by name or contact...',
+              onChanged: (query) {
+                _searchQuery = query;
+                _load();
+              },
+            ),
+          ),
+          Expanded(child: _buildBody(canEdit, canDelete)),
+        ],
+      ),
       floatingActionButton: canEdit
           ? FloatingActionButton(
               onPressed: () => _showSupplierDialog(null),

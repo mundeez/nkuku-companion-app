@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.40.0-alpha] — 2026-10-21
+
+### M-3 — Search toolbars across web + mobile
+- Web: new shared `SearchInput` (debounced ~300ms, clear button, Escape
+  clears) wired into flocks, alerts, suppliers, vaccine inventory, users,
+  journal and sales — all pass `?q=` to the M-1 list endpoints.
+- Mobile: new `DebouncedSearchBar` widget on the same 7 screens; services
+  gained optional `q` params. Flock search bypasses the offline SWR cache;
+  alerts offline fallback filters client-side so stale unfiltered results
+  aren't shown while searching.
+- Sales: `q` flows to both `/sale-records/all` and `/sale-records/dashboard`
+  so the KPI cards stay consistent with the filtered list.
+- Every list gets a "No results match your search" empty state when `q` is
+  active. Validated: web tsc + build, mobile analyze (0 new issues) + 55/55
+  tests.
+
 ## [1.39.0-alpha] — 2026-10-21
 
 ### C-2 — Marketing site + Umami + demo org flag

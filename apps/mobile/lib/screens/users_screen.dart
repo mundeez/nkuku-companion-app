@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/users_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/search_bar.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -13,6 +14,7 @@ class _UsersScreenState extends State<UsersScreen> {
   List<Map<String, dynamic>> _users = [];
   bool _loading = true;
   String? _error;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -23,7 +25,7 @@ class _UsersScreenState extends State<UsersScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final users = await UsersService.getAll();
+      final users = await UsersService.getAll(q: _searchQuery);
       setState(() { _users = users; _loading = false; });
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
@@ -121,7 +123,20 @@ class _UsersScreenState extends State<UsersScreen> {
         onPressed: () => _showForm(),
         child: const Icon(Icons.person_add),
       ),
-      body: _loading
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: DebouncedSearchBar(
+              hintText: 'Search users by name or email...',
+              onChanged: (query) {
+                _searchQuery = query;
+                _load();
+              },
+            ),
+          ),
+          Expanded(
+            child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
@@ -135,13 +150,18 @@ class _UsersScreenState extends State<UsersScreen> {
                   ),
                 )
               : _users.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                          SizedBox(height: 12),
-                          Text('No users found', style: TextStyle(color: Colors.grey)),
+                          const Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                          const SizedBox(height: 12),
+                          Text(
+                            _searchQuery.isNotEmpty
+                                ? 'No results match your search'
+                                : 'No users found',
+                            style: const TextStyle(color: Colors.grey),
+                          ),
                         ],
                       ),
                     )
@@ -225,6 +245,9 @@ class _UsersScreenState extends State<UsersScreen> {
                         },
                       ),
                     ),
+          ),
+        ],
+      ),
     );
   }
 }

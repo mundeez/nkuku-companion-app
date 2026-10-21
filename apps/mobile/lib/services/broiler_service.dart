@@ -36,9 +36,27 @@ class BroilerService {
   // - Falls back to Drift cache when offline
   static Future<List<BroilerFlock>> getFlocks({
     String? status,
+    String? q,
     bool forceRefresh = false,
   }) async {
     try {
+      // Server-side search bypasses the Drift SWR cache: the repository
+      // always re-reads the full cached table after refreshing, which would
+      // discard the API's filtered result set.
+      if (q != null && q.isNotEmpty) {
+        final res = await ApiService.dio.get(
+          '/api/v1/broiler-flocks',
+          queryParameters: {
+            if (status != null) 'status': status,
+            'q': q,
+          },
+        );
+        _assertOk(res);
+        ConnectivityService.instance.markOnline();
+        return (res.data as List)
+            .map((e) => BroilerFlock.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
       final cached = await OfflineRepository.instance.getFlocks(
         status: status,
         forceRefresh: forceRefresh,
@@ -1123,9 +1141,10 @@ class BroilerService {
 
   /// Global sales dashboard — accepts optional filter.
   static Future<Map<String, dynamic>> getSalesDashboard(
-      {SalesFilter? filter}) async {
+      {SalesFilter? filter, String? q}) async {
     final params = <String, dynamic>{};
     if (filter != null) params.addAll(filter.toFilterParams());
+    if (q != null && q.isNotEmpty) params['q'] = q;
     final res = await ApiService.dio.get(
       '/api/v1/sale-records/dashboard',
       queryParameters: params,
@@ -1136,9 +1155,10 @@ class BroilerService {
 
   /// All sales (paginated) — accepts optional filter.
   static Future<({List<SaleRecord> items, int total})> getAllSales(
-      {SalesFilter? filter}) async {
+      {SalesFilter? filter, String? q}) async {
     final params = <String, dynamic>{};
     if (filter != null) params.addAll(filter.toQueryParams());
+    if (q != null && q.isNotEmpty) params['q'] = q;
     final res = await ApiService.dio.get(
       '/api/v1/sale-records/all',
       queryParameters: params,

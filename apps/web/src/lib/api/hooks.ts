@@ -135,8 +135,12 @@ export function useApiMutation<T = unknown, V = unknown>(
 // ─── Specific entity hooks ───────────────────────
 
 /** Flock list query */
-export function useFlocks(status?: string) {
-  const path = `/api/v1/broiler-flocks${status ? `?status=${status}` : ""}`;
+export function useFlocks(params?: { status?: string; q?: string }) {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set("status", params.status);
+  if (params?.q) searchParams.set("q", params.q);
+  const query = searchParams.toString();
+  const path = `/api/v1/broiler-flocks${query ? `?${query}` : ""}`;
   return useApiQuery(path, { staleTime: 60 * 1000 });
 }
 

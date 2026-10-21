@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bell, CheckCircle, Clock, AlertTriangle, Info, RefreshCw, Trash2, CheckCheck, X } from "lucide-react";
+import { Bell, CheckCircle, Clock, AlertTriangle, Info, RefreshCw, Trash2, CheckCheck, X, Search } from "lucide-react";
+import { SearchInput } from "@/components/search-input";
 
 export default function AlertsPage() {
   const router = useRouter();
@@ -17,11 +18,15 @@ export default function AlertsPage() {
   const [filter, setFilter] = useState<"all" | "open" | "resolved">("open");
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
 
   const canDelete = user?.role === "owner" || user?.role === "manager";
 
-  const status = filter === "all" ? "" : `?status=${filter}`;
-  const alertsPath = `/api/v1/alerts${status}`;
+  const alertsParams = new URLSearchParams();
+  if (filter !== "all") alertsParams.set("status", filter);
+  if (searchQuery) alertsParams.set("q", searchQuery);
+  const alertsQs = alertsParams.toString();
+  const alertsPath = `/api/v1/alerts${alertsQs ? `?${alertsQs}` : ""}`;
   const { data: alerts = [], isLoading: loading, isFetching, refetch } = useApiQuery<Alert[]>(
     alertsPath,
     { enabled: !!user }
@@ -46,10 +51,10 @@ export default function AlertsPage() {
     }
   }, [user, isLoading, router]);
 
-  // Clear selection when filter changes
+  // Clear selection when filter or search changes
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filter]);
+  }, [filter, searchQuery]);
 
   async function handleResolve(alertId: string) {
     try {
@@ -165,12 +170,17 @@ export default function AlertsPage() {
 
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap items-center gap-2 mb-6">
         {(["open", "resolved", "all"] as const).map((f) => (
           <Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </Button>
         ))}
+        <SearchInput
+          placeholder="Search alerts…"
+          onSearch={setSearchQuery}
+          className="ml-auto w-full sm:w-64"
+        />
       </div>
 
       {/* Bulk action bar */}
@@ -214,7 +224,13 @@ export default function AlertsPage() {
       )}
 
       <div className="space-y-3">
-        {alerts.length === 0 && (
+        {alerts.length === 0 && searchQuery && (
+          <div className="text-center py-12">
+            <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No results match your search</p>
+          </div>
+        )}
+        {alerts.length === 0 && !searchQuery && (
           <div className="text-center py-12">
             <Bell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">No alerts found.</p>

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Syringe, Trash2, AlertTriangle } from "lucide-react";
+import { SearchInput } from "@/components/search-input";
 
 const statusColors: Record<string, string> = {
   available: "bg-green-100 text-green-800",
@@ -24,6 +25,7 @@ export default function VaccineInventoryPage() {
   const { user, isLoading } = useAuth();
 
   const [items, setItems] = useState<VaccineInventory[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [form, setForm] = useState({
     name: "",
     disease: "",
@@ -39,10 +41,16 @@ export default function VaccineInventoryPage() {
 
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
 
-  function loadAll() {
-    apiFetch<VaccineInventory[]>("/api/v1/vaccine-inventory")
+  function loadAll(q: string = searchQuery) {
+    const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+    apiFetch<VaccineInventory[]>(`/api/v1/vaccine-inventory${qs}`)
       .then(setItems)
       .catch((err) => setError(err.message));
+  }
+
+  function handleSearch(q: string) {
+    setSearchQuery(q);
+    loadAll(q);
   }
 
   async function saveItem(e: React.FormEvent) {
@@ -134,8 +142,18 @@ export default function VaccineInventoryPage() {
         </Card>
       )}
 
+      <SearchInput
+        placeholder="Search vaccine stock…"
+        onSearch={handleSearch}
+        className="mb-4 max-w-sm"
+      />
+
       <div className="space-y-3">
-        {items.length === 0 && <p className="text-muted-foreground">No vaccine inventory recorded.</p>}
+        {items.length === 0 && (
+          <p className="text-muted-foreground">
+            {searchQuery ? "No results match your search" : "No vaccine inventory recorded."}
+          </p>
+        )}
         {items.map((item) => {
           const daysLeft = Math.ceil((new Date(item.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
           return (

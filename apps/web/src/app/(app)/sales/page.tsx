@@ -23,6 +23,7 @@ import {
 import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, ChevronLeft, ChevronRight as ChevronRightIcon, ArrowUp, ArrowDown } from "lucide-react";
 import { SalesFilterBar } from "@/components/sales/sales-filter-bar";
 import { SaleDetailDrawer } from "@/components/sales/sale-detail-drawer";
+import { SearchInput } from "@/components/search-input";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
@@ -34,6 +35,7 @@ function buildFilterParams(filter: SalesFilter): string {
   if (filter.paymentStatus) params.set("paymentStatus", filter.paymentStatus);
   if (filter.flockId) params.set("flockId", filter.flockId);
   if (filter.customer) params.set("customer", filter.customer);
+  if (filter.q) params.set("q", filter.q);
   if (filter.sortBy) { params.set("sortBy", filter.sortBy); params.set("sortDir", filter.sortDir ?? "desc"); }
   params.set("limit", String(filter.limit ?? PAGE_SIZE));
   params.set("offset", String(filter.offset ?? 0));
@@ -249,7 +251,13 @@ export default function SalesDashboardPage() {
 
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
-      {/* Filter Bar */}
+      {/* Search + Filter Bar */}
+      <SearchInput
+        placeholder="Search sales…"
+        value={filter.q ?? ""}
+        onSearch={(q) => setFilter((f) => ({ ...f, q: q || undefined, offset: 0 }))}
+        className="mb-3 max-w-sm"
+      />
       <SalesFilterBar filter={filter} onChange={setFilter} flocks={flocks} showFlockFilter={true} />
 
       {/* KPI Cards */}
@@ -313,7 +321,9 @@ export default function SalesDashboardPage() {
         <CardHeader><CardTitle>Sale Records ({totalSales})</CardTitle></CardHeader>
         <CardContent>
           {sales.length === 0 ? (
-            <p className="text-muted-foreground">No sales records found for the current filters.</p>
+            <p className="text-muted-foreground">
+              {filter.q ? "No results match your search" : "No sales records found for the current filters."}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">

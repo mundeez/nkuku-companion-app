@@ -11,10 +11,14 @@ class VaccineInventoryServiceException implements Exception {
 }
 
 class VaccineInventoryService {
-  static Future<List<VaccineInventory>> getAll({String? status}) async {
+  static Future<List<VaccineInventory>> getAll(
+      {String? status, String? q}) async {
     final res = await ApiService.dio.get(
       '/api/v1/vaccine-inventory',
-      queryParameters: {if (status != null) 'status': status},
+      queryParameters: {
+        if (status != null) 'status': status,
+        if (q != null && q.isNotEmpty) 'q': q,
+      },
     );
     _assertOk(res);
     final data = res.data;

@@ -1,8 +1,11 @@
 import 'api_service.dart';
 
 class UsersService {
-  static Future<List<Map<String, dynamic>>> getAll() async {
-    final res = await ApiService.dio.get('/api/v1/users');
+  static Future<List<Map<String, dynamic>>> getAll({String? q}) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/users',
+      queryParameters: {if (q != null && q.isNotEmpty) 'q': q},
+    );
     return (res.data as List).cast<Map<String, dynamic>>();
   }
 

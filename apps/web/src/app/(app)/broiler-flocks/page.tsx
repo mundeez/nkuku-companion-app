@@ -21,8 +21,9 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Eye, TrendingUp, AlertTriangle, DollarSign } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, TrendingUp, AlertTriangle, DollarSign, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SearchInput } from "@/components/search-input";
 
 interface FlockFormData {
   name: string;
@@ -59,7 +60,8 @@ export default function BroilerFlocksPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { addToast } = useToast();
-  const { data: flocksData = [], isLoading: flocksLoading, error: flocksError } = useFlocks();
+  const [searchQuery, setSearchQuery] = useState("");
+  const { data: flocksData = [], isLoading: flocksLoading, error: flocksError } = useFlocks({ q: searchQuery || undefined });
   const { data: breeds = [], error: breedsError } = useApiQuery<Breed[]>("/api/v1/breeds");
   const { data: suppliers = [], error: suppliersError } = useApiQuery<Supplier[]>("/api/v1/suppliers");
   const flocks = flocksData as BroilerFlock[];
@@ -250,6 +252,12 @@ export default function BroilerFlocksPage() {
           {error}
         </div>
       )}
+
+      <SearchInput
+        placeholder="Search flocks…"
+        onSearch={setSearchQuery}
+        className="mb-6 max-w-sm"
+      />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {flocks.map((flock) => {
@@ -485,7 +493,14 @@ export default function BroilerFlocksPage() {
         })}
       </div>
 
-      {flocks.length === 0 && (
+      {flocks.length === 0 && searchQuery && (
+        <div className="text-center py-12">
+          <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">No results match your search</p>
+        </div>
+      )}
+
+      {flocks.length === 0 && !searchQuery && (
         <div className="text-center py-12">
           <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">No flocks yet</h3>

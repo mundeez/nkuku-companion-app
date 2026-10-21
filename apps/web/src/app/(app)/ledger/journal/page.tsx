@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api/client";
 import type { JournalEntry, Account } from "@/lib/types/ledger";
 import { Plus, ArrowLeft } from "lucide-react";
+import { SearchInput } from "@/components/search-input";
 
 function fmt(s: string | null): string {
   if (!s) return "—";
@@ -36,6 +37,7 @@ export default function JournalListPage() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [error, setError] = useState("");
   const [sourceType, setSourceType] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
@@ -43,12 +45,15 @@ export default function JournalListPage() {
 
   useEffect(() => {
     if (user) {
-      const q = sourceType ? `?sourceType=${sourceType}` : "";
-      apiFetch<JournalEntry[]>(`/api/v1/journal${q}`)
+      const params = new URLSearchParams();
+      if (sourceType) params.set("sourceType", sourceType);
+      if (searchQuery) params.set("q", searchQuery);
+      const qs = params.toString();
+      apiFetch<JournalEntry[]>(`/api/v1/journal${qs ? `?${qs}` : ""}`)
         .then(setEntries)
         .catch((err) => setError(err.message));
     }
-  }, [user, sourceType]);
+  }, [user, sourceType, searchQuery]);
 
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
@@ -66,6 +71,11 @@ export default function JournalListPage() {
           <p className="text-muted-foreground">{entries.length} entries</p>
         </div>
         <div className="flex items-center gap-2">
+          <SearchInput
+            placeholder="Search entries…"
+            onSearch={setSearchQuery}
+            className="w-56"
+          />
           <select
             value={sourceType}
             onChange={(e) => setSourceType(e.target.value)}
@@ -132,7 +142,9 @@ export default function JournalListPage() {
             </table>
           </div>
           {entries.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">No journal entries found.</p>
+            <p className="text-center text-muted-foreground py-8">
+              {searchQuery ? "No results match your search" : "No journal entries found."}
+            </p>
           )}
         </CardContent>
       </Card>

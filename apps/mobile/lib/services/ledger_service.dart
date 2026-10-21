@@ -35,6 +35,7 @@ class LedgerService {
     String? sourceType,
     String? fromDate,
     String? toDate,
+    String? q,
   }) async {
     final res = await ApiService.dio.get(
       '/api/v1/journal',
@@ -42,6 +43,7 @@ class LedgerService {
         if (sourceType != null) 'sourceType': sourceType,
         if (fromDate != null) 'fromDate': fromDate,
         if (toDate != null) 'toDate': toDate,
+        if (q != null && q.isNotEmpty) 'q': q,
       },
     );
     return res.data as List<dynamic>;

@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Pencil, Trash2, Plus, Mail, Copy, XCircle } from "lucide-react";
+import { SearchInput } from "@/components/search-input";
 
 interface UserFormData {
   name: string;
@@ -69,6 +70,7 @@ export default function UsersPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -89,10 +91,16 @@ export default function UsersPage() {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [revokeInviteId, setRevokeInviteId] = useState<string | null>(null);
 
-  function loadUsers() {
-    apiFetch<User[]>("/api/v1/users")
+  function loadUsers(q: string = searchQuery) {
+    const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+    apiFetch<User[]>(`/api/v1/users${qs}`)
       .then(setUsers)
       .catch((err) => setError(err.message));
+  }
+
+  function handleSearch(q: string) {
+    setSearchQuery(q);
+    loadUsers(q);
   }
 
   function loadInvites() {
@@ -272,6 +280,12 @@ export default function UsersPage() {
         </div>
       )}
 
+      <SearchInput
+        placeholder="Search users…"
+        onSearch={handleSearch}
+        className="mb-4 max-w-sm"
+      />
+
       <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
@@ -330,7 +344,7 @@ export default function UsersPage() {
             {users.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                  No users found.
+                  {searchQuery ? "No results match your search" : "No users found."}
                 </TableCell>
               </TableRow>
             )}

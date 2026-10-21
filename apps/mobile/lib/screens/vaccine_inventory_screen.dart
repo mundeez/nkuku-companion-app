@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/vaccine_inventory.dart';
 import '../services/auth_service.dart';
 import '../services/vaccine_inventory_service.dart';
+import '../widgets/search_bar.dart';
 
 class VaccineInventoryScreen extends StatefulWidget {
   const VaccineInventoryScreen({super.key});
@@ -61,6 +62,7 @@ class _VaccineInventoryScreenState extends State<VaccineInventoryScreen> {
   bool _loading = true;
   String? _error;
   _FilterMode _filter = _FilterMode.all;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -75,7 +77,8 @@ class _VaccineInventoryScreenState extends State<VaccineInventoryScreen> {
     });
     try {
       final status = _filter.apiStatus;
-      final results = await VaccineInventoryService.getAll(status: status);
+      final results =
+          await VaccineInventoryService.getAll(status: status, q: _searchQuery);
       if (!mounted) return;
       if (_filter.isClientSide) {
         setState(() {
@@ -161,6 +164,16 @@ class _VaccineInventoryScreenState extends State<VaccineInventoryScreen> {
           : null,
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: DebouncedSearchBar(
+              hintText: 'Search name, disease, supplier, batch...',
+              onChanged: (query) {
+                _searchQuery = query;
+                _load();
+              },
+            ),
+          ),
           SizedBox(
             height: 48,
             child: ListView(
@@ -222,7 +235,9 @@ class _VaccineInventoryScreenState extends State<VaccineInventoryScreen> {
               Icon(Icons.vaccines, size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
               Text(
-                'No vaccine inventory',
+                _searchQuery.isNotEmpty
+                    ? 'No results match your search'
+                    : 'No vaccine inventory',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               if (_filter == _FilterMode.expiringSoon) ...[
