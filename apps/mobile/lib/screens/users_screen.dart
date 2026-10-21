@@ -119,10 +119,12 @@ class _UsersScreenState extends State<UsersScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showForm(),
-        child: const Icon(Icons.person_add),
-      ),
+      floatingActionButton: AuthService.isOwner
+          ? FloatingActionButton(
+              onPressed: () => _showForm(),
+              child: const Icon(Icons.person_add),
+            )
+          : null,
       body: Column(
         children: [
           Padding(
@@ -229,17 +231,19 @@ class _UsersScreenState extends State<UsersScreen> {
                                     padding: EdgeInsets.zero,
                                     backgroundColor: isActive ? Colors.green.withAlpha(20) : Colors.grey.withAlpha(20),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined, size: 20),
-                                    onPressed: () => _showForm(user: u),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                                    onPressed: () => _confirmDelete(u),
-                                  ),
+                                  if (AuthService.isOwner)
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined, size: 20),
+                                      onPressed: () => _showForm(user: u),
+                                    ),
+                                  if (AuthService.isOwner)
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                      onPressed: () => _confirmDelete(u),
+                                    ),
                                 ],
                               ),
-                              onTap: () => _showForm(user: u),
+                              onTap: AuthService.isOwner ? () => _showForm(user: u) : null,
                             ),
                           );
                         },

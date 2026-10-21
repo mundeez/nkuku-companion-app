@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 
 class OverheadsScreen extends StatefulWidget {
   const OverheadsScreen({super.key});
@@ -174,10 +175,11 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text('ZMW ${(o['amountZmw'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                    onPressed: () => _delete(o['id']),
-                                  ),
+                                  if (AuthService.isOwner)
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                      onPressed: () => _delete(o['id']),
+                                    ),
                                 ],
                               ),
                             )),
@@ -191,10 +193,12 @@ class _OverheadsScreenState extends State<OverheadsScreen> {
                 ],
               ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => setState(() => _showForm = !_showForm),
-        child: Icon(_showForm ? Icons.close : Icons.add),
-      ),
+      floatingActionButton: AuthService.canEdit
+          ? FloatingActionButton(
+              onPressed: () => setState(() => _showForm = !_showForm),
+              child: Icon(_showForm ? Icons.close : Icons.add),
+            )
+          : null,
     );
   }
 }

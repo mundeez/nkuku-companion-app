@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.42.0-alpha] — 2026-10-21
+
+### M-5 — Ledger parity: date ranges, mobile export, role gating
+- **Web journal**: from/to date pickers wired to the M-1 `fromDate`/`toDate`
+  params (matches the mobile journal filters that already existed).
+- **Mobile trial balance**: share/export action downloads the CSV from
+  `GET /api/v1/ledger/export/trial-balance` and hands it to the OS share
+  sheet via `share_plus` — first mobile ledger export surface.
+- **Role-gating audit + fixes** (mobile was lagging the API):
+  - `users_screen`: invite FAB, edit, delete, and row-tap now owner-only
+    (API enforces `requireRole('owner')` on all user mutations).
+  - `overheads_screen`: add-FAB gated to owner/manager, delete gated to
+    owner (matches `/overheads` route roles exactly).
+  - Verified web + mobile journal mutations were already correctly gated
+    (new entry: owner/manager; reversal: owner only).
+- Web statement pages already expose CSV export links on
+  income-statement/balance-sheet/cash-flow — confirmed working, no change.
+- Validated: web tsc clean, mobile analyze 0 errors (31-issue baseline),
+  55/55 tests, release APK builds (71.8 MB).
+
 ## [1.41.0-alpha] — 2026-10-21
 
 ### M-4 — Mobile billing awareness + forgot password

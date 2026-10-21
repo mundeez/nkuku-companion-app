@@ -38,6 +38,8 @@ export default function JournalListPage() {
   const [error, setError] = useState("");
   const [sourceType, setSourceType] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   useEffect(() => {
     if (!isLoading && !user) { router.push("/login"); return; }
@@ -48,12 +50,14 @@ export default function JournalListPage() {
       const params = new URLSearchParams();
       if (sourceType) params.set("sourceType", sourceType);
       if (searchQuery) params.set("q", searchQuery);
+      if (fromDate) params.set("fromDate", fromDate);
+      if (toDate) params.set("toDate", toDate);
       const qs = params.toString();
       apiFetch<JournalEntry[]>(`/api/v1/journal${qs ? `?${qs}` : ""}`)
         .then(setEntries)
         .catch((err) => setError(err.message));
     }
-  }, [user, sourceType, searchQuery]);
+  }, [user, sourceType, searchQuery, fromDate, toDate]);
 
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
@@ -75,6 +79,20 @@ export default function JournalListPage() {
             placeholder="Search entries…"
             onSearch={setSearchQuery}
             className="w-56"
+          />
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            aria-label="From date"
+            className="px-2 py-1.5 rounded-md border border-input bg-background text-sm"
+          />
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            aria-label="To date"
+            className="px-2 py-1.5 rounded-md border border-input bg-background text-sm"
           />
           <select
             value={sourceType}

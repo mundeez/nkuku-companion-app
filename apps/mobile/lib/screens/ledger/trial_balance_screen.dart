@@ -1,4 +1,9 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../services/api_service.dart';
 import '../../services/ledger_service.dart';
 
 class TrialBalanceScreen extends StatefulWidget {
@@ -11,6 +16,7 @@ class TrialBalanceScreen extends StatefulWidget {
 class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
   Map<String, dynamic>? _data;
   bool _loading = true;
+  bool _sharing = false;
   String? _error;
 
   @override
@@ -29,6 +35,30 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
     }
   }
 
+  Future<void> _shareCsv() async {
+    setState(() => _sharing = true);
+    try {
+      final res = await ApiService.dio.get<List<int>>(
+        '/api/v1/ledger/export/trial-balance',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/trial-balance.csv');
+      await file.writeAsBytes(res.data as List<int>);
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], subject: 'Trial Balance'),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to export trial balance')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
   String _fmt(dynamic v) {
     if (v == null) return '—';
     final n = double.tryParse(v.toString());
@@ -39,7 +69,16 @@ class _TrialBalanceScreenState extends State<TrialBalanceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trial Balance')),
+      appBar: AppBar(
+        title: const Text('Trial Balance'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.ios_share),
+            tooltip: 'Export CSV',
+            onPressed: _sharing ? null : _shareCsv,
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
