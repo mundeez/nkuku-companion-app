@@ -9,10 +9,20 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { login, loginWithOtp, sendOtp, verifyOtp } from "@/lib/api/client";
+import {
+  login,
+  loginWithOtp,
+  sendOtp,
+  verifyOtp,
+  getPendingDeletion,
+  restoreOrganization,
+  ApiRequestError,
+  type OrganizationPendingDeletion,
+} from "@/lib/api/client";
 import { SocialLoginButtons } from "@/components/auth/social-login-buttons";
 import { SocialSignupForm } from "@/components/auth/social-signup-form";
 import { useBranding } from "@/components/branding-provider";
+import { useToast } from "@/components/toast-provider";
 
 type Mode = "email" | "phone";
 
@@ -20,6 +30,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { refreshUser } = useAuth();
   const branding = useBranding();
+  const { addToast } = useToast();
   const [mode, setMode] = useState<Mode>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +45,41 @@ export default function LoginPage() {
     tempToken: string;
     profile: { email?: string; name?: string; provider: string };
   } | null>(null);
+  // Organization soft-deleted within the 30-day grace window (403 at login)
+  const [pendingDeletion, setPendingDeletion] = useState<OrganizationPendingDeletion | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
+
+  /** Returns true if the error was an org-pending-deletion 403 and has been handled. */
+  function handlePendingDeletion(err: unknown): boolean {
+    const pending = getPendingDeletion(err);
+    if (!pending) return false;
+    setPendingDeletion(pending);
+    setRestoreError("");
+    setError("");
+    return true;
+  }
+
+  async function handleRestore() {
+    if (!pendingDeletion?.restoreToken) return;
+    setRestoring(true);
+    setRestoreError("");
+    try {
+      await restoreOrganization(pendingDeletion.restoreToken);
+      addToast("Restored — please sign in again", "success");
+      setPendingDeletion(null);
+    } catch (err: any) {
+      if (err instanceof ApiRequestError && err.status === 410) {
+        setRestoreError("The deletion window has passed. This organization can no longer be restored.");
+      } else if (err instanceof ApiRequestError && err.status === 401) {
+        setRestoreError("The restore link has expired. Please sign in again to get a new one.");
+      } else {
+        setRestoreError(err?.body?.message || err?.message || "Could not restore the organization.");
+      }
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   // Email + password login (with new-device OTP challenge)
   async function handleEmailLogin(e: React.FormEvent) {
@@ -57,6 +103,7 @@ export default function LoginPage() {
       refreshUser();
       router.push("/dashboard");
     } catch (err: any) {
+      if (handlePendingDeletion(err)) return;
       setError(err.message || "Login failed");
     } finally {
       setLoading(false);
@@ -90,6 +137,7 @@ export default function LoginPage() {
       refreshUser();
       router.push("/dashboard");
     } catch (err: any) {
+      if (handlePendingDeletion(err)) return;
       setError(err.message || "OTP verification failed");
     } finally {
       setLoading(false);
@@ -106,6 +154,7 @@ export default function LoginPage() {
       refreshUser();
       router.push("/dashboard");
     } catch (err: any) {
+      if (handlePendingDeletion(err)) return;
       setError(err.message || "OTP verification failed");
     } finally {
       setLoading(false);
@@ -131,7 +180,47 @@ export default function LoginPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {socialSignup ? (
+          {pendingDeletion ? (
+            <div className="space-y-4" role="alert">
+              <div className="rounded-md border border-destructive/50 bg-destructive/5 p-4 space-y-2">
+                <p className="text-sm font-semibold text-destructive">Organization scheduled for deletion</p>
+                <p className="text-sm">
+                  <span className="font-semibold">{pendingDeletion.organizationName}</span> is scheduled for permanent deletion on{" "}
+                  <span className="font-medium">
+                    {pendingDeletion.purgeAfter
+                      ? new Date(pendingDeletion.purgeAfter).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
+                      : "an upcoming date"}
+                  </span>
+                  .
+                </p>
+                {pendingDeletion.canRestore ? (
+                  <p className="text-sm text-muted-foreground">
+                    As an owner you can cancel the deletion and restore the organization and all of its data.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Ask the organization owner to restore it before that date.
+                  </p>
+                )}
+                {restoreError && <p className="text-sm text-destructive">{restoreError}</p>}
+              </div>
+              {pendingDeletion.canRestore && pendingDeletion.restoreToken && (
+                <Button type="button" className="w-full" disabled={restoring} onClick={handleRestore}>
+                  {restoring ? "Restoring..." : "Restore organization"}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                disabled={restoring}
+                onClick={() => { setPendingDeletion(null); setRestoreError(""); }}
+              >
+                Back to sign in
+              </Button>
+            </div>
+          ) : socialSignup ? (
             <SocialSignupForm
               tempToken={socialSignup.tempToken}
               profile={socialSignup.profile}
@@ -270,7 +359,10 @@ export default function LoginPage() {
                   router.refresh();
                 }}
                 onNeedsSignup={(data) => setSocialSignup(data)}
-                onError={(err) => setError(err)}
+                onError={(err, raw) => {
+                  if (handlePendingDeletion(raw)) return;
+                  setError(err);
+                }}
               />
 
               <p className="text-center text-sm text-muted-foreground mt-4">

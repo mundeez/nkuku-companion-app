@@ -9,6 +9,33 @@ import 'api_cache.dart';
 import 'api_service.dart';
 import 'offline_repository.dart';
 
+/// Payload of the 403 `ORGANIZATION_PENDING_DELETION` login response: the
+/// user's organization was soft-deleted and is inside its 30-day grace
+/// window. Owners receive a short-lived [restoreToken].
+class OrganizationPendingDeletion {
+  final String organizationName;
+  final DateTime? purgeAfter;
+  final bool canRestore;
+  final String? restoreToken;
+
+  const OrganizationPendingDeletion({
+    required this.organizationName,
+    required this.purgeAfter,
+    required this.canRestore,
+    this.restoreToken,
+  });
+
+  factory OrganizationPendingDeletion.fromJson(Map json) {
+    final raw = json['purgeAfter'];
+    return OrganizationPendingDeletion(
+      organizationName: json['organizationName']?.toString() ?? 'Your organization',
+      purgeAfter: raw is String ? DateTime.tryParse(raw)?.toLocal() : null,
+      canRestore: json['canRestore'] == true,
+      restoreToken: json['restoreToken']?.toString(),
+    );
+  }
+}
+
 class AuthService {
   static String? _token;
   static Map<String, dynamic>? _user;
@@ -64,6 +91,109 @@ class AuthService {
 
   static String? get lastError => _lastError;
 
+  /// Sentinel value placed in [lastError] when a login attempt was refused
+  /// because the user's organization is soft-deleted (30-day grace window).
+  /// Details are in [pendingDeletion].
+  static const String orgPendingDeletionError = 'ORGANIZATION_PENDING_DELETION';
+
+  static OrganizationPendingDeletion? _pendingDeletion;
+
+  /// Set when the last login attempt returned 403 ORGANIZATION_PENDING_DELETION.
+  static OrganizationPendingDeletion? get pendingDeletion => _pendingDeletion;
+
+  /// If [status]/[data] describe an ORGANIZATION_PENDING_DELETION response,
+  /// record it and return true. Shared by every login variant.
+  static bool _capturePendingDeletion(int status, dynamic data) {
+    if (status == 403 &&
+        data is Map &&
+        data['error'] == orgPendingDeletionError) {
+      _pendingDeletion = OrganizationPendingDeletion.fromJson(data);
+      _lastError = orgPendingDeletionError;
+      return true;
+    }
+    return false;
+  }
+
+  /// Restore a soft-deleted organization using the 15-minute token handed
+  /// out by the login 403. No auth required. Returns true on success;
+  /// on failure [lastError] is a human-readable message.
+  static Future<bool> restoreOrganization(String restoreToken) async {
+    _lastError = null;
+    try {
+      final res = await ApiService.dio.post(
+        '/api/v1/organizations/restore',
+        data: {'restoreToken': restoreToken},
+      );
+      final status = res.statusCode ?? 0;
+      if (status >= 200 && status < 300) {
+        _pendingDeletion = null;
+        return true;
+      }
+      final code = res.data is Map ? res.data['error'] : null;
+      if (status == 410 || code == 'PURGE_WINDOW_PASSED') {
+        _lastError =
+            'The deletion window has passed. This organization can no longer be restored.';
+      } else if (status == 401 || code == 'INVALID_RESTORE_TOKEN') {
+        _lastError =
+            'The restore link has expired. Sign in again to get a new one.';
+      } else {
+        _lastError = _httpError(status, res.data);
+      }
+      return false;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
+  /// Sentinel value placed in [lastError] when account deletion is blocked
+  /// because the user is the sole owner of an active organization. The
+  /// affected org names are in [soleOwnerOrganizations].
+  static const String soleOwnerError = 'SOLE_OWNER';
+
+  static List<String> _soleOwnerOrganizations = const [];
+  static String? _soleOwnerMessage;
+
+  static List<String> get soleOwnerOrganizations => _soleOwnerOrganizations;
+  static String? get soleOwnerMessage => _soleOwnerMessage;
+
+  /// Permanently delete the signed-in user's account
+  /// (`DELETE /api/v1/account/me`). Does NOT clear the local session — the
+  /// caller should run [logout] and navigate to login on success.
+  static Future<bool> deleteAccount() async {
+    _lastError = null;
+    _soleOwnerOrganizations = const [];
+    _soleOwnerMessage = null;
+    try {
+      final res = await ApiService.dio.delete(
+        '/api/v1/account/me',
+        data: {'confirm': 'DELETE'},
+      );
+      final status = res.statusCode ?? 0;
+      if (status >= 200 && status < 300) return true;
+      final data = res.data;
+      if (status == 409 && data is Map && data['error'] == soleOwnerError) {
+        _soleOwnerOrganizations = (data['organizations'] as List? ?? const [])
+            .map((e) => e.toString())
+            .toList();
+        _soleOwnerMessage = data['message']?.toString();
+        _lastError = soleOwnerError;
+        return false;
+      }
+      _lastError = _httpError(status, data);
+      return false;
+    } on DioException catch (e) {
+      _lastError = _dioError(e);
+      return false;
+    } catch (e) {
+      _lastError = 'Unexpected error: $e';
+      return false;
+    }
+  }
+
   /// Persist tokens to secure storage (Keystore/Keychain) and user info
   /// to SharedPreferences (non-sensitive — just email/role for UI).
   static Future<void> _persistSession({
@@ -81,6 +211,7 @@ class AuthService {
 
   static Future<bool> login(String email, String password) async {
     _lastError = null;
+    _pendingDeletion = null;
     try {
       final res = await ApiService.dio.post('/api/v1/auth/login', data: {
         'email': email,
@@ -88,6 +219,7 @@ class AuthService {
       });
       // validateStatus allows <500 through without throwing, so check 4xx here
       if (res.statusCode != null && res.statusCode! >= 400) {
+        if (_capturePendingDeletion(res.statusCode!, res.data)) return false;
         _lastError = _httpError(res.statusCode!, res.data);
         return false;
       }
@@ -147,6 +279,7 @@ class AuthService {
     Map<String, dynamic>? signupData,
   }) async {
     _lastError = null;
+    _pendingDeletion = null;
     try {
       final res = await ApiService.dio.post('/api/v1/auth/verify-otp', data: {
         'phone': phone,
@@ -155,6 +288,7 @@ class AuthService {
         if (signupData != null) 'signupData': signupData,
       });
       if (res.statusCode != null && res.statusCode! >= 400) {
+        if (_capturePendingDeletion(res.statusCode!, res.data)) return false;
         _lastError = _httpError(res.statusCode!, res.data);
         return false;
       }
@@ -179,12 +313,14 @@ class AuthService {
   /// The OTP must have been sent via [sendOtp] first.
   static Future<bool> loginWithOtp(String phone, String otp) async {
     _lastError = null;
+    _pendingDeletion = null;
     try {
       final res = await ApiService.dio.post('/api/v1/auth/login', data: {
         'phone': phone,
         'otp': otp,
       });
       if (res.statusCode != null && res.statusCode! >= 400) {
+        if (_capturePendingDeletion(res.statusCode!, res.data)) return false;
         _lastError = _httpError(res.statusCode!, res.data);
         return false;
       }
@@ -439,6 +575,7 @@ class AuthService {
 
   /// Internal: send the social token to the API and handle the response.
   static Future<bool> _socialLogin(String provider, String token) async {
+    _pendingDeletion = null;
     try {
       final response = await ApiService.dio.post(
         '/api/v1/auth/social/login',
@@ -460,6 +597,9 @@ class AuthService {
         return true;
       } else {
         final data = response.data;
+        if (_capturePendingDeletion(response.statusCode ?? 0, data)) {
+          return false;
+        }
         _lastError = (data is Map && data['message'] != null)
             ? data['message'].toString()
             : 'Social login failed (${response.statusCode})';

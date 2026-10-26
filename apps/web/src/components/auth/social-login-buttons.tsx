@@ -42,8 +42,8 @@ interface SocialLoginButtonsProps {
     tempToken: string;
     profile: { email?: string; name?: string; provider: string };
   }) => void;
-  /** Called on error */
-  onError?: (error: string) => void;
+  /** Called on error. `raw` is the original thrown error (e.g. ApiRequestError) for callers that need the body. */
+  onError?: (error: string, raw?: unknown) => void;
 }
 
 export function SocialLoginButtons({
@@ -95,7 +95,7 @@ export function SocialLoginButtons({
       // Clean up URL
       window.history.replaceState({}, "", window.location.pathname);
     } catch (err: any) {
-      onError?.(err.message);
+      onError?.(err.message, err);
       window.history.replaceState({}, "", window.location.pathname);
     } finally {
       setLoading(null);
@@ -109,7 +109,7 @@ export function SocialLoginButtons({
       const { url } = await getSocialAuthUrl(provider, redirectUri);
       window.location.href = url;
     } catch (err: any) {
-      onError?.(err.message);
+      onError?.(err.message, err);
       setLoading(null);
     }
   }

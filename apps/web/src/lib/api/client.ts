@@ -232,6 +232,32 @@ export function getUser() {
   return getUserFromStorage();
 }
 
+// ── Organization pending deletion (30-day grace) ──
+
+/** Shape of the 403 body login endpoints return when the user's org is soft-deleted. */
+export type OrganizationPendingDeletion = {
+  error: "ORGANIZATION_PENDING_DELETION";
+  organizationName: string;
+  purgeAfter: string | null;
+  canRestore: boolean;
+  restoreToken?: string;
+};
+
+export function getPendingDeletion(err: unknown): OrganizationPendingDeletion | null {
+  if (err instanceof ApiRequestError && err.status === 403 && err.body?.error === "ORGANIZATION_PENDING_DELETION") {
+    return err.body as OrganizationPendingDeletion;
+  }
+  return null;
+}
+
+/** Restore a soft-deleted organization using the 15-minute token handed out at login. No auth. */
+export async function restoreOrganization(restoreToken: string) {
+  return apiFetch<{ restored: boolean; alreadyActive?: boolean }>(
+    "/api/v1/organizations/restore",
+    { method: "POST", body: JSON.stringify({ restoreToken }) },
+  );
+}
+
 // ── Social Auth ──
 
 export type SocialProvider = "google" | "facebook" | "apple" | "microsoft";

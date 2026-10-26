@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import crypto from 'crypto';
-import { authenticate, requireRole } from '../auth/routes.js';
+import { authenticate, requireRole, verifyRestoreToken } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { checkUserLimit } from '../../core/billing/feature-gate.js';
 import { sendInviteEmail } from '../../core/security/email.service.js';
-import { exportOrganization, requestDeletion } from './lifecycle.service.js';
+import { exportOrganization, requestDeletion, cancelDeletion } from './lifecycle.service.js';
 
 const OrgUpdateSchema = z.object({
   name: z.string().min(1).max(150).optional(),
@@ -166,5 +166,29 @@ export async function buildOrganizationModule(app: FastifyInstance) {
     }
     const updated = await requestDeletion(prisma, organizationId);
     return { deleted: true, purgeAfter: updated.purgeAfter };
+  });
+
+  // POST /api/v1/organizations/restore — cancel a pending deletion.
+  // Unauthenticated: the user can't log in while the org is deleted, so the
+  // login response hands owners a 15-minute restore token instead.
+  app.post('/restore', async (request, reply) => {
+    const { restoreToken } = z.object({ restoreToken: z.string() }).parse(request.body);
+    let claims: { userId: string; organizationId: string };
+    try {
+      claims = verifyRestoreToken(restoreToken);
+    } catch {
+      return reply.status(401).send({ error: 'INVALID_RESTORE_TOKEN' });
+    }
+    const membership = await prisma.organizationMember.findFirst({
+      where: { userId: claims.userId, organizationId: claims.organizationId, role: 'owner' },
+      include: { organization: { select: { deletedAt: true, purgeAfter: true } } },
+    });
+    if (!membership) return reply.status(403).send({ error: 'FORBIDDEN' });
+    if (!membership.organization.deletedAt) return { restored: true, alreadyActive: true };
+    if (membership.organization.purgeAfter && membership.organization.purgeAfter < new Date()) {
+      return reply.status(410).send({ error: 'PURGE_WINDOW_PASSED' });
+    }
+    await cancelDeletion(prisma, claims.organizationId);
+    return { restored: true };
   });
 }

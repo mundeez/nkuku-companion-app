@@ -114,10 +114,16 @@ class ApiService {
         // Check for auth failures on "successful" responses (validateStatus allows <500)
         final status = response.statusCode;
         if (status == 401 || status == 403) {
-          log('Auth failure ($status) on ${response.requestOptions.path} — logging out', name: 'ApiService');
-          AuthService.logout().then((_) {
-            onAuthFailure?.call();
-          });
+          // Only treat this as a session failure when a session exists.
+          // Pre-login calls (login 401 bad credentials, login 403
+          // ORGANIZATION_PENDING_DELETION, restore 401/410) must not
+          // kick off logout + navigation — the caller handles them.
+          if (AuthService.isLoggedIn) {
+            log('Auth failure ($status) on ${response.requestOptions.path} — logging out', name: 'ApiService');
+            AuthService.logout().then((_) {
+              onAuthFailure?.call();
+            });
+          }
         } else if (status == 402) {
           log('Plan limit reached on ${response.requestOptions.path}', name: 'ApiService');
           onPlanLimitReached
@@ -128,10 +134,12 @@ class ApiService {
       onError: (error, handler) {
         final status = error.response?.statusCode;
         if (status == 401 || status == 403) {
-          log('Auth failure ($status) — logging out', name: 'ApiService');
-          AuthService.logout().then((_) {
-            onAuthFailure?.call();
-          });
+          if (AuthService.isLoggedIn) {
+            log('Auth failure ($status) — logging out', name: 'ApiService');
+            AuthService.logout().then((_) {
+              onAuthFailure?.call();
+            });
+          }
         } else if (status == 402) {
           // Reached only when a call site overrides validateStatus — the
           // default path surfaces 402 via onResponse above.

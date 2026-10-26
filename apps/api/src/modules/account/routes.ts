@@ -19,6 +19,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import {
   createAndSendOtp,
@@ -422,5 +423,68 @@ export async function buildAccountModule(app: FastifyInstance) {
 
     await prisma.socialAccount.delete({ where: { id: account.id } });
     return { success: true, message: `${provider} account unlinked` };
+  });
+
+  // ── DELETE /me — delete my account (App Store 5.1.1(v) / DPA erasure) ──
+  // Removes memberships, OTPs, devices and social links; anonymizes the user
+  // row (kept so created-by references stay valid) and deactivates it.
+  // Sole owners of an active org must delete or hand over the org first.
+  app.delete('/me', { preHandler: [authenticate] }, async (request, reply) => {
+    const userId = (request as any).authUser.userId;
+    const { confirm } = z.object({ confirm: z.literal('DELETE') }).parse(request.body ?? {});
+    void confirm;
+
+    const ownerships = await prisma.organizationMember.findMany({
+      where: { userId, role: 'owner', organization: { deletedAt: null } },
+      include: { organization: { select: { id: true, name: true } } },
+    });
+    const blocking: string[] = [];
+    for (const m of ownerships) {
+      const otherOwners = await prisma.organizationMember.count({
+        where: { organizationId: m.organizationId, role: 'owner', NOT: { userId } },
+      });
+      if (otherOwners === 0) blocking.push(m.organization.name);
+    }
+    if (blocking.length) {
+      return reply.status(409).send({
+        error: 'SOLE_OWNER',
+        organizations: blocking,
+        message: 'You are the only owner of these organizations. Delete them or make another member an owner first.',
+      });
+    }
+
+    await prisma.$transaction([
+      prisma.organizationMember.deleteMany({ where: { userId } }),
+      prisma.otpCode.deleteMany({ where: { userId } }),
+      prisma.userDevice.deleteMany({ where: { userId } }),
+      prisma.socialAccount.deleteMany({ where: { userId } }),
+      prisma.invite.deleteMany({ where: { invitedBy: userId, acceptedAt: null } }),
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          email: `deleted-${userId}@deleted.invalid`,
+          phone: null,
+          name: 'Deleted user',
+          passwordHash: crypto.randomBytes(32).toString('hex'),
+          isActive: false,
+          phoneVerifiedAt: null,
+          emailVerifiedAt: null,
+        },
+      }),
+    ]);
+
+    // Revoke refresh tokens so no session survives.
+    if (redis) {
+      let cursor = '0';
+      do {
+        const [next, keys] = await redis.scan(cursor, 'MATCH', `refresh:${userId}:*`, 'COUNT', 100);
+        cursor = next;
+        if (keys.length) await redis.del(...keys);
+      } while (cursor !== '0');
+    }
+
+    reply.clearCookie('nkuku_access_token', { path: '/' });
+    reply.clearCookie('nkuku_refresh_token', { path: '/' });
+    return { deleted: true };
   });
 }

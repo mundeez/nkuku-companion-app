@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { useTheme } from "@/components/theme-provider";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, ApiRequestError } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign, CreditCard, Download, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign, CreditCard, Download, Trash2, UserX } from "lucide-react";
 import { AccountSettings } from "@/components/auth/account-settings";
 
 export default function SettingsPage() {
@@ -22,6 +23,13 @@ export default function SettingsPage() {
   const [confirmName, setConfirmName] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  // Delete-my-account flow (all roles)
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deleteAccountAck, setDeleteAccountAck] = useState(false);
+  const [deleteAccountConfirm, setDeleteAccountConfirm] = useState("");
+  const [deleteAccountError, setDeleteAccountError] = useState("");
+  const [deleteAccountSoleOwnerOrgs, setDeleteAccountSoleOwnerOrgs] = useState<string[]>([]);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -61,6 +69,38 @@ export default function SettingsPage() {
       setDeleteError(err.message === "CONFIRMATION_MISMATCH" ? "Organization name does not match." : err.message);
       setDeleting(false);
     }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteAccountError("");
+    setDeleteAccountSoleOwnerOrgs([]);
+    setDeletingAccount(true);
+    try {
+      await apiFetch("/api/v1/account/me", {
+        method: "DELETE",
+        body: JSON.stringify({ confirm: "DELETE" }),
+      });
+      await logout();
+      router.push("/login");
+    } catch (err: any) {
+      if (err instanceof ApiRequestError && err.status === 409 && err.body?.error === "SOLE_OWNER") {
+        setDeleteAccountSoleOwnerOrgs(Array.isArray(err.body.organizations) ? err.body.organizations : []);
+        setDeleteAccountError(
+          err.body.message || "You are the only owner of an organization. Delete it or make another member an owner first.",
+        );
+      } else {
+        setDeleteAccountError(err?.body?.message || err?.message || "Could not delete your account. Please try again.");
+      }
+      setDeletingAccount(false);
+    }
+  };
+
+  const resetDeleteAccount = () => {
+    setShowDeleteAccount(false);
+    setDeleteAccountAck(false);
+    setDeleteAccountConfirm("");
+    setDeleteAccountError("");
+    setDeleteAccountSoleOwnerOrgs([]);
   };
 
   return (
@@ -218,11 +258,12 @@ export default function SettingsPage() {
         </Card>
       </div>
 
-      {/* Data & Privacy — owner only */}
-      {user.role === "owner" && (
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">Data &amp; Privacy</h2>
-          <div className="grid gap-6 max-w-2xl">
+      {/* Data & Privacy — export + delete-org are owner only; delete-account is for everyone */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-4">Data &amp; Privacy</h2>
+        <div className="grid gap-6 max-w-2xl">
+          {user.role === "owner" && (
+            <>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -274,9 +315,81 @@ export default function SettingsPage() {
                 </Button>
               </CardContent>
             </Card>
-          </div>
+            </>
+          )}
+
+          <Card className="border-destructive/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base text-destructive">
+                <UserX className="h-5 w-5" />
+                Delete my account
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-3">
+                Permanently delete your account <span className="font-medium">{user.email}</span>. You will be removed from your organization and will no longer be able to sign in. This cannot be undone.
+              </p>
+              {!showDeleteAccount ? (
+                <Button variant="destructive" size="sm" onClick={() => setShowDeleteAccount(true)}>
+                  <UserX className="h-4 w-4 mr-1" /> Delete my account
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={deleteAccountAck}
+                      onCheckedChange={setDeleteAccountAck}
+                      aria-label="I understand this is permanent"
+                    />
+                    I understand this is permanent
+                  </label>
+                  <p className="text-sm text-muted-foreground">
+                    Type <span className="font-mono font-medium">DELETE</span> to confirm:
+                  </p>
+                  <input
+                    type="text"
+                    value={deleteAccountConfirm}
+                    onChange={(e) => setDeleteAccountConfirm(e.target.value)}
+                    placeholder="DELETE"
+                    autoComplete="off"
+                    className="w-full max-w-sm px-3 py-2 rounded-md border border-input bg-background text-sm"
+                  />
+                  {deleteAccountError && (
+                    <div className="text-sm text-destructive space-y-1">
+                      <p>{deleteAccountError}</p>
+                      {deleteAccountSoleOwnerOrgs.length > 0 && (
+                        <>
+                          <ul className="list-disc list-inside">
+                            {deleteAccountSoleOwnerOrgs.map((name) => (
+                              <li key={name} className="font-medium">{name}</li>
+                            ))}
+                          </ul>
+                          <p className="text-muted-foreground">
+                            Delete the organization above first, or make another member an owner.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={!deleteAccountAck || deleteAccountConfirm !== "DELETE" || deletingAccount}
+                      onClick={handleDeleteAccount}
+                    >
+                      {deletingAccount ? "Deleting…" : "Permanently delete my account"}
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={deletingAccount} onClick={resetDeleteAccount}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -181,6 +181,36 @@ async function getPrimaryOrganizationId(prisma: any, userId: string): Promise<st
   return membership?.organizationId ?? null;
 }
 
+// Called when a user has no active organization. If their org is merely
+// pending deletion (30-day grace), tell the client so it can offer a restore
+// (owners get a short-lived restore token for POST /organizations/restore).
+async function noOrganizationResponse(prisma: any, reply: any, userId: string) {
+  const pending = await prisma.organizationMember.findFirst({
+    where: { userId, organization: { deletedAt: { not: null } } },
+    include: { organization: { select: { id: true, name: true, purgeAfter: true } } },
+    orderBy: { joinedAt: 'asc' },
+  });
+  if (!pending) return reply.status(403).send({ error: 'NO_ORGANIZATION' });
+  const canRestore = pending.role === 'owner';
+  return reply.status(403).send({
+    error: 'ORGANIZATION_PENDING_DELETION',
+    organizationName: pending.organization.name,
+    purgeAfter: pending.organization.purgeAfter,
+    canRestore,
+    restoreToken: canRestore
+      ? jwt.sign({ userId, organizationId: pending.organization.id, purpose: 'restore' }, SECRET, { expiresIn: '15m' })
+      : undefined,
+  });
+}
+
+export function verifyRestoreToken(token: string): { userId: string; organizationId: string } {
+  const decoded = jwt.verify(token, SECRET) as any;
+  if (decoded?.purpose !== 'restore' || !decoded.userId || !decoded.organizationId) {
+    throw Object.assign(new Error('INVALID_RESTORE_TOKEN'), { statusCode: 401 });
+  }
+  return { userId: decoded.userId, organizationId: decoded.organizationId };
+}
+
 /**
  * Generate a device fingerprint from the request.
  * Web: hash of user-agent + IP (first 8 chars of SHA-256).
@@ -412,7 +442,7 @@ export async function buildAuthModule(app: FastifyInstance) {
 
       const organizationId = await getPrimaryOrganizationId(prisma, user.id);
       if (!organizationId) {
-        return reply.status(403).send({ error: 'NO_ORGANIZATION' });
+        return noOrganizationResponse(prisma, reply, user.id);
       }
 
       // Register/refresh the device
@@ -674,7 +704,7 @@ export async function buildAuthModule(app: FastifyInstance) {
 
       const organizationId = await getPrimaryOrganizationId(prisma, user.id);
       if (!organizationId) {
-        return reply.status(403).send({ error: 'NO_ORGANIZATION' });
+        return noOrganizationResponse(prisma, reply, user.id);
       }
 
       // Register/refresh device
@@ -720,7 +750,7 @@ export async function buildAuthModule(app: FastifyInstance) {
 
       const organizationId = await getPrimaryOrganizationId(prisma, user.id);
       if (!organizationId) {
-        return reply.status(403).send({ error: 'NO_ORGANIZATION' });
+        return noOrganizationResponse(prisma, reply, user.id);
       }
 
       // Check device — if unrecognized and user has a verified phone,
@@ -798,7 +828,7 @@ export async function buildAuthModule(app: FastifyInstance) {
       }
       const organizationId = await getPrimaryOrganizationId(prisma, user.id);
       if (!organizationId) {
-        return reply.status(403).send({ error: 'NO_ORGANIZATION' });
+        return noOrganizationResponse(prisma, reply, user.id);
       }
       const payload: TokenPayload = { userId: user.id, email: user.email, phone: user.phone, role: user.role, organizationId };
       const newAccessToken = jwt.sign(payload, SECRET, { expiresIn: JWT_EXPIRES_IN as any });
@@ -1407,7 +1437,10 @@ export async function authenticate(request: any, reply: any) {
       }
       // Deleted/deactivated organizations reject immediately — otherwise
       // members' short-lived access tokens keep working until expiry.
-      if (payload.organizationId) {
+      // Exception: deleting one's own account must stay reachable so a sole
+      // owner can erase their personal data right after deleting the org.
+      const isAccountDelete = request.method === 'DELETE' && request.routeOptions?.url === '/api/v1/account/me';
+      if (payload.organizationId && !isAccountDelete) {
         const org = await prisma.organization.findUnique({
           where: { id: payload.organizationId },
           select: { isActive: true, deletedAt: true },

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../services/auth_service.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/social_login_buttons.dart';
@@ -28,6 +29,51 @@ class _LoginScreenState extends State<LoginScreen> {
   _OtpStep _otpStep = _OtpStep.enterPhone;
   // For new-device verification triggered by email login
   bool _isNewDeviceFlow = false;
+  // Set when login was refused because the org is soft-deleted (30-day grace)
+  OrganizationPendingDeletion? _pendingDeletion;
+  bool _restoring = false;
+  String? _restoreError;
+
+  /// If the last AuthService call failed with ORGANIZATION_PENDING_DELETION,
+  /// switch to the pending-deletion panel and return true.
+  bool _handlePendingDeletion(String? err) {
+    if (err != AuthService.orgPendingDeletionError) return false;
+    final pending = AuthService.pendingDeletion;
+    if (pending == null) return false;
+    setState(() {
+      _pendingDeletion = pending;
+      _restoreError = null;
+      _error = null;
+      _info = null;
+    });
+    return true;
+  }
+
+  Future<void> _restoreOrganization() async {
+    final token = _pendingDeletion?.restoreToken;
+    if (token == null) return;
+    setState(() {
+      _restoring = true;
+      _restoreError = null;
+    });
+    final ok = await AuthService.restoreOrganization(token);
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        _restoring = false;
+        _pendingDeletion = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Restored — sign in again')),
+      );
+    } else {
+      setState(() {
+        _restoring = false;
+        _restoreError =
+            AuthService.lastError ?? 'Could not restore the organization.';
+      });
+    }
+  }
 
   Future<void> _emailLogin() async {
     setState(() {
@@ -48,6 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } else if (mounted) {
       final err = AuthService.lastError ?? 'Invalid credentials';
+      if (_handlePendingDeletion(err)) return;
       // Check for new-device verification challenge
       if (err.startsWith('NEW_DEVICE_VERIFICATION_REQUIRED:')) {
         final parts = err.split(':');
@@ -106,6 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const BottomNavShell()),
       );
     } else {
+      if (_handlePendingDeletion(AuthService.lastError)) return;
       setState(() {
         _error = AuthService.lastError ?? 'OTP verification failed';
       });
@@ -130,10 +178,109 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const BottomNavShell()),
       );
     } else {
+      if (_handlePendingDeletion(AuthService.lastError)) return;
       setState(() {
         _error = AuthService.lastError ?? 'OTP verification failed';
       });
     }
+  }
+
+  /// Panel shown instead of the login form when the user's organization is
+  /// scheduled for deletion. Owners get a Restore button.
+  Widget _buildPendingDeletionPanel(BuildContext context) {
+    final pending = _pendingDeletion!;
+    final theme = Theme.of(context);
+    final dateLabel = pending.purgeAfter != null
+        ? DateFormat.yMMMMd().format(pending.purgeAfter!)
+        : 'an upcoming date';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.errorContainer.withValues(alpha: 0.3),
+            border: Border.all(color: theme.colorScheme.error),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      color: theme.colorScheme.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Organization scheduled for deletion',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: pending.organizationName,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const TextSpan(
+                        text: ' is scheduled for permanent deletion on '),
+                    TextSpan(
+                      text: dateLabel,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const TextSpan(text: '.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                pending.canRestore
+                    ? 'As an owner you can cancel the deletion and restore the organization and all of its data.'
+                    : 'Ask the organization owner to restore it before that date.',
+                style: const TextStyle(color: Colors.grey),
+              ),
+              if (_restoreError != null) ...[
+                const SizedBox(height: 8),
+                Text(_restoreError!,
+                    style: TextStyle(color: theme.colorScheme.error)),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (pending.canRestore && pending.restoreToken != null)
+          FilledButton.icon(
+            onPressed: _restoring ? null : _restoreOrganization,
+            icon: _restoring
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.restore),
+            label: Text(_restoring ? 'Restoring…' : 'Restore organization'),
+          ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: _restoring
+              ? null
+              : () => setState(() {
+                    _pendingDeletion = null;
+                    _restoreError = null;
+                  }),
+          child: const Text('Back to sign in'),
+        ),
+      ],
+    );
   }
 
   @override
@@ -163,6 +310,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 32),
 
+                // Organization pending deletion — replaces the login form
+                if (_pendingDeletion != null)
+                  _buildPendingDeletionPanel(context)
+                else ...[
                 // Mode toggle (only show if not in new-device flow)
                 if (!_isNewDeviceFlow) ...[
                   ToggleButtons(
@@ -338,6 +489,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       }
                     },
                     onError: (err) {
+                      if (_handlePendingDeletion(err)) return;
                       setState(() => _error = err);
                     },
                   ),
@@ -351,6 +503,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: const Text('Don\'t have an account? Create one'),
                   ),
                 ],
+                ], // end: login form (shown when no pending deletion)
               ],
             ),
           ),

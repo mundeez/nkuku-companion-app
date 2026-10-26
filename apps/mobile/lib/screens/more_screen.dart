@@ -111,6 +111,15 @@ class _MoreScreenState extends State<MoreScreen> {
               MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
             ),
           ),
+          ListTile(
+            leading: Icon(Icons.person_remove_outlined,
+                color: theme.colorScheme.error),
+            title: Text('Delete my account',
+                style: TextStyle(color: theme.colorScheme.error)),
+            subtitle: const Text('Permanently remove your account'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _confirmDeleteAccount,
+          ),
           const Divider(),
 
           // Plan section — current subscription, usage vs limits, and
@@ -392,6 +401,98 @@ class _MoreScreenState extends State<MoreScreen> {
     }
   }
 
+  /// Delete-my-account flow: explain permanence, require typing DELETE,
+  /// call the API, then sign out and return to login. Available to all
+  /// roles; sole owners of an active org are blocked with a 409 and told
+  /// to delete/hand over the org first.
+  Future<void> _confirmDeleteAccount() async {
+    // Uses the State's own `context` so every post-await use is guarded by
+    // the matching `mounted` check (use_build_context_synchronously).
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => const _DeleteAccountDialog(),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Progress indicator while the request is in flight.
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    final ok = await AuthService.deleteAccount();
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // close progress
+
+    if (ok) {
+      await AuthService.logout();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your account has been deleted')),
+      );
+      return;
+    }
+
+    if (AuthService.lastError == AuthService.soleOwnerError) {
+      final orgs = AuthService.soleOwnerOrganizations;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cannot delete account yet'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(AuthService.soleOwnerMessage ??
+                  'You are the only owner of these organizations. Delete them or make another member an owner first.'),
+              if (orgs.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                for (final name in orgs)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.business, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 12),
+              const Text(
+                'Delete the organization first (Settings → Data & Privacy on the web), or make another member an owner.',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AuthService.lastError ??
+            'Could not delete your account. Please try again.'),
+      ),
+    );
+  }
+
   /// Display label for a plan limit — the API uses -1 for "unlimited".
   static String _limitLabel(int max) => max < 0 ? '∞' : '$max';
 
@@ -404,5 +505,83 @@ class _MoreScreenState extends State<MoreScreen> {
       case AppThemeMode.system:
         return 'System';
     }
+  }
+}
+
+/// Confirmation dialog for account deletion. The destructive button is
+/// disabled until the user types DELETE exactly.
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _controller = TextEditingController();
+  bool _canDelete = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      final ok = _controller.text.trim() == 'DELETE';
+      if (ok != _canDelete) setState(() => _canDelete = ok);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('Delete my account?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'This permanently deletes your account '
+            '(${AuthService.user?['email'] ?? 'this user'}). You will be '
+            'removed from your organization and will no longer be able to '
+            'sign in. This cannot be undone.',
+          ),
+          const SizedBox(height: 16),
+          const Text('Type DELETE to confirm:'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              hintText: 'DELETE',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: theme.colorScheme.error,
+            foregroundColor: theme.colorScheme.onError,
+          ),
+          onPressed: _canDelete ? () => Navigator.pop(context, true) : null,
+          child: const Text('Delete account'),
+        ),
+      ],
+    );
   }
 }
