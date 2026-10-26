@@ -299,8 +299,9 @@ cron.schedule('0 1 * * *', async () => {
 import { purgeExpiredOrganizations } from './modules/organizations/lifecycle.service.js';
 cron.schedule('30 1 * * *', async () => {
   try {
-    const { purged } = await purgeExpiredOrganizations(prisma);
+    const { purged, failed } = await purgeExpiredOrganizations(prisma);
     if (purged.length) app.log.info(`[PurgeCron] Purged organizations: ${purged.join(', ')}`);
+    for (const f of failed) app.log.error(`[PurgeCron] Failed to purge "${f.name}": ${f.error}`);
   } catch (err: any) {
     app.log.error('[PurgeCron] Failed:', err.message);
   }

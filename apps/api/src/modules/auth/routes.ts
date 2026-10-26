@@ -172,8 +172,10 @@ function clearAuthCookies(reply: any) {
 // membership (switching between organizations) is a Phase 2 concern; for
 // now every user belongs to exactly one organization.
 async function getPrimaryOrganizationId(prisma: any, userId: string): Promise<string | null> {
+  // Skip deleted/deactivated orgs — otherwise a member of a soft-deleted org
+  // logs in successfully and then every request 401s (ORGANIZATION_INACTIVE).
   const membership = await prisma.organizationMember.findFirst({
-    where: { userId },
+    where: { userId, organization: { isActive: true, deletedAt: null } },
     orderBy: { joinedAt: 'asc' },
   });
   return membership?.organizationId ?? null;

@@ -400,7 +400,7 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
     where: {
       status: 'trialing',
       trialEndsAt: { lt: now },
-      organization: { isDemo: false },
+      organization: { isDemo: false, deletedAt: null },
     },
   });
   for (const sub of expiredTrials) {
@@ -416,7 +416,7 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
     where: {
       status: 'past_due',
       updatedAt: { lt: addDays(now, -GRACE_PERIOD_DAYS) },
-      organization: { isDemo: false },
+      organization: { isDemo: false, deletedAt: null },
     },
   });
   for (const sub of pastDue) {
@@ -443,7 +443,7 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
       status: 'active',
       planCode: { not: 'free' },
       currentPeriodEnd: { lt: now },
-      organization: { isDemo: false },
+      organization: { isDemo: false, deletedAt: null },
     },
   });
   for (const sub of activeSubs) {
@@ -525,7 +525,7 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
   // 4. Dunning — remind on open invoices at T-7, T-1 (before due) and
   // T+1, T+5 (past due). remindersSent is a bitmask so each sends once.
   const openInvoices = await prisma.invoice.findMany({
-    where: { status: 'open' },
+    where: { status: 'open', organization: { isDemo: false, deletedAt: null } },
   });
   const DAY = 86_400_000;
   for (const inv of openInvoices) {

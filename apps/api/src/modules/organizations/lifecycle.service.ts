@@ -7,6 +7,7 @@
 import { gzipSync } from 'node:zlib';
 import type { PrismaClient } from '@prisma/client';
 import { deleteObject } from '../../core/storage/storage.service.js';
+import { sendOrganizationDeletionEmail } from '../../core/security/email.service.js';
 
 const PURGE_DELAY_DAYS = 30;
 
@@ -54,6 +55,8 @@ export async function exportOrganization(prisma: PrismaClient, organizationId: s
   for (const model of ORG_MODELS) {
     tables[model] = await (prisma as any)[model].findMany({ where: { organizationId } });
   }
+  // Invite tokens are live credentials — never include them in an export.
+  tables.invite = (tables.invite as any[]).map(({ token: _t, ...rest }) => rest);
 
   const flocks = tables.broilerFlock as { id: string }[];
   const flockIds = flocks.map((f) => f.id);
@@ -89,21 +92,54 @@ export async function exportOrganization(prisma: PrismaClient, organizationId: s
 
 export async function requestDeletion(prisma: PrismaClient, organizationId: string) {
   const purgeAfter = new Date(Date.now() + PURGE_DELAY_DAYS * 24 * 60 * 60 * 1000);
+  const [org] = await prisma.$transaction([
+    prisma.organization.update({
+      where: { id: organizationId },
+      data: { deletedAt: new Date(), purgeAfter, isActive: false },
+    }),
+    // Stop billing immediately: no further renewals, invoices or dunning.
+    prisma.subscription.updateMany({
+      where: { organizationId, status: { in: ['active', 'trialing', 'past_due', 'suspended'] } },
+      data: { status: 'cancelled' },
+    }),
+    prisma.invoice.updateMany({
+      where: { organizationId, status: 'open' },
+      data: { status: 'void' },
+    }),
+    // Revoke outstanding invites so nobody joins a deleted org.
+    prisma.invite.deleteMany({ where: { organizationId, acceptedAt: null } }),
+  ]);
+
+  const owner = await prisma.organizationMember.findFirst({
+    where: { organizationId, role: 'owner' },
+    include: { user: { select: { email: true, name: true } } },
+    orderBy: { joinedAt: 'asc' },
+  });
+  if (owner?.user.email) {
+    await sendOrganizationDeletionEmail(owner.user.email, org.name, purgeAfter);
+  }
+  return org;
+}
+
+export async function cancelDeletion(prisma: PrismaClient, organizationId: string) {
   return prisma.organization.update({
     where: { id: organizationId },
-    data: { deletedAt: new Date(), purgeAfter, isActive: false },
+    data: { deletedAt: null, purgeAfter: null, isActive: true },
   });
 }
 
 // ── PURGE (daily cron) ────────────────────────────────
 // Journal tables are protected by immutability RULEs — disable the delete
 // rules, remove the rows, re-enable. Requires the DB user to own the tables.
-export async function purgeExpiredOrganizations(prisma: PrismaClient): Promise<{ purged: string[] }> {
+export async function purgeExpiredOrganizations(
+  prisma: PrismaClient,
+): Promise<{ purged: string[]; failed: { name: string; error: string }[] }> {
   const due = await prisma.organization.findMany({
     where: { purgeAfter: { lte: new Date() } },
     select: { id: true, name: true },
   });
   const purged: string[] = [];
+  const failed: { name: string; error: string }[] = [];
 
   for (const org of due) {
     try {
@@ -163,10 +199,10 @@ export async function purgeExpiredOrganizations(prisma: PrismaClient): Promise<{
       await prisma.organization.delete({ where: { id: org.id } });
       purged.push(org.name);
     } catch (err) {
-      // Leave the org queued — next run retries. Surface loudly via throw
-      // so the caller's error logging captures which org failed.
-      throw Object.assign(new Error(`PURGE_FAILED:${org.name}:${(err as Error).message}`), { cause: err });
-      }
+      // Leave this org queued (retried next run) and keep going — one bad
+      // tenant must not block the others.
+      failed.push({ name: org.name, error: (err as Error).message });
+    }
   }
-  return { purged };
+  return { purged, failed };
 }

@@ -172,6 +172,33 @@ export async function sendInviteEmail(
  * Send a dunning/billing reminder email for an open invoice.
  * kind: 'upcoming' (T-7) | 'due_tomorrow' (T-1) | 'overdue' (T+1) | 'final' (T+5)
  */
+export async function sendOrganizationDeletionEmail(
+  to: string,
+  orgName: string,
+  purgeAfter: Date,
+): Promise<SendEmailResult> {
+  const purgeStr = purgeAfter.toISOString().slice(0, 10);
+  const subject = `${orgName} is scheduled for deletion — Nkuku Companion`;
+  const html = `
+    <p>You (or another owner) requested deletion of the organization <strong>${orgName}</strong>.</p>
+    <p>The organization has been deactivated and all its data will be <strong>permanently erased on ${purgeStr}</strong>.</p>
+    <p>If this was a mistake, reply to this email before that date and we can restore it. After ${purgeStr} the data cannot be recovered.</p>
+    <p>— Nkuku Companion Team</p>`;
+
+  if (EMAIL_DISABLED || !SMTP_HOST) {
+    console.log(`[EMAIL DISABLED] To: ${to} | Subject: ${subject}`);
+    return { success: true, message: 'Email logged (EMAIL_DISABLED=true)' };
+  }
+  try {
+    const t = getTransporter();
+    await t.sendMail({ from: SMTP_FROM, to, subject, html });
+    return { success: true, message: 'Deletion notice sent' };
+  } catch (err: any) {
+    console.error('Deletion notice send failed:', err.message);
+    return { success: false, message: `Email send failed: ${err.message}` };
+  }
+}
+
 export async function sendBillingReminderEmail(
   to: string,
   params: {
