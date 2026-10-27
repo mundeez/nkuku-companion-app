@@ -32,11 +32,16 @@ async function seed() {
     update: {},
     create: { organizationId: ORG_ID, userId: USER_ID, role: 'owner' },
   });
-  const breed = await prisma.breed.findFirst();
+  // Unit tests may run before `prisma db seed` (CI) — ensure a breed exists.
+  const breed = await prisma.breed.upsert({
+    where: { name: 'Lifecycle Test Breed' },
+    update: {},
+    create: { name: 'Lifecycle Test Breed', supplier: 'Test' },
+  });
   const flock = await prisma.broilerFlock.create({
     data: {
       organizationId: ORG_ID,
-      breedId: breed!.id,
+      breedId: breed.id,
       name: 'Lifecycle test flock',
       startDate: new Date(),
       initialCount: 100,
@@ -64,6 +69,7 @@ async function cleanup() {
     await prisma.organization.deleteMany({ where: { id } });
   }
   await prisma.user.deleteMany({ where: { id: USER_ID } });
+  await prisma.breed.deleteMany({ where: { name: 'Lifecycle Test Breed' } });
 }
 
 describe('organization lifecycle (export / delete / purge)', () => {
