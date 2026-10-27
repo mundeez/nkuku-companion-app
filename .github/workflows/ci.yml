@@ -29,16 +29,16 @@ jobs:
         ports: ["6379:6379"]
         options: >-
           --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 20
-      minio:
-        # bitnami image starts the server without a command override (GH services can't set one)
-        image: bitnami/minio:2025.4.22
-        ports: ["9000:9000"]
-        env:
-          MINIO_ROOT_USER: ci-minio
-          MINIO_ROOT_PASSWORD: ci-minio-secret
-          MINIO_DEFAULT_BUCKETS: nkuku-documents
     steps:
       - uses: actions/checkout@v4
+      # MinIO runs from a step, not `services:` — the services block can't set
+      # the container CMD and the official image needs `server /data`.
+      - name: Start MinIO (S3 for document tests)
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=ci-minio -e MINIO_ROOT_PASSWORD=ci-minio-secret \
+            minio/minio:RELEASE.2025-04-22T22-40-07Z server /data
+          for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/ready && break || sleep 1; done
       - uses: pnpm/action-setup@v4
         with: { version: 8.15.0 }
       - uses: actions/setup-node@v4
