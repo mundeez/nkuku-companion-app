@@ -21,6 +21,20 @@ describe('Ledger & Trial Balance API', () => {
 
   beforeAll(async () => {
     token = await login();
+    // Make the suite self-sufficient: a fresh seeded DB has no journal
+    // entries, so post one manual entry (cash ← owner's capital).
+    await fetch(`${API_URL}/api/v1/journal`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({
+        entryDate: new Date().toISOString().slice(0, 10),
+        description: 'Ledger API test seed entry',
+        lines: [
+          { accountCode: '1010', debitZmw: 1000 },
+          { accountCode: '3010', creditZmw: 1000 },
+        ],
+      }),
+    });
   });
 
   // ── Accounts Module ──────────────────────────────────
@@ -191,13 +205,13 @@ describe('Ledger & Trial Balance API', () => {
     });
 
     it('filters by sourceType', async () => {
-      const res = await fetch(`${API_URL}/api/v1/journal?sourceType=migration`, {
+      const res = await fetch(`${API_URL}/api/v1/journal?sourceType=manual`, {
         headers: authHeaders(token),
       });
       expect(res.status).toBe(200);
       const entries = await res.json();
       expect(entries.length).toBeGreaterThan(0);
-      expect(entries.every((e: any) => e.sourceType === 'migration')).toBe(true);
+      expect(entries.every((e: any) => e.sourceType === 'manual')).toBe(true);
     });
   });
 
