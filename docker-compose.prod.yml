@@ -150,14 +150,17 @@ services:
       - nkuku_public
     restart: unless-stopped
 
-  # ─── MinIO (self-contained deployments only) ────────────
+  # ─── S3 / MinIO-compatible (self-contained deployments only) ──
   # Prod currently uses the shared pom-minio host (S3_ENDPOINT env). For a
   # standalone/self-contained deploy, start with:
   #   docker compose -f docker-compose.prod.yml --profile self-contained up -d
   # and set S3_ENDPOINT=http://minio:9000 in .env. The bundled postgres in
   # this file covers the DB likewise (DATABASE_URL → postgres:5432).
   minio:
-    image: minio/minio:RELEASE.2025-04-22T22-40-07Z
+    # pgsty/silo = maintained MinIO fork (AGPL, identical S3 API / MINIO_* env /
+    # on-disk format). MinIO removed its own images from Docker Hub + Quay in
+    # Sept 2026, so the upstream image is no longer pullable. Digest-pinned.
+    image: docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
     profiles: ["self-contained"]
     command: ["server", "/data", "--console-address", ":9001"]
     environment:

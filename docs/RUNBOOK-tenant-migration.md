@@ -21,8 +21,14 @@ docker compose exec api npx prisma migrate deploy
 docker compose exec api npx prisma db seed   # breeds, diseases, schedules, plans
 ```
 
-Create the MinIO bucket once (`nkuku-documents`) via the console on
-`127.0.0.1:30090` or `mc mb`.
+The API creates the `nkuku-documents` bucket at boot (`ensureBucket`).
+
+> **MinIO image availability (Sept 2026):** MinIO removed `minio/minio` from
+> Docker Hub and Quay now requires auth. The bundled `minio` service uses
+> `pgsty/silo` (maintained fork, same S3 API/env/on-disk format), digest-pinned.
+> Prod's shared `pom-minio` still runs the cached `minio/minio:RELEASE.2024-11-07`
+> image — **it cannot be re-pulled**. If that host ever loses the image, point
+> the container at the same `pgsty/silo` tag on the existing data volume.
 
 ## Tenant export (per-organization, owner-initiated)
 
