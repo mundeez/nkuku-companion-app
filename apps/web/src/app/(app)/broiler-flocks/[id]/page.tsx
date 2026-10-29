@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
 import { useFlock, useUpdateFlock, useApiQuery, useApiMutation } from "@/lib/api/hooks";
-import { BroilerFlock, GrowthRecord, FeedRecord, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
+import { BroilerFlock, GrowthRecord, FeedRecord, FeedPurchase, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,10 @@ export default function FlockDetailPage() {
   );
   const { data: feedRecords = [], refetch: refetchFeed } = useApiQuery<FeedRecord[]>(
     `/api/v1/feed-records?flockId=${flockId}`,
+    { enabled: !!flockId }
+  );
+  const { data: feedPurchases = [], refetch: refetchFeedPurchases } = useApiQuery<FeedPurchase[]>(
+    `/api/v1/feed-purchases?flockId=${flockId}`,
     { enabled: !!flockId }
   );
   const { data: waterRecords = [], refetch: refetchWater } = useApiQuery<WaterRecord[]>(
@@ -111,6 +115,7 @@ export default function FlockDetailPage() {
     refetchFlock();
     refetchGrowth();
     refetchFeed();
+    refetchFeedPurchases();
     refetchWater();
     refetchMortality();
     refetchVaccination();
@@ -367,7 +372,7 @@ export default function FlockDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="chicks">Chicks</TabsTrigger>
           <TabsTrigger value="feed" className={flock.status === "completed" && user?.role !== "owner" ? "opacity-60" : ""}>
-            Feed ({feedRecords.length})
+            Feed ({feedRecords.length + feedPurchases.length})
             {flock.status === "completed" && <Lock className="h-3 w-3 ml-1 text-muted-foreground" />}
           </TabsTrigger>
           <TabsTrigger value="water" className={flock.status === "completed" && user?.role !== "owner" ? "opacity-60" : ""}>
@@ -682,7 +687,47 @@ export default function FlockDetailPage() {
         </TabsContent>
 
         <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} breedId={flock?.breedId} startDate={flock?.startDate} /></TabsContent>
-        <TabsContent value="feed"><SimpleRecordTab flockId={flockId} records={feedRecords} type="feed" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} suppliers={suppliers} /></TabsContent>
+        <TabsContent value="feed">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" />Feed Purchases ({feedPurchases.length})</CardTitle>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/broiler-flocks/${flockId}/feed`}>Manage purchases &amp; projection</Link>
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {feedPurchases.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No feed purchases recorded yet.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="py-2 pr-4 font-medium">Date</th>
+                        <th className="py-2 pr-4 font-medium">Stage</th>
+                        <th className="py-2 pr-4 font-medium">Supplier</th>
+                        <th className="py-2 pr-4 font-medium text-right">Bags</th>
+                        <th className="py-2 pr-4 font-medium text-right">Total Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feedPurchases.map((p) => (
+                        <tr key={p.id} className="border-b last:border-0">
+                          <td className="py-2 pr-4">{new Date(p.purchaseDate).toLocaleDateString()}</td>
+                          <td className="py-2 pr-4 font-medium">{p.stageName}</td>
+                          <td className="py-2 pr-4 text-muted-foreground">{p.supplier?.name || "-"}</td>
+                          <td className="py-2 pr-4 text-right">{p.bagsPurchased} × {Number(p.bagSizeKg)}kg</td>
+                          <td className="py-2 pr-4 text-right font-medium">ZMW {Number(p.totalCostZmw).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+            </Card>
+            <SimpleRecordTab flockId={flockId} records={feedRecords} type="feed" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} suppliers={suppliers} />
+          </div>
+        </TabsContent>
         <TabsContent value="water"><SimpleRecordTab flockId={flockId} records={waterRecords} type="water" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
         <TabsContent value="mortality"><SimpleRecordTab flockId={flockId} records={mortalityEvents} type="mortality" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
         <TabsContent value="vaccination"><SimpleRecordTab flockId={flockId} records={vaccinationEvents} type="vaccination" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.45.1-alpha] — 2026-10-29
+
+### Fix: mobile feed purchases invisible on web flock Feed tab
+- Mobile's Feed tab tracks **feed purchases** (procurement model), but the web
+  flock detail Feed tab only showed the legacy daily `feed_records` log —
+  entries added on mobile appeared to "not show" on web.
+- Flock detail Feed tab now shows a **Feed Purchases** card (date, stage,
+  supplier, bags, total cost) above the daily Feed Records table, with a
+  "Manage purchases & projection" link to the full Feed page. Tab badge counts
+  records + purchases.
+- `/feed` page: Purchase History no longer hides when the supplier has no
+  feed stages or the projection endpoint fails — it renders whenever
+  purchases exist.
+
 ## [1.45.0-alpha] — 2026-10-29
 
 ### C-2 follow-up: demo data + real marketing screenshots

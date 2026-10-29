@@ -228,19 +228,21 @@ export default function FeedCalculatorPage() {
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
       {/* Feed Projection & Procurement */}
-      {projection && (
+      {(projection || purchases.length > 0) && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
               Feed Projection & Procurement
             </CardTitle>
-            <CardDescription>
-              Bags required per stage (based on {projection.initialCount} initial birds, adjusted for mortality) vs purchased
-            </CardDescription>
+            {projection && (
+              <CardDescription>
+                Bags required per stage (based on {projection.initialCount} initial birds, adjusted for mortality) vs purchased
+              </CardDescription>
+            )}
           </CardHeader>
           <CardContent>
-            {projection.stages.length === 0 ? (
+            {projection && (projection.stages.length === 0 ? (
               <p className="text-muted-foreground">
                 No feed stages configured for this flock&rsquo;s supplier{projection.supplierName ? ` (${projection.supplierName})` : ""}.
                 Assign a supplier with feed stages to see projections.
@@ -298,9 +300,11 @@ export default function FeedCalculatorPage() {
                     </TableRow>
                   </TableBody>
                 </Table>
+              </>
+            ))}
 
-                {/* Existing purchases */}
-                {purchases.length > 0 && (
+            {/* Existing purchases */}
+            {purchases.length > 0 && (
                   <div className="mt-6">
                     <h4 className="text-sm font-semibold mb-2">Purchase History ({purchases.length})</h4>
                     <Table>
@@ -345,8 +349,6 @@ export default function FeedCalculatorPage() {
                       </TableBody>
                     </Table>
                   </div>
-                )}
-              </>
             )}
           </CardContent>
         </Card>
