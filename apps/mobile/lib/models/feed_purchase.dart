@@ -100,6 +100,7 @@ class FeedProjection {
   final int currentCount;
   final String? supplierName;
   final List<FeedProjectionStage> stages;
+  final List<FeedProjectionType> types;
   final FeedProjectionTotals totals;
 
   FeedProjection({
@@ -107,6 +108,7 @@ class FeedProjection {
     required this.currentCount,
     this.supplierName,
     required this.stages,
+    this.types = const [],
     required this.totals,
   });
 
@@ -118,7 +120,92 @@ class FeedProjection {
       stages: (json['stages'] as List? ?? [])
           .map((e) => FeedProjectionStage.fromJson(e))
           .toList(),
+      types: (json['types'] as List? ?? [])
+          .map((e) => FeedProjectionType.fromJson(e))
+          .toList(),
       totals: FeedProjectionTotals.fromJson(json['totals'] ?? {}),
+    );
+  }
+}
+
+/// Grouped projection row: one feed type with per-size columns.
+class FeedProjectionType {
+  final String typeName;
+  final int? dayRangeStart;
+  final int? dayRangeEnd;
+  final double requiredKg;
+  final double purchasedKg;
+  final double remainingKg;
+  final double spentZmw;
+  final double remainingCostZmw;
+  final double coveragePct;
+  final double overPurchasedKg;
+  final String status;
+  final List<FeedProjectionTypeSize> sizes;
+
+  FeedProjectionType({
+    required this.typeName,
+    this.dayRangeStart,
+    this.dayRangeEnd,
+    required this.requiredKg,
+    required this.purchasedKg,
+    required this.remainingKg,
+    required this.spentZmw,
+    required this.remainingCostZmw,
+    required this.coveragePct,
+    required this.overPurchasedKg,
+    required this.status,
+    required this.sizes,
+  });
+
+  factory FeedProjectionType.fromJson(Map<String, dynamic> json) {
+    return FeedProjectionType(
+      typeName: json['typeName'] ?? '',
+      dayRangeStart: json['dayRangeStart'],
+      dayRangeEnd: json['dayRangeEnd'],
+      requiredKg: FeedPurchase._toDouble(json['requiredKg']) ?? 0,
+      purchasedKg: FeedPurchase._toDouble(json['purchasedKg']) ?? 0,
+      remainingKg: FeedPurchase._toDouble(json['remainingKg']) ?? 0,
+      spentZmw: FeedPurchase._toDouble(json['spentZmw']) ?? 0,
+      remainingCostZmw: FeedPurchase._toDouble(json['remainingCostZmw']) ?? 0,
+      coveragePct: FeedPurchase._toDouble(json['coveragePct']) ?? 0,
+      overPurchasedKg: FeedPurchase._toDouble(json['overPurchasedKg']) ?? 0,
+      status: json['status'] ?? 'not_started',
+      sizes: (json['sizes'] as List? ?? [])
+          .map((e) => FeedProjectionTypeSize.fromJson(e))
+          .toList(),
+    );
+  }
+}
+
+class FeedProjectionTypeSize {
+  final String feedStageId;
+  final double unitKg;
+  final int requiredBags;
+  final int purchasedBags;
+  final int remainingBags;
+  final double projectedCostZmw;
+  final double unitPriceZmw;
+
+  FeedProjectionTypeSize({
+    required this.feedStageId,
+    required this.unitKg,
+    required this.requiredBags,
+    required this.purchasedBags,
+    required this.remainingBags,
+    required this.projectedCostZmw,
+    required this.unitPriceZmw,
+  });
+
+  factory FeedProjectionTypeSize.fromJson(Map<String, dynamic> json) {
+    return FeedProjectionTypeSize(
+      feedStageId: json['feedStageId'] ?? '',
+      unitKg: FeedPurchase._toDouble(json['unitKg']) ?? 0,
+      requiredBags: json['requiredBags'] ?? 0,
+      purchasedBags: json['purchasedBags'] ?? 0,
+      remainingBags: json['remainingBags'] ?? 0,
+      projectedCostZmw: FeedPurchase._toDouble(json['projectedCostZmw']) ?? 0,
+      unitPriceZmw: FeedPurchase._toDouble(json['unitPriceZmw']) ?? 0,
     );
   }
 }

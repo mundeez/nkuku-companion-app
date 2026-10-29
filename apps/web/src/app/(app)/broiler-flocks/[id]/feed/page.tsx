@@ -237,7 +237,7 @@ export default function FeedCalculatorPage() {
             )}
           </CardHeader>
           <CardContent>
-            {projection && (projection.types.length === 0 ? (
+            {projection && ((projection.types?.length ?? 0) === 0 ? (
               <p className="text-muted-foreground">
                 No feed stages configured for this flock&rsquo;s supplier{projection.supplierName ? ` (${projection.supplierName})` : ""}.
                 Assign a supplier with feed stages to see projections.
@@ -397,7 +397,7 @@ export default function FeedCalculatorPage() {
               <div>
                 <Label>Bag Size (kg)</Label>
                 {(() => {
-                  const type = projection?.types.find((t) => t.sizes.some((s) => s.feedStageId === purchaseForm.feedStageId));
+                  const type = projection?.types?.find((t) => t.sizes.some((s) => s.feedStageId === purchaseForm.feedStageId));
                   const options = type?.sizes.map((s) => s.unitKg) ?? [];
                   const isOther = options.length > 0 && !options.some((u) => String(u) === purchaseForm.bagSizeKg);
                   if (options.length === 0) {

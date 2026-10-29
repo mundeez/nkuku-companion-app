@@ -695,7 +695,7 @@ export default function FlockDetailPage() {
         <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} breedId={flock?.breedId} startDate={flock?.startDate} /></TabsContent>
         <TabsContent value="feed">
           <div className="space-y-6">
-            {feedProjection && feedProjection.types.length > 0 && (
+            {feedProjection && (feedProjection.types?.length ?? 0) > 0 && (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>

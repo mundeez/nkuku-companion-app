@@ -148,6 +148,89 @@ class _FeedRecordFormState extends State<FeedRecordForm> {
     });
   }
 
+  /// Feed-type key: strips "(25kg)"-style suffixes so size variants of one
+  /// feed type group together — mirrors the API's projection grouping.
+  static String _typeKey(String name) =>
+      name.replaceAll(RegExp(r'\s*\(.*?\)\s*'), '').trim().toLowerCase();
+
+  /// Alternative bag sizes configured for the selected stage's feed type
+  /// (e.g. Starter 50kg + Starter 25kg share one requirement).
+  List<FeedStage> get _siblingStages {
+    if (_selectedFeedStageId == null) return [];
+    final sel = _feedStages.where((s) => s.id == _selectedFeedStageId);
+    if (sel.isEmpty) return [];
+    final key = _typeKey(sel.first.stageName);
+    return _feedStages.where((s) => _typeKey(s.stageName) == key).toList()
+      ..sort((a, b) => b.unitSizeKg.compareTo(a.unitSizeKg));
+  }
+
+  static const _otherSize = '__other__';
+
+  Widget _buildBagSizeField() {
+    final siblings = _siblingStages;
+    if (siblings.isEmpty) {
+      return TextFormField(
+        controller: _bagSizeController,
+        decoration: const InputDecoration(labelText: 'Bag size (kg)'),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: (v) {
+          final n = double.tryParse(v ?? '');
+          if (n == null || n <= 0) return 'Enter a positive value';
+          return null;
+        },
+      );
+    }
+    final current = double.tryParse(_bagSizeController.text);
+    final match = siblings.where((s) => s.unitSizeKg == current);
+    final isOther = match.isEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<String>(
+          value: isOther ? _otherSize : match.first.id,
+          decoration: const InputDecoration(labelText: 'Bag size (kg)'),
+          items: [
+            ...siblings.map((s) => DropdownMenuItem(
+                  value: s.id,
+                  child: Text('${s.unitSizeKg % 1 == 0 ? s.unitSizeKg.toInt() : s.unitSizeKg}kg'),
+                )),
+            const DropdownMenuItem(value: _otherSize, child: Text('Other…')),
+          ],
+          onChanged: (v) {
+            setState(() {
+              if (v == _otherSize) {
+                _bagSizeController.clear();
+              } else {
+                final s = siblings.firstWhere((x) => x.id == v);
+                _bagSizeController.text = s.unitSizeKg.toString();
+                _unitPriceController.text = s.unitPriceZmw.toString();
+              }
+            });
+          },
+          validator: (_) {
+            final n = double.tryParse(_bagSizeController.text);
+            if (n == null || n <= 0) return 'Enter a size';
+            return null;
+          },
+        ),
+        if (isOther)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: TextFormField(
+              controller: _bagSizeController,
+              decoration: const InputDecoration(labelText: 'Custom size (kg)'),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: (v) {
+                final n = double.tryParse(v ?? '');
+                if (n == null || n <= 0) return 'Enter a positive value';
+                return null;
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
   double get _totalCost {
     final bags = int.tryParse(_bagsPurchasedController.text) ?? 0;
     final price = double.tryParse(_unitPriceController.text) ?? 0;
@@ -278,21 +361,7 @@ class _FeedRecordFormState extends State<FeedRecordForm> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _bagSizeController,
-                            decoration: const InputDecoration(
-                                labelText: 'Bag size (kg)'),
-                            keyboardType: const TextInputType
-                                .numberWithOptions(decimal: true),
-                            validator: (v) {
-                              final n = double.tryParse(v ?? '');
-                              if (n == null || n <= 0)
-                                return 'Enter a positive value';
-                              return null;
-                            },
-                          ),
-                        ),
+                        Expanded(child: _buildBagSizeField()),
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextFormField(

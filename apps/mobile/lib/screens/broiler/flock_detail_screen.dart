@@ -953,6 +953,97 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     );
   }
 
+  /// Grouped per-type card row: coverage bar + per-size breakdown + money.
+  Widget _projectionTypeBlock(FeedProjectionType t) {
+    final pct = t.coveragePct.clamp(0, 100) / 100;
+    final over = t.overPurchasedKg > 0;
+    final barColor = over || t.status == 'complete'
+        ? Colors.green
+        : t.status == 'partial'
+            ? Colors.orange
+            : Colors.grey[400];
+    final dayRange = t.dayRangeStart != null
+        ? 'Day ${t.dayRangeStart}${t.dayRangeEnd != null ? '–${t.dayRangeEnd}' : '+'}'
+        : null;
+    String fmt(num v) => v.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(
+                child: Text(t.typeName,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.bold))),
+            if (dayRange != null)
+              Text(dayRange,
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+          ]),
+          const SizedBox(height: 6),
+          // Coverage bar with % inside
+          SizedBox(
+            height: 18,
+            child: Stack(children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 18,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(barColor!),
+                ),
+              ),
+              Center(
+                  child: Text('${t.coveragePct.round()}%',
+                      style: const TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.bold))),
+            ]),
+          ),
+          const SizedBox(height: 6),
+          // Per-size breakdown
+          ...t.sizes.map((s) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 1),
+                child: Row(children: [
+                  SizedBox(
+                      width: 48,
+                      child: Text('${s.unitKg % 1 == 0 ? s.unitKg.toInt() : s.unitKg}kg',
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600))),
+                  Expanded(
+                      child: Text(
+                    'Req ${s.requiredBags} · Bought ${s.purchasedBags} · Left ${s.remainingBags}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[800]),
+                  )),
+                ]),
+              )),
+          const SizedBox(height: 4),
+          Text(
+            'Spent ZMW ${fmt(t.spentZmw)} · To go ZMW ${fmt(t.remainingCostZmw)}',
+            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+          ),
+          if (over)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Text(
+                'over-purchased +${t.overPurchasedKg.toStringAsFixed(0)}kg',
+                style: TextStyle(fontSize: 10, color: Colors.green[800]),
+              ),
+            ),
+          const Divider(height: 16),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFeedTab() {
     final summary = _feedSummary;
     final projection = _feedProjection;
@@ -965,7 +1056,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         padding: const EdgeInsets.all(16),
         children: [
           // ── Feed Projection (required vs purchased) ──
-          if (projection != null && projection.stages.isNotEmpty) ...[
+          if (projection != null &&
+              (projection.types.isNotEmpty || projection.stages.isNotEmpty)) ...[
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -992,11 +1084,17 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                           fontSize: 12, color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 12),
-                    // Header row
-                    _projectionHeader(),
-                    ...projection.stages.map((s) => _projectionStageRow(s)),
-                    const Divider(height: 1),
-                    _projectionTotalRow(projection),
+                    // Grouped per-type view (falls back to stage rows if the
+                    // API hasn't sent types yet)
+                    if (projection.types.isNotEmpty)
+                      ...projection.types
+                          .map((t) => _projectionTypeBlock(t))
+                    else ...[
+                      _projectionHeader(),
+                      ...projection.stages.map((s) => _projectionStageRow(s)),
+                      const Divider(height: 1),
+                      _projectionTotalRow(projection),
+                    ],
                   ],
                 ),
               ),

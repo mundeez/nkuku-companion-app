@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.45.5-alpha] — 2026-10-29
+
+### Mobile: grouped feed projection + web hardening
+- Mobile Feed tab now renders the `types[]` grouped view like web: one card
+  per feed type with a coverage progress bar (%, color by status), per-size
+  "Req / Bought / Left" lines, "Spent · To go" money line, and the
+  over-purchased badge. Falls back to the old stage table if `types` is
+  absent (older API).
+- Mobile feed purchase form: Bag Size becomes a dropdown of the selected
+  stage's sibling sizes (same normalized type) with an "Other…" free entry;
+  picking a size fills its list price.
+- Web defensive guards: `feedProjection.types` is now accessed with optional
+  chaining on the flock Feed tab, /feed page and purchase dialog — a stale
+  cached projection response (pre-`types` field) no longer crashes the tab.
+- Docs index: `/docs` no longer 404s — catch-all made optional (`[[...path]]`)
+  with an index page listing the published markdown docs. Fixes the
+  `/docs?_rsc` prefetch error seen in browser consoles.
+
 ## [1.45.4-alpha] — 2026-10-29
 
 ### Feed projection — grouped per-type table (product decisions applied)
