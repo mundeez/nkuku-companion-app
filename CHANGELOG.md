@@ -11,6 +11,9 @@
 - Mobile feed purchase form: Bag Size becomes a dropdown of the selected
   stage's sibling sizes (same normalized type) with an "Other…" free entry;
   picking a size fills its list price.
+- Web totals row: Status cell now shows the same money format as the type
+  rows — an overall coverage bar (purchasedKg/requiredKg %) with
+  "Spent ZMW x · To go ZMW y" underneath, replacing the "n / m kg secured" text.
 - Web defensive guards: `feedProjection.types` is now accessed with optional
   chaining on the flock Feed tab, /feed page and purchase dialog — a stale
   cached projection response (pre-`types` field) no longer crashes the tab.

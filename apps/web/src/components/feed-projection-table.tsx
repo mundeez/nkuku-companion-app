@@ -141,8 +141,25 @@ export function FeedProjectionTable({
             {sizeUnits.map((u) => (
               <td key={u} className="py-2 px-2 text-right border-l">{totalFor(u, (s) => s.projectedCostZmw).toLocaleString()}</td>
             ))}
-            <td className="py-2 pl-3 text-xs font-normal text-muted-foreground">
-              {projection.totals.purchasedKg.toLocaleString()} / {projection.totals.requiredKg.toLocaleString()} kg secured
+            <td className="py-2 pl-3 pr-1 min-w-[140px]">
+              {(() => {
+                const spent = types.reduce((s, t) => s + t.spentZmw, 0);
+                const toGo = types.reduce((s, t) => s + t.remainingCostZmw, 0);
+                const pct = projection.totals.requiredKg > 0
+                  ? Math.round(Math.min(100, (projection.totals.purchasedKg / projection.totals.requiredKg) * 100))
+                  : 0;
+                return (
+                  <>
+                    <div className="relative h-5 w-full rounded bg-muted overflow-hidden">
+                      <div className={`h-full ${pct >= 100 ? "bg-green-500" : pct > 0 ? "bg-amber-500" : "bg-muted-foreground/20"}`} style={{ width: `${Math.max(pct, 2)}%` }} />
+                      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold">{pct}%</span>
+                    </div>
+                    <div className="mt-1 text-[11px] leading-snug text-muted-foreground font-normal">
+                      Spent {money(spent)} · To go {money(toGo)}
+                    </div>
+                  </>
+                );
+              })()}
             </td>
             {onPurchase && <td />}
           </tr>
