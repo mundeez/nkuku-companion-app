@@ -693,7 +693,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       include: {
         supplier: { include: { feedStages: { orderBy: { sortOrder: 'asc' } } } },
         mortalityEvents: { select: { eventDate: true, count: true, ageDays: true } },
-        feedPurchases: { select: { feedStageId: true, bagsPurchased: true, totalCostZmw: true } },
+        feedPurchases: { select: { feedStageId: true, stageName: true, bagSizeKg: true, bagsPurchased: true, totalCostZmw: true } },
         feedRecords: { select: { feedType: true, quantityKg: true, costZmw: true } },
       },
     });
@@ -715,55 +715,34 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const startDate = flock.startDate ? new Date(flock.startDate) : null;
     const feedStages = flock.supplier.feedStages.filter((fs: any) => fs.stageType === 'feed');
 
-    // Aggregate purchases by feedStageId
-    const purchasesByStage = new Map<string, { bags: number; cost: number }>();
-    for (const p of flock.feedPurchases) {
-      if (!p.feedStageId) continue;
-      const cur = purchasesByStage.get(p.feedStageId) ?? { bags: 0, cost: 0 };
-      cur.bags += p.bagsPurchased;
-      cur.cost += Number(p.totalCostZmw);
-      purchasesByStage.set(p.feedStageId, cur);
-    }
+    // ── Feed-type model ────────────────────────────────────────────────
+    // A feed type (e.g. "Starter") can be sold in alternative bag sizes
+    // ("Starter" 50kg, "Starter (25kg)"). Requirement is computed ONCE in kg
+    // per type, then expressed in each size: buying a 50kg bag reduces the
+    // 25kg remaining by 2, and vice versa — sizes are never summed together.
+    const typeKey = (name: string | null | undefined) =>
+      (name || '').replace(/\s*\(.*?\)\s*/g, '').trim().toLowerCase();
 
-    // Also aggregate existing FeedRecord entries (old feed tracking system)
-    // as purchased bags, matching feedType → stageName and converting kg → bags.
-    const feedRecordBagsByStage = new Map<string, number>();
-    for (const fs of feedStages) {
-      const stageLower = fs.stageName.toLowerCase();
-      const is25kgVariant = stageLower.includes('25');
-      let bagsFromRecords = 0;
-      for (const fr of flock.feedRecords) {
-        const ftLower = (fr.feedType || '').toLowerCase();
-        if (!ftLower) continue;
-        const nameMatches = ftLower === stageLower
-          || stageLower.startsWith(ftLower + ' ')
-          || stageLower.startsWith(ftLower + '(');
-        if (!nameMatches) continue;
-        if (is25kgVariant && !ftLower.includes('25')) continue;
-        if (!is25kgVariant && ftLower.includes('25')) continue;
-        const unitSize = Number(fs.unitSizeKg);
-        if (unitSize > 0) {
-          bagsFromRecords += Math.ceil(Number(fr.quantityKg) / unitSize);
-        }
-      }
-      if (bagsFromRecords > 0) {
-        feedRecordBagsByStage.set(fs.id, bagsFromRecords);
-      }
+    interface TypeBucket {
+      requiredKg: number;
+      birdsAlive: number;
+      stages: any[];
+      purchasedKg: number;
+      purchasedCost: number;
+      bagsByStage: Map<string, number>; // physical bags per stage row (purchase attribution)
     }
-
-    const stages: any[] = [];
-    let totalBagsRequired = 0;
-    let totalBagsPurchased = 0;
-    let totalProjectedCost = 0;
-    let totalPurchasedCost = 0;
+    const typeBuckets = new Map<string, TypeBucket>();
+    const stageById = new Map<string, any>();
+    const stageTypeKey = new Map<string, string>();
 
     for (const fs of feedStages) {
-      // Birds alive at the stage's dayRangeStart = initialCount − mortality on/before that day.
-      // If dayRangeStart is null, use initialCount (no mortality adjustment).
+      stageById.set(fs.id, fs);
+      const key = typeKey(fs.stageName);
+      stageTypeKey.set(fs.id, key);
+
       let birdsAlive = flock.initialCount;
       if (fs.dayRangeStart != null && startDate) {
         const stageStartDay = fs.dayRangeStart;
-        // Mortality events with ageDays <= stageStartDay, or eventDate <= startDate + stageStartDay
         const mortalityBeforeStage = flock.mortalityEvents.reduce((sum: number, m: any) => {
           const mAge = m.ageDays != null
             ? m.ageDays
@@ -774,49 +753,104 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         }, 0);
         birdsAlive = Math.max(0, flock.initialCount - mortalityBeforeStage);
       }
+      const requiredKg = birdsAlive * Number(fs.intakePerBirdKg || 0);
 
-      const { itemsRoundedUp, itemsRaw } = calculateItemsRequired(
-        birdsAlive,
-        fs.intakePerBirdKg,
-        fs.unitSizeKg,
-      );
+      // Alternative bag-size variants of the same type share one requirement.
+      if (!typeBuckets.has(key)) {
+        typeBuckets.set(key, { requiredKg, birdsAlive, stages: [fs], purchasedKg: 0, purchasedCost: 0, bagsByStage: new Map() });
+      } else {
+        typeBuckets.get(key)!.stages.push(fs);
+      }
+    }
 
-      const bagsRequired = itemsRoundedUp ?? 0;
-      const purchased = purchasesByStage.get(fs.id) ?? { bags: 0, cost: 0 };
-      // Combine FeedPurchase bags with FeedRecord-derived bags
-      const bagsPurchased = purchased.bags + (feedRecordBagsByStage.get(fs.id) ?? 0);
-      const bagsRemaining = bagsRequired - bagsPurchased;
-      const projectedCostZmw = bagsRequired > 0
-        ? new Decimal(bagsRequired).mul(fs.unitPriceZmw).toNumber()
-        : 0;
+    // Attribute purchases: kg credited to the feed TYPE (any size counts),
+    // physical bag counts kept per stage row for display. Free-text purchases
+    // (no feedStageId) match by normalized stage name, then by bag size.
+    for (const p of flock.feedPurchases) {
+      let key: string | undefined;
+      if (p.feedStageId) key = stageTypeKey.get(p.feedStageId);
+      if (!key) key = typeKey(p.stageName);
+      const bucket = typeBuckets.get(key);
+      if (!bucket) continue;
 
-      totalBagsRequired += bagsRequired;
-      totalBagsPurchased += bagsPurchased;
-      totalProjectedCost += projectedCostZmw;
-      totalPurchasedCost += purchased.cost;
+      const bagKg = Number(p.bagSizeKg || 0);
+      bucket.purchasedKg += p.bagsPurchased * bagKg;
+      bucket.purchasedCost += Number(p.totalCostZmw);
 
-      let status: 'complete' | 'partial' | 'not_started';
-      if (bagsPurchased >= bagsRequired && bagsRequired > 0) status = 'complete';
-      else if (bagsPurchased > 0) status = 'partial';
-      else status = 'not_started';
+      let row = p.feedStageId ? stageById.get(p.feedStageId) : null;
+      if (!row || typeKey(row.stageName) !== key) {
+        row = bucket.stages.find((s: any) => Number(s.unitSizeKg) === bagKg) ?? null;
+      }
+      if (!row) {
+        row = bucket.stages.reduce((a: any, b: any) => (Number(b.unitSizeKg) > Number(a.unitSizeKg) ? b : a));
+      }
+      bucket.bagsByStage.set(row.id, (bucket.bagsByStage.get(row.id) ?? 0) + p.bagsPurchased);
+    }
 
-      stages.push({
-        feedStageId: fs.id,
-        stageName: fs.stageName,
-        dayRangeStart: fs.dayRangeStart,
-        dayRangeEnd: fs.dayRangeEnd,
-        bagSizeKg: Number(fs.unitSizeKg),
-        intakePerBirdKg: Number(fs.intakePerBirdKg),
-        birdsAliveAtStageStart: birdsAlive,
-        bagsRequired,
-        bagsRaw: itemsRaw,
-        bagsPurchased,
-        bagsRemaining,
-        unitPriceZmw: Number(fs.unitPriceZmw),
-        projectedCostZmw,
-        purchasedCostZmw: purchased.cost,
-        status,
-      });
+    // Legacy FeedRecord kg counts as feed secured (reduces remaining) but is
+    // not procurement — it does not inflate the purchased-bag count.
+    for (const fr of flock.feedRecords) {
+      const bucket = typeBuckets.get(typeKey(fr.feedType));
+      if (bucket) bucket.purchasedKg += Number(fr.quantityKg || 0);
+    }
+
+    const stages: any[] = [];
+    let totalBagsRequired = 0;
+    let totalBagsPurchased = 0;
+    let totalBagsRemaining = 0;
+    let totalProjectedCost = 0;
+    let totalPurchasedCost = 0;
+    let totalRequiredKg = 0;
+    let totalPurchasedKg = 0;
+
+    for (const [key, bucket] of typeBuckets) {
+      const remainingKg = bucket.requiredKg - bucket.purchasedKg;
+      const status: 'complete' | 'partial' | 'not_started' =
+        remainingKg <= 0 && bucket.requiredKg > 0 ? 'complete'
+        : bucket.purchasedKg > 0 ? 'partial'
+        : 'not_started';
+
+      for (const fs of bucket.stages) {
+        const unitKg = Number(fs.unitSizeKg);
+        const bagsRequired = unitKg > 0 ? Math.ceil(bucket.requiredKg / unitKg) : 0;
+        const bagsPurchased = bucket.bagsByStage.get(fs.id) ?? 0;
+        const bagsRemaining = unitKg > 0 ? Math.ceil(remainingKg / unitKg) : 0;
+        const projectedCostZmw = bagsRequired > 0
+          ? new Decimal(bagsRequired).mul(fs.unitPriceZmw).toNumber()
+          : 0;
+
+        stages.push({
+          feedStageId: fs.id,
+          stageName: fs.stageName,
+          dayRangeStart: fs.dayRangeStart,
+          dayRangeEnd: fs.dayRangeEnd,
+          bagSizeKg: unitKg,
+          intakePerBirdKg: Number(fs.intakePerBirdKg),
+          birdsAliveAtStageStart: bucket.birdsAlive,
+          bagsRequired,
+          bagsRaw: unitKg > 0 ? bucket.requiredKg / unitKg : 0,
+          bagsPurchased,
+          bagsRemaining,
+          unitPriceZmw: Number(fs.unitPriceZmw),
+          projectedCostZmw,
+          purchasedCostZmw: 0, // cost reported at type level below
+          status,
+        });
+      }
+
+      // Totals are expressed in each type's primary (largest) bag size so
+      // units stay coherent — 25kg and 50kg bags are never summed together.
+      const primary = bucket.stages.reduce((a: any, b: any) => (Number(b.unitSizeKg) > Number(a.unitSizeKg) ? b : a));
+      const primaryKg = Number(primary.unitSizeKg) || 1;
+      const typePurchasedBags = [...bucket.bagsByStage.values()].reduce((a, b) => a + b, 0);
+
+      totalBagsRequired += Math.ceil(bucket.requiredKg / primaryKg);
+      totalBagsPurchased += typePurchasedBags;
+      totalBagsRemaining += Math.ceil(remainingKg / primaryKg);
+      totalProjectedCost += Math.ceil(bucket.requiredKg / primaryKg) * Number(primary.unitPriceZmw);
+      totalPurchasedCost += bucket.purchasedCost;
+      totalRequiredKg += bucket.requiredKg;
+      totalPurchasedKg += bucket.purchasedKg;
     }
 
     return {
@@ -829,7 +863,10 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       totals: {
         bagsRequired: totalBagsRequired,
         bagsPurchased: totalBagsPurchased,
-        bagsRemaining: totalBagsRequired - totalBagsPurchased,
+        bagsRemaining: totalBagsRemaining,
+        requiredKg: totalRequiredKg,
+        purchasedKg: totalPurchasedKg,
+        remainingKg: totalRequiredKg - totalPurchasedKg,
         projectedCostZmw: totalProjectedCost,
         purchasedCostZmw: totalPurchasedCost,
       },

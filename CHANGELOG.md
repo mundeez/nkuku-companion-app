@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.45.3-alpha] — 2026-10-29
+
+### Fix: feed projection — alternative bag sizes no longer summed
+- `/feed-projection` now computes the requirement **once per feed type in kg**
+  ("Starter", "Starter (25kg)" are one requirement), then expresses
+  Required/Remaining in each bag size. Previously each variant computed its
+  own requirement from the same kg need and totals summed 25kg + 50kg bags
+  into meaningless counts (61 → now 21 in 50kg-equivalents on real data).
+- **Cross-size credit**: buying any bag size credits the type's purchasedKg —
+  3×50kg Starter reduces the 50kg remaining (5→2) *and* the 25kg remaining
+  (9→3). Free-text purchases (no feedStageId) match by normalized stage name.
+- Status is now type-level (same on both size rows); feed_records count as
+  kg secured without inflating the physical purchased-bag count.
+- Totals use each type's primary (largest) bag size for coherent units and
+  add explicit `requiredKg` / `purchasedKg` / `remainingKg`.
+
 ## [1.45.2-alpha] — 2026-10-29
 
 ### Feed tab parity: projection & procurement on web flock detail
