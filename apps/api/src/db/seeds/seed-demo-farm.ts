@@ -37,6 +37,14 @@ async function main() {
   const supplier = await prisma.supplier.create({
     data: { organizationId: orgId, name: 'Lusaka Chick & Feed Supplies', contact: '+260 97 7654321', chickenType: 'broiler' },
   });
+  await prisma.feedStage.createMany({
+    data: [
+      { supplierId: supplier.id, stageName: 'Starter', stageType: 'feed', dayRangeStart: 0, dayRangeEnd: 10, unitSizeKg: 50, unitPriceZmw: 626, intakePerBirdKg: 0.045, sortOrder: 0 },
+      { supplierId: supplier.id, stageName: 'Grower', stageType: 'feed', dayRangeStart: 11, dayRangeEnd: 24, unitSizeKg: 50, unitPriceZmw: 610, intakePerBirdKg: 0.115, sortOrder: 1 },
+      { supplierId: supplier.id, stageName: 'Finisher', stageType: 'feed', dayRangeStart: 25, dayRangeEnd: 42, unitSizeKg: 50, unitPriceZmw: 582, intakePerBirdKg: 0.165, sortOrder: 2 },
+      { supplierId: supplier.id, stageName: 'Day-old Chicks', stageType: 'chick', unitSizeKg: 1, unitPriceZmw: 12, intakePerBirdKg: 0, sortOrder: 99 },
+    ],
+  });
 
   // ═══ FLOCK 1 — "Batch 41" harvested & sold (complete story) ═══
   const f1 = await prisma.broilerFlock.create({

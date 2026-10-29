@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.45.2-alpha] — 2026-10-29
+
+### Feed tab parity: projection & procurement on web flock detail
+- Flock detail Feed tab now shows the **Feed Projection & Procurement** table
+  (per-stage Required / Purchased / Remaining / Projected cost / Status badges
+  + totals) above Feed Purchases — matching the mobile Feed tab layout.
+- Demo seed: supplier now includes feed stages (Starter/Grower/Finisher +
+  Day-old Chicks) so the projection renders on the demo org.
+
 ## [1.45.1-alpha] — 2026-10-29
 
 ### Fix: mobile feed purchases invisible on web flock Feed tab
