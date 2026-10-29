@@ -8,6 +8,7 @@ import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
 import { useFlock, useUpdateFlock, useApiQuery, useApiMutation } from "@/lib/api/hooks";
 import { BroilerFlock, GrowthRecord, FeedRecord, FeedPurchase, FeedProjectionResult, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
+import { FeedProjectionTable } from "@/components/feed-projection-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -694,7 +695,7 @@ export default function FlockDetailPage() {
         <TabsContent value="growth"><SimpleRecordTab flockId={flockId} records={growthRecords} type="growth" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} breedId={flock?.breedId} startDate={flock?.startDate} /></TabsContent>
         <TabsContent value="feed">
           <div className="space-y-6">
-            {feedProjection && feedProjection.stages.length > 0 && (
+            {feedProjection && feedProjection.types.length > 0 && (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
@@ -708,49 +709,7 @@ export default function FlockDetailPage() {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="py-2 pr-4 font-medium">Stage</th>
-                        <th className="py-2 pr-4 font-medium">Day Range</th>
-                        <th className="py-2 pr-4 font-medium">Bag Size</th>
-                        <th className="py-2 pr-4 font-medium text-right">Required</th>
-                        <th className="py-2 pr-4 font-medium text-right">Purchased</th>
-                        <th className="py-2 pr-4 font-medium text-right">Remaining</th>
-                        <th className="py-2 pr-4 font-medium text-right">Proj. Cost</th>
-                        <th className="py-2 pr-4 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {feedProjection.stages.map((s) => (
-                        <tr key={s.feedStageId} className="border-b last:border-0">
-                          <td className="py-2 pr-4 font-medium">{s.stageName}</td>
-                          <td className="py-2 pr-4 text-muted-foreground">
-                            {s.dayRangeStart != null ? `Day ${s.dayRangeStart}${s.dayRangeEnd != null ? `-${s.dayRangeEnd}` : "+"}` : "-"}
-                          </td>
-                          <td className="py-2 pr-4">{s.bagSizeKg}kg</td>
-                          <td className="py-2 pr-4 text-right font-medium">{s.bagsRequired}</td>
-                          <td className="py-2 pr-4 text-right">{s.bagsPurchased}</td>
-                          <td className={`py-2 pr-4 text-right font-medium ${s.bagsRemaining > 0 ? "text-amber-600" : "text-green-600"}`}>{s.bagsRemaining}</td>
-                          <td className="py-2 pr-4 text-right">ZMW {s.projectedCostZmw.toLocaleString()}</td>
-                          <td className="py-2 pr-4">
-                            {s.status === "complete" ? <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Complete</Badge>
-                              : s.status === "partial" ? <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Partial</Badge>
-                              : <Badge variant="outline">Not started</Badge>}
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="font-bold border-t-2">
-                        <td className="py-2 pr-4">Total</td>
-                        <td className="py-2 pr-4" colSpan={2} />
-                        <td className="py-2 pr-4 text-right">{feedProjection.totals.bagsRequired}</td>
-                        <td className="py-2 pr-4 text-right">{feedProjection.totals.bagsPurchased}</td>
-                        <td className={`py-2 pr-4 text-right ${feedProjection.totals.bagsRemaining > 0 ? "text-amber-600" : "text-green-600"}`}>{feedProjection.totals.bagsRemaining}</td>
-                        <td className="py-2 pr-4 text-right">ZMW {feedProjection.totals.projectedCostZmw.toLocaleString()}</td>
-                        <td className="py-2 pr-4" />
-                      </tr>
-                    </tbody>
-                  </table>
+                  <FeedProjectionTable projection={feedProjection} />
                 </CardContent>
               </Card>
             )}

@@ -210,4 +210,139 @@ describe('Feed Projection & Purchases API', () => {
       expect(stage.bagsPurchased).toBe(0);
     });
   });
+
+  describe('Grouped types view (25kg/50kg variants share one requirement)', () => {
+    let typeFlockId: string;
+    let stage50: any;
+    let stage25: any;
+
+    beforeAll(async () => {
+      // Dedicated supplier with one feed type offered in 50kg and 25kg variants
+      const supRes = await api('/api/v1/suppliers', token, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Variant Feeds Test Co', chickenType: 'broiler' }),
+      });
+      const sup = await supRes.json();
+      expect(sup.id).toBeDefined();
+
+      const mkStage = (name: string, unitSizeKg: number, unitPriceZmw: number, sortOrder: number) =>
+        api('/api/v1/feed-stages', token, {
+          method: 'POST',
+          body: JSON.stringify({
+            supplierId: sup.id,
+            stageName: name,
+            stageType: 'feed',
+            dayRangeStart: 0,
+            dayRangeEnd: 10,
+            unitSizeKg,
+            unitPriceZmw,
+            intakePerBirdKg: 1.0,
+            sortOrder,
+          }),
+        }).then((r) => r.json());
+
+      stage50 = await mkStage('TestStart', 50, 600, 0);
+      stage25 = await mkStage('TestStart (25kg)', 25, 340, 1);
+      expect(stage50.id).toBeDefined();
+      expect(stage25.id).toBeDefined();
+
+      const breedsRes = await api('/api/v1/breeds', token);
+      const breeds = await breedsRes.json();
+      const breedId = breeds.find((b: any) => b.name === 'Ross 308').id;
+
+      const flockRes = await api('/api/v1/broiler-flocks', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Variant Projection Test Flock',
+          breedId,
+          supplierId: sup.id,
+          orderDate: '2026-09-01',
+          initialCount: 1000,
+          targetWeight: 2.5,
+          targetAge: 42,
+          feedTransitionDay: 11,
+          chicksCollected: true,
+          collectionDate: '2026-09-05',
+        }),
+      });
+      const flock = await flockRes.json();
+      expect(flock.id).toBeDefined();
+      typeFlockId = flock.id;
+    });
+
+    const getType = async () => {
+      const res = await api(`/api/v1/broiler-flocks/${typeFlockId}/feed-projection`, token);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      const t = data.types.find((x: any) => x.typeName === 'TestStart');
+      return { data, t };
+    };
+
+    it('groups variant sizes into one type row with per-size required bags', async () => {
+      const { t } = await getType();
+      expect(t).toBeDefined();
+      expect(t.requiredKg).toBeCloseTo(1000); // 1000 birds × 1.0 kg
+      expect(t.sizes.map((s: any) => s.unitKg)).toEqual([50, 25]);
+      const s50 = t.sizes.find((s: any) => s.unitKg === 50);
+      const s25 = t.sizes.find((s: any) => s.unitKg === 25);
+      expect(s50.requiredBags).toBe(20);
+      expect(s25.requiredBags).toBe(40);
+      expect(s50.projectedCostZmw).toBe(20 * 600);
+      expect(s25.projectedCostZmw).toBe(40 * 340);
+      expect(t.coveragePct).toBe(0);
+      expect(t.status).toBe('not_started');
+    });
+
+    it('a 50kg purchase credits the type in kg and shrinks the 25kg remaining too', async () => {
+      const res = await api('/api/v1/feed-purchases', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          flockId: typeFlockId,
+          feedStageId: stage50.id,
+          stageName: 'TestStart',
+          bagSizeKg: 50,
+          bagsPurchased: 2,
+          unitPriceZmw: 600,
+          purchaseDate: '2026-09-02',
+        }),
+      });
+      expect(res.status).toBe(200);
+
+      const { t } = await getType();
+      const s50 = t.sizes.find((s: any) => s.unitKg === 50);
+      const s25 = t.sizes.find((s: any) => s.unitKg === 25);
+      expect(t.purchasedKg).toBeCloseTo(100);
+      expect(s50.purchasedBags).toBe(2);
+      expect(s50.remainingBags).toBe(18); // 900kg left ÷ 50
+      expect(s25.purchasedBags).toBe(0);
+      expect(s25.remainingBags).toBe(36); // 900kg left ÷ 25 — cross-size credit
+      expect(t.coveragePct).toBeCloseTo(10);
+      expect(t.status).toBe('partial');
+    });
+
+    it('over-purchasing clamps remaining to 0 and flags the surplus', async () => {
+      const res = await api('/api/v1/feed-purchases', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          flockId: typeFlockId,
+          feedStageId: stage50.id,
+          stageName: 'TestStart',
+          bagSizeKg: 50,
+          bagsPurchased: 25,
+          unitPriceZmw: 600,
+          purchaseDate: '2026-09-03',
+        }),
+      });
+      expect(res.status).toBe(200);
+
+      const { t } = await getType();
+      const s50 = t.sizes.find((s: any) => s.unitKg === 50);
+      const s25 = t.sizes.find((s: any) => s.unitKg === 25);
+      expect(s50.remainingBags).toBe(0);
+      expect(s25.remainingBags).toBe(0);
+      expect(t.overPurchasedKg).toBeCloseTo(350); // 1350kg bought vs 1000kg needed
+      expect(t.coveragePct).toBe(100);
+      expect(t.status).toBe('complete');
+    });
+  });
 });

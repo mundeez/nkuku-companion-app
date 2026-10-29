@@ -197,6 +197,31 @@ export interface FeedProjectionStage extends FeedProjectionStageSummary {
   purchasedCostZmw: number;
 }
 
+export interface FeedProjectionTypeSize {
+  feedStageId: string;
+  unitKg: number;
+  requiredBags: number;
+  purchasedBags: number;
+  remainingBags: number;
+  projectedCostZmw: number;
+  unitPriceZmw: number;
+}
+
+export interface FeedProjectionType {
+  typeName: string;
+  dayRangeStart: number | null;
+  dayRangeEnd: number | null;
+  requiredKg: number;
+  purchasedKg: number;
+  remainingKg: number;
+  spentZmw: number;
+  remainingCostZmw: number;
+  coveragePct: number;
+  overPurchasedKg: number;
+  status: "complete" | "partial" | "not_started";
+  sizes: FeedProjectionTypeSize[];
+}
+
 export interface FeedProjectionResult {
   flockId: string;
   flockName: string;
@@ -204,10 +229,14 @@ export interface FeedProjectionResult {
   currentCount: number;
   supplierName: string | null;
   stages: FeedProjectionStage[];
+  types: FeedProjectionType[];
   totals: {
     bagsRequired: number;
     bagsPurchased: number;
     bagsRemaining: number;
+    requiredKg: number;
+    purchasedKg: number;
+    remainingKg: number;
     projectedCostZmw: number;
     purchasedCostZmw: number;
   };

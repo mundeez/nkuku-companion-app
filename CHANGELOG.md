@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.45.4-alpha] — 2026-10-29
+
+### Feed projection — grouped per-type table (product decisions applied)
+- `/feed-projection` now returns a `types[]` view alongside `stages[]`: one row
+  per feed type with per-size columns (required/purchased/remaining bags and
+  projected cost for each configured bag size), `coveragePct`, `spentZmw`
+  (actual money paid), `remainingCostZmw`, `overPurchasedKg` and kg totals.
+  `stages[]` is unchanged so the mobile app keeps working.
+- Web: new shared `FeedProjectionTable` component renders the grouped layout
+  on the flock Feed tab and the /feed page — Remaining clamps at 0 with a
+  green "over-purchased +Nkg" badge; Status is a coverage bar with the %
+  inside plus "Spent ZMW x · To go ZMW y" underneath.
+- Purchase dialog: Bag Size is now a dropdown of the type's configured sizes
+  with an "Other…" free entry; choosing a size fills its list price.
+- Integration tests: new describe block builds a supplier with 50kg + 25kg
+  variants of one feed type and asserts the grouped response — single kg
+  requirement, cross-size purchase credit, clamp + over-purchased flag.
+
 ## [1.45.3-alpha] — 2026-10-29
 
 ### Fix: feed projection — alternative bag sizes no longer summed

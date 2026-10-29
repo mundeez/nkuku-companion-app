@@ -795,6 +795,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     }
 
     const stages: any[] = [];
+    const types: any[] = [];
     let totalBagsRequired = 0;
     let totalBagsPurchased = 0;
     let totalBagsRemaining = 0;
@@ -814,7 +815,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         const unitKg = Number(fs.unitSizeKg);
         const bagsRequired = unitKg > 0 ? Math.ceil(bucket.requiredKg / unitKg) : 0;
         const bagsPurchased = bucket.bagsByStage.get(fs.id) ?? 0;
-        const bagsRemaining = unitKg > 0 ? Math.ceil(remainingKg / unitKg) : 0;
+        const bagsRemaining = unitKg > 0 ? Math.max(0, Math.ceil(remainingKg / unitKg)) : 0;
         const projectedCostZmw = bagsRequired > 0
           ? new Decimal(bagsRequired).mul(fs.unitPriceZmw).toNumber()
           : 0;
@@ -844,9 +845,40 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const primaryKg = Number(primary.unitSizeKg) || 1;
       const typePurchasedBags = [...bucket.bagsByStage.values()].reduce((a, b) => a + b, 0);
 
+      // Grouped per-type view (one row per feed type; per-size sub-columns)
+      const typeRow = {
+        typeName: primary.stageName.replace(/\s*\(.*?\)\s*/g, '').trim(),
+        dayRangeStart: primary.dayRangeStart,
+        dayRangeEnd: primary.dayRangeEnd,
+        requiredKg: bucket.requiredKg,
+        purchasedKg: bucket.purchasedKg,
+        remainingKg,
+        spentZmw: bucket.purchasedCost,
+        remainingCostZmw: Math.ceil(Math.max(0, remainingKg) / primaryKg) * Number(primary.unitPriceZmw),
+        coveragePct: bucket.requiredKg > 0 ? Math.min(100, (bucket.purchasedKg / bucket.requiredKg) * 100) : 0,
+        overPurchasedKg: Math.max(0, -remainingKg),
+        status,
+        sizes: bucket.stages
+          .slice()
+          .sort((a: any, b: any) => Number(b.unitSizeKg) - Number(a.unitSizeKg))
+          .map((s: any) => {
+            const u = Number(s.unitSizeKg);
+            return {
+              feedStageId: s.id,
+              unitKg: u,
+              requiredBags: u > 0 ? Math.ceil(bucket.requiredKg / u) : 0,
+              purchasedBags: bucket.bagsByStage.get(s.id) ?? 0,
+              remainingBags: u > 0 ? Math.max(0, Math.ceil(remainingKg / u)) : 0,
+              projectedCostZmw: u > 0 ? new Decimal(Math.ceil(bucket.requiredKg / u)).mul(s.unitPriceZmw).toNumber() : 0,
+              unitPriceZmw: Number(s.unitPriceZmw),
+            };
+          }),
+      };
+      types.push(typeRow);
+
       totalBagsRequired += Math.ceil(bucket.requiredKg / primaryKg);
       totalBagsPurchased += typePurchasedBags;
-      totalBagsRemaining += Math.ceil(remainingKg / primaryKg);
+      totalBagsRemaining += Math.max(0, Math.ceil(remainingKg / primaryKg));
       totalProjectedCost += Math.ceil(bucket.requiredKg / primaryKg) * Number(primary.unitPriceZmw);
       totalPurchasedCost += bucket.purchasedCost;
       totalRequiredKg += bucket.requiredKg;
@@ -860,13 +892,14 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       currentCount: flock.currentCount,
       supplierName: flock.supplier.name,
       stages,
+      types,
       totals: {
         bagsRequired: totalBagsRequired,
         bagsPurchased: totalBagsPurchased,
         bagsRemaining: totalBagsRemaining,
         requiredKg: totalRequiredKg,
         purchasedKg: totalPurchasedKg,
-        remainingKg: totalRequiredKg - totalPurchasedKg,
+        remainingKg: Math.max(0, totalRequiredKg - totalPurchasedKg),
         projectedCostZmw: totalProjectedCost,
         purchasedCostZmw: totalPurchasedCost,
       },

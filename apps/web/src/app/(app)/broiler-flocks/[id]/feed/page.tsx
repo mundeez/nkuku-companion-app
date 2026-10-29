@@ -4,12 +4,12 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
-import { FeedProjectionResult, FeedPurchase } from "@/lib/types";
+import { FeedProjectionResult, FeedProjectionType, FeedPurchase } from "@/lib/types";
+import { FeedProjectionTable } from "@/components/feed-projection-table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -122,15 +122,16 @@ export default function FeedCalculatorPage() {
     });
   }
 
-  function openAddPurchase(stage?: FeedProjectionResult["stages"][number]) {
+  function openAddPurchase(type?: FeedProjectionType) {
     setEditingPurchase(null);
-    if (stage) {
+    const primary = type?.sizes[0]; // largest configured bag size
+    if (type && primary) {
       setPurchaseForm({
-        feedStageId: stage.feedStageId,
-        stageName: stage.stageName,
-        bagSizeKg: String(stage.bagSizeKg),
+        feedStageId: primary.feedStageId,
+        stageName: type.typeName,
+        bagSizeKg: String(primary.unitKg),
         bagsPurchased: "",
-        unitPriceZmw: String(stage.unitPriceZmw),
+        unitPriceZmw: String(primary.unitPriceZmw),
         purchaseDate: new Date().toISOString().split("T")[0],
         notes: "",
       });
@@ -207,12 +208,6 @@ export default function FeedCalculatorPage() {
     }
   }
 
-  function statusBadge(status: string) {
-    if (status === "complete") return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Complete</Badge>;
-    if (status === "partial") return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Partial</Badge>;
-    return <Badge variant="outline">Not started</Badge>;
-  }
-
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
 
@@ -242,65 +237,13 @@ export default function FeedCalculatorPage() {
             )}
           </CardHeader>
           <CardContent>
-            {projection && (projection.stages.length === 0 ? (
+            {projection && (projection.types.length === 0 ? (
               <p className="text-muted-foreground">
                 No feed stages configured for this flock&rsquo;s supplier{projection.supplierName ? ` (${projection.supplierName})` : ""}.
                 Assign a supplier with feed stages to see projections.
               </p>
             ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Stage</TableHead>
-                      <TableHead>Day Range</TableHead>
-                      <TableHead>Bag Size</TableHead>
-                      <TableHead className="text-right">Required</TableHead>
-                      <TableHead className="text-right">Purchased</TableHead>
-                      <TableHead className="text-right">Remaining</TableHead>
-                      <TableHead className="text-right">Proj. Cost</TableHead>
-                      <TableHead>Status</TableHead>
-                      {canEdit && <TableHead>Actions</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {projection.stages.map((s) => (
-                      <TableRow key={s.feedStageId}>
-                        <TableCell className="font-medium">{s.stageName}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {s.dayRangeStart != null ? `Day ${s.dayRangeStart}${s.dayRangeEnd != null ? `-${s.dayRangeEnd}` : "+"}` : "-"}
-                        </TableCell>
-                        <TableCell>{s.bagSizeKg}kg</TableCell>
-                        <TableCell className="text-right font-medium">{s.bagsRequired}</TableCell>
-                        <TableCell className="text-right">{s.bagsPurchased}</TableCell>
-                        <TableCell className={`text-right font-medium ${s.bagsRemaining > 0 ? "text-amber-600" : "text-green-600"}`}>
-                          {s.bagsRemaining}
-                        </TableCell>
-                        <TableCell className="text-right">ZMW {s.projectedCostZmw.toLocaleString()}</TableCell>
-                        <TableCell>{statusBadge(s.status)}</TableCell>
-                        {canEdit && (
-                          <TableCell>
-                            <Button variant="outline" size="sm" onClick={() => openAddPurchase(s)}>
-                              <Plus className="h-3 w-3 mr-1" /> Purchase
-                            </Button>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
-                    <TableRow className="font-bold border-t-2">
-                      <TableCell>Total</TableCell>
-                      <TableCell colSpan={2} />
-                      <TableCell className="text-right">{projection.totals.bagsRequired}</TableCell>
-                      <TableCell className="text-right">{projection.totals.bagsPurchased}</TableCell>
-                      <TableCell className={`text-right ${projection.totals.bagsRemaining > 0 ? "text-amber-600" : "text-green-600"}`}>
-                        {projection.totals.bagsRemaining}
-                      </TableCell>
-                      <TableCell className="text-right">ZMW {projection.totals.projectedCostZmw.toLocaleString()}</TableCell>
-                      <TableCell colSpan={canEdit ? 2 : 1} />
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </>
+              <FeedProjectionTable projection={projection} onPurchase={canEdit ? openAddPurchase : undefined} />
             ))}
 
             {/* Existing purchases */}
@@ -453,7 +396,38 @@ export default function FeedCalculatorPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Bag Size (kg)</Label>
-                <Input type="number" step="0.001" value={purchaseForm.bagSizeKg} onChange={(e) => setPurchaseForm({ ...purchaseForm, bagSizeKg: e.target.value })} />
+                {(() => {
+                  const type = projection?.types.find((t) => t.sizes.some((s) => s.feedStageId === purchaseForm.feedStageId));
+                  const options = type?.sizes.map((s) => s.unitKg) ?? [];
+                  const isOther = options.length > 0 && !options.some((u) => String(u) === purchaseForm.bagSizeKg);
+                  if (options.length === 0) {
+                    return <Input type="number" step="0.001" value={purchaseForm.bagSizeKg} onChange={(e) => setPurchaseForm({ ...purchaseForm, bagSizeKg: e.target.value })} />;
+                  }
+                  return (
+                    <>
+                      <select
+                        className="w-full border rounded-md p-2 bg-background text-foreground"
+                        value={isOther ? "other" : purchaseForm.bagSizeKg}
+                        onChange={(e) => {
+                          if (e.target.value === "other") {
+                            setPurchaseForm({ ...purchaseForm, bagSizeKg: "" });
+                          } else {
+                            const size = type!.sizes.find((s) => String(s.unitKg) === e.target.value);
+                            setPurchaseForm({ ...purchaseForm, bagSizeKg: e.target.value, unitPriceZmw: size ? String(size.unitPriceZmw) : purchaseForm.unitPriceZmw });
+                          }
+                        }}
+                      >
+                        {options.map((u) => (
+                          <option key={u} value={String(u)}>{u}kg</option>
+                        ))}
+                        <option value="other">Other…</option>
+                      </select>
+                      {isOther && (
+                        <Input className="mt-2" type="number" step="0.001" placeholder="Custom size (kg)" value={purchaseForm.bagSizeKg} onChange={(e) => setPurchaseForm({ ...purchaseForm, bagSizeKg: e.target.value })} />
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               <div>
                 <Label>Bags Purchased</Label>
