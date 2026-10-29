@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.45.0-alpha] — 2026-10-29
+
+### C-2 follow-up: demo data + real marketing screenshots
+- `src/db/seeds/seed-demo-farm.ts` — idempotent seeder for the is_demo org:
+  3 flocks (harvested Batch 41 with 3 sales + full cost story, active day-26
+  Batch 42, day-6 Batch 43), growth/feed/water/mortality/vaccination records,
+  supplier, alerts; then `migrate-to-double-entry` populates the journal so
+  ledger/statement views show a real balanced trial balance (ZMW 41,660).
+- 7 real screenshots captured via Playwright against production
+  (dashboard, flock detail, sales, ledger, alerts, billing, mobile view) —
+  WebP, ~40–60 KB each in `apps/web/public/screenshots/`.
+- Marketing page: 6-tile screenshot grid with captions + phone-framed
+  mobile shot in the "Built for the field" section — placeholders gone.
+- Demo user `nkuku@zeendeefood.solutions` password set (demo login works).
+
 ## [1.43.0-alpha] — 2026-10-21
 
 ### P-6 + store launch — data residency, tenant lifecycle, release pipeline

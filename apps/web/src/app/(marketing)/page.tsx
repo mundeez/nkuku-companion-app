@@ -100,14 +100,27 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      {/* 5 — Screenshots (populated in a later pass with Nkuku Demo Farm) */}
+      {/* 5 — Screenshots (live data from the Nkuku Demo Farm account) */}
       <section className="mx-auto max-w-6xl px-6 py-20">
         <h2 className="text-center text-3xl font-bold">See it in action</h2>
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          {["Dashboard", "Flock detail", "Sales & ledger", "Mobile app"].map((t) => (
-            <div key={t} className="flex aspect-[16/10] items-center justify-center rounded-xl border bg-muted/50 text-sm text-muted-foreground">
-              {t} — screenshot coming soon
-            </div>
+        <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[
+            ["Dashboard", "Production overview — flocks, mortality, profit at a glance", "dashboard"],
+            ["Flock detail", "Every record for a batch — weights, feed, vaccines, finances", "flock-detail"],
+            ["Sales", "Revenue, customers and payment tracking in ZMW", "sales"],
+            ["Ledger", "Double-entry books — trial balance to GAAP statements", "ledger"],
+            ["Alerts", "Vaccinations, weight checks and anomalies, flagged for you", "alerts"],
+            ["Billing", "Plans in local currency — mobile money or card", "billing"],
+          ].map(([title, desc, file]) => (
+            <figure key={title} className="overflow-hidden rounded-xl border bg-muted/50">
+              <div className="aspect-[16/10] overflow-hidden">
+                <img src={`/screenshots/${file}.webp`} alt={`Nkuku Companion — ${title}`} className="h-full w-full object-cover object-top" loading="lazy" />
+              </div>
+              <figcaption className="px-4 py-3">
+                <div className="font-semibold">{title}</div>
+                <div className="text-sm text-muted-foreground">{desc}</div>
+              </figcaption>
+            </figure>
           ))}
         </div>
       </section>
@@ -142,8 +155,8 @@ export default function MarketingPage() {
               ))}
             </ul>
           </div>
-          <div className="flex aspect-[9/16] max-h-[420px] items-center justify-center justify-self-center rounded-2xl border bg-muted/50 px-16 text-sm text-muted-foreground">
-            App screenshot
+          <div className="justify-self-center overflow-hidden rounded-[2rem] border-4 border-foreground/10 shadow-xl">
+            <img src="/screenshots/mobile.webp" alt="Nkuku Companion mobile app — dashboard" className="max-h-[420px] w-auto" loading="lazy" />
           </div>
         </div>
       </section>
