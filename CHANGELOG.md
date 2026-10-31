@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.46.0-alpha] — 2026-10-30
+
+### Mobile: flock lifecycle parity with web
+- **Complete Flock** — flock detail now exposes the web's `POST /:id/complete`
+  flow: a green "Complete Flock" button on the overview plus an app-bar menu
+  action (owner/manager, active flocks only). Confirmation dialog warns about
+  outstanding payments before completing; the API's warning message is shown
+  after completion.
+- **Owner status transitions** — "Change status" bottom sheet (owner only)
+  offers Active / Sold / Completed / Cancelled via PATCH, matching the web
+  status dropdown. `soldDate` is surfaced on the overview.
+- **Completed-flock lock UX** — non-owners on a completed flock lose the
+  add-record FAB and get a persistent lock banner ("records are read-only —
+  the owner can still edit"), matching the web's lock icons on tabs. Sale
+  payment edits stay available (the API only locks sale POST and birdCount
+  changes).
+- **Sales & Outstanding card** — the overview now shows Revenue collected,
+  Outstanding payments, Profit less outstanding, Avg sale price/bird, and
+  Unrealised profit using the computed fields already returned by
+  `GET /broiler-flocks/:id` (previously dropped by the mobile model).
+- **Status badge** — the overview shows the web-style Pending / Active /
+  Completed / Sold / Cancelled chip instead of raw text.
+- **Edit flock from detail** — app-bar menu item opens the existing flock
+  edit form (previously only reachable from the flocks list popup menu).
+- Sales tab: adds Paid and Outstanding stat cards (web shows 4; mobile
+  showed 2), a payment-progress bar on each sale tile, and taps now open the
+  SaleDetailSheet (payment breakdown + attachments + edit/delete) instead of
+  jumping straight into the edit form — matching the web's detail drawer.
+
 ## [1.45.5-alpha] — 2026-10-29
 
 ### Mobile: grouped feed projection + web hardening

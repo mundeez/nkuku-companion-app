@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/breed.dart';
@@ -19,11 +20,13 @@ import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
 import '../../widgets/flock_charts.dart';
 import '../../widgets/record_card.dart';
+import '../../widgets/sale_detail_sheet.dart';
 import '../../widgets/sales_filter_sheet.dart';
 import '../../widgets/skeleton.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/summary_card.dart';
 import 'calendar_screen.dart';
+import 'flock_form_screen.dart';
 import 'medication_screen.dart';
 import 'records/document_form.dart';
 import 'records/environmental_record_form.dart';
@@ -309,6 +312,134 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     if (result == true && mounted) _loadData();
   }
 
+  // ── Flock actions (edit / complete / status) ──────────────────────────
+
+  /// True when this flock is completed and the current user is not the
+  /// owner — record mutations are locked server-side (FLOCK_COMPLETED).
+  bool get _completedLocked =>
+      _flock?.status == 'completed' && !AuthService.isOwner;
+
+  void _onFlockAction(String action) {
+    switch (action) {
+      case 'edit':
+        _editFlock();
+        break;
+      case 'complete':
+        _confirmCompleteFlock();
+        break;
+      case 'status':
+        _showStatusSheet();
+        break;
+    }
+  }
+
+  Future<void> _editFlock() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => FlockFormScreen(flock: _flock)),
+    );
+    if (result != null && mounted) _loadData();
+  }
+
+  Future<void> _confirmCompleteFlock() async {
+    final flock = _flock!;
+    final outstanding = flock.totalOutstandingPayments ?? 0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Complete flock'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+                'Mark "${flock.name}" as completed? Records will be locked for non-owners.'),
+            if (outstanding > 0) ...[
+              const SizedBox(height: 12),
+              Text(
+                'This flock has outstanding payments totaling '
+                'ZMW ${outstanding.toStringAsFixed(2)}. Payments can still be '
+                'recorded after completion.',
+                style: const TextStyle(color: Colors.orange),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Complete')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final res = await BroilerService.completeFlock(widget.flockId);
+      if (!mounted) return;
+      final warning = res['warnings']?['message'] as String?;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(warning ?? 'Flock marked as completed'),
+        duration: const Duration(seconds: 4),
+      ));
+      _loadData();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data is Map
+          ? (e.response!.data['message'] ?? e.response!.data['error'] ?? '$e')
+          : '$e';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$msg')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Complete failed: $e')));
+    }
+  }
+
+  Future<void> _showStatusSheet() async {
+    final flock = _flock!;
+    const statuses = ['active', 'sold', 'completed', 'cancelled'];
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Change flock status',
+                  style:
+                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            for (final s in statuses)
+              ListTile(
+                title: Text(s[0].toUpperCase() + s.substring(1)),
+                trailing: s == flock.status
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () => Navigator.pop(ctx, s),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || picked == flock.status || !mounted) return;
+    try {
+      await BroilerService.updateFlock(widget.flockId, {'status': picked});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Status updated to $picked')));
+      _loadData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Status change failed: $e')));
+    }
+  }
+
   /// The legacy flat tab index (0-12) for whichever group/sub-tab is
   /// currently selected, or `-1` if that section has no "add record" action.
   int get _currentFlatIndex {
@@ -367,6 +498,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   }
 
   Widget? get _floatingActionButton {
+    // Completed flocks are read-only for non-owners (FLOCK_COMPLETED on API)
+    if (_completedLocked) return null;
     final flatIndex = _currentFlatIndex;
     // -1 = no "add record" action for this section (Overview, Tasks, Calendar)
     if (flatIndex == -1) return null;
@@ -547,6 +680,45 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       title: Text(widget.flockName),
       actions: [
         IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
+        if (_flock != null)
+          PopupMenuButton<String>(
+            tooltip: 'Flock actions',
+            onSelected: _onFlockAction,
+            itemBuilder: (context) => [
+              if (AuthService.canEdit &&
+                  (_flock!.status != 'completed' || AuthService.isOwner))
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: ListTile(
+                    leading: Icon(Icons.edit_outlined),
+                    title: Text('Edit flock'),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  ),
+                ),
+              if (AuthService.canEdit && _flock!.status == 'active')
+                const PopupMenuItem(
+                  value: 'complete',
+                  child: ListTile(
+                    leading: Icon(Icons.check_circle_outline,
+                        color: Colors.green),
+                    title: Text('Complete flock'),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  ),
+                ),
+              if (AuthService.isOwner)
+                const PopupMenuItem(
+                  value: 'status',
+                  child: ListTile(
+                    leading: Icon(Icons.swap_horiz),
+                    title: Text('Change status'),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  ),
+                ),
+            ],
+          ),
       ],
       bottom: TabBar(
         controller: _groupController,
@@ -633,7 +805,26 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                           _buildGroupBody(_groups[gi], gi),
                       ],
                     ),
-      bottomNavigationBar: bulkActionBar,
+      bottomNavigationBar: _completedLocked
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Colors.grey.shade100,
+              child: SafeArea(
+                child: Row(children: [
+                  Icon(Icons.lock_outline,
+                      size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Flock completed — records are read-only (the owner can still edit).',
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  ),
+                ]),
+              ),
+            )
+          : bulkActionBar,
     );
   }
 
@@ -730,7 +921,13 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                                 : null,
                   ),
                 ),
-                Text('Status: ${flock.status}'),
+                if (flock.soldDate != null)
+                  Text('Sold: ${flock.soldDate!.split('T').first}'),
+                const SizedBox(height: 6),
+                Row(children: [
+                  const Text('Status: '),
+                  _statusBadge(flock),
+                ]),
               ],
             ),
           ),
@@ -757,6 +954,20 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     color: Colors.red)),
           ],
         ),
+        if (AuthService.canEdit && flock.status == 'active') ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: Colors.green),
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Complete Flock'),
+              onPressed: _confirmCompleteFlock,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        _buildSalesOutstandingCard(flock),
         const SizedBox(height: 12),
         Card(
           child: Padding(
@@ -810,6 +1021,90 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             ),
           ),
       ],
+    );
+  }
+
+  /// Status chip mirroring the web badge (Pending / Active / Completed /
+  /// Sold / Cancelled).
+  Widget _statusBadge(BroilerFlock flock) {
+    final pending = flock.status == 'active' && !(flock.chicksCollected ?? false);
+    final label = pending
+        ? 'Pending'
+        : flock.status[0].toUpperCase() + flock.status.substring(1);
+    final color = pending
+        ? Colors.amber.shade800
+        : flock.status == 'active'
+            ? Colors.green
+            : flock.status == 'sold'
+                ? Colors.blue
+                : flock.status == 'completed'
+                    ? Colors.purple
+                    : Colors.red;
+    return Chip(
+      label: Text(label,
+          style: TextStyle(fontSize: 12, color: color)),
+      backgroundColor: color.withAlpha(25),
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+    );
+  }
+
+  /// Sales & Outstanding summary — mirrors the web overview card. Hidden
+  /// when the API didn't return the computed fields (e.g. list-level data).
+  Widget _buildSalesOutstandingCard(BroilerFlock flock) {
+    if (flock.actualRevenueCollected == null &&
+        flock.totalOutstandingPayments == null) {
+      return const SizedBox.shrink();
+    }
+    final collected = flock.actualRevenueCollected ?? 0;
+    final outstanding = flock.totalOutstandingPayments ?? 0;
+    final profitNet = flock.actualProfitLessOutstanding ?? 0;
+    final avgPrice = flock.actualAverageSalesPrice ?? 0;
+    final unrealised = flock.unrealisedProfit ?? 0;
+
+    Widget row(String label, String value, {Color? color}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w500, color: color)),
+            ],
+          ),
+        );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Sales & Outstanding',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            row('Revenue collected', 'ZMW ${collected.toStringAsFixed(2)}',
+                color: collected > 0 ? Colors.green.shade700 : null),
+            row('Outstanding payments', 'ZMW ${outstanding.toStringAsFixed(2)}',
+                color: outstanding > 0
+                    ? Colors.red.shade700
+                    : Colors.green.shade700),
+            row('Profit less outstanding', 'ZMW ${profitNet.toStringAsFixed(2)}',
+                color: profitNet > 0
+                    ? Colors.green.shade700
+                    : profitNet < 0
+                        ? Colors.red.shade700
+                        : null),
+            row('Avg sale price/bird',
+                avgPrice > 0 ? 'ZMW ${avgPrice.toStringAsFixed(2)}' : '—'),
+            row('Unrealised profit',
+                unrealised != 0 ? 'ZMW ${unrealised.toStringAsFixed(2)}' : '—',
+                color: unrealised < 0 ? Colors.red.shade700 : Colors.blue.shade700),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1914,17 +2209,16 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
 
   Widget _buildSalesTab() {
     final summary = _saleSummary;
+    double sumKey(String key) =>
+        double.tryParse((summary?[key] ?? 0).toString()) ?? 0;
     final totalBirdsSold = summary != null
         ? (summary['totalBirdsSold'] ?? summary['total_birds_sold'] ?? 0)
         : _saleRecords.fold(0, (sum, r) => sum + r.birdCount);
     final totalRevenue = summary != null
-        ? double.tryParse((summary['totalRevenue'] ??
-                    summary['totalRevenueZmw'] ??
-                    summary['total_revenue_zmw'] ??
-                    0)
-                .toString()) ??
-            0
+        ? sumKey('totalRevenue')
         : _saleRecords.fold(0.0, (sum, r) => sum + r.totalAmountZmw);
+    final totalPaid = sumKey('totalPaid');
+    final outstanding = sumKey('outstanding');
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -1942,9 +2236,28 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: StatCard(
-                  label: 'Total revenue',
+                  label: 'Revenue',
                   value: 'ZMW ${totalRevenue.toStringAsFixed(2)}',
                   color: Colors.teal,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: StatCard(
+                    label: 'Paid',
+                    value: 'ZMW ${totalPaid.toStringAsFixed(2)}',
+                    color: Colors.blue),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: StatCard(
+                  label: 'Outstanding',
+                  value: 'ZMW ${outstanding.toStringAsFixed(2)}',
+                  color: Colors.orange,
                 ),
               ),
             ],
@@ -1966,6 +2279,10 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   : r.paymentStatus == 'partial'
                       ? Colors.orange
                       : Colors.grey;
+              final paid = r.amountPaidZmw ?? 0;
+              final total = r.totalAmountZmw;
+              final pct =
+                  total > 0 ? (paid / total).clamp(0.0, 1.0) : 0.0;
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
@@ -1979,6 +2296,17 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                           '${r.birdCount} birds · ZMW ${r.totalAmountZmw.toStringAsFixed(2)}'),
                       if (r.avgWeightKg != null)
                         Text('Avg weight: ${r.avgWeightKg} kg'),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 5,
+                          backgroundColor: Colors.grey.shade200,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(statusColor),
+                        ),
+                      ),
                     ],
                   ),
                   trailing: Chip(
@@ -1988,20 +2316,24 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     ),
                     backgroundColor: statusColor.withAlpha(30),
                   ),
-                  onTap: AuthService.canManageSales
-                      ? () => _navigateToForm(
-                          SaleRecordForm(flockId: widget.flockId, record: r))
-                      : null,
-                  onLongPress: AuthService.isOwner
-                      ? () => _deleteRecord<SaleRecord>(
-                            label: 'sale record',
-                            record: r,
-                            name: (r) =>
-                                'sale on ${r.saleDate.toIso8601String().split('T').first} (${r.birdCount} birds)',
-                            onDelete: () =>
-                                BroilerService.deleteSaleRecord(r.id),
-                          )
-                      : null,
+                  onTap: () => SaleDetailSheet.show(
+                    context,
+                    sale: r,
+                    onEdit: AuthService.canManageSales
+                        ? () => _navigateToForm(
+                            SaleRecordForm(flockId: widget.flockId, record: r))
+                        : null,
+                    onDelete: AuthService.isOwner
+                        ? () => _deleteRecord<SaleRecord>(
+                              label: 'sale record',
+                              record: r,
+                              name: (r) =>
+                                  'sale on ${r.saleDate.toIso8601String().split('T').first} (${r.birdCount} birds)',
+                              onDelete: () =>
+                                  BroilerService.deleteSaleRecord(r.id),
+                            )
+                        : null,
+                  ),
                 ),
               );
             }),

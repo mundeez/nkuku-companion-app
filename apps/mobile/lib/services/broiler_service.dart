@@ -144,6 +144,18 @@ class BroilerService {
     }
   }
 
+  /// Marks a flock as completed (POST /:id/complete). Returns the decoded
+  /// response — `{...flock, warnings: {message?, outstandingPayments?, ...}}`
+  /// — so the caller can surface the outstanding-payments warning.
+  /// Owner/manager only; 409 when already completed.
+  static Future<Map<String, dynamic>> completeFlock(String id) async {
+    final res =
+        await ApiService.dio.post('/api/v1/broiler-flocks/$id/complete');
+    _assertOk(res);
+    ConnectivityService.instance.markOnline();
+    return res.data as Map<String, dynamic>;
+  }
+
   static Future<void> deleteFlock(String id) async {
     try {
       final res = await ApiService.dio.delete('/api/v1/broiler-flocks/$id');

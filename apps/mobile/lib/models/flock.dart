@@ -25,6 +25,15 @@ class BroilerFlock {
   final bool? chicksCollected;
   final String? collectionDate;
   final String? chickQualityNotes;
+  final String? soldDate;
+  // Computed financial fields returned by GET /broiler-flocks/:id
+  final double? totalCost;
+  final double? totalRevenue;
+  final double? totalOutstandingPayments;
+  final double? actualRevenueCollected;
+  final double? actualProfitLessOutstanding;
+  final double? actualAverageSalesPrice;
+  final double? unrealisedProfit;
 
   BroilerFlock({
     required this.id,
@@ -53,7 +62,18 @@ class BroilerFlock {
     this.chicksCollected,
     this.collectionDate,
     this.chickQualityNotes,
+    this.soldDate,
+    this.totalCost,
+    this.totalRevenue,
+    this.totalOutstandingPayments,
+    this.actualRevenueCollected,
+    this.actualProfitLessOutstanding,
+    this.actualAverageSalesPrice,
+    this.unrealisedProfit,
   });
+
+  static double? _d(dynamic v) =>
+      v == null ? null : double.tryParse(v.toString());
 
   factory BroilerFlock.fromJson(Map<String, dynamic> json) {
     return BroilerFlock(
@@ -103,6 +123,14 @@ class BroilerFlock {
       collectionDate: json['collectionDate'] ?? json['collection_date'],
       chickQualityNotes:
           json['chickQualityNotes'] ?? json['chick_quality_notes'],
+      soldDate: json['soldDate'] ?? json['sold_date'],
+      totalCost: _d(json['totalCost']),
+      totalRevenue: _d(json['totalRevenue']),
+      totalOutstandingPayments: _d(json['totalOutstandingPayments']),
+      actualRevenueCollected: _d(json['actualRevenueCollected']),
+      actualProfitLessOutstanding: _d(json['actualProfitLessOutstanding']),
+      actualAverageSalesPrice: _d(json['actualAverageSalesPrice']),
+      unrealisedProfit: _d(json['unrealisedProfit']),
     );
   }
 
@@ -158,6 +186,14 @@ class BroilerFlock {
     bool? chicksCollected,
     String? collectionDate,
     String? chickQualityNotes,
+    String? soldDate,
+    double? totalCost,
+    double? totalRevenue,
+    double? totalOutstandingPayments,
+    double? actualRevenueCollected,
+    double? actualProfitLessOutstanding,
+    double? actualAverageSalesPrice,
+    double? unrealisedProfit,
   }) {
     return BroilerFlock(
       id: id ?? this.id,
@@ -188,6 +224,18 @@ class BroilerFlock {
       chicksCollected: chicksCollected ?? this.chicksCollected,
       collectionDate: collectionDate ?? this.collectionDate,
       chickQualityNotes: chickQualityNotes ?? this.chickQualityNotes,
+      soldDate: soldDate ?? this.soldDate,
+      totalCost: totalCost ?? this.totalCost,
+      totalRevenue: totalRevenue ?? this.totalRevenue,
+      totalOutstandingPayments:
+          totalOutstandingPayments ?? this.totalOutstandingPayments,
+      actualRevenueCollected:
+          actualRevenueCollected ?? this.actualRevenueCollected,
+      actualProfitLessOutstanding:
+          actualProfitLessOutstanding ?? this.actualProfitLessOutstanding,
+      actualAverageSalesPrice:
+          actualAverageSalesPrice ?? this.actualAverageSalesPrice,
+      unrealisedProfit: unrealisedProfit ?? this.unrealisedProfit,
     );
   }
 
