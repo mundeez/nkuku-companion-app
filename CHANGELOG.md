@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.46.1] — 2026-11-08
+
+### Play Store packaging
+- **applicationId changed** to `com.deeztechologysolutions.nkuku` (from
+  `com.nkuku.nkuku_mobile`) — done now because the ID is immutable after the
+  first Play Console upload. `namespace` and `MainActivity` moved to match.
+- Version bumped to `1.46.1+147` → AAB stamps `versionCode=147`.
+
 ## [1.46.0] — 2026-11-08
 
 ### Play Store packaging
