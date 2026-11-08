@@ -59,7 +59,7 @@ export default function CalendarPage() {
           <h1 className="text-3xl font-bold">Management Calendar</h1>
           <div className="text-muted-foreground">
             {flock?.name} · Hatch: {flock?.startDate ? new Date(flock.startDate).toLocaleDateString() : "-"}
-            {currentDay !== null && ` · Current: Day ${currentDay}`}
+            {currentDay !== null && ` · Current: Day ${currentDay + 1}`}
           </div>
         </div>
         <Button variant="outline" onClick={() => router.push(`/broiler-flocks/${flockId}/calendar/print`)}>
@@ -94,6 +94,13 @@ export default function CalendarPage() {
                 <span className="font-medium">{day.feedPhase}</span>
               </div>
 
+              {day.water && (
+                <div className="mb-2 flex items-center gap-2 text-sm">
+                  <Droplets className="h-4 w-4 text-blue-500" />
+                  <span>Water: {day.water.minLitres}–{day.water.maxLitres} L{day.birdsAlive != null && ` · ${day.birdsAlive} birds`}</span>
+                </div>
+              )}
+
               {day.lightingTemperature && (
                 <div className="mb-2 grid grid-cols-3 gap-1 text-xs">
                   <div className="flex items-center gap-1" title="Light / dark hours">
@@ -114,10 +121,17 @@ export default function CalendarPage() {
               {day.vaccines.length > 0 && (
                 <div className="mb-2 space-y-1">
                   {day.vaccines.map((v, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                      <Syringe className="h-4 w-4 text-green-600" />
-                      <span className="flex-1 truncate">{v.vaccineName}</span>
-                      <Badge variant={v.completed ? "default" : "outline"} className="text-xs">{v.completed ? "Done" : "Due"}</Badge>
+                    <div key={i}>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Syringe className="h-4 w-4 text-green-600" />
+                        <span className="flex-1 truncate">{v.vaccineName}</span>
+                        <Badge variant={v.completed ? "default" : "outline"} className="text-xs">{v.completed ? "Done" : "Due"}</Badge>
+                      </div>
+                      {v.isWaterRoute && v.vaccineWater && (
+                        <div className="ml-6 text-xs text-muted-foreground">
+                          Mix vaccine in ~{v.vaccineWater.minLitres}–{v.vaccineWater.maxLitres} L (field rule ~{v.vaccineWater.fieldRuleLitres} L)
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

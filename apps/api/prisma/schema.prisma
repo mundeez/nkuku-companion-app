@@ -146,6 +146,10 @@ model Organization {
   purgeAfter DateTime? @map("purge_after") @db.Timestamptz(6)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  // Per-org default vaccination schedule (remembered from first flock create
+  // that picks one) and ambient temperature used for daily water estimates.
+  defaultVaccinationScheduleId String? @map("default_vaccination_schedule_id") @db.Uuid
+  ambientTempC                 Decimal @default(25) @map("ambient_temp_c") @db.Decimal(4, 1)
 
   members                      OrganizationMember[]
   invites                      Invite[]
@@ -163,6 +167,7 @@ model Organization {
   feedPurchases                FeedPurchase[]
   adEvents                     AdEvent[]
   auditLogs                    AuditLog[]
+  defaultVaccinationSchedule   VaccinationSchedule? @relation("OrgDefaultVaccinationSchedule", fields: [defaultVaccinationScheduleId], references: [id], onDelete: SetNull)
 
   @@map("organizations")
 }
@@ -688,6 +693,7 @@ model BroilerFlock {
   soldDate                DateTime?   @map("sold_date") @db.Date
   status                  FlockStatus @default(active)
   housingType             HousingType @default(whole_house) @map("housing_type")
+  vaccinationScheduleId   String?     @map("vaccination_schedule_id") @db.Uuid
   createdBy               String?     @map("created_by") @db.Uuid
   createdAt               DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -709,10 +715,12 @@ model BroilerFlock {
   documents            Document[]
   saleRecords          SaleRecord[]
   feedPurchases        FeedPurchase[]
+  vaccinationSchedule  VaccinationSchedule? @relation("FlockVaccinationSchedule", fields: [vaccinationScheduleId], references: [id], onDelete: SetNull)
 
   @@index([breedId, status])
   @@index([supplierId])
   @@index([organizationId])
+  @@index([vaccinationScheduleId])
   @@map("broiler_flocks")
 }
 
@@ -961,7 +969,9 @@ model VaccinationSchedule {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  items VaccinationScheduleItem[]
+  items         VaccinationScheduleItem[]
+  flocks        BroilerFlock[]              @relation("FlockVaccinationSchedule")
+  organizations Organization[]              @relation("OrgDefaultVaccinationSchedule")
 
   @@unique([name])
   @@map("vaccination_schedules")

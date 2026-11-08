@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/broiler_service.dart';
 import '../../models/flock.dart';
 
 class VaccinationSchedulesScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class VaccinationSchedulesScreen extends StatefulWidget {
 
 class _VaccinationSchedulesScreenState extends State<VaccinationSchedulesScreen> {
   List<VaccinationSchedule> _schedules = [];
+  String? _orgDefaultScheduleId;
   bool _loading = true;
   String? _error;
 
@@ -33,8 +35,12 @@ class _VaccinationSchedulesScreenState extends State<VaccinationSchedulesScreen>
       final schedules = (res.data as List)
           .map((e) => VaccinationSchedule.fromJson(e))
           .toList();
+      final org = await BroilerService.getOrganization()
+          .catchError((_) => <String, dynamic>{});
+      if (!mounted) return;
       setState(() {
         _schedules = schedules;
+        _orgDefaultScheduleId = org['defaultVaccinationScheduleId']?.toString();
         _loading = false;
       });
     } catch (e) {
@@ -76,8 +82,12 @@ class _VaccinationSchedulesScreenState extends State<VaccinationSchedulesScreen>
                         margin: const EdgeInsets.only(bottom: 16),
                         child: ExpansionTile(
                           leading: Icon(
-                            schedule.isDefault ? Icons.star : Icons.schedule,
-                            color: schedule.isDefault ? Colors.amber : Colors.green,
+                            schedule.id == _orgDefaultScheduleId
+                                ? Icons.star
+                                : Icons.schedule,
+                            color: schedule.id == _orgDefaultScheduleId
+                                ? Colors.amber
+                                : Colors.green,
                           ),
                           title: Text(schedule.name,
                               maxLines: 1,
@@ -94,7 +104,7 @@ class _VaccinationSchedulesScreenState extends State<VaccinationSchedulesScreen>
                             ...schedule.items.map((item) => ListTile(
                                   leading: CircleAvatar(
                                     backgroundColor: _dayColor(item.ageDays),
-                                    child: Text('D${item.ageDays}',
+                                    child: Text('D${item.displayDay}',
                                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                   ),
                                   title: Text(item.vaccineName,

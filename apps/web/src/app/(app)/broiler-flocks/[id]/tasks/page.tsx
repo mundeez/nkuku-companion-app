@@ -131,7 +131,7 @@ export default function FlockTasksPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <Badge className={categoryColors[task.category] || "bg-gray-100"}>{task.category}</Badge>
-                    <span className="text-sm text-muted-foreground">Day {task.ageDays} · {new Date(task.taskDate).toLocaleDateString()}</span>
+                    <span className="text-sm text-muted-foreground">Day {task.ageDays + 1} · {new Date(task.taskDate).toLocaleDateString()}</span>
                   </div>
                   <h3 className="font-semibold">{task.title}</h3>
                   {task.description && <p className="text-sm text-muted-foreground mt-1">{task.description}</p>}
@@ -163,7 +163,7 @@ export default function FlockTasksPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <Badge className={categoryColors[task.category] || "bg-gray-100"}>{task.category}</Badge>
-                          <span className="text-sm text-muted-foreground">Day {task.ageDays}</span>
+                          <span className="text-sm text-muted-foreground">Day {task.ageDays + 1}</span>
                         </div>
                         <h3 className="font-medium line-through">{task.title}</h3>
                       </div>
@@ -191,7 +191,7 @@ export default function FlockTasksPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <Badge className={categoryColors[task.category] || "bg-gray-100"}>{task.category}</Badge>
-                        <span className="text-sm text-muted-foreground">Day {task.ageDays}</span>
+                        <span className="text-sm text-muted-foreground">Day {task.ageDays + 1}</span>
                       </div>
                       <h3 className="font-medium line-through">{task.title}</h3>
                     </div>

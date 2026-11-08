@@ -8,6 +8,9 @@ import { checkFlockLimit } from '../../core/billing/feature-gate.js';
 import { calculateItemsRequired } from '../../core/calculation-engine/index.js';
 import { AuditService } from '../../core/finance/audit.service.js';
 import { ListQuerySchema, searchWhere, dateRange, orderBy } from '../../core/list-query.js';
+import { resolveVaccinationSchedule } from '../../core/vaccination-schedule.resolver.js';
+import { computeDailyWater, computeVaccineMixVolume, isWaterRoute } from '../../core/water-requirement.service.js';
+import { buildVaccinationDayNotes } from '../../core/vaccination-notes.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -28,6 +31,7 @@ const FlockCreateSchema = z.object({
   expectedCollectionStart: dateOrIso.nullable().optional(),
   expectedCollectionEnd: dateOrIso.nullable().optional(),
   chickQualityNotes: z.string().max(500).optional().nullable(),
+  vaccinationScheduleId: z.string().uuid().nullable().optional(),
 });
 
 const FlockUpdateSchema = z.object({
@@ -51,6 +55,7 @@ const FlockUpdateSchema = z.object({
   soldDate: dateOrIso.nullable().optional(),
   initialCount: z.number().int().min(0).optional(),
   currentCount: z.number().int().min(0).optional(),
+  vaccinationScheduleId: z.string().uuid().nullable().optional(),
 });
 
 export async function buildBroilerFlockModule(app: FastifyInstance) {
@@ -84,6 +89,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         breed: true,
         supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: isLightRequest ? false : true } },
         financialRecords: isLightRequest ? { select: { amountZmw: true, isIncome: true, category: true } } : { select: { amountZmw: true, isIncome: true, category: true } },
+        vaccinationSchedule: { select: { id: true, name: true } },
       },
       orderBy: orderBy(query.sortBy, query.sortDir, ['name', 'startDate', 'status', 'initialBirdCount'], { startDate: 'desc' }),
       ...(query.limit ? { take: query.limit, skip: query.offset } : {}),
@@ -339,6 +345,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } },
         growthRecords: { orderBy: { recordDate: 'desc' }, take: 1 },
         financialRecords: { select: { amountZmw: true, isIncome: true, category: true } },
+        vaccinationSchedule: { select: { id: true, name: true } },
         _count: {
           select: {
             growthRecords: true,
@@ -419,6 +426,11 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     // startDate is derived from collectionDate; null until chicks are collected
     const startDate = (data.chicksCollected && collectionDate) ? collectionDate : null;
 
+    if (data.vaccinationScheduleId) {
+      const schedule = await prisma.vaccinationSchedule.findUnique({ where: { id: data.vaccinationScheduleId } });
+      if (!schedule) return { error: 'VACCINATION_SCHEDULE_NOT_FOUND' };
+    }
+
     const flock = await prisma.broilerFlock.create({
       data: {
         name: data.name,
@@ -439,11 +451,20 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         expectedCollectionStart: data.expectedCollectionStart ? new Date(data.expectedCollectionStart) : null,
         expectedCollectionEnd: data.expectedCollectionEnd ? new Date(data.expectedCollectionEnd) : null,
         chickQualityNotes: data.chickQualityNotes,
+        vaccinationScheduleId: data.vaccinationScheduleId,
         createdBy: _authUser.userId,
         organizationId,
       },
-      include: { breed: true, supplier: { select: { name: true } } },
+      include: { breed: true, supplier: { select: { name: true } }, vaccinationSchedule: { select: { id: true, name: true } } },
     });
+
+    // Remember the org default from the first explicitly chosen schedule
+    if (data.vaccinationScheduleId) {
+      await prisma.organization.updateMany({
+        where: { id: organizationId, defaultVaccinationScheduleId: null },
+        data: { defaultVaccinationScheduleId: data.vaccinationScheduleId },
+      });
+    }
 
     // Auto-create a financial record for chick purchase
     if (data.supplierId && data.chickPriceZmw && data.chickPriceZmw > 0) {
@@ -491,6 +512,11 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
     if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
 
+    if (raw.vaccinationScheduleId) {
+      const schedule = await prisma.vaccinationSchedule.findUnique({ where: { id: raw.vaccinationScheduleId } });
+      if (!schedule) return reply.status(400).send({ error: 'VACCINATION_SCHEDULE_NOT_FOUND' });
+    }
+
     // Completion lock: non-owners cannot modify a completed flock
     const authUser = (request as any).authUser;
     if (existing.status === 'completed' && authUser?.role !== 'owner') {
@@ -529,6 +555,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const flock = await prisma.broilerFlock.update({
       where: { id },
       data: updateData,
+      include: { vaccinationSchedule: { select: { id: true, name: true } } },
     });
 
     // Auto-create sales financial record when flock is marked as sold
@@ -929,22 +956,41 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const today = new Date();
     const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Comprehensive Schedule' : 'Standard Broiler Schedule';
-    const schedule = await prisma.vaccinationSchedule.findFirst({
-      where: { name: scheduleName },
-      include: { items: { orderBy: { sortOrder: 'asc' } } },
-    });
+    const [schedule, org, mortalityEvents, feedTargets, completedVaccines] = await Promise.all([
+      resolveVaccinationSchedule(prisma, flock),
+      prisma.organization.findUnique({ where: { id: organizationId }, select: { ambientTempC: true } }),
+      prisma.mortalityEvent.findMany({ where: { flockId: id }, select: { eventDate: true, count: true } }),
+      prisma.performanceTarget.findMany({ where: { breedId: flock.breedId }, select: { ageDays: true, targetFeed: true } }),
+      prisma.vaccinationEvent.findMany({ where: { flockId: id }, orderBy: { adminDate: 'asc' } }),
+    ]);
 
-    const completedVaccines = await prisma.vaccinationEvent.findMany({
-      where: { flockId: id },
-      orderBy: { adminDate: 'asc' },
-    });
+    const ambientTempC = Number(org?.ambientTempC ?? 25);
+    const birdsAliveAt = (age: number) => {
+      const date = new Date(startDate.getTime() + age * 24 * 60 * 60 * 1000);
+      const deaths = mortalityEvents.reduce((sum: number, m: any) => sum + (new Date(m.eventDate) <= date ? m.count : 0), 0);
+      return Math.max(0, flock.initialCount - deaths);
+    };
+    const feedTargetAt = (age: number) => feedTargets.find((t: any) => t.ageDays === age)?.targetFeed;
+    const waterAt = (age: number) => {
+      const feed = feedTargetAt(age);
+      return feed != null ? computeDailyWater({ targetFeedKgPerBird: Number(feed), birdsAlive: birdsAliveAt(age), ambientTempC }) : null;
+    };
+    const vaccineEntry = (item: any) => {
+      const water = waterAt(item.ageDays);
+      const waterRoute = isWaterRoute(item.adminMethod);
+      return {
+        adminMethod: item.adminMethod,
+        isWaterRoute: waterRoute,
+        vaccineWater: waterRoute && water ? computeVaccineMixVolume({ daily: water, ageDays: item.ageDays, birdsAlive: birdsAliveAt(item.ageDays) }) : null,
+      };
+    };
 
     const events: any[] = [];
 
     // Placement / brooding start
     events.push({
       ageDays: 0,
+      displayDay: 1,
       date: startDate.toISOString().split('T')[0],
       type: 'management',
       title: 'Chick placement / brooding starts',
@@ -958,17 +1004,20 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const completed = completedVaccines.some((v: any) => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - 0) <= 1);
       events.push({
         ageDays: 1,
+        displayDay: 2,
         date: date.toISOString().split('T')[0],
         type: 'vaccination',
         title: `Vaccination: ${item.vaccineName}`,
         description: `Administer via ${item.adminMethod}. ${item.notes || ''}`,
         completed,
+        ...vaccineEntry(item),
       });
     }
 
     // Feed transitions
     events.push({
       ageDays: feedTransitionDay,
+      displayDay: feedTransitionDay + 1,
       date: new Date(startDate.getTime() + feedTransitionDay * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       type: 'feed',
       title: 'Feed transition: Starter to Grower',
@@ -977,6 +1026,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
     events.push({
       ageDays: finisherDay,
+      displayDay: finisherDay + 1,
       date: new Date(startDate.getTime() + finisherDay * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       type: 'feed',
       title: 'Feed transition: Grower to Finisher',
@@ -990,17 +1040,20 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const completed = completedVaccines.some((v: any) => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - item.ageDays) <= 1);
       events.push({
         ageDays: item.ageDays,
+        displayDay: item.ageDays + 1,
         date: date.toISOString().split('T')[0],
         type: 'vaccination',
         title: `Vaccination: ${item.vaccineName}`,
         description: `Administer via ${item.adminMethod}. ${item.notes || ''}`,
         completed,
+        ...vaccineEntry(item),
       });
     }
 
     // Pre-slaughter withdrawal
     events.push({
       ageDays: targetAge - 7,
+      displayDay: targetAge - 6,
       date: new Date(startDate.getTime() + (targetAge - 7) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       type: 'management',
       title: 'Pre-slaughter withdrawal (coccidiostats)',
@@ -1011,6 +1064,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     // Market / processing
     events.push({
       ageDays: targetAge,
+      displayDay: targetAge + 1,
       date: new Date(startDate.getTime() + targetAge * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       type: 'management',
       title: 'Market / processing date',
@@ -1044,29 +1098,47 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const today = new Date();
     const ageDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Comprehensive Schedule' : 'Standard Broiler Schedule';
-
-    // The three post-flock queries are independent of each other — run them
-    // concurrently to cut sequential round-trip latency from 3 awaits to 1.
-    const [schedule, envSchedule, completedVaccines] = await Promise.all([
-      prisma.vaccinationSchedule.findFirst({
-        where: { name: scheduleName },
-        include: { items: { orderBy: { sortOrder: 'asc' } } },
-      }),
+    // The post-flock queries are independent of each other — run them
+    // concurrently to cut sequential round-trip latency.
+    const [schedule, envSchedule, completedVaccines, org, mortalityEvents, feedTargets] = await Promise.all([
+      resolveVaccinationSchedule(prisma, flock),
       getLightingTemperatureScheduleForFlock(prisma, flock, _authUser.userId),
       prisma.vaccinationEvent.findMany({
         where: { flockId: id },
         orderBy: { adminDate: 'asc' },
       }),
+      prisma.organization.findUnique({ where: { id: organizationId }, select: { ambientTempC: true } }),
+      prisma.mortalityEvent.findMany({ where: { flockId: id }, select: { eventDate: true, count: true } }),
+      prisma.performanceTarget.findMany({ where: { breedId: flock.breedId }, select: { ageDays: true, targetFeed: true } }),
     ]);
+
+    const ambientTempC = Number(org?.ambientTempC ?? 25);
+    const birdsAliveAt = (date: Date) => {
+      const deaths = mortalityEvents.reduce((sum: number, m: any) => sum + (new Date(m.eventDate) <= date ? m.count : 0), 0);
+      return Math.max(0, flock.initialCount - deaths);
+    };
 
     const days = [];
     for (let d = 0; d <= targetAge; d++) {
       const date = new Date(startDate.getTime() + d * 24 * 60 * 60 * 1000);
-      const vaccines = (schedule?.items.filter((i: any) => i.ageDays === d) || []).map((item: any) => ({
-        ...item,
-        completed: completedVaccines.some((v: any) => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - d) <= 1),
-      }));
+      const birdsAlive = birdsAliveAt(date);
+      const feedTarget = feedTargets.find((t: any) => t.ageDays === d)?.targetFeed;
+      const water = feedTarget != null
+        ? computeDailyWater({ targetFeedKgPerBird: Number(feedTarget), birdsAlive, ambientTempC })
+        : null;
+      const vaccines = (schedule?.items.filter((i: any) => i.ageDays === d) || []).map((item: any) => {
+        const waterRoute = isWaterRoute(item.adminMethod);
+        return {
+          ...item,
+          displayDay: item.ageDays + 1,
+          adminMethod: item.adminMethod,
+          isWaterRoute: waterRoute,
+          vaccineWater: waterRoute && water
+            ? computeVaccineMixVolume({ daily: water, ageDays: d, birdsAlive })
+            : null,
+          completed: completedVaccines.some((v: any) => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - d) <= 1),
+        };
+      });
 
       const feedTransitionDay = flock.feedTransitionDay || 18;
       const finisherDay = flock.finisherDay || 29;
@@ -1081,36 +1153,18 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       if (d === feedTransitionDay) managementTasks.push('Feed transition: Starter to Grower');
       if (d === finisherDay) managementTasks.push('Feed transition: Grower to Finisher');
 
+      // Vaccination-day guidance is derived from the resolved schedule so it
+      // stays correct when a flock overrides its schedule.
+      const vaccineNotes = buildVaccinationDayNotes(schedule?.items ?? [], d, vaccines);
+
       const healthSupport = d === 0
         ? 'Day 1-3: Stress pack (glucose + electrolytes + vitamins A/D3/E/C) in drinking water. Rehydrates chicks, stimulates appetite, jumpstarts yolk-sac absorption. Hatchery vaccination complete.'
         : d === 1
           ? 'Continue stress pack. Monitor for dehydration. Brooder temp 32-33C.'
         : d === 2
           ? 'Continue stress pack (Day 3 last day). Monitor chick activity and feed intake.'
-        : d === 9
-          ? 'PRE-VACCINATION (Day 10 IBD): Administer vitamins/electrolytes 24h before vaccination. Suspend chlorination 48h before. Prepare skim milk 2g/L stabilizer.'
-        : d === 10
-          ? 'IBD VACCINATION DAY: Suspend chlorination. Use skim milk 2g/L stabilizer. Withdraw water 1-2h before. Administer Cevamune/Nobilis D78 via drinking water. 2-hour consumption window.'
-        : d === 11
-          ? 'POST-IBD VACCINATION: Administer vitamins/electrolytes for 24h after vaccination. Monitor for vaccine reaction and respiratory signs.'
-        : d === 13
-          ? 'PRE-VACCINATION (Day 14 ND+IB): Administer vitamins/electrolytes 24h before. Suspend chlorination. Prepare skim milk stabilizer.'
-        : d === 14
-          ? 'ND+IB VACCINATION DAY: LaSota or Clone 30 via drinking water or eye-drop. Suspend chlorination. Skim milk stabilizer. Withdraw water 1-2h. Eye-drop ensures 100% intake.'
-        : d === 15
-          ? 'POST-ND+IB VACCINATION: Vitamins/electrolytes for 24h. Monitor for respiratory signs (snicking, rales). Maintain gut health.'
-        : d === 17
-          ? 'PRE-VACCINATION (Day 18 IBD booster): Administer vitamins/electrolytes 24h before. Suspend chlorination. Prepare skim milk stabilizer.'
-        : d === 18
-          ? 'IBD BOOSTER VACCINATION DAY: Live Intermediate Plus via drinking water. Skim milk stabilizer. Withdraw water 1-2h. Essential in Lusaka high-challenge areas.'
-        : d === 19
-          ? 'POST-IBD BOOSTER: Vitamins/electrolytes for 24h. Monitor bursal reaction. Maintain gut health.'
-        : d === 20
-          ? 'PRE-VACCINATION (Day 21 ND booster): Administer vitamins/electrolytes 24h before. Suspend chlorination. Prepare skim milk stabilizer.'
-        : d === 21
-          ? 'ND BOOSTER VACCINATION DAY: LaSota or Clone 30 via drinking water. Skim milk stabilizer. Withdraw water 1-2h. Secures immunity to processing weight. NDV genotype VII.2 in Lusaka - ensure full dose.'
-        : d === 22
-          ? 'POST-ND BOOSTER: Vitamins/electrolytes for 24h. Final immunity consolidation window. Monitor flock health.'
+        : vaccineNotes
+          ? vaccineNotes
         : d > 0 && d % 7 === 0
           ? 'Weekly check: vitamins/electrolytes if heat stress. Provide Vitamin C during peak heat (11AM-3PM) in hot season.'
           : 'Monitor; vitamins/electrolytes if stress or heat. Ensure clean water and proper ventilation.';
@@ -1131,8 +1185,11 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
       days.push({
         day: d,
-        age: `Day ${d}`,
+        displayDay: d + 1,
+        age: `Day ${d + 1}`,
         date: date.toISOString().split('T')[0],
+        birdsAlive,
+        water,
         vaccines,
         lightingTemperature,
         feedPhase,

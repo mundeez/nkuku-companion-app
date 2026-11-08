@@ -31,6 +31,9 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
   DateTime? _collectionDate;
   String? _selectedBreedId;
   String? _selectedSupplierId;
+  String? _selectedScheduleId; // null = auto (org default → breed default)
+  List<VaccinationSchedule> _schedules = [];
+  String? _orgDefaultScheduleId;
   String _housingType = 'whole_house';
   bool _chicksCollected = false;
   bool _loadingBreeds = true;
@@ -71,10 +74,16 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
     try {
       final breeds = await BroilerService.getBreeds();
       final suppliers = await BroilerService.getSuppliers();
+      final schedules = await BroilerService.getVaccinationSchedules()
+          .catchError((_) => <VaccinationSchedule>[]);
+      final org = await BroilerService.getOrganization()
+          .catchError((_) => <String, dynamic>{});
       if (!mounted) return;
       setState(() {
         _breeds = breeds;
         _suppliers = suppliers;
+        _schedules = schedules;
+        _orgDefaultScheduleId = org['defaultVaccinationScheduleId']?.toString();
         _loadingBreeds = false;
         _loadingSuppliers = false;
         if (_selectedBreedId == null && breeds.isNotEmpty && widget.flock == null) {
@@ -103,6 +112,7 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
     _qualityNotesController.text = flock.chickQualityNotes ?? '';
     _selectedBreedId = flock.breedId;
     _selectedSupplierId = flock.supplierId;
+    _selectedScheduleId = flock.vaccinationScheduleId;
     _housingType = flock.housingType;
     _chicksCollected = flock.chicksCollected ?? false;
     // Use orderDate for the date picker (falls back to startDate for older flocks)
@@ -162,11 +172,19 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
         chicksCollected: _chicksCollected,
         collectionDate: _collectionDate?.toIso8601String().split('T').first,
         chickQualityNotes: _qualityNotesController.text.trim().isEmpty ? null : _qualityNotesController.text.trim(),
+        vaccinationScheduleId: _selectedScheduleId,
       );
+
+      final body = flock.toJson();
+      // Explicitly clearing a previously set override requires sending null.
+      if (_selectedScheduleId == null &&
+          widget.flock?.vaccinationScheduleId != null) {
+        body['vaccinationScheduleId'] = null;
+      }
 
       final saved = widget.flock == null
           ? await BroilerService.createFlock(flock)
-          : await BroilerService.updateFlock(widget.flock!.id, flock.toJson());
+          : await BroilerService.updateFlock(widget.flock!.id, body);
 
       if (!mounted) return;
       Navigator.pop(context, saved);
@@ -307,6 +325,23 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
                         DropdownMenuItem(value: 'spot_brooding', child: Text('Spot brooding')),
                       ],
                       onChanged: (v) => setState(() => _housingType = v!),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      key: ValueKey(_selectedScheduleId),
+                      initialValue: _selectedScheduleId ?? _orgDefaultScheduleId,
+                      decoration: const InputDecoration(
+                        labelText: 'Vaccination schedule',
+                        helperText: 'Drives the calendar, tasks and vaccination tab for this flock.',
+                        helperMaxLines: 2,
+                      ),
+                      items: [
+                        const DropdownMenuItem(
+                            value: null, child: Text('Auto (org or breed default)')),
+                        ..._schedules.map((s) =>
+                            DropdownMenuItem(value: s.id, child: Text(s.name))),
+                      ],
+                      onChanged: (v) => setState(() => _selectedScheduleId = v),
                     ),
                     const SizedBox(height: 12),
                     if (isEdit) ...[

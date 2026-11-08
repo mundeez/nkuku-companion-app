@@ -81,7 +81,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final primary = Theme.of(context).colorScheme.primary;
     return Scaffold(
       appBar: AppBar(
-        title: Text(currentDay != null ? 'Flock Calendar · Day $currentDay' : 'Flock Calendar'),
+        title: Text(currentDay != null ? 'Flock Calendar · Day ${currentDay + 1}' : 'Flock Calendar'),
         actions: [
           IconButton(
             icon: _sharing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.share),
@@ -115,12 +115,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       children: [
                         CircleAvatar(
                           backgroundColor: isCurrent ? primary.withAlpha(60) : null,
-                          child: Text('${day.day}'),
+                          child: Text('${day.displayDay}'),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Day ${day.day} · ${day.feedPhase}',
+                            'Day ${day.displayDay} · ${day.feedPhase}',
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -139,9 +139,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       ],
                     ),
                     const Divider(),
+                    if (day.water != null) ...[
+                      Text(
+                        'Water: ${day.water!.minLitres}–${day.water!.maxLitres} L'
+                        '${day.birdsAlive != null ? ' · ${day.birdsAlive} birds' : ''}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     if (day.vaccines.isNotEmpty) ...[
                       const Text('Vaccines', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ...day.vaccines.map((v) => Text('• ${v.vaccineName} (Day ${v.ageDays})')),
+                      ...day.vaccines.map((v) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('• ${v.vaccineName} (Day ${v.displayDay})'),
+                              if (v.isWaterRoute && v.vaccineWater != null)
+                                Text(
+                                  '  Mix vaccine in ~${v.vaccineWater!.minLitres}–${v.vaccineWater!.maxLitres} L (field rule ~${v.vaccineWater!.fieldRuleLitres} L)',
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                            ],
+                          )),
                       const SizedBox(height: 8),
                     ],
                     if (env != null) ...[

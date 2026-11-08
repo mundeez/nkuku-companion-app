@@ -691,6 +691,31 @@ class BroilerService {
     return VaccinationScheduleStatus.fromJson(res.data);
   }
 
+  static Future<List<VaccinationSchedule>> getVaccinationSchedules() async {
+    final res =
+        await ApiService.dio.get('/api/v1/vaccination-events/schedules');
+    _assertOk(res);
+    return (res.data as List)
+        .map((e) => VaccinationSchedule.fromJson(e))
+        .toList();
+  }
+
+  /// Current organization settings (includes defaultVaccinationScheduleId and
+  /// ambientTempC).
+  static Future<Map<String, dynamic>> getOrganization() async {
+    final res = await ApiService.dio.get('/api/v1/organizations/me');
+    _assertOk(res);
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  static Future<Map<String, dynamic>> updateOrganization(
+      Map<String, dynamic> body) async {
+    final res =
+        await ApiService.dio.patch('/api/v1/organizations/me', data: body);
+    _assertOk(res);
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
   static Future<VaccinationEvent> createVaccinationEvent(
       VaccinationEvent event) async {
     try {
@@ -1478,12 +1503,14 @@ class MortalitySummary {
 }
 
 class VaccinationScheduleStatus {
+  final VaccinationSchedule? schedule;
   final List<VaccinationEvent> completed;
   final List<VaccinationScheduleItem> upcoming;
   final List<VaccinationScheduleItem> overdue;
   final int ageDays;
 
   VaccinationScheduleStatus({
+    this.schedule,
     required this.completed,
     required this.upcoming,
     required this.overdue,
@@ -1492,6 +1519,9 @@ class VaccinationScheduleStatus {
 
   factory VaccinationScheduleStatus.fromJson(Map<String, dynamic> json) {
     return VaccinationScheduleStatus(
+      schedule: json['schedule'] != null
+          ? VaccinationSchedule.fromJson(json['schedule'])
+          : null,
       completed: (json['completed'] as List? ?? [])
           .map((e) => VaccinationEvent.fromJson(e))
           .toList(),

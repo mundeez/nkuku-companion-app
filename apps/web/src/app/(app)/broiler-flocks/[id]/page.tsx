@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/api/client";
 import { useFlock, useUpdateFlock, useApiQuery, useApiMutation } from "@/lib/api/hooks";
 import { BroilerFlock, GrowthRecord, FeedRecord, FeedPurchase, FeedProjectionResult, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
 import { FeedProjectionTable } from "@/components/feed-projection-table";
+import { FlockVaccinationSchedule } from "@/components/flock-vaccination-schedule";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -1193,13 +1194,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
         <h3 className="text-lg font-medium">{config.title}</h3>
         {canEdit && <Button size="sm" onClick={openAdd}><Icon className="h-4 w-4 mr-1" />Add</Button>}
       </div>
-      {type === "vaccination" && (
-        <div className="mb-4 text-sm">
-          <Link href="/docs/vaccines/Ross308_Zambia_Broiler_Management_Guide.md" target="_blank" className="text-primary hover:underline">
-            Reference: Ross 308 Vaccination Schedule
-          </Link>
-        </div>
-      )}
+      {type === "vaccination" && <FlockVaccinationSchedule flockId={flockId} />}
       <FlockTabChart type={type} records={records} flockId={flockId} breedId={breedId} startDate={startDate} />
 
       {/* Bulk action bar */}

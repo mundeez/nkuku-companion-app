@@ -4,6 +4,9 @@ import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
+import { resolveVaccinationSchedule } from '../../core/vaccination-schedule.resolver.js';
+
+const withDisplayDay = (item: any) => ({ ...item, displayDay: item.ageDays + 1 });
 
 const VaccinationEventCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -28,10 +31,14 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
   app.get('/schedules', { preHandler: [authenticate] }, async (_request, reply) => {
     // Vaccination schedules are global reference data; cache briefly.
     reply.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
-    return prisma.vaccinationSchedule.findMany({
+    const schedules = await prisma.vaccinationSchedule.findMany({
       include: { items: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { isDefault: 'desc' },
     });
+    return schedules.map((s: any) => ({
+      ...s,
+      items: s.items.map(withDisplayDay),
+    }));
   });
 
   app.get('/', { preHandler: [authenticate] }, async (request) => {
@@ -71,7 +78,8 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
     // If chicks not yet collected (no startDate), return empty schedule
     if (!flock.startDate) {
-      return { schedule: [], ageDays: null };
+      const emptySchedule = await resolveVaccinationSchedule(prisma, flock);
+      return { schedule: emptySchedule ? { id: emptySchedule.id, name: emptySchedule.name, items: emptySchedule.items.map(withDisplayDay) } : null, completed: [], upcoming: [], overdue: [], ageDays: null };
     }
 
     const today = new Date();
@@ -84,20 +92,17 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
       orderBy: { adminDate: 'asc' },
     });
 
-    // Get schedule items for breed
-    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Zambia Schedule' : 'Standard Broiler Schedule';
-    const schedule = await prisma.vaccinationSchedule.findFirst({
-      where: { name: scheduleName },
-      include: { items: { orderBy: { sortOrder: 'asc' } } },
-    });
+    // Resolve the schedule for this flock (flock choice → org default → breed default)
+    const schedule = await resolveVaccinationSchedule(prisma, flock);
 
     const upcoming = schedule?.items.filter((item: any) => item.ageDays > ageDays) ?? [];
     const overdue = schedule?.items.filter((item: any) => item.ageDays <= ageDays && !completed.some((c: any) => c.vaccineName === item.vaccineName && Math.abs(c.ageDays - item.ageDays) <= 2)) ?? [];
 
     return {
+      schedule: schedule ? { id: schedule.id, name: schedule.name, items: schedule.items.map(withDisplayDay) } : null,
       completed,
-      upcoming,
-      overdue,
+      upcoming: upcoming.map(withDisplayDay),
+      overdue: overdue.map(withDisplayDay),
       ageDays,
     };
   });

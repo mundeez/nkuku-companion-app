@@ -6,7 +6,7 @@ import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
 import { useFlocks, useCreateFlock, useUpdateFlock, useDeleteFlock, useApiQuery } from "@/lib/api/hooks";
-import { BroilerFlock, Breed, Supplier } from "@/lib/types";
+import { BroilerFlock, Breed, Supplier, VaccinationSchedule, OrganizationSettings } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +41,11 @@ interface FlockFormData {
   collectionDate?: string;
   expectedCollectionStart?: string;
   expectedCollectionEnd?: string;
+  vaccinationScheduleId?: string;
 }
+
+// Sentinel for "let the server decide" (org default → breed default)
+const AUTO_SCHEDULE = "__auto__";
 
 const emptyForm: FlockFormData = {
   name: "",
@@ -64,6 +68,8 @@ export default function BroilerFlocksPage() {
   const { data: flocksData = [], isLoading: flocksLoading, error: flocksError } = useFlocks({ q: searchQuery || undefined });
   const { data: breeds = [], error: breedsError } = useApiQuery<Breed[]>("/api/v1/breeds");
   const { data: suppliers = [], error: suppliersError } = useApiQuery<Supplier[]>("/api/v1/suppliers");
+  const { data: vaccinationSchedules = [] } = useApiQuery<VaccinationSchedule[]>("/api/v1/vaccination-events/schedules");
+  const { data: orgSettings } = useApiQuery<OrganizationSettings>("/api/v1/organizations/me");
   const flocks = flocksData as BroilerFlock[];
   const createFlock = useCreateFlock();
   const updateFlock = useUpdateFlock();
@@ -106,6 +112,7 @@ export default function BroilerFlocksPage() {
       collectionDate: flock.collectionDate ? new Date(flock.collectionDate).toISOString().split("T")[0] : undefined,
       expectedCollectionStart: flock.expectedCollectionStart ? new Date(flock.expectedCollectionStart).toISOString().split("T")[0] : undefined,
       expectedCollectionEnd: flock.expectedCollectionEnd ? new Date(flock.expectedCollectionEnd).toISOString().split("T")[0] : undefined,
+      vaccinationScheduleId: flock.vaccinationScheduleId || AUTO_SCHEDULE,
     });
     setEditOpen(true);
   }
@@ -169,6 +176,9 @@ export default function BroilerFlocksPage() {
     const body: any = { ...formData };
     if (body.supplierId === "custom" || body.supplierId === "") {
       body.supplierId = null;
+    }
+    if (body.vaccinationScheduleId === AUTO_SCHEDULE || body.vaccinationScheduleId === "") {
+      body.vaccinationScheduleId = null;
     }
     return body;
   }
@@ -574,6 +584,24 @@ export default function BroilerFlocksPage() {
               </Select>
             </div>
             <div>
+              <Label>Vaccination Schedule</Label>
+              <Select
+                value={form.vaccinationScheduleId || orgSettings?.defaultVaccinationScheduleId || AUTO_SCHEDULE}
+                onValueChange={(v) => setForm({ ...form, vaccinationScheduleId: v })}
+              >
+                <SelectTrigger><SelectValue placeholder="Auto (org or breed default)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={AUTO_SCHEDULE}>Auto (org or breed default)</SelectItem>
+                  {vaccinationSchedules.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Drives the calendar, tasks and vaccination tab for this flock.
+              </p>
+            </div>
+            <div>
               <Label>Supplier</Label>
               <select
                 className="w-full border rounded-md p-2 bg-background text-foreground"
@@ -710,6 +738,24 @@ export default function BroilerFlocksPage() {
             <div>
               <Label>Finisher Start Day</Label>
               <Input type="number" value={form.finisherDay || ""} onChange={(e) => setForm({ ...form, finisherDay: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label>Vaccination Schedule</Label>
+              <Select
+                value={form.vaccinationScheduleId || AUTO_SCHEDULE}
+                onValueChange={(v) => setForm({ ...form, vaccinationScheduleId: v })}
+              >
+                <SelectTrigger><SelectValue placeholder="Auto (org or breed default)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={AUTO_SCHEDULE}>Auto (org or breed default)</SelectItem>
+                  {vaccinationSchedules.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Drives the calendar, tasks and vaccination tab for this flock.
+              </p>
             </div>
             <div>
               <Label>Supplier</Label>

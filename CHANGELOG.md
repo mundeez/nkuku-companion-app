@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.47.0] — 2026-11-08
+
+### Vaccination schedule — single source of truth (web + mobile)
+- **Root cause fixed:** four surfaces resolved "the" schedule differently
+  (schedule tab/tasks → Ross 308 Zambia; calendar/print/mobile calendar →
+  Ross 308 Comprehensive; web tab → static guide doc; mobile schedules screen
+  starred Standard Broiler). All now go through one resolver:
+  **flock choice → org default → breed default** (Ross 308 → Zambia schedule).
+- **Per-flock schedule picker** on the flock form (web + mobile), "Auto" by
+  default; the first explicit choice is remembered as the org default.
+- **Settings → Flock Defaults** (owner): default vaccination schedule +
+  ambient temperature (°C, default 25) — web and mobile.
+- Web flock Vaccination tab now shows the resolved schedule table
+  (Day / Vaccine / Type / Route / Status) instead of only a doc link.
+- **Day 1 = day-old** display convention everywhere (schedules, calendar,
+  tasks); storage stays 0-based.
+- Calendar pre/post-vaccination guidance (vitamins ±24h, chlorination off
+  48h before, skim-milk stabiliser) is now derived from the resolved schedule
+  instead of hardcoded Day 10/14/18/21 text.
+
+### Water requirement (Aviagen Ross 308 Handbook)
+- Daily flock water shown as a range on calendar/print/tasks:
+  min = feed kg × 1.6 × birds (21 °C); max = feed kg × 1.8 × birds ×
+  (1 + 6.5 % per °C above 21 °C at the org's ambient temperature).
+- Drinking-water vaccine days show the mixing volume: 2-hour share of the
+  daily range, plus the field rule (day × birds ÷ 1000 L) as a cross-check.
+- Schema: `broiler_flocks.vaccination_schedule_id`,
+  `organizations.default_vaccination_schedule_id`, `organizations.ambient_temp_c`
+  (migration `20261023000000_flock_vaccination_schedule`, additive).
+
 ## [1.46.2] — 2026-11-08
 
 ### Play Store packaging

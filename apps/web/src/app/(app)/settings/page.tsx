@@ -9,6 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { OrganizationSettings, VaccinationSchedule } from "@/lib/types";
 import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign, CreditCard, Download, Trash2, UserX } from "lucide-react";
 import { AccountSettings } from "@/components/auth/account-settings";
 
@@ -30,6 +34,11 @@ export default function SettingsPage() {
   const [deleteAccountError, setDeleteAccountError] = useState("");
   const [deleteAccountSoleOwnerOrgs, setDeleteAccountSoleOwnerOrgs] = useState<string[]>([]);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  // Flock defaults (owner only)
+  const [defaultScheduleId, setDefaultScheduleId] = useState<string>("__auto__");
+  const [ambientTempC, setAmbientTempC] = useState<string>("25");
+  const [flockDefaultsSaving, setFlockDefaultsSaving] = useState(false);
+  const [flockDefaultsMsg, setFlockDefaultsMsg] = useState("");
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -39,11 +48,16 @@ export default function SettingsPage() {
     if (user) {
       Promise.all([
         apiFetch("/api/v1/breeds"),
-        apiFetch("/api/v1/vaccination-events").catch(() => []),
-        apiFetch<{ name: string }>("/api/v1/organizations/me").catch(() => null),
-      ]).then(([b, , org]) => {
+        apiFetch<VaccinationSchedule[]>("/api/v1/vaccination-events/schedules").catch(() => []),
+        apiFetch<OrganizationSettings>("/api/v1/organizations/me").catch(() => null),
+      ]).then(([b, scheds, org]) => {
         setBreeds(b);
-        if (org) setOrgName(org.name);
+        setSchedules(scheds);
+        if (org) {
+          setOrgName(org.name);
+          setDefaultScheduleId(org.defaultVaccinationScheduleId ?? "__auto__");
+          setAmbientTempC(String(Number(org.ambientTempC ?? 25)));
+        }
         setLoading(false);
       }).catch(() => setLoading(false));
     }
@@ -92,6 +106,26 @@ export default function SettingsPage() {
         setDeleteAccountError(err?.body?.message || err?.message || "Could not delete your account. Please try again.");
       }
       setDeletingAccount(false);
+    }
+  };
+
+  const saveFlockDefaults = async () => {
+    setFlockDefaultsMsg("");
+    setFlockDefaultsSaving(true);
+    try {
+      await apiFetch("/api/v1/organizations/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          defaultVaccinationScheduleId: defaultScheduleId === "__auto__" ? null : defaultScheduleId,
+          ambientTempC: Number(ambientTempC),
+        }),
+      });
+      setFlockDefaultsMsg("Saved.");
+    } catch (err: any) {
+      setFlockDefaultsMsg(err.message || "Failed to save.");
+    } finally {
+      setFlockDefaultsSaving(false);
     }
   };
 
@@ -203,6 +237,54 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Flock Defaults — owner only */}
+        {user.role === "owner" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Syringe className="h-5 w-5" />
+                Flock Defaults
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm">Default vaccination schedule</Label>
+                  <Select value={defaultScheduleId} onValueChange={setDefaultScheduleId}>
+                    <SelectTrigger><SelectValue placeholder="Auto (breed default)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__auto__">Auto (breed default)</SelectItem>
+                      {schedules.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm">Ambient temperature (°C)</Label>
+                  <Input
+                    type="number"
+                    min={10}
+                    max={45}
+                    step={0.5}
+                    value={ambientTempC}
+                    onChange={(e) => setAmbientTempC(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Used to estimate daily drinking-water ranges on flock calendars.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={saveFlockDefaults} disabled={flockDefaultsSaving}>
+                    {flockDefaultsSaving ? "Saving…" : "Save"}
+                  </Button>
+                  {flockDefaultsMsg && <span className="text-xs text-muted-foreground">{flockDefaultsMsg}</span>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Disease Database */}
         <Card>

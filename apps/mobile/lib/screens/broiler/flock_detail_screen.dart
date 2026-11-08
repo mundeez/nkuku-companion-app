@@ -1614,8 +1614,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ── Vaccination schedule reference ──
-          if (overdue.isNotEmpty || upcoming.isNotEmpty) ...[
+          // ── Vaccination schedule (resolved per flock) ──
+          if (status?.schedule != null) ...[
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -1628,17 +1628,78 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Vaccination Schedule',
+                            'Vaccination Schedule — ${status!.schedule!.name}',
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
                         ),
-                        if (status != null)
-                          Text(
-                            'Day ${status.ageDays}',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[600]),
-                          ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...status.schedule!.items.map((item) {
+                      final done = completed.any((c) =>
+                          c.vaccineName == item.vaccineName &&
+                          (c.ageDays - item.ageDays).abs() <= 2);
+                      final od = overdue.any((o) => o.id == item.id);
+                      final chipLabel = done
+                          ? 'Done'
+                          : od
+                              ? 'Overdue'
+                              : 'Upcoming';
+                      final chipColor = done
+                          ? Colors.green
+                          : od
+                              ? Colors.red
+                              : Colors.grey;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 40,
+                              child: Text('D${item.displayDay}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13)),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.vaccineName,
+                                      style: const TextStyle(fontSize: 13)),
+                                  Text(
+                                    '${item.vaccineType} · ${item.adminMethod.replaceAll('_', ' ')}',
+                                    style: TextStyle(
+                                        fontSize: 11, color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(chipLabel,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: chipColor,
+                                    fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ] else if (overdue.isNotEmpty || upcoming.isNotEmpty) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Vaccination Schedule',
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const SizedBox(height: 12),
                     if (overdue.isNotEmpty) ...[
@@ -1736,7 +1797,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 Text(item.vaccineName,
                     style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
                 Text(
-                  'Day ${item.ageDays} · ${item.adminMethod.replaceAll('_', ' ')}'
+                  'Day ${item.displayDay} · ${item.adminMethod.replaceAll('_', ' ')}'
                   '${item.vaccineType.isNotEmpty ? ' · ${item.vaccineType}' : ''}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),

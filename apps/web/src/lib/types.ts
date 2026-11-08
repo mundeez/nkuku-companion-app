@@ -163,6 +163,8 @@ export interface BroilerFlock {
   actualAverageSalesPrice?: number;
   unrealisedProfit?: number;
   housingType: "whole_house" | "spot_brooding";
+  vaccinationScheduleId?: string | null;
+  vaccinationSchedule?: { id: string; name: string } | null;
   chicksCollected: boolean;
   collectionDate?: string;
   expectedCollectionStart?: string | null;
@@ -484,10 +486,27 @@ export interface FlockTimelineEvent {
   completed: boolean;
 }
 
+export interface DailyWaterRequirement {
+  minLitres: number;
+  maxLitres: number;
+  perBirdMinLitres: number;
+  perBirdMaxLitres: number;
+  ambientTempC: number;
+}
+
+export interface VaccineMixVolume {
+  minLitres: number;
+  maxLitres: number;
+  fieldRuleLitres: number;
+}
+
 export interface FlockCalendarDay {
   day: number;
+  displayDay?: number;
   age: string;
   date: string;
+  birdsAlive?: number;
+  water?: DailyWaterRequirement | null;
   vaccines: VaccinationScheduleItem[];
   lightingTemperature?: LightingTemperatureScheduleItemData;
   feedPhase: string;
@@ -527,10 +546,31 @@ export interface VaccinationScheduleItem {
   vaccineName: string;
   vaccineType: string;
   ageDays: number;
+  displayDay?: number;
   adminMethod: string;
+  isWaterRoute?: boolean;
+  vaccineWater?: VaccineMixVolume | null;
   sortOrder: number;
   notes?: string;
   completed?: boolean;
+}
+
+export interface VaccinationSchedule {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  description?: string;
+  items: VaccinationScheduleItem[];
+}
+
+export interface OrganizationSettings {
+  id: string;
+  name: string;
+  country: string;
+  currency: string;
+  planCode: string;
+  defaultVaccinationScheduleId?: string | null;
+  ambientTempC?: number | string;
 }
 
 // ── Dashboard Summary ─────────────────────────

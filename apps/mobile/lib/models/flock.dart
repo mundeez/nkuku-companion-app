@@ -26,6 +26,8 @@ class BroilerFlock {
   final String? collectionDate;
   final String? chickQualityNotes;
   final String? soldDate;
+  final String? vaccinationScheduleId;
+  final String? vaccinationScheduleName;
   // Computed financial fields returned by GET /broiler-flocks/:id
   final double? totalCost;
   final double? totalRevenue;
@@ -63,6 +65,8 @@ class BroilerFlock {
     this.collectionDate,
     this.chickQualityNotes,
     this.soldDate,
+    this.vaccinationScheduleId,
+    this.vaccinationScheduleName,
     this.totalCost,
     this.totalRevenue,
     this.totalOutstandingPayments,
@@ -124,6 +128,9 @@ class BroilerFlock {
       chickQualityNotes:
           json['chickQualityNotes'] ?? json['chick_quality_notes'],
       soldDate: json['soldDate'] ?? json['sold_date'],
+      vaccinationScheduleId:
+          json['vaccinationScheduleId'] ?? json['vaccination_schedule_id'],
+      vaccinationScheduleName: json['vaccinationSchedule']?['name'],
       totalCost: _d(json['totalCost']),
       totalRevenue: _d(json['totalRevenue']),
       totalOutstandingPayments: _d(json['totalOutstandingPayments']),
@@ -156,6 +163,8 @@ class BroilerFlock {
       if (collectionDate != null) 'collectionDate': collectionDate,
       if (chickQualityNotes != null && chickQualityNotes!.isNotEmpty)
         'chickQualityNotes': chickQualityNotes,
+      if (vaccinationScheduleId != null)
+        'vaccinationScheduleId': vaccinationScheduleId,
     };
   }
 
@@ -187,6 +196,8 @@ class BroilerFlock {
     String? collectionDate,
     String? chickQualityNotes,
     String? soldDate,
+    String? vaccinationScheduleId,
+    String? vaccinationScheduleName,
     double? totalCost,
     double? totalRevenue,
     double? totalOutstandingPayments,
@@ -225,6 +236,10 @@ class BroilerFlock {
       collectionDate: collectionDate ?? this.collectionDate,
       chickQualityNotes: chickQualityNotes ?? this.chickQualityNotes,
       soldDate: soldDate ?? this.soldDate,
+      vaccinationScheduleId:
+          vaccinationScheduleId ?? this.vaccinationScheduleId,
+      vaccinationScheduleName:
+          vaccinationScheduleName ?? this.vaccinationScheduleName,
       totalCost: totalCost ?? this.totalCost,
       totalRevenue: totalRevenue ?? this.totalRevenue,
       totalOutstandingPayments:
@@ -292,12 +307,63 @@ class VaccinationSchedule {
   }
 }
 
+class VaccineMixVolume {
+  final double minLitres;
+  final double maxLitres;
+  final double fieldRuleLitres;
+
+  VaccineMixVolume({
+    required this.minLitres,
+    required this.maxLitres,
+    required this.fieldRuleLitres,
+  });
+
+  factory VaccineMixVolume.fromJson(Map<String, dynamic> json) {
+    double d(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0;
+    return VaccineMixVolume(
+      minLitres: d(json['minLitres']),
+      maxLitres: d(json['maxLitres']),
+      fieldRuleLitres: d(json['fieldRuleLitres']),
+    );
+  }
+}
+
+class DailyWaterRequirement {
+  final double minLitres;
+  final double maxLitres;
+  final double perBirdMinLitres;
+  final double perBirdMaxLitres;
+  final double ambientTempC;
+
+  DailyWaterRequirement({
+    required this.minLitres,
+    required this.maxLitres,
+    required this.perBirdMinLitres,
+    required this.perBirdMaxLitres,
+    required this.ambientTempC,
+  });
+
+  factory DailyWaterRequirement.fromJson(Map<String, dynamic> json) {
+    double d(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0;
+    return DailyWaterRequirement(
+      minLitres: d(json['minLitres']),
+      maxLitres: d(json['maxLitres']),
+      perBirdMinLitres: d(json['perBirdMinLitres']),
+      perBirdMaxLitres: d(json['perBirdMaxLitres']),
+      ambientTempC: d(json['ambientTempC']),
+    );
+  }
+}
+
 class VaccinationScheduleItem {
   final String id;
   final String vaccineName;
   final String vaccineType;
   final int ageDays;
+  final int displayDay;
   final String adminMethod;
+  final bool isWaterRoute;
+  final VaccineMixVolume? vaccineWater;
   final String? notes;
 
   VaccinationScheduleItem({
@@ -305,17 +371,26 @@ class VaccinationScheduleItem {
     required this.vaccineName,
     required this.vaccineType,
     required this.ageDays,
+    int? displayDay,
     required this.adminMethod,
+    this.isWaterRoute = false,
+    this.vaccineWater,
     this.notes,
-  });
+  }) : displayDay = displayDay ?? ageDays + 1;
 
   factory VaccinationScheduleItem.fromJson(Map<String, dynamic> json) {
+    final age = json['ageDays'] ?? json['age_days'] ?? 0;
     return VaccinationScheduleItem(
       id: json['id'] ?? '',
       vaccineName: json['vaccineName'] ?? json['vaccine_name'] ?? '',
       vaccineType: json['vaccineType'] ?? json['vaccine_type'] ?? '',
-      ageDays: json['ageDays'] ?? json['age_days'] ?? 0,
+      ageDays: age,
+      displayDay: json['displayDay'] ?? (age is int ? age + 1 : null),
       adminMethod: json['adminMethod'] ?? json['admin_method'] ?? '',
+      isWaterRoute: json['isWaterRoute'] ?? false,
+      vaccineWater: json['vaccineWater'] != null
+          ? VaccineMixVolume.fromJson(json['vaccineWater'])
+          : null,
       notes: json['notes'],
     );
   }
@@ -455,7 +530,10 @@ class LightingTemperatureScheduleItem {
 
 class CalendarDay {
   final int day;
+  final int displayDay;
   final String date;
+  final int? birdsAlive;
+  final DailyWaterRequirement? water;
   final String feedPhase;
   final List<VaccinationScheduleItem> vaccines;
   final LightingTemperatureScheduleItem? lightingTemperature;
@@ -464,17 +542,25 @@ class CalendarDay {
 
   CalendarDay({
     required this.day,
+    int? displayDay,
     required this.date,
+    this.birdsAlive,
+    this.water,
     required this.feedPhase,
     required this.vaccines,
     this.lightingTemperature,
     required this.managementTasks,
     required this.healthSupport,
-  });
+  }) : displayDay = displayDay ?? day + 1;
 
   factory CalendarDay.fromJson(Map<String, dynamic> json) {
     return CalendarDay(
       day: json['day'] ?? 0,
+      displayDay: json['displayDay'],
+      birdsAlive: json['birdsAlive'],
+      water: json['water'] != null
+          ? DailyWaterRequirement.fromJson(json['water'])
+          : null,
       date: json['date'] ?? '',
       feedPhase: json['feedPhase'] ?? json['feed_phase'] ?? '',
       vaccines: (json['vaccines'] as List?)

@@ -467,6 +467,156 @@ describe('Broiler Management API', () => {
     });
   });
 
+  describe('Vaccination Schedule Resolution', () => {
+    let comprehensiveId: string;
+    let zambiaId: string;
+    let standardId: string;
+    let overrideFlockId: string;
+    let orgDefaultFlockId: string;
+
+    it('lists schedules with displayDay on items', async () => {
+      const res = await fetch(`${API_URL}/api/v1/vaccination-events/schedules`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      comprehensiveId = data.find((s: any) => s.name === 'Ross 308 Comprehensive Schedule').id;
+      zambiaId = data.find((s: any) => s.name === 'Ross 308 Zambia Schedule').id;
+      standardId = data.find((s: any) => s.name === 'Standard Broiler Schedule').id;
+      expect(comprehensiveId).toBeDefined();
+      const item = data[0].items[0];
+      expect(item.displayDay).toBe(item.ageDays + 1);
+    });
+
+    it('remembers the org default from the first explicitly chosen schedule', async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Schedule Override Flock',
+          breedId,
+          orderDate: today,
+          initialCount: 100,
+          chicksCollected: true,
+          collectionDate: today,
+          vaccinationScheduleId: comprehensiveId,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.vaccinationScheduleId).toBe(comprehensiveId);
+      expect(data.vaccinationSchedule?.id).toBe(comprehensiveId);
+      overrideFlockId = data.id;
+
+      const orgRes = await fetch(`${API_URL}/api/v1/organizations/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const org = await orgRes.json();
+      expect(org.defaultVaccinationScheduleId).toBe(comprehensiveId);
+      expect(Number(org.ambientTempC)).toBe(25);
+    });
+
+    it('flock override beats org default', async () => {
+      const res = await fetch(`${API_URL}/api/v1/vaccination-events/schedule?flockId=${overrideFlockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      expect(data.schedule.id).toBe(comprehensiveId);
+      expect(data.schedule.name).toBe('Ross 308 Comprehensive Schedule');
+      expect(data.schedule.items[0].displayDay).toBe(data.schedule.items[0].ageDays + 1);
+    });
+
+    it('org default beats breed default', async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Org Default Flock',
+          breedId,
+          orderDate: today,
+          initialCount: 200,
+          chicksCollected: true,
+          collectionDate: today,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const flock = await res.json();
+      orgDefaultFlockId = flock.id;
+
+      const sched = await fetch(`${API_URL}/api/v1/vaccination-events/schedule?flockId=${orgDefaultFlockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await sched.json();
+      // Ross 308 breed default is 'Ross 308 Zambia Schedule', but org default
+      // (Comprehensive, set above) wins.
+      expect(data.schedule.id).toBe(comprehensiveId);
+    });
+
+    it('PATCHing flock schedule overrides org default', async () => {
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks/${orgDefaultFlockId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vaccinationScheduleId: standardId }),
+      });
+      expect(res.status).toBe(200);
+
+      const sched = await fetch(`${API_URL}/api/v1/vaccination-events/schedule?flockId=${orgDefaultFlockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await sched.json();
+      expect(data.schedule.id).toBe(standardId);
+    });
+
+    it('calendar summary days have displayDay, birdsAlive and water; water-route vaccines have vaccineWater', async () => {
+      const res = await fetch(`${API_URL}/api/v1/broiler-flocks/${overrideFlockId}/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.days[0].displayDay).toBe(1);
+      expect(data.days[0].birdsAlive).toBe(100);
+      expect(data.days[0].water).not.toBeNull();
+      // Day-0 feed target is ~0; a later day must show a positive range
+      const wetDay = data.days.find((d: any) => d.water && d.water.minLitres > 0);
+      expect(wetDay).toBeDefined();
+      expect(wetDay.water.maxLitres).toBeGreaterThanOrEqual(wetDay.water.minLitres);
+      expect(data.days[0].water.maxLitres).toBeGreaterThanOrEqual(data.days[0].water.minLitres);
+      const waterVax = data.days.flatMap((d: any) => d.vaccines).find((v: any) => v.isWaterRoute);
+      expect(waterVax).toBeDefined();
+      expect(waterVax.vaccineWater).not.toBeNull();
+      expect(waterVax.vaccineWater.fieldRuleLitres).toBeGreaterThan(0);
+      expect(waterVax.displayDay).toBe(waterVax.ageDays + 1);
+    });
+
+    it('PATCH /organizations/me accepts default schedule and ambientTempC', async () => {
+      const res = await fetch(`${API_URL}/api/v1/organizations/me`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultVaccinationScheduleId: zambiaId, ambientTempC: 30 }),
+      });
+      expect(res.status).toBe(200);
+      const org = await res.json();
+      expect(org.defaultVaccinationScheduleId).toBe(zambiaId);
+      expect(Number(org.ambientTempC)).toBe(30);
+    });
+
+    it('cleans up test flocks and resets org defaults', async () => {
+      for (const id of [overrideFlockId, orgDefaultFlockId]) {
+        await fetch(`${API_URL}/api/v1/broiler-flocks/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      await fetch(`${API_URL}/api/v1/organizations/me`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultVaccinationScheduleId: null, ambientTempC: 25 }),
+      });
+    });
+  });
+
   describe('Cleanup', () => {
     it('deletes the test flock', async () => {
       const res = await fetch(`${API_URL}/api/v1/broiler-flocks/${flockId}`, {

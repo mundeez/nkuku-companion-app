@@ -11,6 +11,8 @@ const OrgUpdateSchema = z.object({
   name: z.string().min(1).max(150).optional(),
   country: z.string().length(2).optional(),
   currency: z.string().length(3).optional(),
+  defaultVaccinationScheduleId: z.string().uuid().nullable().optional(),
+  ambientTempC: z.number().min(10).max(45).optional(),
 });
 
 const InviteCreateSchema = z.object({
@@ -31,6 +33,8 @@ export async function buildOrganizationModule(app: FastifyInstance) {
       select: {
         id: true, name: true, country: true, currency: true, planCode: true,
         isActive: true, createdAt: true,
+        defaultVaccinationScheduleId: true,
+        ambientTempC: true,
         _count: { select: { members: true } },
       },
     });
@@ -45,6 +49,10 @@ export async function buildOrganizationModule(app: FastifyInstance) {
     const updateData: any = { ...data };
     if (updateData.country) updateData.country = updateData.country.toUpperCase();
     if (updateData.currency) updateData.currency = updateData.currency.toUpperCase();
+    if (data.defaultVaccinationScheduleId) {
+      const schedule = await prisma.vaccinationSchedule.findUnique({ where: { id: data.defaultVaccinationScheduleId } });
+      if (!schedule) return { error: 'VACCINATION_SCHEDULE_NOT_FOUND' };
+    }
     return prisma.organization.update({ where: { id: organizationId }, data: updateData });
   });
 

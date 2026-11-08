@@ -56,6 +56,7 @@ export default function PrintCalendarPage() {
             <th className="border border-gray-300 p-2 text-left">Temp (°C)</th>
             <th className="border border-gray-300 p-2 text-left">RH (%)</th>
             <th className="border border-gray-300 p-2 text-left">Vaccination / Booster</th>
+            <th className="border border-gray-300 p-2 text-left">Water (L)</th>
             <th className="border border-gray-300 p-2 text-left">Feed Phase</th>
             <th className="border border-gray-300 p-2 text-left">Management Tasks</th>
             <th className="border border-gray-300 p-2 text-left">Health / Stress Support</th>
@@ -77,8 +78,16 @@ export default function PrintCalendarPage() {
               </td>
               <td className="border border-gray-300 p-2">
                 {day.vaccines.length > 0
-                  ? day.vaccines.map((v) => `${v.vaccineName} (${v.completed ? "Done" : "Due"})`).join("; ")
+                  ? day.vaccines.map((v) =>
+                      `${v.vaccineName} (${v.completed ? "Done" : "Due"})` +
+                      (v.isWaterRoute && v.vaccineWater
+                        ? ` — mix in ~${v.vaccineWater.minLitres}–${v.vaccineWater.maxLitres} L (field rule ~${v.vaccineWater.fieldRuleLitres} L)`
+                        : "")
+                    ).join("; ")
                   : ""}
+              </td>
+              <td className="border border-gray-300 p-2">
+                {day.water ? `${day.water.minLitres}–${day.water.maxLitres}` : ""}
               </td>
               <td className="border border-gray-300 p-2">{day.feedPhase}</td>
               <td className="border border-gray-300 p-2">

@@ -9,6 +9,7 @@ import '../services/offline_repository.dart';
 import '../services/sync_service.dart';
 import '../services/api_cache.dart';
 import 'account_settings_screen.dart';
+import 'flock_defaults_screen.dart';
 import 'login_screen.dart';
 import 'users_screen.dart';
 import 'projections_screen.dart';
@@ -270,6 +271,19 @@ class _MoreScreenState extends State<MoreScreen> {
             subtitle: const Text('ZMW — Zambian Kwacha'),
             trailing: const Chip(label: Text('Default')),
           ),
+          if (AuthService.isOwner)
+            ListTile(
+              leading: const Icon(Icons.tune),
+              title: const Text('Flock Defaults'),
+              subtitle: const Text(
+                  'Default vaccination schedule and ambient temperature'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const FlockDefaultsScreen()),
+              ),
+            ),
           ListTile(
             leading: const Icon(Icons.notifications_outlined),
             title: const Text('Notifications'),

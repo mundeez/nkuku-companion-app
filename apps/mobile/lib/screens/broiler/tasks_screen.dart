@@ -158,7 +158,7 @@ class _TasksScreenState extends State<TasksScreen> {
                       return Card(
                         margin: const EdgeInsets.only(top: 12),
                         child: ListTile(
-                          leading: CircleAvatar(child: Text('D${task.ageDays}')),
+                          leading: CircleAvatar(child: Text('D${task.ageDays + 1}')),
                           title: Text(task.title,
                               maxLines: 1, overflow: TextOverflow.ellipsis),
                           subtitle: Text(

@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { getLightingTemperatureScheduleForFlock } from '../../core/lighting-temperature-schedule.service.js';
+import { resolveVaccinationSchedule } from '../../core/vaccination-schedule.resolver.js';
+import { computeDailyWater, computeVaccineMixVolume, isWaterRoute } from '../../core/water-requirement.service.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -77,13 +79,26 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
     const feedTransitionDay = flock.feedTransitionDay || 11;
     const finisherDay = 25; // configurable default for Ross 308
 
-    const scheduleName = flock.breed?.name === 'Ross 308' ? 'Ross 308 Zambia Schedule' : 'Standard Broiler Schedule';
-    const schedule = await prisma.vaccinationSchedule.findFirst({
-      where: { name: scheduleName },
-      include: { items: { orderBy: { sortOrder: 'asc' } } },
-    });
+    const [schedule, org, mortalityEvents, feedTargets] = await Promise.all([
+      resolveVaccinationSchedule(prisma, flock),
+      prisma.organization.findUnique({ where: { id: organizationId }, select: { ambientTempC: true } }),
+      prisma.mortalityEvent.findMany({ where: { flockId }, select: { eventDate: true, count: true } }),
+      prisma.performanceTarget.findMany({ where: { breedId: flock.breedId }, select: { ageDays: true, targetFeed: true } }),
+    ]);
 
     const envSchedule = await getLightingTemperatureScheduleForFlock(prisma, flock, _authUser.userId);
+
+    const ambientTempC = Number(org?.ambientTempC ?? 25);
+    const birdsAliveAt = (date: Date) => {
+      const deaths = mortalityEvents.reduce((sum: number, m: any) => sum + (new Date(m.eventDate) <= date ? m.count : 0), 0);
+      return Math.max(0, flock.initialCount - deaths);
+    };
+    const dailyWaterAt = (age: number, date: Date) => {
+      const feed = feedTargets.find((t: any) => t.ageDays === age)?.targetFeed;
+      return feed != null
+        ? computeDailyWater({ targetFeedKgPerBird: Number(feed), birdsAlive: birdsAliveAt(date), ambientTempC })
+        : null;
+    };
 
     // Fetch all existing tasks for this flock in a single query and index them
     // by `${dateStr}|${title}` so we can dedupe candidate tasks in memory instead
@@ -123,11 +138,16 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
       const dateStr = taskDate.toISOString().split('T')[0];
       const dayTaskDate = new Date(dateStr);
 
+      const dayWater = dailyWaterAt(ageDays, taskDate);
+      const waterDesc = dayWater
+        ? ` Expected today: ${dayWater.minLitres}–${dayWater.maxLitres} L for ${birdsAliveAt(taskDate)} birds (ambient ${ambientTempC}°C).`
+        : '';
+
       // Daily routine tasks
       const routineTasks = [
         { category: 'environment' as const, title: 'Check temperature and humidity 2x daily', description: 'Record morning and evening readings.' },
         { category: 'management' as const, title: 'Record mortality and culls', description: 'Count dead birds and note cause if known.' },
-        { category: 'management' as const, title: 'Monitor feed and water consumption', description: 'Compare to expected daily targets.' },
+        { category: 'management' as const, title: 'Monitor feed and water consumption', description: `Compare to expected daily targets.${waterDesc}` },
         { category: 'environment' as const, title: 'Inspect litter quality', description: 'Check for wet spots, caking, and ammonia.' },
       ];
       for (const task of routineTasks) {
@@ -150,7 +170,12 @@ export async function buildFlockTaskModule(app: FastifyInstance) {
       // Vaccination tasks from schedule
       for (const item of schedule?.items || []) {
         if (item.ageDays === ageDays) {
-          pushCandidate(ageDays, dayTaskDate, 'vaccination', `Vaccination: ${item.vaccineName}`, `Administer via ${item.adminMethod}. ${item.notes || ''}`);
+          let description = `Administer via ${item.adminMethod}. ${item.notes || ''}`;
+          if (isWaterRoute(item.adminMethod) && dayWater) {
+            const mix = computeVaccineMixVolume({ daily: dayWater, ageDays, birdsAlive: birdsAliveAt(taskDate) });
+            description += ` Mix in ~${mix.minLitres}–${mix.maxLitres} L (field rule ~${mix.fieldRuleLitres} L).`;
+          }
+          pushCandidate(ageDays, dayTaskDate, 'vaccination', `Vaccination: ${item.vaccineName}`, description);
         }
       }
 
