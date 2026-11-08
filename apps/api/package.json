@@ -1,6 +1,6 @@
 {
   "name": "api",
-  "version": "1.46.1",
+  "version": "1.46.2",
   "private": true,
   "description": "Nkuku Companion API — Fastify + Prisma + PostgreSQL",
   "scripts": {

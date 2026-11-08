@@ -18,7 +18,7 @@ if (keystoreFile.exists()) {
 }
 
 android {
-    namespace = "com.deeztechologysolutions.nkuku"
+    namespace = "com.deeztechnologysolutions.nkuku"
     compileSdk = 37  // flutter_secure_storage requires SDK 37+
     ndkVersion = flutter.ndkVersion
 
@@ -33,7 +33,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.deeztechologysolutions.nkuku"
+        applicationId = "com.deeztechnologysolutions.nkuku"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

@@ -1,4 +1,4 @@
-package com.deeztechologysolutions.nkuku
+package com.deeztechnologysolutions.nkuku
 
 import io.flutter.embedding.android.FlutterActivity
 

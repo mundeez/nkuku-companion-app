@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.46.2] — 2026-11-08
+
+### Play Store packaging
+- **applicationId corrected** to `com.deeztechnologysolutions.nkuku`
+  (mirrors `deeztechnology.solutions`; fixes the "techology" typo from
+  1.46.1). `namespace` and `MainActivity` moved to match.
+- Version `1.46.2+148` → AAB stamps `versionCode=148`.
+- **Final package identity for Play Console:** `com.deeztechnologysolutions.nkuku`
+  — immutable after first upload. Discard all earlier AABs.
+
 ## [1.46.1] — 2026-11-08
 
 ### Play Store packaging
