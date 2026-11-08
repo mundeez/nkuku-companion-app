@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.46.0] — 2026-11-08
+
+### Play Store packaging
+- **Android versionCode discipline** — pubspec now carries a `+146` build
+  number so the AAB stamps `versionCode=146`, `versionName=1.46.0` (Play
+  requires strictly increasing codes on every upload; previously every build
+  defaulted to code 1). Increment the suffix on every future release.
+- **Launcher label** — `android:label` changed from `nkuku_mobile` to
+  **Nkuku Companion** (the name shown under the installed app icon).
+- First signed release AAB produced:
+  `build/app/outputs/bundle/release/app-release.aab` — package
+  `com.nkuku.nkuku_mobile`, minSdk 24, targetSdk 36.
+
 ## [1.46.0-alpha] — 2026-10-30
 
 ### Mobile: flock lifecycle parity with web
