@@ -23,7 +23,9 @@ async function api(path: string, options: any = {}, token?: string) {
 async function journalFor(sourceId: string, token: string) {
   const all: any[] = [];
   for (const st of ['sale', 'sale_payment']) {
-    const { data } = await api(`/api/v1/journal?sourceType=${st}&limit=100`, {}, token);
+    // Newest-first so freshly posted test entries are on the first page even
+    // when the org already has hundreds of sale entries.
+    const { data } = await api(`/api/v1/journal?sourceType=${st}&sortBy=createdAt&sortDir=desc&limit=100`, {}, token);
     all.push(...((data.data ?? data) as any[]));
   }
   return all.filter((e: any) => e.sourceId === sourceId);

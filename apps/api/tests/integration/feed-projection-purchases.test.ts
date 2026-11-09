@@ -220,7 +220,7 @@ describe('Feed Projection & Purchases API', () => {
       // Dedicated supplier with one feed type offered in 50kg and 25kg variants
       const supRes = await api('/api/v1/suppliers', token, {
         method: 'POST',
-        body: JSON.stringify({ name: 'Variant Feeds Test Co', chickenType: 'broiler' }),
+        body: JSON.stringify({ name: `Variant Feeds Test Co ${Date.now()}`, chickenType: 'broiler' }),
       });
       const sup = await supRes.json();
       expect(sup.id).toBeDefined();

@@ -372,23 +372,27 @@ describe('Sale Records API', () => {
       expect(patchRes.status).toBe(422);
     });
 
-    it('rejects amountPaid change on a paid record without status change', async () => {
+    it('owner amountPaid correction on a paid record derives status and logs an adjustment', async () => {
       const { data: sale } = await createSale(token, flockId, {
         paymentStatus: 'paid',
         totalAmountZmw: 750,
       });
       saleIds.push(sale.id);
 
-      // Try to set amountPaidZmw to 0 without changing paymentStatus
+      // Owner sets amountPaidZmw to 0 without touching paymentStatus — status is derived
       const patchRes = await fetch(`${API_URL}/api/v1/sale-records/${sale.id}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ amountPaidZmw: 0 }),
       });
-      expect(patchRes.status).toBe(422);
+      expect(patchRes.status).toBe(200);
+      const updated = await patchRes.json();
+      expect(updated.paymentStatus).toBe('pending');
+      expect(Number(updated.amountPaidZmw)).toBe(0);
+      expect(updated.paymentsCount).toBeGreaterThanOrEqual(1);
     });
 
-    it('rejects non-zero amountPaid on a pending record without status change', async () => {
+    it('owner non-zero amountPaid on a pending record derives partial status', async () => {
       const { data: sale } = await createSale(token, flockId, {
         paymentStatus: 'pending',
         totalAmountZmw: 750,
@@ -400,7 +404,11 @@ describe('Sale Records API', () => {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ amountPaidZmw: 100 }),
       });
-      expect(patchRes.status).toBe(422);
+      expect(patchRes.status).toBe(200);
+      const updated = await patchRes.json();
+      expect(updated.paymentStatus).toBe('partial');
+      expect(Number(updated.amountPaidZmw)).toBe(100);
+      expect(Number(updated.remainingDueZmw)).toBe(650);
     });
 
     it('auto-updates amountPaid when totalAmount changes on a paid record', async () => {
