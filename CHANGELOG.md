@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.49.0] — 2026-11-09
+
+### Platform staff console — foundation (P1 of PLAN-super-admin-console)
+- **Staff identity is separate from tenant users**: `staff_users`,
+  `staff_sessions`, `staff_recovery_codes`, `platform_audit_events`
+  (append-only via CREATE RULE), `impersonation_sessions` tables.
+- Staff roles per approved matrix: `super_admin`, `support`, `finance`,
+  `content_editor`, `marketing`, `auditor` — explicit permission strings
+  checked by `requireStaff`/`requirePermission`.
+- `/api/v1/platform` auth: login → **mandatory TOTP enrolment** (otplib,
+  10 hashed recovery codes) → 15-min access + 30-day refresh sessions;
+  `POST /auth/reauth` required within 5 min for dangerous permissions.
+- IP allowlist hook on all `/api/v1/platform/*` (`PLATFORM_ALLOWED_CIDRS`);
+  approved escape hatch — `PLATFORM_ALLOWLIST_BYPASS_TOTP=true` lets a
+  super_admin pass from any IP and logs `security.allowlist_bypass` to the
+  immutable platform audit log.
+- Staff management (`staff.manage` + re-auth): list, invite (emails
+  bootstrap link), disable, change role, reset TOTP. Guards: can't disable
+  yourself, can't disable the last super_admin, TOTP reset for a
+  super_admin requires a different super_admin.
+- Bootstrap: first boot with empty staff table creates
+  `PLATFORM_SUPER_ADMIN_EMAIL` (admin@zeendeefood.solutions) and logs a
+  one-time password to stderr.
+- Legacy `/api/v1/admin/*` keeps working one release: super_admin staff
+  JWTs are accepted there via a shim; `isPlatformAdmin` flag path remains
+  until the console ships (P2).
+
+### Tests & data hygiene (P0)
+- Integration suite now runs against `docker-compose.test.yml`
+  (dedicated postgres `nkuku_test` + redis + minio + api:3002) with a
+  globalSetup guard that refuses non-test targets. Production purge
+  applied separately (786 test orgs / 869 test users removed).
+
 ## [1.48.0] — 2026-11-09
 
 ### Sale payment history + Accounts Receivable
