@@ -48,6 +48,8 @@ import { buildDocumentModule } from './modules/documents/routes.js';
 import { buildAdModule } from './modules/ads/routes.js';
 import { buildAdCampaignModule } from './modules/ad-campaigns/routes.js';
 import { buildAdminOpsModule } from './modules/admin-ops/routes.js';
+import { buildPlatformModule } from './modules/platform/routes.js';
+import { bootstrapPlatformStaff } from './core/staff-auth/bootstrap.js';
 import { ensureBucket } from './core/storage/storage.service.js';
 import { getS3Client, getS3Bucket } from './core/storage/s3-client.js';
 import { SchedulerService } from './core/finance/scheduler.service.js';
@@ -226,6 +228,12 @@ await app.register(buildDocumentModule, { prefix: '/api/v1/documents' });
 await app.register(buildAdModule, { prefix: '/api/v1/ads' });
 await app.register(buildAdCampaignModule, { prefix: '/api/v1/ad-campaigns' });
 await app.register(buildAdminOpsModule, { prefix: '/api/v1/admin' });
+await app.register(buildPlatformModule, { prefix: '/api/v1/platform' });
+
+// ── Platform staff bootstrap ─────────────
+// Creates the first super_admin StaffUser (one-time password logged to
+// stderr) when the staff table is empty. Idempotent.
+await bootstrapPlatformStaff(prisma, app.log);
 
 // ── Health check ─────────────────────────
 // Shallow: process is up. Deep: verifies DB, Redis, S3 reachability.

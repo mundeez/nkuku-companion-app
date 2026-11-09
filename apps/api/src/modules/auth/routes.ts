@@ -18,6 +18,7 @@ import {
   type SocialProvider,
 } from '../../core/security/social-auth.service.js';
 import { authRateLimit } from '../../core/security/rate-limiter.js';
+import { tryDecodeStaffToken } from '../../core/staff-auth/staff-auth.service.js';
 
 const LoginSchema = z.object({
   email: z.string().email().optional(),
@@ -1458,6 +1459,19 @@ export async function authenticate(request: any, reply: any) {
     // picks up the change on their next login/refresh.
     request.authUser = payload;
   } catch {
+    // Deprecation shim (P1, one release): a valid platform staff JWT
+    // (aud 'platform') is NOT a tenant credential — tenant routes keep
+    // rejecting it — but while the legacy /api/v1/admin/* aliases exist
+    // they may be reached with a staff token, so let it through on that
+    // surface only and set request.staffUser (no authUser). The actual
+    // authorisation decision is made by requirePlatformAdmin.
+    if (request.url?.startsWith('/api/v1/admin/')) {
+      const staffClaims = tryDecodeStaffToken(token);
+      if (staffClaims) {
+        request.staffUser = staffClaims;
+        return;
+      }
+    }
     return reply.status(401).send({ error: 'INVALID_TOKEN' });
   }
 }

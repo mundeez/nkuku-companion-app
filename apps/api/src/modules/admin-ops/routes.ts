@@ -4,6 +4,12 @@ import { authenticate } from '../auth/routes.js';
 import { requirePlatformAdmin } from '../../core/billing/feature-gate.js';
 import { getBrandingConfig, validateLicenseDb } from '../../core/branding/branding.config.js';
 
+// DEPRECATED (P1, super-admin console): /api/v1/admin/* is kept as an
+// alias surface for ONE release while the dedicated console at
+// /api/v1/platform/* rolls out — treat as `Sunset` and remove once the
+// console is live. requirePlatformAdmin accepts staff JWTs (aud
+// 'platform', role super_admin) in addition to the legacy
+// User.isPlatformAdmin flag during the transition.
 export async function buildAdminOpsModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
