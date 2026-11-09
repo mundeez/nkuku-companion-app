@@ -23,6 +23,7 @@ export async function buildDashboardModule(app: FastifyInstance) {
     const [
       flocks,
       openAlerts,
+      saleRecords,
       financialRecords,
     ] = await Promise.all([
       prisma.broilerFlock.findMany({
@@ -41,6 +42,10 @@ export async function buildDashboardModule(app: FastifyInstance) {
         },
         include: { flock: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
+      }),
+      prisma.saleRecord.findMany({
+        where: { organizationId },
+        select: { totalAmountZmw: true, amountPaidZmw: true, paymentStatus: true },
       }),
       prisma.financialRecord.findMany({
         where: {
@@ -82,6 +87,11 @@ export async function buildDashboardModule(app: FastifyInstance) {
       .reduce((s: number, r: any) => s + Number(r.amountZmw), 0);
     const netProfit = Number((totalRevenue - totalCost).toFixed(2));
     const profitPerBird = totalBirds > 0 ? Number((netProfit / totalBirds).toFixed(2)) : 0;
+
+    const totalCollected = saleRecords.reduce((s: number, r: any) => s + Number(r.amountPaidZmw ?? 0), 0);
+    const totalOutstanding = saleRecords
+      .filter((r: any) => r.paymentStatus !== 'paid')
+      .reduce((s: number, r: any) => s + Math.max(0, Number(r.totalAmountZmw) - Number(r.amountPaidZmw ?? 0)), 0);
 
     // ── Monthly Trend (last 12 months) ───────
     const now = new Date();
@@ -203,6 +213,8 @@ export async function buildDashboardModule(app: FastifyInstance) {
         totalCost: Number(totalCost.toFixed(2)),
         netProfit,
         profitPerBird,
+        totalCollected: Number(totalCollected.toFixed(2)),
+        totalOutstanding: Number(totalOutstanding.toFixed(2)),
         openAlerts: openAlerts.length,
       },
       monthlyTrend,

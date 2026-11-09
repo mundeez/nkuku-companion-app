@@ -366,7 +366,7 @@ export default function SalesPage() {
                 </select>
               </div>
               <div>
-                <Label htmlFor="amountPaidZmw">Amount Paid (ZMW)</Label>
+                <Label htmlFor="amountPaidZmw">Amount Paid (ZMW){editingId ? " — Correction — logged as an adjustment" : ""}</Label>
                 <Input
                   id="amountPaidZmw"
                   type="number"
@@ -374,9 +374,13 @@ export default function SalesPage() {
                   min="0"
                   value={effectiveAmountPaid}
                   onChange={(e) => setForm({ ...form, amountPaidZmw: e.target.value })}
-                  disabled={form.paymentStatus === "paid" || form.paymentStatus === "pending"}
+                  disabled={form.paymentStatus === "paid" || form.paymentStatus === "pending" || (editingId != null && user?.role !== "owner")}
+                  title={editingId != null && user?.role !== "owner" ? "Only an owner can correct the amount paid — use Record payment in the sale detail" : undefined}
                   placeholder={form.paymentStatus === "paid" ? "Auto-set to total" : form.paymentStatus === "pending" ? "0.00" : "Enter amount"}
                 />
+                {editingId != null && user?.role !== "owner" && (
+                  <p className="text-xs text-muted-foreground mt-1">Owner only — use Record payment to add a payment</p>
+                )}
               </div>
               <div className="md:col-span-3">
                 <Label htmlFor="notes">Notes</Label>
@@ -448,16 +452,16 @@ export default function SalesPage() {
                         <span className={cn("h-2 w-2 rounded-full", statusColor)} />
                         <span className="text-xs font-medium capitalize">{r.paymentStatus}</span>
                       </div>
-                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                      <div className="relative h-4 w-full rounded-full bg-muted overflow-hidden">
                         <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${pctPaid}%` }} />
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold">
+                          {pctPaid.toFixed(0)}%
+                        </span>
                       </div>
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{fmtZmw(paid)}</span>
+                        <span>Paid {fmtZmw(paid)} · <span className={remaining > 0 ? "text-amber-600" : ""}>Due {fmtZmw(remaining)}</span></span>
                         <span>{fmtZmw(total)}</span>
                       </div>
-                      {r.paymentStatus === "partial" && (
-                        <span className="text-xs text-amber-600 font-medium">{fmtZmw(remaining)} remaining</span>
-                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>

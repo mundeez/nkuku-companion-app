@@ -298,7 +298,15 @@ class _SaleRecordFormState extends State<SaleRecordForm> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _amountPaidController,
-                  decoration: const InputDecoration(labelText: 'Amount paid (ZMW)'),
+                  decoration: InputDecoration(
+                    labelText: 'Amount paid (ZMW)',
+                    helperText: widget.record != null
+                        ? (AuthService.isOwner
+                            ? 'Correction — logged as an adjustment'
+                            : 'Owner only — use Record payment on the sale detail')
+                        : null,
+                  ),
+                  enabled: widget.record == null || AuthService.isOwner,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   validator: (v) {
                     final n = double.tryParse(v ?? '');

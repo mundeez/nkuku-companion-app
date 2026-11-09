@@ -1,3 +1,35 @@
+class SalePayment {
+  final String id;
+  final String saleRecordId;
+  final double amountZmw;
+  final DateTime paidAt;
+  final String method;
+  final String? reference;
+  final String? note;
+
+  SalePayment({
+    required this.id,
+    required this.saleRecordId,
+    required this.amountZmw,
+    required this.paidAt,
+    required this.method,
+    this.reference,
+    this.note,
+  });
+
+  factory SalePayment.fromJson(Map<String, dynamic> json) {
+    return SalePayment(
+      id: json['id'],
+      saleRecordId: json['saleRecordId'] ?? '',
+      amountZmw: double.tryParse(json['amountZmw']?.toString() ?? '0') ?? 0,
+      paidAt: DateTime.parse(json['paidAt'] ?? json['paid_at'] ?? DateTime.now().toIso8601String()),
+      method: json['method'] ?? 'cash',
+      reference: json['reference'],
+      note: json['note'],
+    );
+  }
+}
+
 class SaleRecord {
   final String id;
   final String flockId;
@@ -10,6 +42,9 @@ class SaleRecord {
   final double totalAmountZmw;
   final String paymentStatus;
   final double? amountPaidZmw;
+  final double? remainingDueZmw;
+  final double? paidPct;
+  final int? paymentsCount;
   final String? notes;
   final String? flockName;
 
@@ -25,6 +60,9 @@ class SaleRecord {
     required this.totalAmountZmw,
     this.paymentStatus = 'pending',
     this.amountPaidZmw,
+    this.remainingDueZmw,
+    this.paidPct,
+    this.paymentsCount,
     this.notes,
     this.flockName,
   });
@@ -47,6 +85,15 @@ class SaleRecord {
       paymentStatus: json['paymentStatus'] ?? json['payment_status'] ?? 'pending',
       amountPaidZmw: (json['amountPaidZmw'] ?? json['amount_paid_zmw']) != null
           ? double.tryParse((json['amountPaidZmw'] ?? json['amount_paid_zmw']).toString())
+          : null,
+      remainingDueZmw: json['remainingDueZmw'] != null
+          ? double.tryParse(json['remainingDueZmw'].toString())
+          : null,
+      paidPct: json['paidPct'] != null
+          ? double.tryParse(json['paidPct'].toString())
+          : null,
+      paymentsCount: json['paymentsCount'] != null
+          ? int.tryParse(json['paymentsCount'].toString())
           : null,
       notes: _stripFrPrefix(json['notes']),
       flockName: json['flock'] is Map ? json['flock']['name'] : null,

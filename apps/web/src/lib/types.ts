@@ -575,6 +575,8 @@ export interface OrganizationSettings {
 
 // ── Dashboard Summary ─────────────────────────
 export interface DashboardKpis {
+  totalCollected?: number;
+  totalOutstanding?: number;
   activeFlocks: number;
   pendingFlocks: number;
   totalFlocks: number;
@@ -669,10 +671,24 @@ export interface SaleRecord {
   totalAmountZmw: number;
   paymentStatus: PaymentStatus;
   amountPaidZmw: number | null;
+  remainingDueZmw?: number;
+  paidPct?: number;
+  paymentsCount?: number;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
   flock?: { name: string; breed?: { name: string } };
+}
+
+export interface SalePayment {
+  id: string;
+  saleRecordId: string;
+  amountZmw: number;
+  paidAt: string;
+  method: 'cash' | 'mobile_money_airtel' | 'mobile_money_mtn' | 'mobile_money_zamtel' | 'bank_transfer' | 'other' | 'adjustment' | 'opening_balance';
+  reference: string | null;
+  note: string | null;
+  createdAt: string;
 }
 
 export interface SaleRecordSummary {

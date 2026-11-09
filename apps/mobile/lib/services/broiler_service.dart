@@ -1164,6 +1164,33 @@ class BroilerService {
     throw BroilerServiceException('Unexpected sale-records response');
   }
 
+  static Future<List<SalePayment>> getSalePayments(String saleId) async {
+    final res = await ApiService.dio.get('/api/v1/sale-records/$saleId/payments');
+    _assertOk(res);
+    return (res.data as List)
+        .map((e) => SalePayment.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<Map<String, dynamic>> recordSalePayment(
+      String saleId, Map<String, dynamic> body) async {
+    try {
+      final res = await ApiService.dio
+          .post('/api/v1/sale-records/$saleId/payments', data: body);
+      _assertOk(res);
+      return res.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final code = e.response?.data is Map ? e.response?.data['error'] : null;
+      throw BroilerServiceException(code ?? 'Failed to record payment');
+    }
+  }
+
+  static Future<void> deleteSalePayment(String saleId, String paymentId) async {
+    final res = await ApiService.dio
+        .delete('/api/v1/sale-records/$saleId/payments/$paymentId');
+    _assertOk(res);
+  }
+
   static Future<Map<String, dynamic>> getSaleRecordSummary(
       String flockId, {SalesFilter? filter}) async {
     final params = <String, dynamic>{'flockId': flockId};

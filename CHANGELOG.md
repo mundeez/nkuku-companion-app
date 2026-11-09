@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.48.0] — 2026-11-09
+
+### Sale payment history + Accounts Receivable
+- **Payment history per sale** (`sale_payments`): amount, date, method
+  (cash / Airtel / MTN / Zamtel mobile money / bank transfer / other),
+  reference, note. "Record payment" on the sale detail (web drawer + mobile
+  sheet); owner-only delete. Existing paid amounts backfilled as one
+  "Opening balance" entry per sale.
+- "Amount paid" stays editable for **owners only** as a correction — each
+  change is logged as a signed `adjustment` entry.
+- API: `GET/POST /sale-records/:id/payments`, `DELETE …/payments/:paymentId`
+  (`PAYMENT_EXCEEDS_DUE`, `PAYMENT_EDIT_OWNER_ONLY`); sale responses gain
+  `remainingDueZmw`, `paidPct`, `paymentsCount`.
+- **Ledger:** sales now post Dr Cash 1010 (paid) + Dr Accounts Receivable 1020
+  (unpaid) / Cr Bird Sales 4010 at creation; each payment posts Dr 1010 /
+  Cr 1020; adjustments and deletions reverse correctly. Previously sales were
+  only journaled by the one-off migration script and always as full Cash.
+- One-time correction (`correct-sales-receivables.ts`) applied to production:
+  125 sales re-posted with the Cash/AR split, 118 old entries reversed;
+  trial balance balanced, 1020 = ZMW 13,830.00 = sum of remaining dues.
+- Zero-value sales (free birds) are not journaled.
+
+### Revenue / outstanding visibility (web + mobile)
+- Home dashboard: **Revenue** and **Outstanding** KPI tiles (`kpis.totalCollected`,
+  `kpis.totalOutstanding`).
+- Flock list cards: "Revenue ZMW x · Outstanding ZMW y" + collected-vs-outstanding bar.
+- Sale tiles everywhere: "Paid ZMW x · Due ZMW y" with the % inside the bar.
+
+### Fixed
+- Mobile flock Sales tab lost its active filter after editing/deleting a sale or
+  pull-to-refresh (list showed everything while the filter badge stayed on).
+
+### Ops note
+- `JournalSourceType` gained `sale` / `sale_payment`. `ALTER TYPE … ADD VALUE`
+  needs the type owner, so on fresh DBs apply `infra/sql/add-sale-source-types.sql`
+  as a superuser before `prisma migrate deploy`.
+
 ## [1.47.0] — 2026-11-08
 
 ### Vaccination schedule — single source of truth (web + mobile)

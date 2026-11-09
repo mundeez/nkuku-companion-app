@@ -9,6 +9,8 @@ class DashboardKpis {
   final double netProfit;
   final double profitPerBird;
   final int openAlerts;
+  final double totalCollected;
+  final double totalOutstanding;
 
   const DashboardKpis({
     required this.activeFlocks,
@@ -21,6 +23,8 @@ class DashboardKpis {
     required this.netProfit,
     required this.profitPerBird,
     required this.openAlerts,
+    this.totalCollected = 0,
+    this.totalOutstanding = 0,
   });
 
   factory DashboardKpis.fromJson(Map<String, dynamic> json) => DashboardKpis(
@@ -34,6 +38,8 @@ class DashboardKpis {
         netProfit: (json['netProfit'] ?? 0.0).toDouble(),
         profitPerBird: (json['profitPerBird'] ?? 0.0).toDouble(),
         openAlerts: (json['openAlerts'] ?? 0) as int,
+        totalCollected: (json['totalCollected'] ?? 0.0).toDouble(),
+        totalOutstanding: (json['totalOutstanding'] ?? 0.0).toDouble(),
       );
 }
 

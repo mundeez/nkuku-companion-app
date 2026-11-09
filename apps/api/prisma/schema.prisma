@@ -1394,6 +1394,8 @@ model JournalEntry {
 }
 
 enum JournalSourceType {
+  sale
+  sale_payment
   manual
   feed_record
   vaccination_event
@@ -1509,6 +1511,7 @@ model SaleRecord {
   totalAmountZmw  Decimal  @map("total_amount_zmw") @db.Decimal(14, 2)
   paymentStatus   String   @default("pending") @map("payment_status") @db.VarChar(20)
   amountPaidZmw   Decimal? @map("amount_paid_zmw") @db.Decimal(14, 2)
+  journalEntryId  String?  @map("journal_entry_id") @db.Uuid
   notes           String?  @db.Text
   createdBy       String?  @map("created_by") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1518,12 +1521,33 @@ model SaleRecord {
   flock        BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
   creator      User?        @relation("SaleRecordCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   documents    Document[]
+  payments     SalePayment[]
 
   @@index([flockId, saleDate])
   @@index([saleDate])
   @@index([organizationId])
   @@index([organizationId, customerName])
   @@map("sale_records")
+}
+
+model SalePayment {
+  id             String   @id @default(uuid()) @db.Uuid
+  saleRecordId   String   @map("sale_record_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  amountZmw      Decimal  @map("amount_zmw") @db.Decimal(12, 2)
+  paidAt         DateTime @map("paid_at") @db.Date
+  method         String   @db.VarChar(30)
+  reference      String?  @db.VarChar(120)
+  note           String?  @db.Text
+  journalEntryId String?  @map("journal_entry_id") @db.Uuid
+  createdBy      String?  @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  saleRecord SaleRecord @relation(fields: [saleRecordId], references: [id], onDelete: Cascade)
+
+  @@index([saleRecordId])
+  @@index([organizationId, paidAt])
+  @@map("sale_payments")
 }
 
 // ── ADVERTISING (Phase 4b) ────────────────────

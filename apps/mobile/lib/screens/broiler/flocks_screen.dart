@@ -304,7 +304,36 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                       ),
                                     ],
                                   ),
+                                if ((flock.totalRevenue ?? 0) > 0) ...[
+                                  const SizedBox(height: 6),
+                                  Text.rich(
+                                    TextSpan(children: [
+                                      TextSpan(text: 'Revenue ZMW ${flock.totalRevenue!.toStringAsFixed(2)}'),
+                                      if ((flock.totalOutstandingPayments ?? 0) > 0)
+                                        TextSpan(
+                                          text: ' · Outstanding ZMW ${flock.totalOutstandingPayments!.toStringAsFixed(2)}',
+                                          style: TextStyle(color: Colors.orange.shade700),
+                                        ),
+                                    ]),
+                                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(3),
+                                    child: Row(children: [
+                                      Expanded(
+                                        flex: ((flock.totalRevenue! - (flock.totalOutstandingPayments ?? 0)) / flock.totalRevenue! * 100).round().clamp(0, 100),
+                                        child: Container(height: 6, color: Colors.green),
+                                      ),
+                                      if ((flock.totalOutstandingPayments ?? 0) > 0)
+                                        Expanded(
+                                          flex: (flock.totalOutstandingPayments! / flock.totalRevenue! * 100).round().clamp(0, 100),
+                                          child: Container(height: 6, color: Colors.orange),
+                                        ),
+                                    ]),
+                                  ),
                                 ],
+                              ],
                               ),
                               trailing: PopupMenuButton<String>(
                                 onSelected: (value) {

@@ -213,7 +213,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             .catchError((_) => <MedicationRecord>[]),
         BroilerService.getEnvironmentalRecords(widget.flockId)
             .catchError((_) => <EnvironmentalRecord>[]),
-        BroilerService.getSaleRecords(widget.flockId)
+        BroilerService.getSaleRecords(widget.flockId, filter: _salesFilter)
             .then((r) => r.items)
             .catchError((_) => <SaleRecord>[]),
         BroilerService.getDocuments(widget.flockId)
@@ -231,7 +231,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       ]);
 
       final saleSummaryFuture =
-          _safeCall(BroilerService.getSaleRecordSummary(widget.flockId));
+          _safeCall(BroilerService.getSaleRecordSummary(widget.flockId,
+              filter: _salesFilter));
 
       final flock = await flockFuture;
 
@@ -2360,12 +2361,27 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                       const SizedBox(height: 6),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(
-                          value: pct,
-                          minHeight: 5,
-                          backgroundColor: Colors.grey.shade200,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(statusColor),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            LinearProgressIndicator(
+                              value: pct,
+                              minHeight: 14,
+                              backgroundColor: Colors.grey.shade200,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(statusColor),
+                            ),
+                            Text('${(pct * 100).round()}%',
+                                style: const TextStyle(
+                                    fontSize: 9, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        'Paid ZMW ${paid.toStringAsFixed(2)} · Due ZMW ${(total - paid).toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: (total - paid) > 0 ? Colors.orange.shade700 : Colors.grey.shade600,
                         ),
                       ),
                     ],

@@ -505,20 +505,29 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
             const SizedBox(height: 4),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: pct,
-                backgroundColor: Colors.grey.shade200,
-                color: statusColor,
-                minHeight: 6,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  LinearProgressIndicator(
+                    value: pct,
+                    backgroundColor: Colors.grey.shade200,
+                    color: statusColor,
+                    minHeight: 14,
+                  ),
+                  Text('${(pct * 100).round()}%',
+                      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                ],
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              r.paymentStatus == 'paid'
-                  ? 'ZMW ${total.toStringAsFixed(2)} fully paid'
-                  : r.paymentStatus == 'partial'
-                      ? 'ZMW ${paid.toStringAsFixed(2)} / ${total.toStringAsFixed(2)} (${remaining.toStringAsFixed(2)} remaining)'
-                      : 'ZMW ${total.toStringAsFixed(2)} unpaid',
+            Text.rich(
+              TextSpan(children: [
+                TextSpan(text: 'Paid ZMW ${paid.toStringAsFixed(2)} · '),
+                TextSpan(
+                  text: 'Due ZMW ${remaining.toStringAsFixed(2)}',
+                  style: TextStyle(color: remaining > 0 ? Colors.orange.shade700 : Colors.grey.shade600),
+                ),
+              ]),
               style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
             ),
           ],

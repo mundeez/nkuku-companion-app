@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/sale_record.dart';
 import '../services/auth_service.dart';
+import '../services/broiler_service.dart';
 import 'attachment_section.dart';
 
 /// A bottom sheet that shows full sale record details:
@@ -175,6 +176,12 @@ class SaleDetailSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
+                // Payment history
+                _sectionTitle(context, 'Payments'),
+                const SizedBox(height: 8),
+                SalePaymentsSection(sale: sale, onChanged: () => Navigator.pop(context)),
+                const SizedBox(height: 16),
+
                 // Attachments
                 _sectionTitle(context, 'Attachments'),
                 const SizedBox(height: 8),
@@ -253,18 +260,34 @@ class SaleDetailSheet extends StatelessWidget {
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: pct,
-              backgroundColor: Colors.grey.shade200,
-              color: color,
-              minHeight: 8,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                LinearProgressIndicator(
+                  value: pct,
+                  backgroundColor: Colors.grey.shade200,
+                  color: color,
+                  minHeight: 14,
+                ),
+                Text('${(pct * 100).round()}%',
+                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+              ],
             ),
           ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('ZMW ${_fmt(paid)} paid', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: 'Paid ZMW ${_fmt(paid)} · '),
+                  TextSpan(
+                    text: 'Due ZMW ${_fmt(remaining)}',
+                    style: TextStyle(color: remaining > 0 ? Colors.orange.shade700 : Colors.grey.shade600),
+                  ),
+                ]),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
               Text('ZMW ${_fmt(total)} total', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             ],
           ),
@@ -319,6 +342,339 @@ class SaleDetailSheet extends StatelessWidget {
           Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         ],
       ),
+    );
+  }
+}
+
+/// Payment history for a sale: list of entries, "Record payment" form,
+/// owner-only delete. Calls [onChanged] after a successful mutation so the
+/// host screen can reload its sale lists.
+class SalePaymentsSection extends StatefulWidget {
+  final SaleRecord sale;
+  final VoidCallback? onChanged;
+
+  const SalePaymentsSection({super.key, required this.sale, this.onChanged});
+
+  @override
+  State<SalePaymentsSection> createState() => _SalePaymentsSectionState();
+}
+
+class _SalePaymentsSectionState extends State<SalePaymentsSection> {
+  List<SalePayment> _payments = [];
+  bool _loading = true;
+
+  static const _methodLabels = {
+    'cash': 'Cash',
+    'mobile_money_airtel': 'Mobile Money — Airtel',
+    'mobile_money_mtn': 'Mobile Money — MTN',
+    'mobile_money_zamtel': 'Mobile Money — Zamtel',
+    'bank_transfer': 'Bank Transfer',
+    'other': 'Other',
+    'adjustment': 'Adjustment',
+    'opening_balance': 'Opening balance',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final payments = await BroilerService.getSalePayments(widget.sale.id);
+      if (!mounted) return;
+      setState(() {
+        _payments = payments;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  double get _due =>
+      (widget.sale.totalAmountZmw - (widget.sale.amountPaidZmw ?? 0))
+          .clamp(0.0, double.infinity);
+
+  Future<void> _recordPayment() async {
+    final amountCtrl =
+        TextEditingController(text: _due > 0 ? _due.toStringAsFixed(2) : '');
+    final refCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    String method = 'cash';
+    DateTime paidAt = DateTime.now();
+    String? error;
+    bool saving = false;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Record payment',
+                  style: Theme.of(ctx).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration:
+                    const InputDecoration(labelText: 'Amount (ZMW)'),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () async {
+                  final d = await showDatePicker(
+                    context: ctx,
+                    initialDate: paidAt,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now().add(const Duration(days: 1)),
+                  );
+                  if (d != null) setSheet(() => paidAt = d);
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(labelText: 'Date'),
+                  child:
+                      Text(paidAt.toIso8601String().split('T').first),
+                ),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: method,
+                decoration: const InputDecoration(labelText: 'Method'),
+                items: const [
+                  DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                  DropdownMenuItem(
+                      value: 'mobile_money_airtel',
+                      child: Text('Mobile Money — Airtel')),
+                  DropdownMenuItem(
+                      value: 'mobile_money_mtn',
+                      child: Text('Mobile Money — MTN')),
+                  DropdownMenuItem(
+                      value: 'mobile_money_zamtel',
+                      child: Text('Mobile Money — Zamtel')),
+                  DropdownMenuItem(
+                      value: 'bank_transfer',
+                      child: Text('Bank Transfer')),
+                  DropdownMenuItem(value: 'other', child: Text('Other')),
+                ],
+                onChanged: (v) => setSheet(() => method = v ?? 'cash'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: refCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Reference (optional)'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: noteCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Note (optional)'),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(error!,
+                    style: TextStyle(
+                        color: Theme.of(ctx).colorScheme.error,
+                        fontSize: 12)),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final amount =
+                              double.tryParse(amountCtrl.text.trim()) ?? 0;
+                          if (amount <= 0) {
+                            setSheet(() =>
+                                error = 'Enter an amount greater than zero');
+                            return;
+                          }
+                          setSheet(() {
+                            saving = true;
+                            error = null;
+                          });
+                          try {
+                            await BroilerService.recordSalePayment(
+                              widget.sale.id,
+                              {
+                                'amountZmw': amount,
+                                'paidAt':
+                                    paidAt.toIso8601String().split('T').first,
+                                'method': method,
+                                if (refCtrl.text.trim().isNotEmpty)
+                                  'reference': refCtrl.text.trim(),
+                                if (noteCtrl.text.trim().isNotEmpty)
+                                  'note': noteCtrl.text.trim(),
+                              },
+                            );
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                          } on BroilerServiceException catch (e) {
+                            setSheet(() {
+                              saving = false;
+                              error = e.message;
+                            });
+                          }
+                        },
+                  child: Text(saving ? 'Saving…' : 'Save payment'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (saved == true) {
+      await _load();
+      widget.onChanged?.call();
+    }
+  }
+
+  Future<void> _deletePayment(SalePayment p) async {
+    try {
+      await BroilerService.deleteSalePayment(widget.sale.id, p.id);
+      await _load();
+      widget.onChanged?.call();
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canRecord = AuthService.canManageSales && _due > 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: Center(
+                child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))),
+          )
+        else if (_payments.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text('No payments recorded',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                    fontStyle: FontStyle.italic)),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < _payments.length; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  Builder(builder: (context) {
+                    final p = _payments[i];
+                    final muted = p.method == 'adjustment' ||
+                        p.method == 'opening_balance';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      p.amountZmw < 0
+                                          ? '− ZMW ${(-p.amountZmw).toStringAsFixed(2)}'
+                                          : 'ZMW ${p.amountZmw.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: muted
+                                            ? FontWeight.normal
+                                            : FontWeight.w500,
+                                        color: muted
+                                            ? Colors.grey.shade600
+                                            : null,
+                                      ),
+                                    ),
+                                    Text(
+                                      p.paidAt
+                                          .toIso8601String()
+                                          .split('T')
+                                          .first,
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  [
+                                    _methodLabels[p.method] ?? p.method,
+                                    if (p.reference != null &&
+                                        p.reference!.isNotEmpty)
+                                      p.reference!,
+                                    if (p.note != null && p.note!.isNotEmpty)
+                                      p.note!,
+                                  ].join(' · '),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                    fontStyle: muted
+                                        ? FontStyle.italic
+                                        : FontStyle.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (AuthService.isOwner && !muted)
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              color: Theme.of(context).colorScheme.error,
+                              onPressed: () => _deletePayment(p),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ],
+            ),
+          ),
+        if (canRecord) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _recordPayment,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Record payment'),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

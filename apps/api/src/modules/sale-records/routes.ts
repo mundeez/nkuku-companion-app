@@ -5,6 +5,11 @@ import { authenticate, requireRole } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { AuditService } from '../../core/finance/audit.service.js';
 import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
+import { JournalEngine } from '../../core/double-entry/journal.engine.js';
+import { AutoPostService } from '../../core/double-entry/auto-post.service.js';
+
+const PAYMENT_METHODS = ['cash', 'mobile_money_airtel', 'mobile_money_mtn', 'mobile_money_zamtel', 'bank_transfer', 'other'] as const;
+const PaymentMethodSchema = z.enum(PAYMENT_METHODS);
 
 const SaleRecordCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -17,10 +22,19 @@ const SaleRecordCreateSchema = z.object({
   totalAmountZmw: z.number().nonnegative(),
   paymentStatus: z.enum(['pending', 'partial', 'paid']).default('pending'),
   amountPaidZmw: z.number().nonnegative().nullish(),
+  initialPaymentMethod: PaymentMethodSchema.optional(),
   notes: z.string().nullish(),
 });
 
 const SaleRecordUpdateSchema = SaleRecordCreateSchema.partial().omit({ flockId: true });
+
+const PaymentCreateSchema = z.object({
+  amountZmw: z.number().positive(),
+  paidAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  method: PaymentMethodSchema.default('cash'),
+  reference: z.string().max(120).nullish(),
+  note: z.string().nullish(),
+});
 
 /** Parse a linked FinancialRecord id from the notes prefix `[FR:{id}]`. */
 function parseFinancialRecordId(notes: string | null | undefined): string | null {
@@ -36,9 +50,19 @@ function stripFrPrefix(notes: string | null | undefined): string | null {
   return stripped || null;
 }
 
-/** Serialize a sale record for API responses — strips [FR:] prefix from notes. */
+/** Serialize a sale record for API responses — strips [FR:] prefix from notes
+ *  and adds derived payment fields. */
 function serializeSaleRecord(record: any): any {
-  return { ...record, notes: stripFrPrefix(record.notes) };
+  const total = Number(record.totalAmountZmw ?? 0);
+  const paid = Number(record.amountPaidZmw ?? 0);
+  const paymentsCount = record._count?.payments ?? record.payments?.length;
+  return {
+    ...record,
+    notes: stripFrPrefix(record.notes),
+    remainingDueZmw: Math.max(0, total - paid),
+    paidPct: total > 0 ? Math.round((paid / total) * 1000) / 10 : 0,
+    paymentsCount,
+  };
 }
 
 /** Build a Prisma `where` clause from common filter params. */
@@ -164,6 +188,143 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
   const audit = new AuditService(prisma);
   const flockLock = checkFlockNotLocked(prisma);
+  const journalEngine = new JournalEngine(prisma);
+  const autoPost = new AutoPostService(journalEngine, prisma);
+
+  const PAYMENT_INCLUDE = { _count: { select: { payments: true } } } as const;
+
+  // Recompute amountPaidZmw + paymentStatus from the payment history.
+  async function recomputeSaleTotals(saleId: string) {
+    const sum = await prisma.salePayment.aggregate({
+      where: { saleRecordId: saleId },
+      _sum: { amountZmw: true },
+    });
+    const paid = Number(sum._sum.amountZmw ?? 0);
+    const sale = await prisma.saleRecord.findUnique({ where: { id: saleId } });
+    const total = Number(sale?.totalAmountZmw ?? 0);
+    const paymentStatus = paid >= total && total > 0 ? 'paid' : paid > 0 ? 'partial' : 'pending';
+    return prisma.saleRecord.update({
+      where: { id: saleId },
+      data: { amountPaidZmw: paid, paymentStatus },
+      include: PAYMENT_INCLUDE,
+    });
+  }
+
+  async function findSaleScoped(id: string, organizationId: string) {
+    const record = await prisma.saleRecord.findFirst({
+      where: { id },
+      include: { flock: true, ...PAYMENT_INCLUDE },
+    });
+    if (!record || record.flock.organizationId !== organizationId) return null;
+    return record;
+  }
+
+  // GET /:id/payments — payment history
+  app.get('/:id/payments', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const organizationId = getOrganizationId(request);
+    const record = await findSaleScoped(id, organizationId);
+    if (!record) return reply.status(404).send({ error: 'NOT_FOUND' });
+    return prisma.salePayment.findMany({
+      where: { saleRecordId: id },
+      orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
+    });
+  });
+
+  // POST /:id/payments — record a payment
+  app.post('/:id/payments', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const data = PaymentCreateSchema.parse(request.body);
+    const _authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    const record = await findSaleScoped(id, organizationId);
+    if (!record) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    const total = Number(record.totalAmountZmw);
+    const paidSoFar = Number(record.amountPaidZmw ?? 0);
+    const remaining = total - paidSoFar;
+    if (data.amountZmw > remaining + 0.005) {
+      return reply.status(400).send({ error: 'PAYMENT_EXCEEDS_DUE', message: `Payment exceeds remaining due of ${remaining.toFixed(2)} ZMW` });
+    }
+
+    const paidAt = data.paidAt ? new Date(data.paidAt) : new Date();
+
+    const payment = await prisma.$transaction(async (tx: any) => {
+      const p = await tx.salePayment.create({
+        data: {
+          saleRecordId: id,
+          organizationId,
+          amountZmw: data.amountZmw,
+          paidAt,
+          method: data.method,
+          reference: data.reference ?? null,
+          note: data.note ?? null,
+          createdBy: _authUser.userId,
+        },
+      });
+
+      const sum = await tx.salePayment.aggregate({
+        where: { saleRecordId: id },
+        _sum: { amountZmw: true },
+      });
+      const paid = Number(sum._sum.amountZmw ?? 0);
+      const paymentStatus = paid >= total ? 'paid' : paid > 0 ? 'partial' : 'pending';
+      await tx.saleRecord.update({
+        where: { id },
+        data: { amountPaidZmw: paid, paymentStatus },
+      });
+      return p;
+    });
+
+    // Journal post AFTER the tx commits — JournalEngine uses the global prisma
+    // and journal rows are immutable, so a tx rollback could orphan an entry.
+    const warnings: string[] = [];
+    try {
+      const journalId = await autoPost.postSalePaymentJournal({
+        paymentId: payment.id,
+        amount: data.amountZmw,
+        paidAt,
+        description: `Payment: ${record.customerName ?? 'customer'} — sale ${record.saleDate.toISOString().split('T')[0]}`,
+        flockId: record.flockId,
+        organizationId,
+        postedBy: _authUser.userId,
+      });
+      if (journalId) {
+        await prisma.salePayment.update({ where: { id: payment.id }, data: { journalEntryId: journalId } });
+        payment.journalEntryId = journalId;
+      }
+    } catch (e) {
+      request.log.error({ err: e, paymentId: payment.id }, 'sale payment journal post failed after commit');
+      warnings.push('JOURNAL_POST_FAILED');
+    }
+
+    const updated = await recomputeSaleTotals(id);
+    return reply.status(201).send({ payment, sale: serializeSaleRecord(updated), warnings });
+  });
+
+  // DELETE /:id/payments/:paymentId — owner only
+  app.delete('/:id/payments/:paymentId', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const { id, paymentId } = z.object({ id: z.string().uuid(), paymentId: z.string().uuid() }).parse(request.params);
+    const _authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    const record = await findSaleScoped(id, organizationId);
+    if (!record) return reply.status(404).send({ error: 'NOT_FOUND' });
+    const payment = await prisma.salePayment.findFirst({ where: { id: paymentId, saleRecordId: id } });
+    if (!payment) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    if (payment.journalEntryId) {
+      try {
+        await journalEngine.reverse(payment.journalEntryId, _authUser.userId, 'Payment deleted');
+      } catch (e) {
+        request.log.error({ err: e, paymentId }, 'payment journal reversal failed');
+      }
+    }
+    await prisma.salePayment.delete({ where: { id: paymentId } });
+    const updated = await recomputeSaleTotals(id);
+    return { deleted: true, sale: serializeSaleRecord(updated) };
+  });
 
   // GET /all — list all sale records for the user (for sales dashboard)
   app.get('/all', { preHandler: [authenticate] }, async (request, reply) => {
@@ -187,7 +348,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     const [records, total] = await Promise.all([
       prisma.saleRecord.findMany({
         where,
-        include: { flock: { select: { name: true, breed: { select: { name: true } } } } },
+        include: { flock: { select: { name: true, breed: { select: { name: true } } } }, ...PAYMENT_INCLUDE },
         orderBy: prismaSortFields.has(sortBy) ? { [sortBy]: sortDir } : { saleDate: 'desc' },
         take: query.limit,
         skip: query.offset,
@@ -313,7 +474,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     const [records, total] = await Promise.all([
       prisma.saleRecord.findMany({
         where,
-        include: query.flockId ? undefined : { flock: { select: { name: true, breed: { select: { name: true } } } } },
+        include: query.flockId ? PAYMENT_INCLUDE : { flock: { select: { name: true, breed: { select: { name: true } } } }, ...PAYMENT_INCLUDE },
         orderBy: { [sortBy]: sortDir },
         take: query.limit,
         skip: query.offset,
@@ -336,7 +497,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
     const record = await prisma.saleRecord.findFirst({
       where: { id },
-      include: { flock: true, documents: { orderBy: { createdAt: 'desc' } } },
+      include: { flock: true, documents: { orderBy: { createdAt: 'desc' } }, ...PAYMENT_INCLUDE },
     });
     if (!record || record.flock.organizationId !== organizationId) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -444,17 +605,43 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     const notesPrefix = `[FR:${financialRecord.id}]`;
     const originalNotes = finalData.notes ? ` ${finalData.notes}` : '';
 
+    const { initialPaymentMethod, ...createData } = finalData as any;
     const created = await prisma.saleRecord.create({
       data: {
-        ...finalData,
-        saleDate: new Date(finalData.saleDate),
+        ...createData,
+        saleDate: new Date(createData.saleDate),
         flockId,
-        amountPaidZmw: finalData.amountPaidZmw ?? null,
+        amountPaidZmw: createData.amountPaidZmw ?? null,
         notes: `${notesPrefix}${originalNotes}`,
         createdBy: _authUser.userId,
         organizationId,
       },
     });
+
+    // Record an initial payment row when an amount paid was supplied.
+    // The sale's own journal entry already puts this into Cash, so the
+    // payment row itself gets no separate posting (journalEntryId = null).
+    const initialPaid = Number(created.amountPaidZmw ?? 0);
+    if (initialPaid > 0) {
+      await prisma.salePayment.create({
+        data: {
+          saleRecordId: created.id,
+          organizationId,
+          amountZmw: initialPaid,
+          paidAt: created.saleDate,
+          method: initialPaymentMethod ?? 'cash',
+          note: 'Recorded with sale',
+          createdBy: _authUser.userId,
+        },
+      });
+    }
+
+    // Post the sale to the journal: Dr Cash (paid) + Dr AR (unpaid) / Cr Bird Sales.
+    try {
+      await autoPost.postSale(created.id, _authUser.userId);
+    } catch (e) {
+      request.log.error(e, 'sale journal post failed');
+    }
 
     // Decrement flock currentCount by birdCount sold
     await prisma.broilerFlock.update({
@@ -472,7 +659,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       ipAddress: request.ip,
     });
 
-    return serializeSaleRecord(created);
+    return serializeSaleRecord({ ...created, _count: { payments: initialPaid > 0 ? 1 : 0 } });
   });
 
   // PATCH /:id
@@ -490,14 +677,24 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    // Validate payment rules (use existing total + status if not being updated)
-    const validationError = validatePaymentRules(data, Number(record.totalAmountZmw), record.paymentStatus);
+    // Direct amountPaidZmw edits are owner-only manual corrections: the delta
+    // is logged as a signed 'adjustment' payment row with its own journal.
+    const currentPaid = Number(record.amountPaidZmw ?? 0);
+    const manualPaidCorrection = data.amountPaidZmw !== undefined && data.amountPaidZmw !== currentPaid;
+    if (manualPaidCorrection && _authUser.role !== 'owner') {
+      return reply.status(403).send({ error: 'PAYMENT_EDIT_OWNER_ONLY', message: 'Only an owner can correct the amount paid directly — use Record Payment instead.' });
+    }
+
+    // When the field is a manual correction, remove it from the normal
+    // validation/enforcement path — the adjustment mechanism owns it.
+    const validationData = manualPaidCorrection ? { ...data, amountPaidZmw: undefined, paymentStatus: undefined } : data;
+    const validationError = validatePaymentRules(validationData, Number(record.totalAmountZmw), record.paymentStatus);
     if (validationError) {
       return reply.status(422).send({ error: 'VALIDATION_ERROR', message: validationError });
     }
 
     // Enforce payment consistency
-    const paymentOverrides = enforcePaymentRules(data, Number(record.totalAmountZmw), record.paymentStatus);
+    const paymentOverrides = manualPaidCorrection ? {} : enforcePaymentRules(data, Number(record.totalAmountZmw), record.paymentStatus);
 
     // Preserve the [FR:<id>] prefix in notes — clients may strip it for
     // display, so re-prepend it on update to keep the FinancialRecord link.
@@ -513,10 +710,59 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
         : data.notes;
     }
 
+    if (manualPaidCorrection) {
+      delete updateData.amountPaidZmw;
+      delete updateData.paymentStatus;
+    }
+
     const updated = await prisma.saleRecord.update({
       where: { id },
       data: updateData,
     });
+
+    // Log the manual correction as an adjustment payment (signed delta).
+    if (manualPaidCorrection) {
+      const delta = data.amountPaidZmw! - currentPaid;
+      const adj = await prisma.salePayment.create({
+        data: {
+          saleRecordId: id,
+          organizationId,
+          amountZmw: delta,
+          paidAt: new Date(),
+          method: 'adjustment',
+          note: 'Manual correction',
+          createdBy: _authUser.userId,
+        },
+      });
+      try {
+        const journalId = await autoPost.postSalePaymentJournal({
+          paymentId: adj.id,
+          amount: delta,
+          paidAt: adj.paidAt,
+          description: `Adjustment: ${record.customerName ?? 'customer'} — sale ${record.saleDate.toISOString().split('T')[0]}`,
+          flockId: record.flockId,
+          organizationId,
+          postedBy: _authUser.userId,
+        });
+        if (journalId) {
+          await prisma.salePayment.update({ where: { id: adj.id }, data: { journalEntryId: journalId } });
+        }
+      } catch (e) {
+        request.log.error({ err: e, paymentId: adj.id }, 'adjustment journal post failed');
+      }
+      await recomputeSaleTotals(id);
+    }
+
+    // If the sale total changed and the sale is already posted, reverse and
+    // re-post with the new paid/unpaid split.
+    if (data.totalAmountZmw !== undefined && record.journalEntryId) {
+      try {
+        await journalEngine.reverse(record.journalEntryId, _authUser.userId, 'Sale total changed');
+        await autoPost.postSale(id, _authUser.userId);
+      } catch (e) {
+        request.log.error(e, 'sale journal re-post failed');
+      }
+    }
 
     // If birdCount changed, adjust the flock's currentCount by the delta.
     // Enforce the flock-completed lock for non-owners when birdCount changes.
@@ -564,7 +810,8 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       ipAddress: request.ip,
     });
 
-    return serializeSaleRecord(updated);
+    const refreshed = await prisma.saleRecord.findUnique({ where: { id }, include: PAYMENT_INCLUDE });
+    return serializeSaleRecord(refreshed ?? updated);
   });
 
   // DELETE /:id
@@ -582,6 +829,18 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     }
 
     if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
+
+    // Reverse every journal posting tied to this sale (the sale's own entry
+    // plus each payment/adjustment entry) before the rows cascade away.
+    const paymentsWithJournals = await prisma.salePayment.findMany({
+      where: { saleRecordId: id, journalEntryId: { not: null } },
+    });
+    for (const p of paymentsWithJournals) {
+      await journalEngine.reverse(p.journalEntryId!, _authUser.userId, 'Sale deleted');
+    }
+    if (record.journalEntryId) {
+      await journalEngine.reverse(record.journalEntryId, _authUser.userId, 'Sale deleted');
+    }
 
     // Delete the linked FinancialRecord first, if present.
     const financialRecordId = parseFinancialRecordId(record.notes);

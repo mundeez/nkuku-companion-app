@@ -212,6 +212,13 @@ class _KpiGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
+      _Kpi('Revenue', 'ZMW ${_fmt(kpis.totalRevenue)}', Icons.attach_money,
+          Colors.green,
+          subtitle: 'Total bird sales'),
+      _Kpi('Outstanding', 'ZMW ${_fmt(kpis.totalOutstanding)}',
+          Icons.pending_actions,
+          kpis.totalOutstanding > 0 ? Colors.orange : Colors.grey,
+          subtitle: 'Collected ZMW ${_fmt(kpis.totalCollected)}'),
       _Kpi('Active Flocks', kpis.activeFlocks.toString(), Icons.trending_up,
           Colors.blue,
           subtitle: '${kpis.pendingFlocks} pending'),

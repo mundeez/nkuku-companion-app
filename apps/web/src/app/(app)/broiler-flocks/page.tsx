@@ -352,6 +352,27 @@ export default function BroilerFlocksPage() {
                     <span className="font-medium">{flock.salePriceZmw != null && Number(flock.salePriceZmw) > 0 ? `ZMW ${Number(flock.salePriceZmw).toFixed(2)}` : "-"}</span>
                   </div>
                   <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Revenue · Outstanding</span>
+                    <span className="font-medium">
+                      <span className="text-green-600">ZMW {totalRevenue.toFixed(2)}</span>
+                      {(flock.totalOutstandingPayments ?? 0) > 0 && (
+                        <span className="text-amber-600"> · ZMW {Number(flock.totalOutstandingPayments).toFixed(2)}</span>
+                      )}
+                    </span>
+                  </div>
+                  {totalRevenue > 0 && (
+                    <div className="flex h-1.5 w-full rounded-full overflow-hidden bg-muted">
+                      <div
+                        className="bg-green-500"
+                        style={{ width: `${((totalRevenue - (flock.totalOutstandingPayments ?? 0)) / totalRevenue) * 100}%` }}
+                      />
+                      <div
+                        className="bg-amber-500"
+                        style={{ width: `${((flock.totalOutstandingPayments ?? 0) / totalRevenue) * 100}%` }}
+                      />
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Projected Revenue</span>
                     <span className="font-medium text-blue-600">ZMW {projectedRevenue.toFixed(2)}</span>
                   </div>
