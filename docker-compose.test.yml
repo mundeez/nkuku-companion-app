@@ -1,0 +1,151 @@
+# ─────────────────────────────────────────────────────────────
+# Isolated, throwaway stack for the API integration test suite.
+#
+# Why this exists: the integration tests register organizations, users,
+# flocks, sales and journal entries. They must NEVER run against the
+# dev/prod database (shared-postgres/nkuku_db) again — this stack gives
+# them a dedicated Postgres (nkuku_test), Redis and MinIO.
+#
+# Usage (from repo root):
+#   docker compose -f docker-compose.test.yml up -d --build     # start
+#   docker compose -f docker-compose.test.yml logs -f api       # watch boot
+#   docker compose -f docker-compose.test.yml exec api pnpm run test:integration
+#   docker compose -f docker-compose.test.yml down -v           # teardown + wipe data
+#
+# Convenience wrappers (from apps/api):
+#   pnpm run test:stack        → up -d --build
+#   pnpm run test:compose      → up -d --build + run integration tests inside
+#   pnpm run test:stack:down   → down -v (destroys the test database volume)
+#
+# From the host instead of inside the container:
+#   cd apps/api && API_URL=http://localhost:3002 \
+#     TEST_DATABASE_URL=postgresql://nkuku_user:test_password@127.0.0.1:35432/nkuku_test \
+#     JWT_SECRET=test_jwt_secret_min_64_chars_long_for_test_env_only \
+#     pnpm run test:integration
+#
+# Safety: the API sets NKUKU_TEST_TARGET=1 so GET /health reports
+# { "env": "test" }; the vitest globalSetup refuses to run without it.
+# The stack is on its own compose project (nkuku-test) and private network —
+# it does not touch the running nkuku-companion-app services.
+# ─────────────────────────────────────────────────────────────
+name: nkuku-test
+
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: nkuku_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: nkuku_test
+    volumes:
+      - pgdata-test:/var/lib/postgresql/data
+    ports:
+      # Exposed on localhost only, for host-side vitest runs whose test files
+      # open a direct Prisma connection (TEST_DATABASE_URL above).
+      - "127.0.0.1:35432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nkuku_user -d nkuku_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - test-net
+
+  redis-test:
+    image: redis:7-alpine
+    networks:
+      - test-net
+
+  minio-test:
+    # Same pinned image as the shared pom-minio service (already cached on dev
+    # hosts). Dedicated instance + bucket so document-upload tests never touch
+    # shared object storage.
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: test-minio
+      MINIO_ROOT_PASSWORD: test-minio-secret
+    volumes:
+      - minio-test-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks:
+      - test-net
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: development
+    environment:
+      NODE_ENV: development
+      # Marks this instance as a valid test target — surfaced via GET /health
+      # as { "env": "test" } and required by the vitest globalSetup guard.
+      NKUKU_TEST_TARGET: "1"
+      DATABASE_URL: postgresql://nkuku_user:test_password@postgres-test:5432/nkuku_test
+      REDIS_URL: redis://redis-test:6379
+      PORT: "3001"
+      HOST: 0.0.0.0
+      JWT_SECRET: test_jwt_secret_min_64_chars_long_for_test_env_only
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      OWNER_EMAIL: owner@nkuku.local
+      OWNER_PASSWORD: change_me
+      # Rate limits off — mirrors CI, avoids 429 flakes under the test suite.
+      BULK_RATE_LIMIT: "0"
+      AUTH_RATE_LIMIT: "0"
+      TEST_MODE: "true"
+      EMAIL_DISABLED: "true"
+      SMS_DISABLED: "true"
+      WEB_BASE_URL: http://localhost:30000
+      # ── S3 / MinIO (dedicated test instance + bucket) ──
+      S3_ENDPOINT: http://minio-test:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: test-minio
+      S3_SECRET_KEY: test-minio-secret
+      S3_BUCKET: nkuku-documents-test
+      S3_FORCE_PATH_STYLE: "true"
+      # No ClamAV in the test stack — fail-open, mirrors CI.
+      REQUIRE_VIRUS_SCAN: "false"
+      MAX_ATTACHMENTS_PER_TX: "20"
+      # No ntfy service in the test stack; alert delivery is best-effort and
+      # failures are logged, not fatal.
+      NTFY_BASE_URL: http://127.0.0.1:9
+    # Same mounts as the dev compose service — currently vestigial (the app
+    # runs from /workspace/apps/api), kept for parity so future WorkDir fixes
+    # behave identically in both stacks.
+    volumes:
+      - ./apps/api/src:/app/src:ro
+      - ./apps/api/prisma:/app/prisma:ro
+      - ./apps/api/tests:/app/tests:ro
+      - ./apps/api/vitest.config.ts:/app/vitest.config.ts:ro
+      - api_test_node_modules:/app/node_modules
+    ports:
+      - "127.0.0.1:3002:3001"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_started
+      minio-test:
+        condition: service_healthy
+    networks:
+      - test-net
+    restart: unless-stopped
+    # Fresh DB → migrate, apply test-only DB extras (JournalSourceType enum
+    # values 'sale'/'sale_payment' — on shared Postgres these are added by a
+    # superuser one-off, see infra/sql/add-sale-source-types.sql), then seed
+    # (idempotent) and start the dev server.
+    command:
+      ["sh", "-c", "npx prisma migrate deploy && npx tsx tests/helpers/db-extras.ts && npx prisma db seed && pnpm run dev"]
+
+volumes:
+  pgdata-test:
+  minio-test-data:
+  api_test_node_modules:
+
+networks:
+  test-net:

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
-const API_URL = 'http://localhost:3001';
+import { TEST_API_URL } from '../helpers/env.js';
+const API_URL = TEST_API_URL;
 const PASSWORD = 'TestPass123!';
 
 async function register(suffix: string) {

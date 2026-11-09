@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
-const API_URL = 'http://localhost:3001';
+import { TEST_API_URL } from '../helpers/env.js';
+const API_URL = TEST_API_URL;
 
 async function login() {
   const res = await fetch(`${API_URL}/api/v1/auth/login`, {

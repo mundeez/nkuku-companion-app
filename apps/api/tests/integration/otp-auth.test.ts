@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
-const API_URL = 'http://localhost:3001';
+import { TEST_API_URL } from '../helpers/env.js';
+const API_URL = TEST_API_URL;
 
 /**
  * Retrieve the most recent OTP code for a phone number via the dev-only

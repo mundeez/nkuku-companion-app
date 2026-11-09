@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 
-const API_URL = 'http://localhost:3001';
-const prisma = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
+import { TEST_API_URL, TEST_DATABASE_URL } from '../helpers/env.js';
+const API_URL = TEST_API_URL;
+const prisma = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
 
 async function registerUser(suffix: string, country = 'ZM', currency = 'ZMW') {
   const email = `admin-ops-test-${suffix}@example.com`;

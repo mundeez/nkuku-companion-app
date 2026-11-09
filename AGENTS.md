@@ -17,10 +17,23 @@ docker compose up --build -d
 # View API logs
 docker logs nkuku-companion-app-api-1 -f
 
-# Backend tests
-docker compose exec api pnpm run test:unit
-docker compose exec api pnpm run test:integration
-docker compose exec api pnpm run test
+# Backend tests — run against the ISOLATED test stack (docker-compose.test.yml:
+# dedicated postgres nkuku_test + redis + minio + api on host port 3002).
+# NEVER run the suite inside the dev/prod api container — a globalSetup guard
+# refuses unless GET /health reports env=test (NKUKU_TEST_TARGET=1) or
+# DATABASE_URL contains 'nkuku_test'.
+cd apps/api
+pnpm run test:compose            # up -d --build the test stack + run integration tests
+pnpm run test:stack              # just bring the stack up
+pnpm run test:stack:down         # down -v — destroys the test DB volume
+# Or inside an already-running test stack:
+docker compose -f docker-compose.test.yml exec api pnpm run test          # unit + integration
+docker compose -f docker-compose.test.yml exec api pnpm run test:unit     # no API needed
+# Or from the host (postgres-test is on 127.0.0.1:35432):
+API_URL=http://localhost:3002 \
+  TEST_DATABASE_URL=postgresql://nkuku_user:test_password@127.0.0.1:35432/nkuku_test \
+  JWT_SECRET=test_jwt_secret_min_64_chars_long_for_test_env_only \
+  pnpm run test:integration
 
 # Database (migrations are REAL since P-2 — do NOT use `prisma db push`)
 # Schema change workflow:

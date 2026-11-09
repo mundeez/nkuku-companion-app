@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import jwt from 'jsonwebtoken';
 
-const API_URL = 'http://localhost:3001';
+import { TEST_API_URL } from '../helpers/env.js';
+const API_URL = TEST_API_URL;
 
 // These tests focus on the parts of the social auth flow that don't require
 // real OAuth provider credentials:

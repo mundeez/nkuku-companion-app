@@ -232,7 +232,14 @@ await app.register(buildAdminOpsModule, { prefix: '/api/v1/admin' });
 // GET /health        → always 200 if the process serves (load-balancer probe)
 // GET /health?deep=1 → 200 ok / 503 degraded with per-check results
 app.get('/health', async (req, reply) => {
-  const base = { status: 'ok', timestamp: new Date().toISOString() };
+  const base = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    // Lets the integration suite's globalSetup verify it is pointed at a
+    // throwaway test environment before running destructive tests.
+    // NKUKU_TEST_TARGET=1 is only ever set by docker-compose.test.yml and CI.
+    env: process.env.NKUKU_TEST_TARGET === '1' ? 'test' : process.env.NODE_ENV ?? 'development',
+  };
   if (!(req.query as any)?.deep) return base;
 
   const check = async (fn: () => Promise<unknown>) => {

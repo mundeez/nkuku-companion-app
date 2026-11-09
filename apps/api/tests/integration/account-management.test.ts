@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import _jwt from 'jsonwebtoken';
 
-const API_URL = 'http://localhost:3001';
+import { TEST_API_URL } from '../helpers/env.js';
+const API_URL = TEST_API_URL;
 
 const _JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret_change_in_production';
 
