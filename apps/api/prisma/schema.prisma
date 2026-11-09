@@ -52,6 +52,7 @@ model User {
   devices                             UserDevice[]
   socialAccounts                      SocialAccount[]
   createdAdCampaigns                  AdCampaign[]                  @relation("AdCampaignCreatedBy")
+  impersonationTargets                ImpersonationSession[]        @relation("ImpersonationTargetUser")
 
   @@map("users")
 }
@@ -167,6 +168,7 @@ model Organization {
   feedPurchases                FeedPurchase[]
   adEvents                     AdEvent[]
   auditLogs                    AuditLog[]
+  impersonationSessions        ImpersonationSession[]
   defaultVaccinationSchedule   VaccinationSchedule? @relation("OrgDefaultVaccinationSchedule", fields: [defaultVaccinationScheduleId], references: [id], onDelete: SetNull)
 
   @@map("organizations")
@@ -1667,4 +1669,131 @@ enum LicenseStatus {
   expired
   revoked
   suspended
+}
+
+// ── PLATFORM STAFF (Super Admin Console, P1) ──────────────
+// Staff identities are completely separate from tenant Users — a staff
+// member who also farms uses a normal tenant account for that. See
+// PLAN-super-admin-console.md §3–§5.
+
+enum StaffRole {
+  super_admin
+  support
+  finance
+  content_editor
+  marketing
+  auditor
+}
+
+model StaffUser {
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String    @unique
+  name          String
+  passwordHash  String    @map("password_hash") // bcrypt; empty for invited staff until bootstrap
+  role          StaffRole
+  // TOTP secret, AES-256-GCM encrypted at rest (never stored plaintext).
+  totpSecretEnc String?   @map("totp_secret_enc")
+  totpEnabledAt DateTime? @map("totp_enabled_at") @db.Timestamptz(6)
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdById   String?   @map("created_by_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  createdBy             StaffUser?             @relation("StaffUserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdStaff          StaffUser[]            @relation("StaffUserCreatedBy")
+  sessions              StaffSession[]
+  recoveryCodes         StaffRecoveryCode[]
+  auditEvents           PlatformAuditEvent[]
+  impersonationSessions ImpersonationSession[] @relation("ImpersonationStaff")
+
+  @@map("staff_users")
+}
+
+// Refresh-token sessions for staff. The raw refresh token is opaque; only
+// its SHA-256 hash is stored so a DB leak cannot replay sessions.
+model StaffSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  staffUserId      String    @map("staff_user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash") @db.VarChar(64)
+  deviceLabel      String?   @map("device_label") @db.VarChar(200)
+  ip               String?   @db.VarChar(45)
+  userAgent        String?   @map("user_agent") @db.VarChar(500)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  staffUser StaffUser @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+
+  @@index([staffUserId])
+  @@map("staff_sessions")
+}
+
+// One-time recovery codes (10 per staff user, regenerated on TOTP
+// enrolment/reset). SHA-256 hashed; a code is consumed by setting usedAt.
+model StaffRecoveryCode {
+  id          String    @id @default(uuid()) @db.Uuid
+  staffUserId String    @map("staff_user_id") @db.Uuid
+  codeHash    String    @map("code_hash") @db.VarChar(64)
+  usedAt      DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  staffUser StaffUser @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+
+  @@index([staffUserId])
+  @@map("staff_recovery_codes")
+}
+
+// Append-only platform-level audit log. Rows are immutable — UPDATE and
+// DELETE are blocked at the DB level by CREATE RULE (see
+// prisma/sql/platform-audit-immutability.sql, applied after migrate).
+// organizationId is deliberately NOT a foreign key: audit rows must
+// survive tenant (GDPR) deletion.
+model PlatformAuditEvent {
+  id             String    @id @default(uuid()) @db.Uuid
+  actorStaffId   String    @map("actor_staff_id") @db.Uuid
+  actorRole      StaffRole @map("actor_role")
+  action         String    @db.VarChar(80)
+  targetType     String    @map("target_type") @db.VarChar(50)
+  targetId       String?   @map("target_id") @db.VarChar(80)
+  organizationId String?   @map("organization_id") @db.Uuid
+  reason         String?
+  before         Json?
+  after          Json?
+  ip             String?   @db.VarChar(45)
+  userAgent      String?   @map("user_agent") @db.VarChar(500)
+  requestId      String?   @map("request_id") @db.VarChar(80)
+  occurredAt     DateTime  @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  actor StaffUser @relation(fields: [actorStaffId], references: [id])
+
+  @@index([actorStaffId])
+  @@index([action])
+  @@index([organizationId])
+  @@index([occurredAt])
+  @@map("platform_audit_events")
+}
+
+// Record of a staff member impersonating a tenant user (full act-as
+// support flow lands in P2/P3 — this table is created now so the audit
+// trail exists from day one).
+model ImpersonationSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  staffUserId    String    @map("staff_user_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  targetUserId   String    @map("target_user_id") @db.Uuid
+  reason         String
+  ticketId       String?   @map("ticket_id") @db.VarChar(80)
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz(6)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+  ip             String?   @db.VarChar(45)
+
+  staffUser    StaffUser    @relation("ImpersonationStaff", fields: [staffUserId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  targetUser   User         @relation("ImpersonationTargetUser", fields: [targetUserId], references: [id])
+
+  @@index([staffUserId])
+  @@index([organizationId])
+  @@map("impersonation_sessions")
 }

@@ -169,6 +169,58 @@ export async function sendInviteEmail(
 }
 
 /**
+ * Send a platform staff invite / bootstrap email for the admin console.
+ * Separate from the tenant organization invite — staff accounts live on
+ * the platform console host, not the tenant web app.
+ * @param to Recipient email
+ * @param inviteUrl Full URL the staff member opens to set their password
+ * @param staffName Display name of the invited staff member
+ * @param inviterName Name of the staff member who sent the invite
+ */
+export async function sendStaffInviteEmail(
+  to: string,
+  inviteUrl: string,
+  staffName: string,
+  inviterName: string,
+): Promise<SendEmailResult> {
+  const subject = `You've been granted Nkuku platform staff access`;
+  const html = `
+    <p>Hi ${staffName},</p>
+    <p><strong>${inviterName}</strong> has created a staff account for you on the Nkuku platform console.</p>
+    <p>Open the link below to set your password. You will then be asked to enrol two-factor authentication (TOTP) — this is mandatory for all staff.</p>
+    <p><a href="${inviteUrl}">Set your password</a></p>
+    <p>Or copy this link: ${inviteUrl}</p>
+    <p>This link expires in 7 days. If you weren't expecting this, contact your platform administrator.</p>
+    <p>— Nkuku Platform</p>`;
+
+  if (EMAIL_DISABLED || !SMTP_HOST) {
+    const msg = `[EMAIL DISABLED] To: ${to} | Subject: ${subject} | URL: ${inviteUrl}`;
+    console.log(msg);
+    return { success: true, message: 'Email logged (EMAIL_DISABLED=true)', devUrl: inviteUrl };
+  }
+
+  try {
+    const t = getTransporter();
+    await t.sendMail({ from: SMTP_FROM, to, subject, html });
+    return {
+      success: true,
+      message: 'Staff invite email sent',
+      ...(TEST_MODE ? { devUrl: inviteUrl } : {}),
+    };
+  } catch (err: any) {
+    console.error('Staff invite email send failed:', err.message);
+    if (TEST_MODE) {
+      return {
+        success: true,
+        message: `Staff invite email send failed (test mode): ${err.message}`,
+        devUrl: inviteUrl,
+      };
+    }
+    return { success: false, message: `Email send failed: ${err.message}` };
+  }
+}
+
+/**
  * Send a dunning/billing reminder email for an open invoice.
  * kind: 'upcoming' (T-7) | 'due_tomorrow' (T-1) | 'overdue' (T+1) | 'final' (T+5)
  */

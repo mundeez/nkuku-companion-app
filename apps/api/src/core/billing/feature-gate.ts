@@ -25,9 +25,31 @@ export async function shouldShowAds(prisma: PrismaClient, organizationId: string
  * Restrict a route to platform administrators (cross-organization admin
  * surfaces, e.g. ad campaign management). Not part of the org-scoped RBAC
  * system — checked via a dedicated `User.isPlatformAdmin` flag.
+ *
+ * Deprecation shim (P1, kept for one release while /api/v1/admin/* alias
+ * routes exist): a valid platform staff JWT (aud 'platform', accepted by
+ * authenticate() on that surface only) with role super_admin also passes.
+ * New platform endpoints use requireStaff()/requirePermission() instead.
  */
 export async function requirePlatformAdmin(request: FastifyRequest, reply: FastifyReply) {
   const prisma = (request as any).server?.prisma ?? (reply as any).server?.prisma;
+
+  // Staff JWT path — set by authenticate() for /api/v1/admin/* requests.
+  const staffClaims = (request as any).staffUser;
+  if (staffClaims?.role === 'super_admin' && prisma) {
+    try {
+      const staffUser = await (prisma as PrismaClient).staffUser.findUnique({
+        where: { id: staffClaims.staffId },
+        select: { isActive: true },
+      });
+      if (staffUser?.isActive) return;
+    } catch {
+      // staff_users table may not exist yet on un-migrated DBs — fall
+      // through to the legacy isPlatformAdmin check.
+    }
+  }
+
+  // Legacy tenant-user path (User.isPlatformAdmin — deprecated).
   const userId = (request as any).authUser?.userId;
   if (!prisma || !userId) {
     return reply.status(403).send({ error: 'FORBIDDEN' });
