@@ -1510,7 +1510,7 @@ model SaleRecord {
   pricePerBirdZmw Decimal  @map("price_per_bird_zmw") @db.Decimal(14, 2)
   totalAmountZmw  Decimal  @map("total_amount_zmw") @db.Decimal(14, 2)
   paymentStatus   String   @default("pending") @map("payment_status") @db.VarChar(20)
-  amountPaidZmw   Decimal? @map("amount_paid_zmw") @db.Decimal(14, 2)
+  amountPaidZmw   Decimal @default(0) @map("amount_paid_zmw") @db.Decimal(14, 2)
   journalEntryId  String?  @map("journal_entry_id") @db.Uuid
   notes           String?  @db.Text
   createdBy       String?  @map("created_by") @db.Uuid
