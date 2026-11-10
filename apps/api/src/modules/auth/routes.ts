@@ -909,8 +909,9 @@ export async function buildAuthModule(app: FastifyInstance) {
       maxAge: Math.floor(remainingMs / 1000),
     });
     reply.clearCookie('nkuku_refresh_token', { path: '/' });
+    const { passwordHash: _passwordHash, ...safeUser } = user;
     return {
-      user: { ...user, organizationId: payload.organizationId },
+      user: { ...safeUser, organizationId: payload.organizationId },
       impersonation: payload.impersonation,
       expiresAt: payload.impersonation.expiresAt,
     };
@@ -930,7 +931,9 @@ export async function buildAuthModule(app: FastifyInstance) {
     const payload = (request as any).authUser as TokenPayload;
     const prisma = (app as any).prisma;
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-    return { user: user ? { ...user, organizationId: payload.organizationId } : null };
+    if (!user) return { user: null };
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+    return { user: { ...safeUser, organizationId: payload.organizationId } };
   });
 
   // ── Social Authentication Endpoints ──

@@ -138,6 +138,8 @@ services:
         NEXT_PUBLIC_TENANT_APP_URL: https://nkuku.zeendeefood.solutions
     environment:
       NODE_ENV: production
+      # Standalone server.js listens on PORT (default 3000)
+      PORT: 3003
       NEXT_PUBLIC_API_URL: https://nkuku.zeendeefood.solutions
       NEXT_PUBLIC_TENANT_APP_URL: https://nkuku.zeendeefood.solutions
     # Bind to localhost only — ISPConfig nginx proxies in from the outside
