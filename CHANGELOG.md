@@ -1,5 +1,59 @@
 # Changelog
 
+## [1.50.0] — 2026-11-10
+
+### Platform staff console — tenant operations (P2 of PLAN-super-admin-console)
+
+**New app: `apps/admin-web`** — standalone Next.js console for
+`admin.nkuku.zeendeefood.solutions` (staff JWT + TOTP + reauth modal +
+permission-filtered nav): dashboard, tenant search/list/detail, staff
+management, platform audit viewer. Production service on `127.0.0.1:30030`
+in `docker-compose.prod.yml`; ISPConfig directives in
+`infra/ispconfig/nginx-directives-admin.conf`.
+
+**Tenant ops API (`/api/v1/platform`, all requireStaff + IP allowlist;
+mutations also require re-auth):**
+- `GET /tenants` + `GET /tenants/:id` — search/filter/sort/paginate,
+  members, usage vs limits, subs, invoices, dual audit feeds.
+- `POST /tenants/:id/override` — `TenantOverride` rows (plan comp, limit
+  lifts, expiry); `getEffectivePlanCode`/`getEffectivePlanLimits` consult
+  the newest active override before the subscription.
+- `POST /tenants/:id/suspend|reactivate` — suspended orgs 423
+  `ORG_SUSPENDED` on every route except `GET /api/v1/billing/*` and
+  `/api/v1/auth/*` (so the tenant can still pay up); finance role only.
+- Support ops — reset-password (emails link + revokes sessions),
+  force-logout, resend-verification, change-owner.
+  `User.tokensValidAfter` gives a global sign-out marker enforced on both
+  access and refresh paths (`<=` comparison so a same-second login can't
+  outlive revocation).
+- `POST /tenants/:id/delete` — typed-name confirm (`422 CONFIRM_MISMATCH`),
+  reuses the 30-day soft-delete/purge path.
+- **Impersonation** — `POST /tenants/:id/impersonate` (reason required,
+  platform audit written before mint) issues a 30-min non-refreshable
+  tenant JWT with an `impersonation` claim; `POST /impersonation/:id/end`
+  and `GET /impersonation` manage sessions. Denylist enforced via
+  `denyImpersonation` (403) on credential changes, billing writes, org/
+  member deletes, journal post/reverse, user create/patch/delete, nested
+  impersonation. Tenant `AuditLog` rows record `impersonatedByStaffId` so
+  farmers can see support actions in their own audit log.
+- `GET /audit-events` — paginated platform audit feed for the console.
+
+**Tenant-side UX:**
+- `POST /api/v1/auth/impersonation-session` exchanges the staff-minted
+  Bearer JWT for the web app's HttpOnly cookie (clears refresh cookie —
+  a leftover real session must not silently re-auth mid-impersonation).
+- Web `/impersonate?token=` handoff page + persistent countdown banner
+  with end-session; web + mobile route 423 `ORG_SUSPENDED` to dedicated
+  suspended screens carrying the staff-set message.
+- Fixed: `/auth/me` and the impersonation-session response no longer
+  include `passwordHash`.
+
+**CORS:** `admin.nkuku.zeendeefood.solutions` added to `CORS_ORIGINS`.
+
+### Tests
+- 24 new integration tests (`platform-tenants.test.ts`) + shared staff
+  helpers; full suite 437/437 on the isolated stack.
+
 ## [1.49.0] — 2026-11-09
 
 ### Platform staff console — foundation (P1 of PLAN-super-admin-console)
