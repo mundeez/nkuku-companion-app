@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
+import 'screens/suspended_screen.dart';
 import 'widgets/bottom_nav.dart';
 import 'widgets/upgrade_sheet.dart';
 import 'services/auth_service.dart';
@@ -57,6 +58,7 @@ class _NkukuAppState extends State<NkukuApp> {
     AuthService.addAuthStateListener(_onAuthChanged);
     ApiService.onAuthFailure = _onAuthFailure;
     ApiService.onPlanLimitReached = _onPlanLimitReached;
+    ApiService.onOrgSuspended = _onOrgSuspended;
     if (AuthService.isLoggedIn) {
       NotificationService.startListening();
     }
@@ -95,12 +97,26 @@ class _NkukuAppState extends State<NkukuApp> {
     }
   }
 
+  /// HTTP 423 ORG_SUSPENDED — staff suspended this org at the platform
+  /// level (P2 super-admin console). Route to the suspended screen; the
+  /// session itself stays alive for billing/auth routes.
+  void _onOrgSuspended(String message) {
+    final ctx = ApiService.navigatorKey.currentContext;
+    if (ctx != null) {
+      Navigator.of(ctx).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => SuspendedScreen(message: message)),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   void dispose() {
     _themeProvider.removeListener(_onThemeChanged);
     AuthService.removeAuthStateListener(_onAuthChanged);
     ApiService.onAuthFailure = null;
     ApiService.onPlanLimitReached = null;
+    ApiService.onOrgSuspended = null;
     super.dispose();
   }
 

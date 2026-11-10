@@ -71,9 +71,26 @@ export async function apiFetch<T = any>(
     const errorCode = data?.error || `HTTP ${res.status}`;
     handleAuthError(errorCode);
     notifyIfPlanLimit(res.status, data);
+    if (res.status === 423 && data?.error === "ORG_SUSPENDED") {
+      notifyOrgSuspended(data?.message);
+    }
     throw new ApiRequestError(res.status, data);
   }
   return data as T;
+}
+
+/**
+ * Platform suspension (P2): any 423 ORG_SUSPENDED routes the tenant to a
+ * dedicated page carrying the staff-set message. Skip when impersonating —
+ * staff need to keep browsing the suspended org.
+ */
+function notifyOrgSuspended(message?: string) {
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem("nkuku_impersonation")) return;
+  sessionStorage.setItem("nkuku_suspended_message", message || "");
+  if (!window.location.pathname.startsWith("/suspended")) {
+    window.location.href = "/suspended";
+  }
 }
 
 export async function apiUpload(

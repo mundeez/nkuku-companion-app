@@ -875,6 +875,56 @@ export async function buildAuthModule(app: FastifyInstance) {
     return { success: true };
   });
 
+  // ── Staff impersonation web handoff (P2, super-admin console) ──
+  // The platform console mints a 30-min non-refreshable tenant JWT with an
+  // `impersonation` claim; the admin's browser then opens
+  // /impersonate?token=<jwt> on the tenant app, which calls this endpoint to
+  // exchange the Bearer token for the HttpOnly cookie the web client uses.
+  // The refresh cookie is deliberately cleared — a leftover real session
+  // must not silently re-auth mid-impersonation, and when the token expires
+  // the impersonator is bounced to /login (session over).
+  app.post('/impersonation-session', async (request, reply) => {
+    const { token } = z.object({ token: z.string() }).parse(request.body ?? {});
+    let payload: TokenPayload;
+    try {
+      payload = TokenPayloadSchema.parse(jwt.verify(token, SECRET));
+    } catch {
+      return reply.status(401).send({ error: 'INVALID_IMPERSONATION_TOKEN' });
+    }
+    if (!payload.impersonation) {
+      return reply.status(403).send({ error: 'NOT_IMPERSONATION_TOKEN' });
+    }
+    const endsAt = new Date(payload.impersonation.expiresAt).getTime();
+    const remainingMs = endsAt - Date.now();
+    if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
+      return reply.status(401).send({ error: 'IMPERSONATION_EXPIRED' });
+    }
+    const prisma = (request as any).server?.prisma ?? (reply.server as any)?.prisma;
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user || !user.isActive) {
+      return reply.status(401).send({ error: 'USER_INVALID' });
+    }
+    reply.setCookie('nkuku_access_token', token, {
+      ...COOKIE_OPTIONS,
+      maxAge: Math.floor(remainingMs / 1000),
+    });
+    reply.clearCookie('nkuku_refresh_token', { path: '/' });
+    return {
+      user: { ...user, organizationId: payload.organizationId },
+      impersonation: payload.impersonation,
+      expiresAt: payload.impersonation.expiresAt,
+    };
+  });
+
+  // POST /api/v1/auth/impersonation-session/end — clear the impersonation
+  // cookie. Unauthenticated by design: the impersonated cookie IS the
+  // credential being cleared. The platform-side session end (audit +
+  // endedAt) is the console's job via POST /platform/impersonation/:id/end.
+  app.post('/impersonation-session/end', async (_request, reply) => {
+    clearAuthCookies(reply);
+    return { success: true };
+  });
+
   // GET /api/v1/auth/me
   app.get('/me', { preHandler: [authenticate] }, async (request) => {
     const payload = (request as any).authUser as TokenPayload;

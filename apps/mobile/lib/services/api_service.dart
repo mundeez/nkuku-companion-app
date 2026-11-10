@@ -101,6 +101,12 @@ class ApiService {
   /// the upgrade bottom sheet.
   static void Function(PlanLimitInfo info)? onPlanLimitReached;
 
+  /// Optional callback invoked on 423 ORG_SUSPENDED (platform suspension by
+  /// support staff — P2 super-admin console). Carries the staff-set message;
+  /// the caller should route to the suspended screen. Unlike 401 this does
+  /// NOT log the user out — the session stays valid for billing/auth routes.
+  static void Function(String message)? onOrgSuspended;
+
   static void setupInterceptors() {
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
@@ -128,6 +134,15 @@ class ApiService {
           log('Plan limit reached on ${response.requestOptions.path}', name: 'ApiService');
           onPlanLimitReached
               ?.call(PlanLimitInfo.fromResponse(response.data));
+        } else if (status == 423 &&
+            response.data is Map &&
+            response.data['error'] == 'ORG_SUSPENDED' &&
+            AuthService.isLoggedIn) {
+          log('Organization suspended on ${response.requestOptions.path}', name: 'ApiService');
+          onOrgSuspended?.call(
+            (response.data['message'] as String?) ??
+                'This organization has been suspended. Please contact support.',
+          );
         }
         handler.next(response);
       },
