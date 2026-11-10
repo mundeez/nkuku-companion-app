@@ -10,6 +10,13 @@ export interface AuditEntry {
   newState?: any;
   ipAddress?: string;
   periodId?: string;
+  /**
+   * P2 (super-admin console): when the mutation ran under a staff
+   * impersonation token, the acting StaffUser id — lets the tenant see
+   * support activity attributed in their own audit log. Pass
+   * `request.authUser.impersonation?.staffId` at call sites.
+   */
+  impersonatedByStaffId?: string | null;
 }
 
 export interface AuditQuery {
@@ -38,6 +45,7 @@ export class AuditService {
         newState: entry.newState ?? null,
         ipAddress: entry.ipAddress ?? null,
         periodId: entry.periodId ?? null,
+        impersonatedByStaffId: entry.impersonatedByStaffId ?? null,
       },
     });
   }

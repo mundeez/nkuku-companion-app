@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import crypto from 'crypto';
-import { authenticate, requireRole, verifyRestoreToken } from '../auth/routes.js';
+import { authenticate, requireRole, verifyRestoreToken, denyImpersonation } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { checkUserLimit } from '../../core/billing/feature-gate.js';
 import { sendInviteEmail } from '../../core/security/email.service.js';
@@ -73,7 +73,7 @@ export async function buildOrganizationModule(app: FastifyInstance) {
   });
 
   // DELETE /api/v1/organizations/members/:id — remove a member (owner only)
-  app.delete('/members/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.delete('/members/:id', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const _authUser = (request as any).authUser;
@@ -164,7 +164,7 @@ export async function buildOrganizationModule(app: FastifyInstance) {
   // POST /api/v1/organizations/delete — soft-delete the org (owner only).
   // Requires the exact org name as confirmation. Data is purged by cron
   // after 30 days; the org is deactivated immediately.
-  app.post('/delete', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  app.post('/delete', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const { confirmName } = z.object({ confirmName: z.string() }).parse(request.body);
     const org = await prisma.organization.findUnique({ where: { id: organizationId } });

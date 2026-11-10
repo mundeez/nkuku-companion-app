@@ -184,6 +184,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'FinancialRecord',
       entityId: created.id,
       action: 'create',
@@ -221,6 +222,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'FinancialRecord',
       entityId: id,
       action: 'update',
@@ -252,6 +254,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'FinancialRecord',
       entityId: id,
       action: 'delete',
@@ -313,6 +316,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
           await audit.log({
             organizationId,
             userId: _authUser.userId,
+            impersonatedByStaffId: _authUser.impersonation?.staffId,
             entityType: 'FinancialRecord',
             entityId: record.id,
             action: 'create',
@@ -347,6 +351,7 @@ export async function buildFinancialRecordModule(app: FastifyInstance) {
           await audit.log({
             organizationId,
             userId: _authUser.userId,
+            impersonatedByStaffId: _authUser.impersonation?.staffId,
             entityType: 'FinancialRecord',
             entityId: record.id,
             action: 'delete',

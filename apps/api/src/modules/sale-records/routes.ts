@@ -652,6 +652,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'SaleRecord',
       entityId: created.id,
       action: 'create',
@@ -802,6 +803,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'SaleRecord',
       entityId: id,
       action: 'update',
@@ -863,6 +865,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'SaleRecord',
       entityId: id,
       action: 'delete',

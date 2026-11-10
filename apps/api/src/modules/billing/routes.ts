@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { authenticate, requireRole } from '../auth/routes.js';
+import { authenticate, requireRole, denyImpersonation } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { SELF_SERVE_PLANS, getPlan, type PlanCode } from '../../core/billing/plans.js';
 import {
@@ -78,7 +78,8 @@ export async function buildBillingModule(app: FastifyInstance) {
   });
 
   // ── POST /addons/:code/subscribe — purchase an add-on ──
-  app.post('/addons/:code/subscribe', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // denyImpersonation: billing checkout is on the P2 impersonation denylist.
+  app.post('/addons/:code/subscribe', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const _authUser = (request as any).authUser;
     const { code } = z.object({ code: z.enum(['remove_ads_addon']) }).parse(request.params);
@@ -115,7 +116,8 @@ export async function buildBillingModule(app: FastifyInstance) {
   });
 
   // ── POST /addons/:code/cancel — cancel an add-on ──
-  app.post('/addons/:code/cancel', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // denyImpersonation: billing cancellation is on the P2 impersonation denylist.
+  app.post('/addons/:code/cancel', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const { code } = z.object({ code: z.enum(['remove_ads_addon']) }).parse(request.params);
     try {
@@ -127,7 +129,8 @@ export async function buildBillingModule(app: FastifyInstance) {
   });
 
   // ── POST /subscribe — subscribe to a plan (or change plans) ──
-  app.post('/subscribe', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // denyImpersonation: plan checkout/change is on the P2 impersonation denylist.
+  app.post('/subscribe', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const _authUser = (request as any).authUser;
 
@@ -187,7 +190,8 @@ export async function buildBillingModule(app: FastifyInstance) {
   });
 
   // ── POST /cancel — cancel subscription (downgrade to free) ──
-  app.post('/cancel', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // denyImpersonation: cancellation is on the P2 impersonation denylist.
+  app.post('/cancel', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     try {
       const result = await cancelSubscription(prisma, organizationId);
@@ -242,7 +246,8 @@ export async function buildBillingModule(app: FastifyInstance) {
   });
 
   // ── POST /verify-payment — verify a payment after redirect ──
-  app.post('/verify-payment', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // denyImpersonation: completes a checkout — P2 impersonation denylist.
+  app.post('/verify-payment', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const body = VerifyPaymentSchema.parse(request.body);
     const result = await verifyPaymentRedirect(prisma, { ...body, organizationId });
@@ -291,7 +296,8 @@ export async function buildBillingModule(app: FastifyInstance) {
 
   // ── GET /dev/mock-pay — dev-only endpoint to simulate a successful payment ──
   // Only available when FLUTTERWAVE_SECRET_KEY is not set (mock mode)
-  app.get('/dev/mock-pay', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // denyImpersonation: simulates a payment — P2 impersonation denylist.
+  app.get('/dev/mock-pay', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     if (!allProvidersMock) {
       return reply.status(404).send({ error: 'NOT_FOUND' });
     }

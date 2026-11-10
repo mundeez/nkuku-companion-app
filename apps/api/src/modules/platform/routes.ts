@@ -46,6 +46,7 @@ import { writePlatformAudit } from '../../core/staff-auth/audit.service.js';
 import { platformIpAllowlist } from '../../core/staff-auth/ip-allowlist.js';
 import { sendStaffInviteEmail } from '../../core/security/email.service.js';
 import { PLATFORM_CONSOLE_BASE_URL } from '../../core/staff-auth/bootstrap.js';
+import { buildPlatformTenantsModule } from './tenants.js';
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -683,4 +684,9 @@ export async function buildPlatformModule(app: FastifyInstance) {
       return { staff: publicStaff(updated) };
     },
   );
+
+  // ── P2: tenant ops (tenants / impersonation / audit events) ──
+  // Registered inside this module's encapsulated scope so the IP allowlist
+  // onRequest hook above covers these routes too.
+  await app.register(buildPlatformTenantsModule);
 }

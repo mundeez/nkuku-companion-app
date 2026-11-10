@@ -128,6 +128,17 @@ const TokenPayloadSchema = z.object({
   phone: z.string().nullable().optional(),
   role: z.enum(['owner', 'manager', 'flock_minder', 'sales_person', 'viewer']),
   organizationId: z.string(),
+  // Present only on staff-impersonation tokens minted by
+  // POST /api/v1/platform/tenants/:id/impersonate (P2). The claim is the
+  // authoritative expiry for the session (30-min TTL); denyImpersonation
+  // gates sensitive routes and tenant AuditLog rows record the staffId.
+  impersonation: z
+    .object({
+      staffId: z.string(),
+      sessionId: z.string(),
+      expiresAt: z.string(),
+    })
+    .optional(),
 });
 
 export type TokenPayload = z.infer<typeof TokenPayloadSchema>;
@@ -827,6 +838,20 @@ export async function buildAuthModule(app: FastifyInstance) {
       if (!user || !user.isActive) {
         return reply.status(401).send({ error: 'USER_INVALID' });
       }
+      // Global sign-out (P2 support ops): refresh tokens minted at-or-before
+      // the revocation timestamp are dead — without this check a
+      // force-logged-out user could silently exchange their way back in.
+      // iat is second-granularity vs tokensValidAfter ms, so `<=` is used:
+      // a token minted in the same wall-clock second as the revocation is
+      // killed too. Edge case: a login completed in that same second is
+      // rejected — self-heals on the next login.
+      if (
+        user.tokensValidAfter &&
+        typeof decoded.iat === 'number' &&
+        decoded.iat <= Math.floor(user.tokensValidAfter.getTime() / 1000)
+      ) {
+        return reply.status(401).send({ error: 'TOKEN_REVOKED' });
+      }
       const organizationId = await getPrimaryOrganizationId(prisma, user.id);
       if (!organizationId) {
         return noOrganizationResponse(prisma, reply, user.id);
@@ -1429,12 +1454,39 @@ export async function authenticate(request: any, reply: any) {
     const decoded = jwt.verify(token, SECRET) as any;
     const payload = TokenPayloadSchema.parse(decoded);
 
+    // Staff impersonation sessions (P2): the claim's expiresAt is the
+    // authoritative end of the 30-min session. A session ended early via
+    // POST /platform/impersonation/:id/end is NOT re-checked against the DB
+    // here — the denylisted routes + AuditLog impersonation marking cover
+    // that gap until token expiry (documented limitation, plan §4).
+    if (payload.impersonation) {
+      const endsAt = new Date(payload.impersonation.expiresAt).getTime();
+      if (!Number.isFinite(endsAt) || endsAt <= Date.now()) {
+        return reply.status(401).send({ error: 'IMPERSONATION_EXPIRED' });
+      }
+      (request as any).impersonation = payload.impersonation;
+    }
+
     // Validate user still exists and is active in DB
     const prisma = (request as any).server?.prisma ?? (reply.server as any)?.prisma;
     if (prisma) {
       const user = await prisma.user.findUnique({ where: { id: payload.userId } });
       if (!user || !user.isActive) {
         return reply.status(401).send({ error: 'INVALID_TOKEN' });
+      }
+      // Global sign-out (P2 support ops): access tokens minted at-or-before
+      // the user's revocation timestamp are rejected immediately rather
+      // than living out their 15-minute TTL. iat is second-granularity vs
+      // tokensValidAfter ms, so `<=` is used — otherwise a force-logout in
+      // the same second as a login leaves the just-minted token alive
+      // (worst case: the very session we were asked to kill). A login
+      // landing in that same second is rejected but self-heals on retry.
+      if (
+        user.tokensValidAfter &&
+        typeof decoded.iat === 'number' &&
+        decoded.iat <= Math.floor(user.tokensValidAfter.getTime() / 1000)
+      ) {
+        return reply.status(401).send({ error: 'TOKEN_REVOKED' });
       }
       // Deleted/deactivated organizations reject immediately — otherwise
       // members' short-lived access tokens keep working until expiry.
@@ -1444,10 +1496,30 @@ export async function authenticate(request: any, reply: any) {
       if (payload.organizationId && !isAccountDelete) {
         const org = await prisma.organization.findUnique({
           where: { id: payload.organizationId },
-          select: { isActive: true, deletedAt: true },
+          select: { isActive: true, deletedAt: true, suspendedAt: true, suspendedMessage: true },
         });
         if (!org || !org.isActive || org.deletedAt) {
           return reply.status(401).send({ error: 'ORGANIZATION_INACTIVE' });
+        }
+        // Platform suspension (P2): a suspended org is read-only nothing —
+        // EVERY request 423s, including reads, so the tenant sees the
+        // suspension message and pays up. Escape hatches (needed to actually
+        // resolve the suspension):
+        //   - GET /api/v1/billing/* — view plan/invoices/payment links
+        //   - /api/v1/auth/*       — /me, /refresh, /logout stay alive
+        //   - impersonation tokens — staff must still be able to see the
+        //     tenant while investigating (claim expiry still enforced).
+        if (org.suspendedAt && !payload.impersonation) {
+          const url = (request.url as string) || '';
+          const allowed =
+            url.startsWith('/api/v1/auth/') ||
+            (request.method === 'GET' && url.startsWith('/api/v1/billing/'));
+          if (!allowed) {
+            return reply.status(423).send({
+              error: 'ORG_SUSPENDED',
+              message: org.suspendedMessage || 'This organization has been suspended. Please contact support.',
+            });
+          }
         }
       }
     }
@@ -1483,4 +1555,20 @@ export function requireRole(...roles: string[]) {
       return reply.status(403).send({ error: 'FORBIDDEN' });
     }
   };
+}
+
+/**
+ * preHandler — refuse requests made under a staff-impersonation token
+ * (P2, plan §4 denylist). Apply AFTER authenticate on routes that must
+ * never run as an impersonated user: credential changes (password/phone/
+ * email/TOTP), billing checkout & cancellation, org delete, member
+ * delete/role change, journal posting & reversal, nested impersonation.
+ */
+export async function denyImpersonation(request: any, reply: any) {
+  if ((request as any).authUser?.impersonation) {
+    return reply.status(403).send({
+      error: 'IMPERSONATION_DENIED',
+      message: 'This action is not available during an impersonation session',
+    });
+  }
 }

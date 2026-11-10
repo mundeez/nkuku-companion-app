@@ -9,9 +9,15 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
-import { authenticator } from 'otplib';
-import { TEST_API_URL, TEST_DATABASE_URL } from '../helpers/env.js';
+import { TEST_DATABASE_URL } from '../helpers/env.js';
+import {
+  api,
+  post,
+  staffEmail,
+  createStaff,
+  onboardStaff,
+  STAFF_PASSWORD,
+} from '../helpers/staff.js';
 import {
   hasPermission,
   ROLE_PERMISSIONS,
@@ -19,77 +25,22 @@ import {
 } from '../../src/core/staff-auth/permissions.js';
 import { ipMatchesCidr, ipInAllowlist } from '../../src/core/staff-auth/ip-allowlist.js';
 
-const API_URL = TEST_API_URL;
 const prisma = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
 
-const STAFF_PASSWORD = 'StaffTestPass123!';
-
-async function api(path: string, options: any = {}, token?: string) {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
-  return { status: res.status, data: await res.json().catch(() => null) };
-}
-
-function post(path: string, body: any, token?: string) {
-  return api(path, { method: 'POST', body: JSON.stringify(body) }, token);
-}
-
-let seq = 0;
-function staffEmail(role: string) {
-  return `staff-test-${role}-${Date.now()}-${seq++}@example.com`;
-}
-
 /** Create a StaffUser row directly (password only — no TOTP). */
-async function createStaff(role: string) {
-  const email = staffEmail(role);
-  const staff = await prisma.staffUser.create({
-    data: {
-      email,
-      name: `Test ${role}`,
-      passwordHash: await bcrypt.hash(STAFF_PASSWORD, 10),
-      role: role as any,
-    },
-  });
-  return { staff, email };
+async function createStaffLocal(role: string) {
+  return createStaff(prisma, role);
 }
 
-/** Full login → TOTP enrol → confirm. Returns access token + recovery codes. */
-async function onboardStaff(email: string) {
+/** Full login → TOTP enrol → confirm, asserting the happy-path contract. */
+async function onboardStaffAsserted(email: string) {
   const login = await post('/api/v1/platform/auth/login', {
     email,
     password: STAFF_PASSWORD,
   });
   expect(login.status).toBe(200);
   expect(login.data.requiresTotpEnrollment).toBe(true);
-  const ticket = login.data.ticket;
-
-  const enroll = await api('/api/v1/platform/auth/totp/enroll', {
-    method: 'POST',
-    body: JSON.stringify({}),
-  }, ticket);
-  expect(enroll.status).toBe(200);
-  expect(enroll.data.secret).toBeDefined();
-  expect(enroll.data.otpauthUrl).toContain('otpauth://');
-
-  const code = authenticator.generate(enroll.data.secret);
-  const confirm = await post('/api/v1/platform/auth/totp/confirm', {
-    ticket,
-    code,
-  });
-  expect(confirm.status).toBe(200);
-  expect(confirm.data.accessToken).toBeDefined();
-  expect(confirm.data.refreshToken).toBeDefined();
-  expect(Array.isArray(confirm.data.recoveryCodes)).toBe(true);
-  expect(confirm.data.recoveryCodes.length).toBe(10);
-  return {
-    accessToken: confirm.data.accessToken as string,
-    refreshToken: confirm.data.refreshToken as string,
-    recoveryCodes: confirm.data.recoveryCodes as string[],
-  };
+  return onboardStaff(email);
 }
 
 describe('Platform staff auth (P1)', () => {
@@ -102,18 +53,18 @@ describe('Platform staff auth (P1)', () => {
   let auditorToken: string;
 
   beforeAll(async () => {
-    const s = await createStaff('super_admin');
+    const s = await createStaffLocal('super_admin');
     superEmail = s.email;
     superId = s.staff.id;
-    const sup = await createStaff('support');
+    const sup = await createStaffLocal('support');
     supportId = sup.staff.id;
-    const aud = await createStaff('auditor');
+    const aud = await createStaffLocal('auditor');
 
-    const onboarded = await onboardStaff(superEmail);
+    const onboarded = await onboardStaffAsserted(superEmail);
     superToken = onboarded.accessToken;
     superRecoveryCodes = onboarded.recoveryCodes;
-    supportToken = (await onboardStaff(sup.email)).accessToken;
-    auditorToken = (await onboardStaff(aud.email)).accessToken;
+    supportToken = (await onboardStaffAsserted(sup.email)).accessToken;
+    auditorToken = (await onboardStaffAsserted(aud.email)).accessToken;
   });
 
   afterAll(async () => {
