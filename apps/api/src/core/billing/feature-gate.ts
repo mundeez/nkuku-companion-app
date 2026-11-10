@@ -5,7 +5,7 @@
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
-import { getEffectivePlanCode, getOrCreateSubscription } from './billing.service.js';
+import { getEffectivePlanCode, getEffectivePlanLimits, getOrCreateSubscription } from './billing.service.js';
 import { hasFeature, getPlan } from './plans.js';
 import { hasActiveAddon } from './addons.js';
 
@@ -73,7 +73,13 @@ export function requireFeature(feature: string) {
     }
 
     const planCode = await getEffectivePlanCode(prisma, organizationId);
-    if (!hasFeature(planCode, feature)) {
+    // Effective limits fold in any active TenantOverride (limitsJson may
+    // extend/replace the plan's feature list — P2 staff overrides).
+    const limits = await getEffectivePlanLimits(prisma, organizationId);
+    const enabled = Array.isArray(limits?.features)
+      ? limits.features.includes(feature)
+      : hasFeature(planCode, feature);
+    if (!enabled) {
       const plan = getPlan(planCode);
       return reply.status(402).send({
         error: 'PLAN_LIMIT_REACHED',
@@ -98,7 +104,8 @@ export async function checkFlockLimit(request: FastifyRequest, reply: FastifyRep
   const plan = getPlan(planCode);
   if (!plan) return;
 
-  const maxFlocks = plan.limits.maxActiveFlocks;
+  const limits = await getEffectivePlanLimits(prisma, organizationId);
+  const maxFlocks = limits.maxActiveFlocks ?? plan.limits.maxActiveFlocks;
   if (maxFlocks === -1) return; // unlimited
 
   const activeCount = await (prisma as PrismaClient).broilerFlock.count({
@@ -130,7 +137,8 @@ export async function checkUserLimit(request: FastifyRequest, reply: FastifyRepl
   const plan = getPlan(planCode);
   if (!plan) return;
 
-  const maxUsers = plan.limits.maxUsers;
+  const limits = await getEffectivePlanLimits(prisma, organizationId);
+  const maxUsers = limits.maxUsers ?? plan.limits.maxUsers;
   if (maxUsers === -1) return; // unlimited
 
   const memberCount = await (prisma as PrismaClient).organizationMember.count({
@@ -168,7 +176,8 @@ export async function checkDocumentLimit(
   const plan = getPlan(planCode);
   if (!plan) return { allowed: false, reason: 'Unknown plan' };
 
-  const max = plan.limits.maxDocumentsPerRecord;
+  const limits = await getEffectivePlanLimits(prisma, organizationId);
+  const max = limits.maxDocumentsPerRecord ?? plan.limits.maxDocumentsPerRecord;
   if (max === -1) return { allowed: true };
   if (max === 0) {
     return {
@@ -194,6 +203,7 @@ export async function getPlanLimitsForOrg(prisma: PrismaClient, organizationId: 
   const planCode = await getEffectivePlanCode(prisma, organizationId);
   const plan = getPlan(planCode);
   const sub = await getOrCreateSubscription(prisma, organizationId);
+  const limits = await getEffectivePlanLimits(prisma, organizationId);
 
   // Get current usage
   const [activeFlocks, members, pendingInvites] = await Promise.all([
@@ -206,7 +216,7 @@ export async function getPlanLimitsForOrg(prisma: PrismaClient, organizationId: 
     planCode,
     planName: plan?.name || planCode,
     subscriptionStatus: sub.status,
-    limits: plan?.limits || {},
+    limits,
     usage: {
       activeFlocks,
       users: members + pendingInvites,

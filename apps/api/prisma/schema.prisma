@@ -37,6 +37,12 @@ model User {
   // manually via a one-off DB update. See docs/ADVERTISING_PLAN.md §2.
   isPlatformAdmin Boolean @default(false) @map("is_platform_admin")
 
+  // Global sign-out marker (P2, super-admin console): JWTs whose iat is
+  // before this timestamp are rejected by authenticate()/POST /auth/refresh.
+  // Set by platform support ops (force logout, password reset) and cleared
+  // never — it simply moves forward on each revocation.
+  tokensValidAfter DateTime? @map("tokens_valid_after") @db.Timestamptz(6)
+
   createdSuppliers                    Supplier[]                    @relation("SupplierCreatedBy")
   createdBatches                      Batch[]                       @relation("BatchCreatedBy")
   createdCycles                       ProductionCycle[]             @relation("CycleCreatedBy")
@@ -145,6 +151,14 @@ model Organization {
   // daily purge job hard-deletes all org data.
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
   purgeAfter DateTime? @map("purge_after") @db.Timestamptz(6)
+  // Platform-initiated suspension (P2, super-admin console): set by staff
+  // via /api/v1/platform/tenants/:id/suspend. While suspendedAt is set,
+  // tenant authenticate() rejects every request with 423 ORG_SUSPENDED
+  // except billing-read and auth routes — distinct from the billing-side
+  // Subscription.status 'suspended' (dunning), which only downgrades plan.
+  suspendedAt      DateTime? @map("suspended_at") @db.Timestamptz(6)
+  suspendedReason  String?   @map("suspended_reason")
+  suspendedMessage String?   @map("suspended_message")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   // Per-org default vaccination schedule (remembered from first flock create
@@ -169,6 +183,7 @@ model Organization {
   adEvents                     AdEvent[]
   auditLogs                    AuditLog[]
   impersonationSessions        ImpersonationSession[]
+  tenantOverrides              TenantOverride[]
   defaultVaccinationSchedule   VaccinationSchedule? @relation("OrgDefaultVaccinationSchedule", fields: [defaultVaccinationScheduleId], references: [id], onDelete: SetNull)
 
   @@map("organizations")
@@ -1199,6 +1214,11 @@ model AuditLog {
   newState       Json?       @map("new_state")
   ipAddress      String?     @map("ip_address") @db.VarChar(45)
   periodId       String?     @map("period_id") @db.Uuid
+  // P2: when this mutation was performed by platform staff inside an
+  // impersonation session, the acting StaffUser id — so the tenant can see
+  // support activity attributed in their own audit log. Deliberately NOT a
+  // foreign key: audit rows must never block staff-user deletion.
+  impersonatedByStaffId String? @map("impersonated_by_staff_id") @db.Uuid
   occurredAt     DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -1706,6 +1726,7 @@ model StaffUser {
   recoveryCodes         StaffRecoveryCode[]
   auditEvents           PlatformAuditEvent[]
   impersonationSessions ImpersonationSession[] @relation("ImpersonationStaff")
+  tenantOverrides       TenantOverride[]
 
   @@map("staff_users")
 }
@@ -1796,4 +1817,30 @@ model ImpersonationSession {
   @@index([staffUserId])
   @@index([organizationId])
   @@map("impersonation_sessions")
+}
+
+// Staff-initiated plan/limit override or comp for a tenant (P2, super-admin
+// console). Managed via /api/v1/platform/tenants/:id/override (permission
+// billing.override + re-auth). A row is "active" while:
+//   (compUntil IS NULL OR compUntil > now) AND (expiresAt IS NULL OR expiresAt > now)
+// getEffectivePlanCode() consults the newest active override BEFORE the
+// subscription — a comp'd org behaves as that plan. Old overrides are
+// expired (expiresAt = now) rather than deleted so the table doubles as
+// the override history; reason is mandatory for every change.
+model TenantOverride {
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  planCode         String?   @map("plan_code") @db.VarChar(30)
+  limitsJson       Json?     @map("limits_json")
+  compUntil        DateTime? @map("comp_until") @db.Timestamptz(6)
+  reason           String
+  createdByStaffId String?   @map("created_by_staff_id") @db.Uuid
+  expiresAt        DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    StaffUser?   @relation(fields: [createdByStaffId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("tenant_overrides")
 }

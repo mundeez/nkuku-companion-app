@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { authenticate, requireRole } from '../auth/routes.js';
+import { authenticate, requireRole, denyImpersonation } from '../auth/routes.js';
 import { JournalEngine } from '../../core/double-entry/journal.engine.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 
@@ -95,7 +95,8 @@ export async function buildJournalModule(app: FastifyInstance) {
   });
 
   // POST / — post manual entry (owner/manager)
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+  // denyImpersonation: ledger writes are on the P2 impersonation denylist.
+  app.post('/', { preHandler: [authenticate, denyImpersonation, requireRole('owner', 'manager')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const data = ManualEntrySchema.parse(request.body);
     const _authUser = (request as any).authUser;
@@ -121,7 +122,8 @@ export async function buildJournalModule(app: FastifyInstance) {
   });
 
   // POST /:id/reverse — post reversing entry (owner only)
-  app.post('/:id/reverse', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // denyImpersonation: journal reversal is on the P2 impersonation denylist.
+  app.post('/:id/reverse', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const { reason } = z.object({ reason: z.string().optional() }).parse(request.body ?? {});

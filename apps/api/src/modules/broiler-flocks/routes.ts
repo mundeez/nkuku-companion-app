@@ -633,6 +633,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: authUser.userId,
+      impersonatedByStaffId: authUser.impersonation?.staffId,
       entityType: 'BroilerFlock',
       entityId: id,
       action: 'update',

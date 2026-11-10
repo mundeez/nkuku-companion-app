@@ -417,6 +417,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
       await audit.log({
         organizationId: _authUser.organizationId,
         userId: _authUser.userId,
+        impersonatedByStaffId: _authUser.impersonation?.staffId,
         entityType: 'Document',
         entityId: _authUser.userId, // no document ID yet; use user ID as entity ref
         action: 'virus_scan_rejected',
@@ -474,6 +475,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     await audit.log({
       organizationId: _authUser.organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'Document',
       entityId: created.id,
       action: 'create',
@@ -612,6 +614,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     await audit.log({
       organizationId: _authUser.organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'Document',
       entityId: id,
       action: 'delete',
@@ -656,6 +659,7 @@ export async function buildDocumentModule(app: FastifyInstance) {
     await audit.log({
       organizationId: _authUser.organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'Document',
       entityId: id,
       action: 'update',

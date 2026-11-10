@@ -28,7 +28,7 @@ import {
   maskPhone,
 } from '../../core/security/otp.service.js';
 import { sendVerificationEmail } from '../../core/security/email.service.js';
-import { authenticate } from '../auth/routes.js';
+import { authenticate, denyImpersonation } from '../auth/routes.js';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const EMAIL_VERIFICATION_EXPIRES = '30m';
@@ -124,7 +124,7 @@ export async function buildAccountModule(app: FastifyInstance) {
   });
 
   // ── POST /me/phone — initiate phone linking (sends OTP) ──
-  app.post('/me/phone', { preHandler: [authenticate] }, async (request, reply) => {
+  app.post('/me/phone', { preHandler: [authenticate, denyImpersonation] }, async (request, reply) => {
     const userId = (request as any).authUser.userId;
     const { phone } = LinkPhoneSchema.parse(request.body);
 
@@ -153,7 +153,7 @@ export async function buildAccountModule(app: FastifyInstance) {
   });
 
   // ── POST /me/phone/verify — verify OTP and link phone ──
-  app.post('/me/phone/verify', { preHandler: [authenticate] }, async (request, reply) => {
+  app.post('/me/phone/verify', { preHandler: [authenticate, denyImpersonation] }, async (request, reply) => {
     const userId = (request as any).authUser.userId;
     const { phone, otp } = VerifyPhoneSchema.parse(request.body);
 
@@ -184,7 +184,7 @@ export async function buildAccountModule(app: FastifyInstance) {
   });
 
   // ── DELETE /me/phone — unlink phone ──
-  app.delete('/me/phone', { preHandler: [authenticate] }, async (request, reply) => {
+  app.delete('/me/phone', { preHandler: [authenticate, denyImpersonation] }, async (request, reply) => {
     const userId = (request as any).authUser.userId;
     const user = await prisma.user.findUnique({ where: { id: userId } });
 
@@ -209,7 +209,7 @@ export async function buildAccountModule(app: FastifyInstance) {
   });
 
   // ── POST /me/email/verify — send email verification link ──
-  app.post('/me/email/verify', { preHandler: [authenticate] }, async (request, reply) => {
+  app.post('/me/email/verify', { preHandler: [authenticate, denyImpersonation] }, async (request, reply) => {
     const userId = (request as any).authUser.userId;
     const user = await prisma.user.findUnique({ where: { id: userId } });
 
@@ -278,7 +278,7 @@ export async function buildAccountModule(app: FastifyInstance) {
   });
 
   // ── POST /me/password — change password (requires current password) ──
-  app.post('/me/password', { preHandler: [authenticate] }, async (request, reply) => {
+  app.post('/me/password', { preHandler: [authenticate, denyImpersonation] }, async (request, reply) => {
     const userId = (request as any).authUser.userId;
     const { currentPassword, newPassword } = ChangePasswordSchema.parse(request.body);
 
@@ -398,7 +398,7 @@ export async function buildAccountModule(app: FastifyInstance) {
   });
 
   // ── DELETE /me/social/:provider — unlink a social provider ──
-  app.delete('/me/social/:provider', { preHandler: [authenticate] }, async (request, reply) => {
+  app.delete('/me/social/:provider', { preHandler: [authenticate, denyImpersonation] }, async (request, reply) => {
     const userId = (request as any).authUser.userId;
     const { provider } = z.object({
       provider: z.enum(['google', 'facebook', 'apple', 'microsoft']),
@@ -429,7 +429,7 @@ export async function buildAccountModule(app: FastifyInstance) {
   // Removes memberships, OTPs, devices and social links; anonymizes the user
   // row (kept so created-by references stay valid) and deactivates it.
   // Sole owners of an active org must delete or hand over the org first.
-  app.delete('/me', { preHandler: [authenticate] }, async (request, reply) => {
+  app.delete('/me', { preHandler: [authenticate, denyImpersonation] }, async (request, reply) => {
     const userId = (request as any).authUser.userId;
     const { confirm } = z.object({ confirm: z.literal('DELETE') }).parse(request.body ?? {});
     void confirm;

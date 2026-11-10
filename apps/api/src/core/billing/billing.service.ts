@@ -66,13 +66,55 @@ export async function getOrCreateSubscription(prisma: PrismaClient, organization
 }
 
 /**
+ * The newest active TenantOverride for an organization, or null.
+ * "Active" (P2, plan §5): (compUntil IS NULL OR compUntil > now) AND
+ * (expiresAt IS NULL OR expiresAt > now). Rows are never deleted —
+ * superseded overrides are expired by setting expiresAt = now.
+ */
+export async function getActiveTenantOverride(prisma: PrismaClient, organizationId: string) {
+  const now = new Date();
+  return prisma.tenantOverride.findFirst({
+    where: {
+      organizationId,
+      AND: [
+        { OR: [{ compUntil: null }, { compUntil: { gt: now } }] },
+        { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+/**
  * Get the effective plan code for an organization (from subscription or org default).
+ * An active staff TenantOverride with a planCode wins over the subscription —
+ * a comp'd org behaves as the override plan (P2, super-admin console).
  */
 export async function getEffectivePlanCode(prisma: PrismaClient, organizationId: string): Promise<PlanCode> {
+  const override = await getActiveTenantOverride(prisma, organizationId);
+  if (override?.planCode) return override.planCode as PlanCode;
+
   const sub = await getOrCreateSubscription(prisma, organizationId);
   // If suspended, downgrade to free
   if (sub.status === 'suspended') return 'free';
   return sub.planCode as PlanCode;
+}
+
+/**
+ * Effective plan limits for an organization: the plan's declared limits
+ * with any active TenantOverride.limitsJson keys merged over the top
+ * (a limits-only override can lift e.g. maxActiveFlocks without changing
+ * the plan; a `features` key replaces the feature list outright).
+ */
+export async function getEffectivePlanLimits(prisma: PrismaClient, organizationId: string) {
+  const planCode = await getEffectivePlanCode(prisma, organizationId);
+  const plan = getPlan(planCode);
+  const limits: any = { ...(plan?.limits ?? {}) };
+  const override = await getActiveTenantOverride(prisma, organizationId);
+  if (override?.limitsJson && typeof override.limitsJson === 'object' && !Array.isArray(override.limitsJson)) {
+    Object.assign(limits, override.limitsJson);
+  }
+  return limits;
 }
 
 /**

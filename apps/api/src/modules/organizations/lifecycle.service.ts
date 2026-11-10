@@ -12,6 +12,10 @@ import { sendOrganizationDeletionEmail } from '../../core/security/email.service
 const PURGE_DELAY_DAYS = 30;
 
 // Direct org-scoped models (organizationId column).
+// NOTE: impersonation_sessions has an ON DELETE RESTRICT org FK (platform
+// operational rows, not tenant data) — it must be deleted BEFORE the org
+// row or the purge fails. tenant_overrides uses ON DELETE CASCADE so it
+// needs no entry here. platform_audit_events deliberately survives (no FK).
 const ORG_MODELS = [
   'supplier',
   'productionCycle',
@@ -28,6 +32,7 @@ const ORG_MODELS = [
   'adEvent',
   'subscription',
   'invoice',
+  'impersonationSession',
   'organizationMember',
   'invite',
 ] as const;

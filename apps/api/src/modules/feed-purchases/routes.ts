@@ -123,6 +123,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'FeedPurchase',
       entityId: purchase.id,
       action: 'create',
@@ -211,6 +212,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'FeedPurchase',
       entityId: id,
       action: 'update',
@@ -260,6 +262,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
     await audit.log({
       organizationId,
       userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
       entityType: 'FeedPurchase',
       entityId: id,
       action: 'delete',

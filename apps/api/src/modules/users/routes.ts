@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { authenticate, requireRole } from '../auth/routes.js';
+import { authenticate, requireRole, denyImpersonation } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { ListQuerySchema, searchWhere, orderBy } from '../../core/list-query.js';
 
@@ -61,7 +61,8 @@ export async function buildUserModule(app: FastifyInstance) {
   });
 
   // POST /api/v1/users — create a user and add them to the caller's organization
-  app.post('/', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // (denyImpersonation: creates a credential-bearing account — P2 denylist)
+  app.post('/', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const data = UserCreateSchema.parse(request.body);
 
@@ -82,8 +83,8 @@ export async function buildUserModule(app: FastifyInstance) {
     return reply.status(201).send(user);
   });
 
-  // PATCH /api/v1/users/:id
-  app.patch('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // PATCH /api/v1/users/:id — member role + password change (P2 denylist)
+  app.patch('/:id', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const membership = await prisma.organizationMember.findFirst({ where: { organizationId, userId: id } });
@@ -110,7 +111,8 @@ export async function buildUserModule(app: FastifyInstance) {
   });
 
   // DELETE /api/v1/users/:id — remove from the caller's organization (soft delete if it's their only org)
-  app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+  // (denyImpersonation: member delete — P2 denylist)
+  app.delete('/:id', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const membership = await prisma.organizationMember.findFirst({ where: { organizationId, userId: id } });
