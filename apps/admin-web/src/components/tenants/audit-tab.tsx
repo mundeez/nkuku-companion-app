@@ -96,21 +96,31 @@ export function TenantAuditTab({ tenant }: { tenant: TenantDetail }) {
             <p className="text-sm text-muted-foreground">No recent platform events.</p>
           ) : (
             <div className="space-y-2">
-              {audit.map((e, i) => (
+              {audit.map((e, i) => {
+                const actorObj = typeof e.actor === "object" && e.actor !== null ? e.actor : null;
+                const actorLabel =
+                  e.actorEmail ??
+                  actorObj?.email ?? actorObj?.name ??
+                  (typeof e.actor === "string" ? e.actor : null) ??
+                  e.actorStaffId ??
+                  "system";
+                const roleLabel = e.actorRole ?? actorObj?.role ?? null;
+                return (
                 <div key={e.id ?? i} className="flex items-baseline justify-between gap-4 border-b pb-2 text-sm last:border-0">
                   <div>
                     <span className="font-medium">{e.action}</span>
                     {e.reason && <span className="ml-2 text-muted-foreground">— {e.reason}</span>}
                     <div className="text-xs text-muted-foreground">
-                      {e.actorEmail ?? e.actor ?? e.actorStaffId ?? "system"}
-                      {e.actorRole ? ` (${e.actorRole})` : ""}
+                      {actorLabel}
+                      {roleLabel ? ` (${roleLabel})` : ""}
                     </div>
                   </div>
                   <span className="whitespace-nowrap text-xs text-muted-foreground" title={formatDateTime(e.occurredAt)}>
                     {timeAgo(e.occurredAt)}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

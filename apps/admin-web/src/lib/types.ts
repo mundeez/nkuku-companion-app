@@ -131,7 +131,8 @@ export interface AuditEvent {
   actorStaffId?: string | null;
   actorRole?: string | null;
   actorEmail?: string | null;
-  actor?: string | null;
+  // The API includes the staff user relation — a nested object, not a string
+  actor?: { id: string; email: string | null; name: string | null; role: string } | null;
   targetType?: string | null;
   targetId?: string | null;
   organizationId?: string | null;

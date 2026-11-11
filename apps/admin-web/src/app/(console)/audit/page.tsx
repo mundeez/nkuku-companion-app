@@ -216,6 +216,15 @@ function AuditInner() {
                     {data.items.map((ev) => {
                       const open = !!expanded[ev.id];
                       const hasDetail = ev.before !== undefined || ev.after !== undefined || ev.ip || ev.userAgent;
+                      // actor arrives as a nested {id,email,name,role} object
+                      const actorObj = typeof ev.actor === "object" && ev.actor !== null ? ev.actor : null;
+                      const actorLabel =
+                        ev.actorEmail ??
+                        actorObj?.email ?? actorObj?.name ??
+                        (typeof ev.actor === "string" ? ev.actor : null) ??
+                        ev.actorStaffId ??
+                        "system";
+                      const roleLabel = ev.actorRole ?? actorObj?.role ?? null;
                       return (
                         <Fragment key={ev.id}>
                           <tr className="border-b align-top">
@@ -223,8 +232,8 @@ function AuditInner() {
                               {timeAgo(ev.occurredAt)}
                             </td>
                             <td className="py-2.5 pr-4">
-                              <div className="font-medium">{ev.actorEmail ?? ev.actor ?? ev.actorStaffId ?? "system"}</div>
-                              {ev.actorRole && <div className="text-xs text-muted-foreground">{ev.actorRole}</div>}
+                              <div className="font-medium">{actorLabel}</div>
+                              {roleLabel && <div className="text-xs text-muted-foreground">{roleLabel}</div>}
                             </td>
                             <td className="py-2.5 pr-4">
                               <Badge variant="secondary" className="font-mono text-[11px]">{ev.action}</Badge>
