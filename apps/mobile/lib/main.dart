@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
+import 'screens/maintenance_screen.dart';
 import 'screens/suspended_screen.dart';
 import 'widgets/bottom_nav.dart';
 import 'widgets/upgrade_sheet.dart';
@@ -59,6 +60,7 @@ class _NkukuAppState extends State<NkukuApp> {
     ApiService.onAuthFailure = _onAuthFailure;
     ApiService.onPlanLimitReached = _onPlanLimitReached;
     ApiService.onOrgSuspended = _onOrgSuspended;
+    ApiService.onMaintenanceMode = _onMaintenanceMode;
     if (AuthService.isLoggedIn) {
       NotificationService.startListening();
     }
@@ -110,6 +112,19 @@ class _NkukuAppState extends State<NkukuApp> {
     }
   }
 
+  /// HTTP 503 MAINTENANCE_MODE — staff put the org in maintenance (P3).
+  /// Route to the maintenance screen; the session stays alive and
+  /// "Try again" re-enters the app once maintenance lifts.
+  void _onMaintenanceMode(String message) {
+    final ctx = ApiService.navigatorKey.currentContext;
+    if (ctx != null) {
+      Navigator.of(ctx).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => MaintenanceScreen(message: message)),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   void dispose() {
     _themeProvider.removeListener(_onThemeChanged);
@@ -117,6 +132,7 @@ class _NkukuAppState extends State<NkukuApp> {
     ApiService.onAuthFailure = null;
     ApiService.onPlanLimitReached = null;
     ApiService.onOrgSuspended = null;
+    ApiService.onMaintenanceMode = null;
     super.dispose();
   }
 

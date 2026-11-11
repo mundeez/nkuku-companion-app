@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { LogOut, Moon, Settings, Sun, CreditCard, Megaphone, BarChart3 } from "lucide-react";
+import { LogOut, Moon, Settings, Sun, CreditCard, Megaphone, BarChart3, LifeBuoy } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { useTheme } from "@/components/theme-provider";
 import { Avatar } from "@/components/ui/avatar";
@@ -69,6 +69,15 @@ export function UserNav() {
             >
               <CreditCard className="mr-2 h-4 w-4" />
               Billing & Plans
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link
+              href="/support"
+              className="cursor-pointer w-full items-center"
+            >
+              <LifeBuoy className="mr-2 h-4 w-4" />
+              Support
             </Link>
           </DropdownMenuItem>
           {user.isPlatformAdmin && (

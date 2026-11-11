@@ -107,6 +107,29 @@ class ApiService {
   /// NOT log the user out — the session stays valid for billing/auth routes.
   static void Function(String message)? onOrgSuspended;
 
+  /// Optional callback invoked on 503 MAINTENANCE_MODE (platform
+  /// maintenance flag set by staff — P3). Carries the staff-set message;
+  /// the caller should route to the maintenance screen. Session stays
+  /// valid — retrying once maintenance lifts resumes normal operation.
+  static void Function(String message)? onMaintenanceMode;
+
+  /// Shared 503 MAINTENANCE_MODE check for both response paths.
+  /// `validateStatus` lets <500 through so 503 normally arrives via onError,
+  /// but call sites can override validateStatus per-request — cover both.
+  static void _maybeNotifyMaintenanceMode(
+      int? status, dynamic data, String path) {
+    if (status == 503 &&
+        data is Map &&
+        data['error'] == 'MAINTENANCE_MODE' &&
+        AuthService.isLoggedIn) {
+      log('Maintenance mode on $path', name: 'ApiService');
+      onMaintenanceMode?.call(
+        (data['message'] as String?) ??
+            'We are performing scheduled maintenance. Please try again shortly.',
+      );
+    }
+  }
+
   static void setupInterceptors() {
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
@@ -144,6 +167,8 @@ class ApiService {
                 'This organization has been suspended. Please contact support.',
           );
         }
+        _maybeNotifyMaintenanceMode(
+            status, response.data, response.requestOptions.path);
         handler.next(response);
       },
       onError: (error, handler) {
@@ -162,6 +187,10 @@ class ApiService {
           onPlanLimitReached
               ?.call(PlanLimitInfo.fromResponse(error.response?.data));
         }
+        // 503 MAINTENANCE_MODE lands here under the default validateStatus
+        // (<500 throws) — the primary path for this notification.
+        _maybeNotifyMaintenanceMode(status, error.response?.data,
+            error.requestOptions.path);
         handler.next(error);
       },
     ));

@@ -2,6 +2,12 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  env: {
+    // Expose the package.json version to the client bundle — sent as the
+    // x-app-version header on support tickets so staff can tell which
+    // build a report came from.
+    NEXT_PUBLIC_APP_VERSION: require('./package.json').version,
+  },
   async rewrites() {
     // Proxy /api and /health to the backend API when NEXT_PUBLIC_API_URL is
     // not set (i.e. when the web app is accessed directly on port 30000

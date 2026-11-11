@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OrganizationSettings, VaccinationSchedule } from "@/lib/types";
-import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign, CreditCard, Download, Trash2, UserX } from "lucide-react";
+import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign, CreditCard, Download, Trash2, UserX, LifeBuoy } from "lucide-react";
 import { AccountSettings } from "@/components/auth/account-settings";
 
 export default function SettingsPage() {
@@ -307,6 +307,24 @@ export default function SettingsPage() {
                 Browse Diseases
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Help & Support */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <LifeBuoy className="h-5 w-5" />
+              Help &amp; Support
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Having trouble or found a bug? Open a support ticket and our team will get back to you.
+            </p>
+            <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => router.push("/support")}>
+              Contact support
+            </Button>
           </CardContent>
         </Card>
       </div>

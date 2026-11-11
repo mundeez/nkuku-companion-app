@@ -11,6 +11,7 @@ import '../services/api_cache.dart';
 import 'account_settings_screen.dart';
 import 'flock_defaults_screen.dart';
 import 'login_screen.dart';
+import 'support_screen.dart';
 import 'users_screen.dart';
 import 'projections_screen.dart';
 import 'expansion_plan_screen.dart';
@@ -110,6 +111,16 @@ class _MoreScreenState extends State<MoreScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.support_agent),
+            title: const Text('Support'),
+            subtitle: const Text('Contact our team, view your tickets'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SupportScreen()),
             ),
           ),
           ListTile(

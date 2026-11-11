@@ -1,5 +1,9 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+/** App version from package.json (injected via next.config.js env). Sent as
+ * the `x-app-version` header on support tickets. */
+export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
+
 export type ApiError = { error: string; message?: string };
 
 export class ApiRequestError extends Error {
@@ -74,6 +78,9 @@ export async function apiFetch<T = any>(
     if (res.status === 423 && data?.error === "ORG_SUSPENDED") {
       notifyOrgSuspended(data?.message);
     }
+    if (res.status === 503 && data?.error === "MAINTENANCE_MODE") {
+      notifyMaintenanceMode(data?.message);
+    }
     throw new ApiRequestError(res.status, data);
   }
   return data as T;
@@ -90,6 +97,20 @@ function notifyOrgSuspended(message?: string) {
   sessionStorage.setItem("nkuku_suspended_message", message || "");
   if (!window.location.pathname.startsWith("/suspended")) {
     window.location.href = "/suspended";
+  }
+}
+
+/**
+ * Maintenance mode (P3): any 503 MAINTENANCE_MODE routes the tenant to a
+ * dedicated page carrying the staff-set message. Skip when impersonating —
+ * staff need to keep browsing the org while it is in maintenance.
+ */
+function notifyMaintenanceMode(message?: string) {
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem("nkuku_impersonation")) return;
+  sessionStorage.setItem("nkuku_maintenance_message", message || "");
+  if (!window.location.pathname.startsWith("/maintenance")) {
+    window.location.href = "/maintenance";
   }
 }
 

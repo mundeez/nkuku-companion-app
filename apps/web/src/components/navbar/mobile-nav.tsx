@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogOut, Moon, Sun, Settings, CreditCard, Bell } from "lucide-react";
+import { Menu, X, LogOut, Moon, Sun, Settings, CreditCard, Bell, LifeBuoy } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { useTheme } from "@/components/theme-provider";
 import { Avatar } from "@/components/ui/avatar";
@@ -115,6 +115,14 @@ export function MobileNav({ sections }: MobileNavProps) {
               >
                 <CreditCard className="h-4 w-4" />
                 Billing
+              </Link>
+              <Link
+                href="/support"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <LifeBuoy className="h-4 w-4" />
+                Support
               </Link>
             </nav>
           </div>
