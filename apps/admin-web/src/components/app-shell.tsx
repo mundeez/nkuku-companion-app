@@ -9,7 +9,7 @@ import {
   clearImpersonation,
   getImpersonation,
 } from "@/lib/api/client";
-import { endImpersonation } from "@/lib/api/platform";
+import { endImpersonation, listTickets } from "@/lib/api/platform";
 import { hasPerm } from "@/lib/rbac";
 import { ROLE_LABELS } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   LayoutDashboard,
   Building2,
+  LifeBuoy,
+  Mail,
+  HeartPulse,
   ScrollText,
   UserCog,
   LogOut,
@@ -33,14 +36,50 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   permission: string;
   exact?: boolean;
+  /** Show the open-support-ticket count badge on this item. */
+  openTicketBadge?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, permission: "platform.dashboard.read", exact: true },
   { href: "/tenants", label: "Tenants", icon: Building2, permission: "tenants.read" },
+  { href: "/support", label: "Support", icon: LifeBuoy, permission: "support.tickets.read", openTicketBadge: true },
+  { href: "/comms", label: "Comms", icon: Mail, permission: "comms.log.read" },
+  { href: "/health", label: "Health", icon: HeartPulse, permission: "platform.dashboard.read" },
   { href: "/audit", label: "Audit Log", icon: ScrollText, permission: "audit.read" },
   { href: "/staff", label: "Staff", icon: UserCog, permission: "staff.manage" },
 ];
+
+/** Open-ticket count for the Support nav item — light poll every 60s. */
+function OpenTicketBadge() {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const tick = () => {
+      listTickets({ status: "open", pageSize: 1 })
+        .then((r) => {
+          if (alive) setCount(r.total);
+        })
+        .catch(() => {
+          // Endpoint not live yet / transient — hide the badge, don't nag.
+        });
+    };
+    tick();
+    const t = setInterval(tick, 60_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
+
+  if (!count) return null;
+  return (
+    <Badge variant="destructive" className="ml-auto px-1.5 py-0 text-[10px] leading-4">
+      {count > 99 ? "99+" : count}
+    </Badge>
+  );
+}
 
 function ImpersonationChip() {
   const [session, setSession] = useState<any | null>(null);
@@ -147,6 +186,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <Icon className="h-4 w-4" />
                 {item.label}
+                {item.openTicketBadge && <OpenTicketBadge />}
               </Link>
             );
           })}

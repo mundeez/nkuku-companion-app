@@ -117,11 +117,14 @@ export async function requestDeletion(prisma: PrismaClient, organizationId: stri
 
   const owner = await prisma.organizationMember.findFirst({
     where: { organizationId, role: 'owner' },
-    include: { user: { select: { email: true, name: true } } },
+    include: { user: { select: { id: true, email: true, name: true } } },
     orderBy: { joinedAt: 'asc' },
   });
   if (owner?.user.email) {
-    await sendOrganizationDeletionEmail(owner.user.email, org.name, purgeAfter);
+    await sendOrganizationDeletionEmail(owner.user.email, org.name, purgeAfter, {
+      organizationId,
+      userId: owner.user.id,
+    });
   }
   return org;
 }

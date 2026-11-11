@@ -118,6 +118,7 @@ export async function buildOrganizationModule(app: FastifyInstance) {
       inviteUrl,
       org?.name || 'your organization',
       inviter?.name || 'A team member',
+      { organizationId, userId: _authUser.userId },
     );
 
     return {

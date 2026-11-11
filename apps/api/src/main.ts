@@ -49,11 +49,14 @@ import { buildAdModule } from './modules/ads/routes.js';
 import { buildAdCampaignModule } from './modules/ad-campaigns/routes.js';
 import { buildAdminOpsModule } from './modules/admin-ops/routes.js';
 import { buildPlatformModule } from './modules/platform/routes.js';
+import { buildSupportModule } from './modules/support/routes.js';
 import { bootstrapPlatformStaff } from './core/staff-auth/bootstrap.js';
 import { ensureBucket } from './core/storage/storage.service.js';
 import { getS3Client, getS3Bucket } from './core/storage/s3-client.js';
 import { SchedulerService } from './core/finance/scheduler.service.js';
 import { DailyRecalculationService } from './core/finance/daily-recalculation.service.js';
+import { initComms } from './core/comms/comms.service.js';
+import { executeCronJob, type CronJobDef } from './core/cron/cron.service.js';
 import cron from 'node-cron';
 import * as Sentry from '@sentry/node';
 
@@ -143,6 +146,10 @@ if (process.env.NODE_ENV !== 'production') {
 // Decorate with shared Prisma instance
 app.decorate('prisma', prisma);
 
+// Wire the shared client into the comms log (P3) so email.service's
+// deliver() and other senders can write comms_log rows.
+initComms(prisma);
+
 // ── Redis (for refresh token tracking, OTP dev endpoint, rate limiting) ──
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 let redis: any = null;
@@ -229,6 +236,7 @@ await app.register(buildAdModule, { prefix: '/api/v1/ads' });
 await app.register(buildAdCampaignModule, { prefix: '/api/v1/ad-campaigns' });
 await app.register(buildAdminOpsModule, { prefix: '/api/v1/admin' });
 await app.register(buildPlatformModule, { prefix: '/api/v1/platform' });
+await app.register(buildSupportModule, { prefix: '/api/v1/support' });
 
 // ── Platform staff bootstrap ─────────────
 // Creates the first super_admin StaffUser (one-time password logged to
@@ -275,52 +283,78 @@ app.get('/health', async (req, reply) => {
   return reply.status(ok ? 200 : 503).send({ ...base, status: ok ? 'ok' : 'degraded', checks: { db, redis: redisHealth, s3 } });
 });
 
-// ── Start scheduled report cron ──────────
+// ── Platform cron registry (P3) ──────────
+// Every scheduled job is registered here and executed through
+// executeCronJob(), which writes a cron_runs row (running →
+// success/failed) and notifies staff (ntfy platform-ops) on failure.
+// The registry is exposed on the app so the ops endpoint
+// (POST /api/v1/platform/ops/cron/:name/run) can trigger a job by name
+// and the health endpoint can compute per-job freshness vs maxAgeSec.
 const scheduler = new SchedulerService(prisma);
-scheduler.startCron();
-
-// ── Start daily financial recalc cron ────
-// NOTE: Harvest projection auto-generation disabled — projections are no longer
-// auto-created as financial records. Overhead allocation still runs daily.
 const dailyRecalc = new DailyRecalculationService(prisma);
 const marketPrice = parseFloat(process.env.MARKET_PRICE_PER_KG || '25');
-cron.schedule('0 2 * * *', async () => {
-  app.log.info('[DailyRecalc] Starting daily overhead allocation...');
-  try {
-    await dailyRecalc.runDailyForAllOrganizations({ marketPricePerKg: marketPrice });
-    app.log.info('[DailyRecalc] Completed successfully');
-  } catch (err: any) {
-    app.log.error('[DailyRecalc] Failed:', err.message);
-  }
-});
 
-// ── Start daily billing cron ─────────────
-// Runs at 1:00 AM daily — generates recurring invoices, expires trials,
-// and suspends past-due subscriptions past the grace period.
 import { runDailyBillingCron } from './core/billing/billing.service.js';
-cron.schedule('0 1 * * *', async () => {
-  app.log.info('[BillingCron] Starting daily billing run...');
-  try {
-    const result = await runDailyBillingCron(prisma);
-    app.log.info(`[BillingCron] Done: ${result.invoicesGenerated} invoices, ${result.trialsExpired} trials expired, ${result.subscriptionsSuspended} suspended`);
-  } catch (err: any) {
-    app.log.error('[BillingCron] Failed:', err.message);
-  }
-});
-
-// ── Start daily tenant purge cron ────────
-// Hard-deletes organizations whose 30-day soft-delete grace has passed
-// (P-6 right-to-erasure). Runs after the billing cron.
 import { purgeExpiredOrganizations } from './modules/organizations/lifecycle.service.js';
-cron.schedule('30 1 * * *', async () => {
-  try {
-    const { purged, failed } = await purgeExpiredOrganizations(prisma);
-    if (purged.length) app.log.info(`[PurgeCron] Purged organizations: ${purged.join(', ')}`);
-    for (const f of failed) app.log.error(`[PurgeCron] Failed to purge "${f.name}": ${f.error}`);
-  } catch (err: any) {
-    app.log.error('[PurgeCron] Failed:', err.message);
-  }
-});
+
+const DAY_BUDGET_SEC = 26 * 3600; // daily jobs go stale after ~26 h
+export const cronJobs: CronJobDef[] = [
+  {
+    // Hourly sweep for due scheduled reports.
+    name: 'scheduled_reports',
+    schedule: '0 * * * *',
+    maxAgeSec: 2 * 3600,
+    run: () => scheduler.runDueReports(),
+  },
+  {
+    // NOTE: Harvest projection auto-generation disabled — projections are
+    // no longer auto-created as financial records. Overhead allocation
+    // still runs daily.
+    name: 'daily_recalc',
+    schedule: '0 2 * * *',
+    maxAgeSec: DAY_BUDGET_SEC,
+    run: async () => {
+      app.log.info('[DailyRecalc] Starting daily overhead allocation...');
+      const result = await dailyRecalc.runDailyForAllOrganizations({ marketPricePerKg: marketPrice });
+      app.log.info('[DailyRecalc] Completed successfully');
+      return result;
+    },
+  },
+  {
+    // 1:00 AM — recurring invoices, trial expiry, past-due suspension.
+    name: 'billing_daily',
+    schedule: '0 1 * * *',
+    maxAgeSec: DAY_BUDGET_SEC,
+    run: async () => {
+      app.log.info('[BillingCron] Starting daily billing run...');
+      const result = await runDailyBillingCron(prisma);
+      app.log.info(`[BillingCron] Done: ${result.invoicesGenerated} invoices, ${result.trialsExpired} trials expired, ${result.subscriptionsSuspended} suspended`);
+      return result;
+    },
+  },
+  {
+    // 1:30 AM — hard-deletes orgs past the 30-day soft-delete grace (P-6).
+    name: 'tenant_purge',
+    schedule: '30 1 * * *',
+    maxAgeSec: DAY_BUDGET_SEC,
+    run: async () => {
+      const { purged, failed } = await purgeExpiredOrganizations(prisma);
+      if (purged.length) app.log.info(`[PurgeCron] Purged organizations: ${purged.join(', ')}`);
+      for (const f of failed) app.log.error(`[PurgeCron] Failed to purge "${f.name}": ${f.error}`);
+      if (failed.length) {
+        throw new Error(`Failed to purge ${failed.length} org(s): ${failed.map((f: any) => f.name).join(', ')}`);
+      }
+      return { purged };
+    },
+  },
+];
+
+app.decorate('cronJobs', cronJobs);
+for (const job of cronJobs) {
+  cron.schedule(job.schedule, () => {
+    void executeCronJob(prisma, job);
+  });
+}
 
 // ── Start server ─────────────────────────
 const port = parseInt(process.env.PORT || '3001', 10);

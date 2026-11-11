@@ -90,3 +90,18 @@ export async function makeStaffWithToken(prisma: PrismaClient, role: string, bas
   const tokens = await onboardStaff(email, baseUrl);
   return { staff, email, ...tokens };
 }
+
+/**
+ * Re-auth a staff session (POST /platform/auth/reauth with password) and
+ * return a NEW access token carrying a fresh reauthAt — required before
+ * requireReauth-gated endpoints (system.ops, comms.resend, …). Call this
+ * right before the gated request in long-running test files, since the
+ * re-auth window is only 5 minutes.
+ */
+export async function reauthStaff(accessToken: string, baseUrl = TEST_API_URL): Promise<string> {
+  const res = await post('/api/v1/platform/auth/reauth', { password: STAFF_PASSWORD }, accessToken, baseUrl);
+  if (res.status !== 200) {
+    throw new Error(`staff reauth failed: ${JSON.stringify(res.data)}`);
+  }
+  return res.data.accessToken as string;
+}

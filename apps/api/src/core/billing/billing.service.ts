@@ -9,6 +9,7 @@ import { getAddon, getAddonPrice, type AddonCode } from './addons.js';
 import { generateTxRef, verifyWebhookSignature, isMockMode } from './flutterwave.service.js';
 import { getProvider, providerForCurrency, allProvidersMock } from './providers/index.js';
 import { sendBillingReminderEmail } from '../security/email.service.js';
+import { notifyStaff } from '../comms/staff-notify.js';
 
 const TRIAL_DAYS = 14;
 const GRACE_PERIOD_DAYS = 7; // past_due → suspended after 7 days
@@ -329,6 +330,30 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
     return { success: false, invoice, message: 'Transaction reference mismatch' };
   }
 
+  // Terminal payment failures page staff on the platform-ops topic —
+  // deduped to the FIRST failed event for this tx_ref so provider
+  // webhook retries don't re-alert ("once, not per retry", P3 spec).
+  // Counted BEFORE inserting this event's row (which may itself be
+  // status 'failed').
+  let priorFailedCount = 0;
+  try {
+    priorFailedCount = await prisma.paymentEvent.count({
+      where: { providerRef: txRef, status: 'failed' },
+    });
+  } catch {
+    // best-effort — a count failure must not break payment handling
+  }
+  const notifyTerminalFailure = (message: string) => {
+    if (priorFailedCount !== 0) return;
+    priorFailedCount++; // belt-and-suspenders: never alert twice in one call
+    notifyStaff(
+      'Payment verification failed',
+      `tx_ref ${txRef} (invoice ${invoice.invoiceNumber}, org ${invoice.organizationId}): ${message}`,
+      4,
+      ['warning', 'billing'],
+    );
+  };
+
   // Record the payment event
   await prisma.paymentEvent.create({
     data: {
@@ -348,9 +373,11 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
     if (!provider.isMock && verification.amount > 0) {
       const invoiceAmount = Number(invoice.amountDue);
       if (Math.abs(verification.amount - invoiceAmount) > 0.01) {
+        notifyTerminalFailure(`Amount mismatch: expected ${invoiceAmount}, got ${verification.amount}`);
         return { success: false, invoice, message: `Amount mismatch: expected ${invoiceAmount}, got ${verification.amount}` };
       }
       if (verification.currency && verification.currency !== invoice.currency) {
+        notifyTerminalFailure(`Currency mismatch: expected ${invoice.currency}, got ${verification.currency}`);
         return { success: false, invoice, message: `Currency mismatch: expected ${invoice.currency}, got ${verification.currency}` };
       }
     }
@@ -401,6 +428,7 @@ export async function processPaymentEvent(prisma: PrismaClient, params: {
     });
   }
 
+  notifyTerminalFailure(verification.message || 'Payment verification failed');
   return { success: false, invoice, message: verification.message || 'Payment verification failed' };
 }
 
@@ -590,7 +618,7 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
       daysOverdue: Math.max(0, Math.ceil(-daysUntilDue)),
       paymentLink: inv.paymentLink,
       kind,
-    });
+    }, { organizationId: inv.organizationId, userId: contact.userId });
     await prisma.invoice.update({
       where: { id: inv.id },
       data: { remindersSent: inv.remindersSent | bit, lastReminderAt: now },
@@ -612,6 +640,7 @@ async function getOrgBillingContact(prisma: PrismaClient, organizationId: string
     email: member.user.email,
     name: member.user.name || undefined,
     phone: member.user.phone || undefined,
+    userId: member.user.id,
   };
 }
 

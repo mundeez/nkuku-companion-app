@@ -47,6 +47,7 @@ import { platformIpAllowlist } from '../../core/staff-auth/ip-allowlist.js';
 import { sendStaffInviteEmail } from '../../core/security/email.service.js';
 import { PLATFORM_CONSOLE_BASE_URL } from '../../core/staff-auth/bootstrap.js';
 import { buildPlatformTenantsModule } from './tenants.js';
+import { buildPlatformSupportModule } from './support.js';
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -510,7 +511,9 @@ export async function buildPlatformModule(app: FastifyInstance) {
 
       const bootstrapToken = signStaffTicket(staff.id, 'staff_bootstrap', BOOTSTRAP_TICKET_TTL);
       const inviteUrl = `${PLATFORM_CONSOLE_BASE_URL}/set-password?token=${bootstrapToken}`;
-      const emailResult = await sendStaffInviteEmail(email, inviteUrl, body.name, actor.email);
+      const emailResult = await sendStaffInviteEmail(email, inviteUrl, body.name, actor.email, {
+        sentByStaffId: actor.staffId,
+      });
 
       await writePlatformAudit(prisma, {
         actorStaffId: actor.staffId,
@@ -689,4 +692,7 @@ export async function buildPlatformModule(app: FastifyInstance) {
   // Registered inside this module's encapsulated scope so the IP allowlist
   // onRequest hook above covers these routes too.
   await app.register(buildPlatformTenantsModule);
+
+  // ── P3: support inbox / comms log / health / ops actions ──
+  await app.register(buildPlatformSupportModule);
 }

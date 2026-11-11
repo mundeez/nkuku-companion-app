@@ -18,16 +18,21 @@ import {
 } from "./client";
 import type {
   AuditEvent,
+  CommsLogItem,
   FailedPayments,
   ImpersonationResult,
   ImpersonationSession,
   Paged,
+  PlatformHealth,
   PlatformMetrics,
   StaffRole,
   StaffUser,
   TenantDetail,
   TenantListItem,
   TenantMember,
+  TicketDetail,
+  TicketListItem,
+  TicketStatus,
 } from "../types";
 
 // ── normalisers ────────────────────────────────────────
@@ -354,4 +359,223 @@ export async function getMetrics(): Promise<PlatformMetrics> {
 
 export async function getFailedPayments(): Promise<FailedPayments> {
   return withPlatformFallback<FailedPayments>("/failed-payments", "/failed-payments");
+}
+
+// ── support tickets (support.tickets.*) ────────────────
+
+export interface TicketListQuery {
+  status?: string;
+  /** "unassigned" sentinel or a staff id (resolve "me" client-side to user.id). */
+  assigned?: string;
+  orgId?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function listTickets(q: TicketListQuery): Promise<Paged<TicketListItem>> {
+  const params = new URLSearchParams();
+  if (q.status) params.set("status", q.status);
+  if (q.assigned) params.set("assigned", q.assigned);
+  if (q.orgId) params.set("orgId", q.orgId);
+  if (q.search) params.set("search", q.search);
+  params.set("page", String(q.page ?? 1));
+  params.set("pageSize", String(q.pageSize ?? 20));
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/tickets?${params.toString()}`);
+  // API calls the assignee relation `assignedStaff`; the contract says `assignee`.
+  const items: TicketListItem[] = (data?.items ?? []).map((t: any) => ({
+    ...t,
+    assignee: t.assignee ?? t.assignedStaff ?? null,
+  }));
+  return { ...data, items };
+}
+
+export async function getTicket(id: string): Promise<TicketDetail> {
+  const raw = await apiFetch<any>(`${PLATFORM_BASE}/tickets/${id}`);
+  // Two possible layouts: contract nests organization/requester/assignee
+  // inside `ticket`; the implementation returns them as siblings.
+  const ticketRaw = raw?.ticket ?? raw ?? {};
+  const org = ticketRaw.organization ?? raw?.organization ?? null;
+  const ticket = {
+    ...ticketRaw,
+    organization: org
+      ? {
+          ...org,
+          suspendedAt: org.suspendedAt ?? (org.suspended ? "suspended" : null),
+        }
+      : null,
+    requester: ticketRaw.requester ?? raw?.requester ?? null,
+    assignee:
+      ticketRaw.assignee ?? ticketRaw.assignedStaff ?? raw?.assignee ?? raw?.assignedStaff ?? null,
+  };
+  return {
+    ticket,
+    messages: raw?.messages ?? ticketRaw.messages ?? [],
+  };
+}
+
+export async function replyTicket(id: string, body: { body: string; internalNote?: boolean }) {
+  return apiFetch(`${PLATFORM_BASE}/tickets/${id}/reply`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function assignTicket(id: string, staffId: string | null) {
+  return apiFetch(`${PLATFORM_BASE}/tickets/${id}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ staffId }),
+  });
+}
+
+export async function setTicketStatus(id: string, status: TicketStatus) {
+  return apiFetch(`${PLATFORM_BASE}/tickets/${id}/status`, {
+    method: "POST",
+    body: JSON.stringify({ status }),
+  });
+}
+
+// ── comms log (comms.log.read / comms.resend) ──────────
+
+export interface CommsQuery {
+  channel?: string;
+  status?: string;
+  orgId?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/** Date-input values ("YYYY-MM-DD") need a time component for the API's
+ *  z.string().datetime() filters — expand to day bounds. */
+function toIsoBound(date: string, end: "start" | "end"): string {
+  if (date.includes("T")) return date;
+  const suffix = end === "start" ? "T00:00:00.000" : "T23:59:59.999";
+  return new Date(`${date}${suffix}`).toISOString();
+}
+
+export async function listComms(q: CommsQuery): Promise<Paged<CommsLogItem>> {
+  const params = new URLSearchParams();
+  if (q.channel) params.set("channel", q.channel);
+  if (q.status) params.set("status", q.status);
+  if (q.orgId) params.set("orgId", q.orgId);
+  if (q.from) params.set("from", toIsoBound(q.from, "start"));
+  if (q.to) params.set("to", toIsoBound(q.to, "end"));
+  params.set("page", String(q.page ?? 1));
+  params.set("pageSize", String(q.pageSize ?? 20));
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/comms?${params.toString()}`);
+  // API embeds the org relation; the contract has a bare organizationId.
+  const items: CommsLogItem[] = (data?.items ?? []).map((r: any) => ({
+    ...r,
+    organizationId: r.organizationId ?? r.organization?.id ?? null,
+  }));
+  return { ...data, items };
+}
+
+export async function resendComms(id: string): Promise<{ ok: boolean; message?: string }> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/comms/${id}/resend`, {
+    method: "POST",
+    body: "{}",
+  });
+  // Contract says {ok}; implementation returns {resent, message, resendOfId}.
+  return { ok: data?.ok ?? data?.resent ?? true, message: data?.message };
+}
+
+// ── platform health & ops (platform.dashboard.read / system.ops) ──
+
+export async function getPlatformHealth(): Promise<PlatformHealth> {
+  const raw = await apiFetch<any>(`${PLATFORM_BASE}/health`);
+  // Implementation returns {status, checkedAt, checks:{key:{status,...}}}
+  // with cron freshness nested at checks.cron.jobs; the contract describes a
+  // flatter {overall, checks[], cron[], system{}} payload. Normalise both.
+  const checksMap: Record<string, any> = Array.isArray(raw?.checks)
+    ? Object.fromEntries(raw.checks.map((c: any) => [c.name ?? "check", c]))
+    : raw?.checks ?? {};
+
+  const checks: PlatformHealth["checks"] = Object.entries(checksMap)
+    .filter(([name]) => name !== "cron") // cron freshness has its own table
+    .map(([name, c]: [string, any]) => ({
+      name,
+      status: c.status ?? c.rag ?? "amber",
+      latencyMs: c.latencyMs ?? null,
+      detail:
+        c.detail ??
+        c.dbSizePretty ??
+        c.bucket ??
+        (c.freePercent != null ? `${c.freePercent}% free` : null) ??
+        (c.uptimeSec != null ? `up ${c.uptimeSec}s` : null) ??
+        c.reply ??
+        c.note ??
+        null,
+      error: c.error ?? null,
+    }));
+
+  const cronRaw = raw?.cron ?? checksMap?.cron?.jobs ?? [];
+  const cron: PlatformHealth["cron"] = (Array.isArray(cronRaw) ? cronRaw : []).map((j: any) => ({
+    name: j.name,
+    schedule: j.schedule,
+    lastRunAt: j.lastRunAt ?? null,
+    lastFinishedAt: j.lastFinishedAt ?? null,
+    lastStatus: j.lastStatus ?? null,
+    ageMinutes: j.ageMinutes ?? (j.ageSec != null ? j.ageSec / 60 : null),
+    ageSec: j.ageSec ?? null,
+    expectedMinutes: j.expectedMinutes ?? null,
+    stale: j.stale ?? (j.rag != null && j.rag !== "green"),
+    rag: j.rag,
+    detail: j.detail ?? null,
+  }));
+
+  const sys = raw?.system ?? {};
+  const system: PlatformHealth["system"] = {
+    uptimeSec: sys.uptimeSec ?? checksMap?.api?.uptimeSec,
+    version: sys.version ?? checksMap?.api?.version,
+    dbSizeBytes: sys.dbSizeBytes ?? checksMap?.db?.dbSizeBytes,
+    diskFreePct: sys.diskFreePct ?? checksMap?.disk?.freePercent,
+  };
+
+  // Maintenance-mode state isn't in the health payload today — accept it as a
+  // top-level object, a system field, or a check named "maintenance" if added.
+  const maintCheck = checks.find((c) => c.name === "maintenance");
+  const maintRaw = raw?.maintenance ?? sys.maintenance ?? sys.maintenanceMode ?? null;
+  const maintenance =
+    maintRaw && typeof maintRaw === "object"
+      ? { enabled: !!maintRaw.enabled, message: maintRaw.message ?? maintRaw.detail ?? null }
+      : maintRaw !== null && maintRaw !== undefined
+        ? { enabled: !!maintRaw, message: null }
+        : maintCheck
+          ? { enabled: maintCheck.status !== "green", message: maintCheck.detail ?? null }
+          : null;
+
+  return {
+    overall: raw?.overall ?? raw?.status ?? "amber",
+    checkedAt: raw?.checkedAt ?? new Date().toISOString(),
+    checks,
+    cron,
+    system,
+    maintenance,
+  };
+}
+
+export async function runCronJob(name: string): Promise<{ started: boolean }> {
+  return apiFetch(`${PLATFORM_BASE}/ops/cron/${encodeURIComponent(name)}/run`, {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+export async function setMaintenanceMode(body: {
+  enabled: boolean;
+  message?: string;
+}): Promise<{ enabled: boolean; message?: string | null }> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/ops/maintenance`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  // Contract says {enabled}; implementation returns {maintenance:{enabled,message,by,at}}.
+  const m = data?.maintenance;
+  return {
+    enabled: m?.enabled ?? data?.enabled ?? body.enabled,
+    message: m?.message ?? data?.message ?? null,
+  };
 }

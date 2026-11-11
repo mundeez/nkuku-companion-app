@@ -316,6 +316,8 @@ export async function buildPlatformTenantsModule(app: FastifyInstance) {
       activeOverride,
       platformEvents,
       tenantAudit,
+      supportTotal,
+      supportOpen,
     ] = await Promise.all([
       prisma.organizationMember.findMany({
         where: { organizationId: id },
@@ -370,6 +372,10 @@ export async function buildPlatformTenantsModule(app: FastifyInstance) {
           userId: true, impersonatedByStaffId: true, ipAddress: true, occurredAt: true,
         },
       }),
+      prisma.supportTicket.count({ where: { organizationId: id } }),
+      prisma.supportTicket.count({
+        where: { organizationId: id, status: { in: ['open', 'in_progress', 'waiting_on_user'] } },
+      }),
     ]);
 
     return {
@@ -408,9 +414,8 @@ export async function buildPlatformTenantsModule(app: FastifyInstance) {
         totalBirds: flockBirds._sum.currentCount ?? 0,
         totalInitialBirds: flockBirds._sum.initialCount ?? 0,
       },
-      // support tickets land in P3 — placeholder so the console contract
-      // is stable for the web app being built in parallel.
-      supportTickets: [],
+      // P3: real ticket counts (open = anything not resolved/closed).
+      supportTickets: { open: supportOpen, total: supportTotal },
       platformAuditEvents: platformEvents,
       tenantAuditLog: tenantAudit,
     };
@@ -622,7 +627,11 @@ export async function buildPlatformTenantsModule(app: FastifyInstance) {
         JWT_SECRET,
         { expiresIn: '30m' },
       );
-      const emailResult = await sendVerificationEmail(user.email, token, 'reset_password');
+      const emailResult = await sendVerificationEmail(user.email, token, 'reset_password', {
+        organizationId: id,
+        userId: user.id,
+        sentByStaffId: actor.staffId,
+      });
 
       await writePlatformAudit(prisma, {
         actorStaffId: actor.staffId,
@@ -707,7 +716,11 @@ export async function buildPlatformTenantsModule(app: FastifyInstance) {
         JWT_SECRET,
         { expiresIn: '30m' },
       );
-      const emailResult = await sendVerificationEmail(user.email, token, 'verify_email');
+      const emailResult = await sendVerificationEmail(user.email, token, 'verify_email', {
+        organizationId: id,
+        userId: user.id,
+        sentByStaffId: actor.staffId,
+      });
 
       await writePlatformAudit(prisma, {
         actorStaffId: actor.staffId,

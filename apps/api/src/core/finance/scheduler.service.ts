@@ -88,16 +88,26 @@ export class SchedulerService {
     }
   }
 
+  /**
+   * Run every scheduled report whose nextRunAt is due. Extracted so the
+   * platform cron registry (main.ts cronJobs, P3) can wrap it in CronRun
+   * bookkeeping; startCron() keeps the legacy direct-schedule path.
+   */
+  async runDueReports(): Promise<{ reportsRun: number }> {
+    const now = new Date();
+    const due = await this.prisma.scheduledReport.findMany({
+      where: { isActive: true, nextRunAt: { lte: now } },
+    });
+    for (const report of due) {
+      await this.executeReport(report.id);
+    }
+    return { reportsRun: due.length };
+  }
+
   startCron() {
     // Check every hour for reports that need to run
     cron.schedule('0 * * * *', async () => {
-      const now = new Date();
-      const due = await this.prisma.scheduledReport.findMany({
-        where: { isActive: true, nextRunAt: { lte: now } },
-      });
-      for (const report of due) {
-        await this.executeReport(report.id);
-      }
+      await this.runDueReports();
     });
   }
 

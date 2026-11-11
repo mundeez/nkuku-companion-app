@@ -59,6 +59,9 @@ model User {
   socialAccounts                      SocialAccount[]
   createdAdCampaigns                  AdCampaign[]                  @relation("AdCampaignCreatedBy")
   impersonationTargets                ImpersonationSession[]        @relation("ImpersonationTargetUser")
+  supportTickets                      SupportTicket[]
+  ticketMessages                      TicketMessage[]
+  commsLogs                           CommsLog[]
 
   @@map("users")
 }
@@ -184,6 +187,8 @@ model Organization {
   auditLogs                    AuditLog[]
   impersonationSessions        ImpersonationSession[]
   tenantOverrides              TenantOverride[]
+  supportTickets               SupportTicket[]
+  commsLogs                    CommsLog[]
   defaultVaccinationSchedule   VaccinationSchedule? @relation("OrgDefaultVaccinationSchedule", fields: [defaultVaccinationScheduleId], references: [id], onDelete: SetNull)
 
   @@map("organizations")
@@ -1727,6 +1732,10 @@ model StaffUser {
   auditEvents           PlatformAuditEvent[]
   impersonationSessions ImpersonationSession[] @relation("ImpersonationStaff")
   tenantOverrides       TenantOverride[]
+  assignedTickets       SupportTicket[]
+  ticketMessages        TicketMessage[]
+  commsLogs             CommsLog[]
+  platformFlags         PlatformFlag[]
 
   @@map("staff_users")
 }
@@ -1843,4 +1852,136 @@ model TenantOverride {
 
   @@index([organizationId])
   @@map("tenant_overrides")
+}
+
+// ── PLATFORM P3: SUPPORT INBOX / COMMS LOG / OPS ─────────
+// Support tickets filed from tenant apps ("Contact support"), the platform
+// comms delivery log, cron run history for the health panel, and generic
+// platform flags (maintenance_mode now; feature flags land in P4).
+// See PLAN-super-admin-console.md §5–§6 P3.
+
+enum TicketStatus {
+  open
+  in_progress
+  waiting_on_user
+  resolved
+  closed
+
+  @@map("ticket_status")
+}
+
+// A tenant support request. The requester is `userId` (FK users, cascade —
+// deleting the user removes their tickets); `organizationId` scopes the
+// ticket for staff filtering and the org dossier. `meta` captures client
+// diagnostics (app version, device info) sent via x-app-version /
+// x-device-info headers at create time.
+model SupportTicket {
+  id              String       @id @default(uuid()) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  userId          String       @map("user_id") @db.Uuid
+  subject         String       @db.VarChar(200)
+  category        String       @default("general") @db.VarChar(40)
+  status          TicketStatus @default(open)
+  priority        String       @default("normal") @db.VarChar(10)
+  assignedStaffId String?      @map("assigned_staff_id") @db.Uuid
+  resolvedAt      DateTime?    @map("resolved_at") @db.Timestamptz(6)
+  lastMessageAt   DateTime     @default(now()) @map("last_message_at") @db.Timestamptz(6)
+  meta            Json?
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedStaff StaffUser?      @relation(fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  messages      TicketMessage[]
+
+  @@index([organizationId])
+  @@index([status, lastMessageAt])
+  @@map("support_tickets")
+}
+
+// One message in a ticket thread. authorType is 'user' or 'staff';
+// the matching author FK is set (the other is null). internalNote rows
+// are staff-only annotations — never returned to tenant callers.
+model TicketMessage {
+  id            String   @id @default(uuid()) @db.Uuid
+  ticketId      String   @map("ticket_id") @db.Uuid
+  authorType    String   @map("author_type") @db.VarChar(10)
+  authorUserId  String?  @map("author_user_id") @db.Uuid
+  authorStaffId String?  @map("author_staff_id") @db.Uuid
+  body          String
+  internalNote  Boolean  @default(false) @map("internal_note")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorUser  User?         @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorStaff StaffUser?    @relation(fields: [authorStaffId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@map("ticket_messages")
+}
+
+// Platform communications log — one row per attempted outbound message on
+// every channel (email now; sms/push reserved for the Kannel path and FCM).
+// Written by email.service's deliver() (and the console resend action).
+// organizationId/userId/sentByStaffId are nullable FKs (SetNull) so log rows
+// survive tenant/user deletion — same audit-survival rule as
+// platform_audit_events. `body` stores the rendered message body so the
+// console resend action can re-deliver verbatim.
+model CommsLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  channel        String   @db.VarChar(10)
+  toAddr         String   @map("to_addr") @db.VarChar(320)
+  subject        String?  @db.VarChar(300)
+  body           String?
+  template       String?  @db.VarChar(60)
+  providerRef    String?  @map("provider_ref") @db.VarChar(200)
+  status         String   @db.VarChar(12)
+  error          String?
+  resendOfId     String?  @map("resend_of_id") @db.Uuid
+  sentByStaffId  String?  @map("sent_by_staff_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sentByStaff  StaffUser?    @relation(fields: [sentByStaffId], references: [id], onDelete: SetNull)
+  resendOf     CommsLog?     @relation("CommsResend", fields: [resendOfId], references: [id], onDelete: SetNull)
+  resends      CommsLog[]    @relation("CommsResend")
+
+  @@index([organizationId, createdAt])
+  @@index([status, createdAt])
+  @@map("comms_log")
+}
+
+// Execution history for the platform cron registry (main.ts cronJobs).
+// Each scheduled run writes one row: 'running' at start, then 'success'
+// or 'failed' (+ error) at finish. The platform health endpoint computes
+// per-job freshness from these rows.
+model CronRun {
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String    @db.VarChar(60)
+  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(6)
+  status     String    @db.VarChar(10)
+  error      String?
+  meta       Json?
+
+  @@index([name, startedAt])
+  @@map("cron_runs")
+}
+
+// Generic key→JSON platform settings store. Currently holds
+// 'maintenance_mode' ({ enabled, message, by, at }); P4 feature flags
+// reuse this table.
+model PlatformFlag {
+  key              String   @id @db.VarChar(60)
+  value            Json
+  updatedByStaffId String?  @map("updated_by_staff_id") @db.Uuid
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedByStaff StaffUser? @relation(fields: [updatedByStaffId], references: [id], onDelete: SetNull)
+
+  @@map("platform_flags")
 }

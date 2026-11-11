@@ -202,3 +202,141 @@ export interface FailedPayments {
   }[];
   count: number;
 }
+
+// ── P3: support tickets ────────────────────────────────
+
+export type TicketStatus =
+  | "open"
+  | "in_progress"
+  | "waiting_on_user"
+  | "resolved"
+  | "closed";
+
+export interface StaffRef {
+  id: string;
+  email: string;
+  name: string | null;
+}
+
+export interface TicketListItem {
+  id: string;
+  subject: string;
+  category: string;
+  status: TicketStatus;
+  priority: string;
+  createdAt: string;
+  lastMessageAt: string | null;
+  organization: { id: string; name: string } | null;
+  requester: { id: string; email: string; name: string | null } | null;
+  assignee: StaffRef | null;
+  messageCount: number;
+  /** API heuristic: open/in-progress or re-pinged after resolved. */
+  awaitingStaffReply?: boolean;
+  resolvedAt?: string | null;
+}
+
+export interface TicketMessage {
+  id: string;
+  authorType: "user" | "staff";
+  authorUserId?: string | null;
+  authorStaffId?: string | null;
+  body: string;
+  internalNote: boolean;
+  createdAt: string;
+  author: { email: string; name: string | null } | null;
+}
+
+export interface TicketDetail {
+  ticket: {
+    id: string;
+    subject: string;
+    category: string;
+    status: TicketStatus;
+    priority: string;
+    meta?: Record<string, any> | null;
+    organization: {
+      id: string;
+      name: string;
+      planCode: string;
+      suspendedAt?: string | null;
+      /** API may send a boolean instead of a timestamp. */
+      suspended?: boolean;
+      isDemo?: boolean;
+    } | null;
+    requester: {
+      id: string;
+      email: string;
+      name: string | null;
+      role?: string;
+    } | null;
+    assignee: StaffRef | null;
+    createdAt: string;
+    lastMessageAt: string | null;
+    resolvedAt?: string | null;
+  };
+  messages: TicketMessage[];
+}
+
+// ── P3: comms log ──────────────────────────────────────
+
+export interface CommsLogItem {
+  id: string;
+  channel: "email" | "sms" | "push" | string;
+  toAddr: string;
+  subject: string | null;
+  template: string | null;
+  status: string;
+  error: string | null;
+  createdAt: string;
+  resendOfId: string | null;
+  organizationId: string | null;
+  /** API sends the org relation — we surface its name over the raw id. */
+  organization?: { id: string; name: string } | null;
+  providerRef?: string | null;
+  sentByStaff?: { id: string; email: string; name: string | null } | null;
+  /** Resend needs a stored body — absent bodies are rejected server-side. */
+  hasBody?: boolean;
+}
+
+// ── P3: platform health ────────────────────────────────
+
+export type RagStatus = "green" | "amber" | "red";
+
+export interface HealthCheck {
+  name: string;
+  status: RagStatus;
+  latencyMs?: number | null;
+  detail?: string | null;
+  error?: string | null;
+}
+
+export interface CronJobStatus {
+  name: string;
+  lastRunAt: string | null;
+  lastStatus: string | null;
+  ageMinutes: number | null;
+  expectedMinutes: number | null;
+  stale: boolean;
+  /** Extra fields the API reports per job. */
+  schedule?: string;
+  rag?: RagStatus;
+  detail?: string | null;
+  lastFinishedAt?: string | null;
+  ageSec?: number | null;
+}
+
+export interface PlatformHealth {
+  overall: RagStatus;
+  checkedAt: string;
+  checks: HealthCheck[];
+  cron: CronJobStatus[];
+  system: {
+    uptimeSec?: number;
+    version?: string;
+    dbSizeBytes?: number;
+    diskFreePct?: number;
+  };
+  /** Maintenance-mode state when the API surfaces it (shape not yet frozen —
+   *  normalised in lib/api/platform.ts from health payload). */
+  maintenance?: { enabled: boolean; message?: string | null } | null;
+}

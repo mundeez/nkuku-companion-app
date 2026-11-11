@@ -233,7 +233,10 @@ export async function buildAccountModule(app: FastifyInstance) {
       { expiresIn: EMAIL_VERIFICATION_EXPIRES },
     );
 
-    const result = await sendVerificationEmail(user.email, token, 'verify_email');
+    const result = await sendVerificationEmail(user.email, token, 'verify_email', {
+      userId,
+      organizationId: (request as any).authUser?.organizationId ?? null,
+    });
     if (!result.success) {
       return reply.status(500).send({ error: 'EMAIL_SEND_FAILED', message: result.message });
     }
@@ -342,7 +345,9 @@ export async function buildAccountModule(app: FastifyInstance) {
       { expiresIn: PASSWORD_RESET_EXPIRES },
     );
 
-    const result = await sendVerificationEmail(user.email, token, 'reset_password');
+    const result = await sendVerificationEmail(user.email, token, 'reset_password', {
+      userId: user.id,
+    });
     if (!result.success) {
       return reply.status(500).send({ error: 'EMAIL_SEND_FAILED', message: result.message });
     }

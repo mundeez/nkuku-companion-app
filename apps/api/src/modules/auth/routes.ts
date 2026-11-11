@@ -19,6 +19,7 @@ import {
 } from '../../core/security/social-auth.service.js';
 import { authRateLimit } from '../../core/security/rate-limiter.js';
 import { tryDecodeStaffToken } from '../../core/staff-auth/staff-auth.service.js';
+import { getMaintenanceMode } from '../../core/platform-flags/flags.service.js';
 
 const LoginSchema = z.object({
   email: z.string().email().optional(),
@@ -1491,6 +1492,27 @@ export async function buildAuthModule(app: FastifyInstance) {
 
 // ── Auth middleware ────────────────────────
 export async function authenticate(request: any, reply: any) {
+  // Platform maintenance mode (P3): while the 'maintenance_mode'
+  // PlatformFlag is enabled, every authenticated tenant route 503s with
+  // MAINTENANCE_MODE so client apps can show the notice. Escape hatch:
+  // /api/v1/auth/* stays alive (login/refresh/me must keep working —
+  // the flag is checked here because authenticate() also runs on auth
+  // routes). Staff JWTs are unaffected (different middleware/audience);
+  // public routes never reach this check. Flag read is cached 10 s.
+  const requestUrl = (request.url as string) || '';
+  if (!requestUrl.startsWith('/api/v1/auth/')) {
+    const flagPrisma = (request as any).server?.prisma ?? (reply.server as any)?.prisma;
+    if (flagPrisma) {
+      const maintenance = await getMaintenanceMode(flagPrisma);
+      if (maintenance.enabled) {
+        return reply.status(503).send({
+          error: 'MAINTENANCE_MODE',
+          message: maintenance.message || 'The platform is undergoing scheduled maintenance. Please try again shortly.',
+        });
+      }
+    }
+  }
+
   // Check Bearer header first (mobile clients), then fall back to cookie (web)
   const auth = request.headers.authorization;
   let token: string | null = null;

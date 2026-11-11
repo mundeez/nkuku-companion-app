@@ -89,6 +89,7 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
       if (mounted) {
         _replyController.clear();
         await _load();
+        if (mounted) setState(() => _sending = false);
       }
     } catch (e) {
       if (mounted) {
@@ -126,7 +127,10 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
     setState(() => _closing = true);
     try {
       await SupportService.closeTicket(widget.id);
-      if (mounted) await _load();
+      if (mounted) {
+        await _load();
+        if (mounted) setState(() => _closing = false);
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _closing = false);
