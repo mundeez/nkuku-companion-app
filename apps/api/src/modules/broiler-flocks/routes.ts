@@ -721,7 +721,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       include: {
         supplier: { include: { feedStages: { orderBy: { sortOrder: 'asc' } } } },
         mortalityEvents: { select: { eventDate: true, count: true, ageDays: true } },
-        feedPurchases: { select: { feedStageId: true, stageName: true, bagSizeKg: true, bagsPurchased: true, totalCostZmw: true } },
+        feedPurchases: { select: { feedStageId: true, stageName: true, fulfillsFeedType: true, bagSizeKg: true, bagsPurchased: true, totalCostZmw: true } },
         feedRecords: { select: { feedType: true, quantityKg: true, costZmw: true } },
       },
     });
@@ -792,11 +792,14 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     }
 
     // Attribute purchases: kg credited to the feed TYPE (any size counts),
-    // physical bag counts kept per stage row for display. Free-text purchases
-    // (no feedStageId) match by normalized stage name, then by bag size.
+    // physical bag counts kept per stage row for display. Attribution order:
+    // explicit fulfillsFeedType → linked feedStageId → normalized stage name.
+    // The explicit field makes multi-supplier purchases count regardless of
+    // how the other supplier names its stages.
     for (const p of flock.feedPurchases) {
       let key: string | undefined;
-      if (p.feedStageId) key = stageTypeKey.get(p.feedStageId);
+      if (p.fulfillsFeedType) key = typeKey(p.fulfillsFeedType);
+      if (!key && p.feedStageId) key = stageTypeKey.get(p.feedStageId);
       if (!key) key = typeKey(p.stageName);
       const bucket = typeBuckets.get(key);
       if (!bucket) continue;

@@ -81,7 +81,7 @@ model SocialAccount {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserId])
   @@index([userId])
@@ -92,16 +92,16 @@ model SocialAccount {
 // Stores OTP codes for phone verification (signup, login, new device).
 // Codes are hashed (SHA-256) so a DB compromise doesn't reveal live codes.
 model OtpCode {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String?  @db.Uuid // null for signup OTPs (user not yet created)
-  phone     String   @db.VarChar(20) // E.164 format
-  codeHash  String   @map("code_hash") @db.VarChar(64) // SHA-256 hex
-  purpose   String   @db.VarChar(20) // "signup" | "login" | "new_device"
-  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String?   @db.Uuid // null for signup OTPs (user not yet created)
+  phone     String    @db.VarChar(20) // E.164 format
+  codeHash  String    @map("code_hash") @db.VarChar(64) // SHA-256 hex
+  purpose   String    @db.VarChar(20) // "signup" | "login" | "new_device"
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
   usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([phone, purpose])
   @@map("otp_codes")
@@ -112,14 +112,14 @@ model OtpCode {
 // A device fingerprint is derived from user-agent + IP hash (web) or
 // a generated device ID (mobile).
 model UserDevice {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @db.Uuid
-  deviceFingerprint String @map("device_fingerprint") @db.VarChar(64)
-  deviceLabel   String?  @map("device_label") @db.VarChar(200) // e.g. "Chrome on Windows"
-  lastSeenAt    DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @db.Uuid
+  deviceFingerprint String   @map("device_fingerprint") @db.VarChar(64)
+  deviceLabel       String?  @map("device_label") @db.VarChar(200) // e.g. "Chrome on Windows"
+  lastSeenAt        DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deviceFingerprint])
   @@map("user_devices")
@@ -140,34 +140,34 @@ enum Role {
 // performance targets, diseases, vaccination schedule templates, equipment
 // catalog) remains global and is NOT organization-scoped.
 model Organization {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @db.VarChar(150)
-  country   String   @db.VarChar(2) // ISO 3166-1 alpha-2, e.g. "ZM", "BW"
-  currency  String   @default("ZMW") @map("currency") @db.Char(3)
-  planCode  String   @default("free") @map("plan_code") @db.VarChar(30)
-  isActive  Boolean  @default(true) @map("is_active")
+  id                           String    @id @default(uuid()) @db.Uuid
+  name                         String    @db.VarChar(150)
+  country                      String    @db.VarChar(2) // ISO 3166-1 alpha-2, e.g. "ZM", "BW"
+  currency                     String    @default("ZMW") @map("currency") @db.Char(3)
+  planCode                     String    @default("free") @map("plan_code") @db.VarChar(30)
+  isActive                     Boolean   @default(true) @map("is_active")
   // Demo orgs (e.g. "Nkuku Demo Farm") are excluded from admin MRR/churn
   // metrics and billing cron — fictional data for marketing/screenshots.
-  isDemo    Boolean  @default(false) @map("is_demo")
+  isDemo                       Boolean   @default(false) @map("is_demo")
   // Soft-delete (DPA right-to-erasure): owner requests deletion → deletedAt
   // set and isActive=false; purgeAfter = deletedAt + 30 days, at which the
   // daily purge job hard-deletes all org data.
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
-  purgeAfter DateTime? @map("purge_after") @db.Timestamptz(6)
+  deletedAt                    DateTime? @map("deleted_at") @db.Timestamptz(6)
+  purgeAfter                   DateTime? @map("purge_after") @db.Timestamptz(6)
   // Platform-initiated suspension (P2, super-admin console): set by staff
   // via /api/v1/platform/tenants/:id/suspend. While suspendedAt is set,
   // tenant authenticate() rejects every request with 423 ORG_SUSPENDED
   // except billing-read and auth routes — distinct from the billing-side
   // Subscription.status 'suspended' (dunning), which only downgrades plan.
-  suspendedAt      DateTime? @map("suspended_at") @db.Timestamptz(6)
-  suspendedReason  String?   @map("suspended_reason")
-  suspendedMessage String?   @map("suspended_message")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  suspendedAt                  DateTime? @map("suspended_at") @db.Timestamptz(6)
+  suspendedReason              String?   @map("suspended_reason")
+  suspendedMessage             String?   @map("suspended_message")
+  createdAt                    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   // Per-org default vaccination schedule (remembered from first flock create
   // that picks one) and ambient temperature used for daily water estimates.
-  defaultVaccinationScheduleId String? @map("default_vaccination_schedule_id") @db.Uuid
-  ambientTempC                 Decimal @default(25) @map("ambient_temp_c") @db.Decimal(4, 1)
+  defaultVaccinationScheduleId String?   @map("default_vaccination_schedule_id") @db.Uuid
+  ambientTempC                 Decimal   @default(25) @map("ambient_temp_c") @db.Decimal(4, 1)
 
   members                      OrganizationMember[]
   invites                      Invite[]
@@ -183,13 +183,14 @@ model Organization {
   subscriptions                Subscription[]
   invoices                     Invoice[]
   feedPurchases                FeedPurchase[]
+  feedBags                     FeedBag[]
   adEvents                     AdEvent[]
   auditLogs                    AuditLog[]
   impersonationSessions        ImpersonationSession[]
   tenantOverrides              TenantOverride[]
   supportTickets               SupportTicket[]
   commsLogs                    CommsLog[]
-  defaultVaccinationSchedule   VaccinationSchedule? @relation("OrgDefaultVaccinationSchedule", fields: [defaultVaccinationScheduleId], references: [id], onDelete: SetNull)
+  defaultVaccinationSchedule   VaccinationSchedule?          @relation("OrgDefaultVaccinationSchedule", fields: [defaultVaccinationScheduleId], references: [id], onDelete: SetNull)
 
   @@map("organizations")
 }
@@ -271,30 +272,30 @@ enum SubscriptionStatus {
 // An invoice generated for a subscription period. One invoice per billing
 // cycle per subscription. Tracks the amount due, amount paid, and status.
 model Invoice {
-  id               String        @id @default(uuid()) @db.Uuid
-  organizationId   String        @map("organization_id") @db.Uuid
-  subscriptionId   String        @map("subscription_id") @db.Uuid
-  invoiceNumber    String        @unique @map("invoice_number") @db.VarChar(50)
-  planCode         String        @map("plan_code") @db.VarChar(30)
-  billingCycle     BillingCycle  @map("billing_cycle")
-  amountDue        Decimal       @map("amount_due") @db.Decimal(12, 2)
-  amountPaid       Decimal       @default(0) @map("amount_paid") @db.Decimal(12, 2)
-  currency         String        @default("ZMW") @db.Char(3)
-  status           InvoiceStatus @default(draft)
-  periodStart      DateTime      @map("period_start") @db.Timestamptz(6)
-  periodEnd        DateTime      @map("period_end") @db.Timestamptz(6)
-  dueDate          DateTime      @map("due_date") @db.Timestamptz(6)
-  paidAt           DateTime?     @map("paid_at") @db.Timestamptz(6)
-  provider         String        @default("flutterwave") @db.VarChar(30) // flutterwave | lenco | dpo
-  providerRef      String?       @unique @map("provider_ref") @db.VarChar(100) // provider tx ref
-  paymentLink      String?       @map("payment_link") @db.Text // provider checkout URL
-  remindersSent    Int           @default(0) @map("reminders_sent") // dunning bitmask: 1=T-7, 2=T-1, 4=T+1, 8=T+5
-  lastReminderAt   DateTime?     @map("last_reminder_at") @db.Timestamptz(6)
-  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  subscriptionId String        @map("subscription_id") @db.Uuid
+  invoiceNumber  String        @unique @map("invoice_number") @db.VarChar(50)
+  planCode       String        @map("plan_code") @db.VarChar(30)
+  billingCycle   BillingCycle  @map("billing_cycle")
+  amountDue      Decimal       @map("amount_due") @db.Decimal(12, 2)
+  amountPaid     Decimal       @default(0) @map("amount_paid") @db.Decimal(12, 2)
+  currency       String        @default("ZMW") @db.Char(3)
+  status         InvoiceStatus @default(draft)
+  periodStart    DateTime      @map("period_start") @db.Timestamptz(6)
+  periodEnd      DateTime      @map("period_end") @db.Timestamptz(6)
+  dueDate        DateTime      @map("due_date") @db.Timestamptz(6)
+  paidAt         DateTime?     @map("paid_at") @db.Timestamptz(6)
+  provider       String        @default("flutterwave") @db.VarChar(30) // flutterwave | lenco | dpo
+  providerRef    String?       @unique @map("provider_ref") @db.VarChar(100) // provider tx ref
+  paymentLink    String?       @map("payment_link") @db.Text // provider checkout URL
+  remindersSent  Int           @default(0) @map("reminders_sent") // dunning bitmask: 1=T-7, 2=T-1, 4=T+1, 8=T+5
+  lastReminderAt DateTime?     @map("last_reminder_at") @db.Timestamptz(6)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  subscription Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription  Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   paymentEvents PaymentEvent[]
 
   @@index([organizationId])
@@ -313,16 +314,16 @@ enum InvoiceStatus {
 // A payment event from Flutterwave (webhook or manual verification).
 // Multiple events can map to one invoice (e.g. pending → success).
 model PaymentEvent {
-  id              String   @id @default(uuid()) @db.Uuid
-  invoiceId       String   @map("invoice_id") @db.Uuid
-  provider        String   @db.VarChar(30) // "flutterwave"
-  providerRef     String   @map("provider_ref") @db.VarChar(100) // tx_ref
-  providerTxnId   String?  @map("provider_txn_id") @db.VarChar(100) // flw_tx_ref
-  amount          Decimal  @db.Decimal(12, 2)
-  currency        String   @default("ZMW") @db.Char(3)
-  status          String   @db.VarChar(20) // "success", "failed", "pending", "cancelled"
-  rawPayload      Json?    @map("raw_payload") // full webhook payload for audit
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id            String   @id @default(uuid()) @db.Uuid
+  invoiceId     String   @map("invoice_id") @db.Uuid
+  provider      String   @db.VarChar(30) // "flutterwave"
+  providerRef   String   @map("provider_ref") @db.VarChar(100) // tx_ref
+  providerTxnId String?  @map("provider_txn_id") @db.VarChar(100) // flw_tx_ref
+  amount        Decimal  @db.Decimal(12, 2)
+  currency      String   @default("ZMW") @db.Char(3)
+  status        String   @db.VarChar(20) // "success", "failed", "pending", "cancelled"
+  rawPayload    Json?    @map("raw_payload") // full webhook payload for audit
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -345,14 +346,15 @@ model Supplier {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  feedStages   FeedStage[]
-  feedRecords  FeedRecord[]
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  feedStages    FeedStage[]
+  feedRecords   FeedRecord[]
   feedPurchases FeedPurchase[]
-  flocks       BroilerFlock[]
-  batches      Batch[]
-  projections  Projection[]
-  creator      User?          @relation("SupplierCreatedBy", fields: [createdBy], references: [id])
+  feedBags      FeedBag[]
+  flocks        BroilerFlock[]
+  batches       Batch[]
+  projections   Projection[]
+  creator       User?          @relation("SupplierCreatedBy", fields: [createdBy], references: [id])
 
   @@index([organizationId])
   @@map("suppliers")
@@ -378,6 +380,7 @@ model FeedStage {
   batchExpenses BatchExpense[]
   priceHistory  FeedStagePriceHistory[]
   feedPurchases FeedPurchase[]
+  feedBags      FeedBag[]
 
   @@unique([supplierId, stageName])
   @@index([supplierId, sortOrder])
@@ -737,7 +740,8 @@ model BroilerFlock {
   documents            Document[]
   saleRecords          SaleRecord[]
   feedPurchases        FeedPurchase[]
-  vaccinationSchedule  VaccinationSchedule? @relation("FlockVaccinationSchedule", fields: [vaccinationScheduleId], references: [id], onDelete: SetNull)
+  feedBags             FeedBag[]
+  vaccinationSchedule  VaccinationSchedule?  @relation("FlockVaccinationSchedule", fields: [vaccinationScheduleId], references: [id], onDelete: SetNull)
 
   @@index([breedId, status])
   @@index([supplierId])
@@ -801,32 +805,74 @@ model FeedRecord {
 // FinancialRecord (category: feed) and auto-posts a double-entry journal
 // entry (debit 5020 Feed COGS, credit 1010 Cash).
 model FeedPurchase {
-  id              String   @id @default(uuid()) @db.Uuid
-  organizationId  String   @map("organization_id") @db.Uuid
-  flockId         String   @map("flock_id") @db.Uuid
-  feedStageId     String?  @map("feed_stage_id") @db.Uuid
-  supplierId      String?  @map("supplier_id") @db.Uuid
-  purchaseDate    DateTime @map("purchase_date") @db.Date
-  stageName       String   @map("stage_name") @db.VarChar(50)
-  bagSizeKg       Decimal  @map("bag_size_kg") @db.Decimal(10, 3)
-  bagsPurchased   Int      @map("bags_purchased")
-  unitPriceZmw    Decimal  @map("unit_price_zmw") @db.Decimal(12, 2)
-  totalCostZmw    Decimal  @map("total_cost_zmw") @db.Decimal(14, 2)
-  notes           String?  @db.Text
-  createdBy       String?  @map("created_by") @db.Uuid
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  flockId          String   @map("flock_id") @db.Uuid
+  feedStageId      String?  @map("feed_stage_id") @db.Uuid
+  supplierId       String?  @map("supplier_id") @db.Uuid
+  purchaseDate     DateTime @map("purchase_date") @db.Date
+  stageName        String   @map("stage_name") @db.VarChar(50)
+  bagSizeKg        Decimal  @map("bag_size_kg") @db.Decimal(10, 3)
+  bagsPurchased    Int      @map("bags_purchased")
+  unitPriceZmw     Decimal  @map("unit_price_zmw") @db.Decimal(12, 2)
+  totalCostZmw     Decimal  @map("total_cost_zmw") @db.Decimal(14, 2)
+  notes            String?  @db.Text
+  // The projected feed type this purchase fulfills (e.g. "Starter"), explicit
+  // so purchases from any supplier attribute correctly regardless of naming.
+  fulfillsFeedType String?  @map("fulfills_feed_type") @db.VarChar(50)
+  createdBy        String?  @map("created_by") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  flock        BroilerFlock  @relation(fields: [flockId], references: [id], onDelete: Cascade)
-  feedStage    FeedStage?    @relation(fields: [feedStageId], references: [id], onDelete: SetNull)
-  supplier     Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  creator      User?         @relation("FeedPurchaseCreatedBy", fields: [createdBy], references: [id])
+  flock        BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  feedStage    FeedStage?   @relation(fields: [feedStageId], references: [id], onDelete: SetNull)
+  supplier     Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  creator      User?        @relation("FeedPurchaseCreatedBy", fields: [createdBy], references: [id])
+  bags         FeedBag[]
 
   @@index([flockId, purchaseDate])
   @@index([organizationId])
   @@index([feedStageId])
   @@map("feed_purchases")
+}
+
+enum FeedBagStatus {
+  sealed
+  open
+  finished
+}
+
+// Individual feed bags materialized from a FeedPurchase. A bag's lifecycle is
+// sealed → open → finished, giving per-bag consumption tracking and stock.
+model FeedBag {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  flockId        String        @map("flock_id") @db.Uuid
+  purchaseId     String        @map("purchase_id") @db.Uuid
+  feedStageId    String?       @map("feed_stage_id") @db.Uuid
+  supplierId     String?       @map("supplier_id") @db.Uuid
+  stageName      String        @map("stage_name") @db.VarChar(50)
+  bagSizeKg      Decimal       @map("bag_size_kg") @db.Decimal(10, 3)
+  bagIndex       Int           @map("bag_index") // 1..bagsPurchased within the purchase
+  status         FeedBagStatus @default(sealed)
+  openedAt       DateTime?     @map("opened_at") @db.Timestamptz(6)
+  openedById     String?       @map("opened_by_id") @db.Uuid
+  finishedAt     DateTime?     @map("finished_at") @db.Timestamptz(6)
+  finishedById   String?       @map("finished_by_id") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  flock        BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  purchase     FeedPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  feedStage    FeedStage?   @relation(fields: [feedStageId], references: [id], onDelete: SetNull)
+  supplier     Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([flockId, status])
+  @@index([purchaseId])
+  @@index([organizationId])
+  @@map("feed_bags")
 }
 
 model WaterRecord {
@@ -992,8 +1038,8 @@ model VaccinationSchedule {
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   items         VaccinationScheduleItem[]
-  flocks        BroilerFlock[]              @relation("FlockVaccinationSchedule")
-  organizations Organization[]              @relation("OrgDefaultVaccinationSchedule")
+  flocks        BroilerFlock[]            @relation("FlockVaccinationSchedule")
+  organizations Organization[]            @relation("OrgDefaultVaccinationSchedule")
 
   @@unique([name])
   @@map("vaccination_schedules")
@@ -1209,25 +1255,25 @@ enum PeriodType {
 
 // ── AUDIT LOG ────────────────────────────
 model AuditLog {
-  id             String      @id @default(uuid()) @db.Uuid
-  organizationId String      @map("organization_id") @db.Uuid
-  userId         String?     @map("user_id") @db.Uuid
-  entityType     String      @map("entity_type") @db.VarChar(50)
-  entityId       String      @map("entity_id") @db.Uuid
-  action         AuditAction
-  previousState  Json?       @map("previous_state")
-  newState       Json?       @map("new_state")
-  ipAddress      String?     @map("ip_address") @db.VarChar(45)
-  periodId       String?     @map("period_id") @db.Uuid
+  id                    String      @id @default(uuid()) @db.Uuid
+  organizationId        String      @map("organization_id") @db.Uuid
+  userId                String?     @map("user_id") @db.Uuid
+  entityType            String      @map("entity_type") @db.VarChar(50)
+  entityId              String      @map("entity_id") @db.Uuid
+  action                AuditAction
+  previousState         Json?       @map("previous_state")
+  newState              Json?       @map("new_state")
+  ipAddress             String?     @map("ip_address") @db.VarChar(45)
+  periodId              String?     @map("period_id") @db.Uuid
   // P2: when this mutation was performed by platform staff inside an
   // impersonation session, the acting StaffUser id — so the tenant can see
   // support activity attributed in their own audit log. Deliberately NOT a
   // foreign key: audit rows must never block staff-user deletion.
-  impersonatedByStaffId String? @map("impersonated_by_staff_id") @db.Uuid
-  occurredAt     DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  impersonatedByStaffId String?     @map("impersonated_by_staff_id") @db.Uuid
+  occurredAt            DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  period FinancialPeriod?   @relation(fields: [periodId], references: [id])
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  period       FinancialPeriod? @relation(fields: [periodId], references: [id])
 
   @@index([organizationId, occurredAt])
   @@index([entityType, entityId])
@@ -1537,16 +1583,16 @@ model SaleRecord {
   pricePerBirdZmw Decimal  @map("price_per_bird_zmw") @db.Decimal(14, 2)
   totalAmountZmw  Decimal  @map("total_amount_zmw") @db.Decimal(14, 2)
   paymentStatus   String   @default("pending") @map("payment_status") @db.VarChar(20)
-  amountPaidZmw   Decimal @default(0) @map("amount_paid_zmw") @db.Decimal(14, 2)
+  amountPaidZmw   Decimal  @default(0) @map("amount_paid_zmw") @db.Decimal(14, 2)
   journalEntryId  String?  @map("journal_entry_id") @db.Uuid
   notes           String?  @db.Text
   createdBy       String?  @map("created_by") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  flock        BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
-  creator      User?        @relation("SaleRecordCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  flock        BroilerFlock  @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  creator      User?         @relation("SaleRecordCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   documents    Document[]
   payments     SalePayment[]
 
@@ -1669,20 +1715,20 @@ model AdEvent {
 // for the active deployment, but this table provides an auditable record
 // of all issued licenses and their status.
 model License {
-  id              String       @id @default(uuid()) @db.Uuid
-  licenseKey      String       @unique @map("license_key")
-  licensedTo      String       @map("licensed_to")
-  licensedToEmail String?      @map("licensed_to_email")
-  plan            String       @default("enterprise")
-  maxUsers        Int?         @map("max_users")
-  maxOrganizations Int?        @map("max_organizations")
-  isWhiteLabel    Boolean      @default(false) @map("is_white_label")
-  issuedAt        DateTime     @default(now()) @map("issued_at") @db.Timestamptz(6)
-  expiresAt       DateTime?    @map("expires_at") @db.Timestamptz(6)
-  status          LicenseStatus @default(active)
-  notes           String?
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String        @id @default(uuid()) @db.Uuid
+  licenseKey       String        @unique @map("license_key")
+  licensedTo       String        @map("licensed_to")
+  licensedToEmail  String?       @map("licensed_to_email")
+  plan             String        @default("enterprise")
+  maxUsers         Int?          @map("max_users")
+  maxOrganizations Int?          @map("max_organizations")
+  isWhiteLabel     Boolean       @default(false) @map("is_white_label")
+  issuedAt         DateTime      @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt        DateTime?     @map("expires_at") @db.Timestamptz(6)
+  status           LicenseStatus @default(active)
+  notes            String?
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([status])
   @@index([licenseKey])

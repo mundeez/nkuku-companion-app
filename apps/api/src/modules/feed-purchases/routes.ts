@@ -14,11 +14,31 @@ const FeedPurchaseCreateSchema = z.object({
   supplierId: z.string().uuid().optional(),
   purchaseDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
   stageName: z.string().min(1).max(50),
+  // Explicit projected feed type (e.g. "Starter") — supplier-agnostic attribution.
+  fulfillsFeedType: z.string().max(50).optional(),
   bagSizeKg: z.coerce.number().positive(),
   bagsPurchased: z.number().int().positive(),
   unitPriceZmw: z.coerce.number().nonnegative(),
   notes: z.string().optional(),
 });
+
+// Materialize individual FeedBag rows (1..bagsPurchased) for a purchase.
+async function materializeBags(prisma: any, purchase: any, fromIndex = 1) {
+  const rows = [];
+  for (let i = fromIndex; i <= purchase.bagsPurchased; i++) {
+    rows.push({
+      organizationId: purchase.organizationId,
+      flockId: purchase.flockId,
+      purchaseId: purchase.id,
+      feedStageId: purchase.feedStageId,
+      supplierId: purchase.supplierId,
+      stageName: purchase.stageName,
+      bagSizeKg: purchase.bagSizeKg,
+      bagIndex: i,
+    });
+  }
+  if (rows.length) await prisma.feedBag.createMany({ data: rows });
+}
 
 const FeedPurchaseUpdateSchema = FeedPurchaseCreateSchema.partial().omit({ flockId: true });
 
@@ -84,6 +104,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
         supplierId: data.supplierId ?? null,
         purchaseDate: new Date(data.purchaseDate),
         stageName: data.stageName,
+        fulfillsFeedType: data.fulfillsFeedType ?? null,
         bagSizeKg: data.bagSizeKg,
         bagsPurchased: data.bagsPurchased,
         unitPriceZmw: data.unitPriceZmw,
@@ -92,6 +113,9 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
         createdBy: _authUser.userId,
       },
     });
+
+    // Materialize individual bags for lifecycle tracking (sealed → open → finished)
+    await materializeBags(prisma, purchase);
 
     // Auto-create a linked FinancialRecord (category: feed, expense)
     const description = `Feed Purchase: ${data.bagsPurchased} × ${data.bagSizeKg}kg ${data.stageName} bags`;
@@ -169,6 +193,27 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
     const unitPriceZmw = data.unitPriceZmw !== undefined ? Number(data.unitPriceZmw) : Number(existing.unitPriceZmw);
     const totalCostZmw = new Decimal(bagsPurchased).mul(unitPriceZmw).toNumber();
 
+    // Reducing bagsPurchased: ensure enough sealed bags exist to remove,
+    // BEFORE touching the purchase row.
+    let removableBags: any[] = [];
+    if (data.bagsPurchased !== undefined && data.bagsPurchased < existing.bagsPurchased) {
+      const bagCount = await prisma.feedBag.count({ where: { purchaseId: id } });
+      const excess = bagCount - data.bagsPurchased;
+      if (excess > 0) {
+        removableBags = await prisma.feedBag.findMany({
+          where: { purchaseId: id, status: 'sealed' },
+          orderBy: { bagIndex: 'desc' },
+          take: excess,
+        });
+        if (removableBags.length < excess) {
+          return reply.status(400).send({
+            error: 'BAGS_ALREADY_CONSUMED',
+            message: `Only ${removableBags.length} sealed bag(s) can be removed — the rest are already open/finished.`,
+          });
+        }
+      }
+    }
+
     const updated = await prisma.feedPurchase.update({
       where: { id },
       data: {
@@ -176,6 +221,7 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
         supplierId: data.supplierId,
         purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
         stageName: data.stageName,
+        fulfillsFeedType: data.fulfillsFeedType,
         bagSizeKg: data.bagSizeKg,
         bagsPurchased: data.bagsPurchased,
         unitPriceZmw: data.unitPriceZmw,
@@ -183,6 +229,28 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
         notes: data.notes,
       },
     });
+
+    // Keep materialized bags in sync with the purchase.
+    if (data.bagsPurchased !== undefined && data.bagsPurchased !== existing.bagsPurchased) {
+      const bagCount = await prisma.feedBag.count({ where: { purchaseId: id } });
+      if (data.bagsPurchased > bagCount) {
+        await materializeBags(prisma, { ...updated, bagsPurchased: data.bagsPurchased }, bagCount + 1);
+      } else if (removableBags.length) {
+        await prisma.feedBag.deleteMany({ where: { id: { in: removableBags.map((b: any) => b.id) } } });
+      }
+    }
+    // Denormalized bag fields describe the physical item — keep them current.
+    if (data.stageName !== undefined || data.bagSizeKg !== undefined || data.feedStageId !== undefined || data.supplierId !== undefined) {
+      await prisma.feedBag.updateMany({
+        where: { purchaseId: id },
+        data: {
+          stageName: updated.stageName,
+          bagSizeKg: updated.bagSizeKg,
+          feedStageId: updated.feedStageId,
+          supplierId: updated.supplierId,
+        },
+      });
+    }
 
     // Sync the linked FinancialRecord
     const finRecord = await prisma.financialRecord.findFirst({

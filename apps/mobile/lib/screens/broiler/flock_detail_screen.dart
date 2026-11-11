@@ -5,6 +5,7 @@ import '../../models/breed.dart';
 import '../../models/document.dart';
 import '../../models/environmental_record.dart';
 import '../../models/financial_record.dart';
+import '../../models/feed_bag.dart';
 import '../../models/feed_record.dart';
 import '../../models/feed_purchase.dart';
 import '../../models/flock.dart';
@@ -95,6 +96,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   GrowthRecordAnalysis? _growthAnalysis;
   List<FeedRecord> _feedRecords = [];
   List<FeedPurchase> _feedPurchases = [];
+  List<FeedBag> _feedBags = [];
   FeedSummary? _feedSummary;
   FeedProjection? _feedProjection;
   List<WaterRecord> _waterRecords = [];
@@ -201,6 +203,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             .catchError((_) => <FeedRecord>[]),
         BroilerService.getFeedPurchases(widget.flockId)
             .catchError((_) => <FeedPurchase>[]),
+        BroilerService.getFeedBags(widget.flockId)
+            .catchError((_) => <FeedBag>[]),
         BroilerService.getWaterRecords(widget.flockId)
             .catchError((_) => <WaterRecord>[]),
         BroilerService.getMortalityEvents(widget.flockId)
@@ -255,14 +259,15 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       final growth = results[0] as List<GrowthRecord>;
       final feed = results[1] as List<FeedRecord>;
       final feedPurchases = results[2] as List<FeedPurchase>;
-      final water = results[3] as List<WaterRecord>;
-      final mortality = results[4] as List<MortalityEvent>;
-      final vaccination = results[5] as List<VaccinationEvent>;
-      final financial = results[6] as List<FinancialRecord>;
-      final medication = results[7] as List<MedicationRecord>;
-      final environment = results[8] as List<EnvironmentalRecord>;
-      final sales = results[9] as List<SaleRecord>;
-      final documents = results[10] as List<DocumentRecord>;
+      final feedBags = results[3] as List<FeedBag>;
+      final water = results[4] as List<WaterRecord>;
+      final mortality = results[5] as List<MortalityEvent>;
+      final vaccination = results[6] as List<VaccinationEvent>;
+      final financial = results[7] as List<FinancialRecord>;
+      final medication = results[8] as List<MedicationRecord>;
+      final environment = results[9] as List<EnvironmentalRecord>;
+      final sales = results[10] as List<SaleRecord>;
+      final documents = results[11] as List<DocumentRecord>;
 
       final analysis = summaries[0] as GrowthRecordAnalysis?;
       final feedSummary = summaries[1] as FeedSummary?;
@@ -279,6 +284,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         _growthAnalysis = analysis;
         _feedRecords = feed;
         _feedPurchases = feedPurchases;
+        _feedBags = feedBags;
         _feedSummary = feedSummary;
         _feedProjection = feedProjection;
         _waterRecords = water;
@@ -1414,6 +1420,10 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   'ZMW ${totalPurchaseCost.toStringAsFixed(2)}'),
             ]),
           if (_feedPurchases.isNotEmpty) const SizedBox(height: 12),
+          if (_feedBags.isNotEmpty) ...[
+            _buildFeedStockCard(),
+            const SizedBox(height: 12),
+          ],
           if (_feedRecords.isNotEmpty) FeedChart(records: _feedRecords),
           if (_feedPurchases.isEmpty && _feedRecords.isEmpty)
             const Center(
@@ -1433,9 +1443,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             ..._feedPurchases.map((p) => RecordCard(
                   title:
                       '${p.stageName ?? 'Unknown'} · ${p.bagsPurchased} × ${p.bagSizeKg}kg',
-                  subtitle: p.supplierName != null
-                      ? 'Supplier: ${p.supplierName}'
-                      : null,
+                  subtitle: _purchaseSubtitle(p),
                   trailing: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -1468,8 +1476,168 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                     _toggleRecordSelect(p.id);
                   },
                 )),
+            if (_feedRecords.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text('Loose feed records',
+                    style: Theme.of(context).textTheme.titleSmall),
+              ),
+              Text(
+                'Kg entries logged via the feed form — counted as secured feed, not tracked as bags.',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 4),
+              ..._feedRecords.map((r) => RecordCard(
+                    title:
+                        '${r.feedType} · ${r.quantityKg.toStringAsFixed(1)}kg',
+                    subtitle: _feedRecordSubtitle(r),
+                    trailing: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(r.recordDate.toIso8601String().split('T').first),
+                        if (r.costZmw != null)
+                          Text('ZMW ${r.costZmw!.toStringAsFixed(2)}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  )),
+            ],
           ],
         ],
+      ),
+    );
+  }
+
+  String? _feedRecordSubtitle(FeedRecord r) {
+    final parts = [
+      if (r.feedBrand != null && r.feedBrand!.isNotEmpty) r.feedBrand!,
+      if (r.supplierName != null) 'Supplier: ${r.supplierName}',
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  String? _purchaseSubtitle(FeedPurchase p) {
+    final parts = [
+      if (p.supplierName != null) 'Supplier: ${p.supplierName}',
+      if (p.fulfillsFeedType != null && p.fulfillsFeedType != p.stageName)
+        'counts as ${p.fulfillsFeedType}',
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  Future<void> _bagAction(FeedBag bag, String action) async {
+    try {
+      switch (action) {
+        case 'open':
+          await BroilerService.openFeedBag(bag.id);
+          break;
+        case 'finish':
+          await BroilerService.finishFeedBag(bag.id);
+          break;
+        case 'reseal':
+          await BroilerService.resealFeedBag(bag.id);
+          break;
+      }
+      await _loadData();
+    } on DioException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.response?.data?['message'] ??
+                e.response?.data?['error'] ??
+                'Bag update failed')));
+      }
+    }
+  }
+
+  Color _bagStatusColor(String status) {
+    switch (status) {
+      case 'open':
+        return Colors.amber.shade700;
+      case 'finished':
+        return Colors.grey;
+      default:
+        return Colors.blue.shade700;
+    }
+  }
+
+  Widget _buildFeedStockCard() {
+    final inStock = _feedBags.where((b) => b.status != 'finished').length;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Icon(Icons.shopping_bag, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Feed Stock — $inStock bags in stock',
+                    style: Theme.of(context).textTheme.titleSmall),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            ..._feedBags.map((b) {
+              final dimmed = b.status == 'finished';
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(children: [
+                  Expanded(
+                    child: Opacity(
+                      opacity: dimmed ? 0.5 : 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('#${b.bagIndex} ${b.stageName} · ${b.bagSizeKg}kg',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w500)),
+                          if (b.supplierName != null)
+                            Text(b.supplierName!,
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey[600])),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _bagStatusColor(b.status).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(b.status,
+                        style: TextStyle(
+                            fontSize: 11, color: _bagStatusColor(b.status))),
+                  ),
+                  if (AuthService.canEdit && b.status != 'finished') ...[
+                    const SizedBox(width: 8),
+                    if (b.status == 'sealed')
+                      TextButton(
+                        onPressed: () => _bagAction(b, 'open'),
+                        child: const Text('Open'),
+                      )
+                    else
+                      PopupMenuButton<String>(
+                        onSelected: (v) => _bagAction(b, v),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: 'finish', child: Text('Finish')),
+                          PopupMenuItem(value: 'reseal', child: Text('Reseal')),
+                        ],
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(Icons.more_vert, size: 18),
+                        ),
+                      ),
+                  ],
+                ]),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import '../models/breed.dart';
 import '../models/document.dart';
 import '../models/environmental_record.dart';
 import '../models/financial_record.dart';
+import '../models/feed_bag.dart';
 import '../models/feed_record.dart';
 import '../models/feed_purchase.dart';
 import '../models/flock.dart';
@@ -455,6 +456,44 @@ class BroilerService {
       rethrow;
     }
   }
+
+  // Feed bags — individual sealed/open/finished bags materialized from purchases
+  static Future<List<FeedBag>> getFeedBags(String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/feed-bags',
+      queryParameters: {'flockId': flockId},
+    );
+    _assertOk(res);
+    if (res.data is Map && res.data['error'] != null)
+      throw BroilerServiceException(res.data['error']);
+    return (res.data as List).map((e) => FeedBag.fromJson(e)).toList();
+  }
+
+  static Future<List<FeedBagStageSummary>> getFeedBagSummary(
+      String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/feed-bags/summary',
+      queryParameters: {'flockId': flockId},
+    );
+    _assertOk(res);
+    final stages = res.data['stages'] as List? ?? [];
+    return stages.map((e) => FeedBagStageSummary.fromJson(e)).toList();
+  }
+
+  static Future<FeedBag> _transitionFeedBag(String id, String action) async {
+    final res = await ApiService.dio
+        .post('/api/v1/feed-bags/$id/$action', data: {});
+    _assertOk(res);
+    ConnectivityService.instance.markOnline();
+    return FeedBag.fromJson(res.data);
+  }
+
+  static Future<FeedBag> openFeedBag(String id) =>
+      _transitionFeedBag(id, 'open');
+  static Future<FeedBag> finishFeedBag(String id) =>
+      _transitionFeedBag(id, 'finish');
+  static Future<FeedBag> resealFeedBag(String id) =>
+      _transitionFeedBag(id, 'reseal');
 
   static Future<void> deleteFeedPurchase(String id) async {
     try {

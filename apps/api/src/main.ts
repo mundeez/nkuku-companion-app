@@ -27,6 +27,7 @@ import { buildBroilerFlockModule } from './modules/broiler-flocks/routes.js';
 import { buildGrowthRecordModule } from './modules/growth-records/routes.js';
 import { buildFeedRecordModule } from './modules/feed-records/routes.js';
 import { buildFeedPurchaseModule } from './modules/feed-purchases/routes.js';
+import { buildFeedBagModule } from './modules/feed-bags/routes.js';
 import { buildWaterRecordModule } from './modules/water-records/routes.js';
 import { buildMortalityEventModule } from './modules/mortality-events/routes.js';
 import { buildVaccinationEventModule } from './modules/vaccination-events/routes.js';
@@ -214,6 +215,7 @@ await app.register(buildBroilerFlockModule, { prefix: '/api/v1/broiler-flocks' }
 await app.register(buildGrowthRecordModule, { prefix: '/api/v1/growth-records' });
 await app.register(buildFeedRecordModule, { prefix: '/api/v1/feed-records' });
 await app.register(buildFeedPurchaseModule, { prefix: '/api/v1/feed-purchases' });
+await app.register(buildFeedBagModule, { prefix: '/api/v1/feed-bags' });
 await app.register(buildWaterRecordModule, { prefix: '/api/v1/water-records' });
 await app.register(buildMortalityEventModule, { prefix: '/api/v1/mortality-events' });
 await app.register(buildVaccinationEventModule, { prefix: '/api/v1/vaccination-events' });

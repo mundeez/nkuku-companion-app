@@ -260,8 +260,47 @@ export interface FeedPurchase {
   createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
+  fulfillsFeedType?: string | null;
   feedStage?: { stageName: string; unitSizeKg: number } | null;
   supplier?: { name: string } | null;
+}
+
+export type FeedBagStatus = "sealed" | "open" | "finished";
+
+export interface FeedBag {
+  id: string;
+  organizationId: string;
+  flockId: string;
+  purchaseId: string;
+  feedStageId?: string | null;
+  supplierId?: string | null;
+  stageName: string;
+  bagSizeKg: number;
+  bagIndex: number;
+  status: FeedBagStatus;
+  openedAt?: string | null;
+  openedById?: string | null;
+  finishedAt?: string | null;
+  finishedById?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  supplier?: { name: string } | null;
+  purchase?: { purchaseDate: string; unitPriceZmw: number } | null;
+}
+
+export interface FeedBagStageSummary {
+  stageName: string;
+  sealed: number;
+  open: number;
+  finished: number;
+  sealedKg: number;
+  openKg: number;
+  suppliers: string[];
+}
+
+export interface FeedBagSummary {
+  flockId: string;
+  stages: FeedBagStageSummary[];
 }
 
 export interface GrowthRecord {

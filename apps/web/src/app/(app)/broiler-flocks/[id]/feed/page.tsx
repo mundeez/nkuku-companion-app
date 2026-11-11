@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api/client";
-import { FeedProjectionResult, FeedProjectionType, FeedPurchase } from "@/lib/types";
+import { FeedBag, FeedBagSummary, FeedProjectionResult, FeedProjectionType, FeedPurchase, FeedRecord } from "@/lib/types";
 import { FeedProjectionTable } from "@/components/feed-projection-table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,10 @@ export default function FeedCalculatorPage() {
   // Feed projection + purchases state
   const [projection, setProjection] = useState<FeedProjectionResult | null>(null);
   const [purchases, setPurchases] = useState<FeedPurchase[]>([]);
+  const [feedRecords, setFeedRecords] = useState<FeedRecord[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [bags, setBags] = useState<FeedBag[]>([]);
+  const [bagSummary, setBagSummary] = useState<FeedBagSummary | null>(null);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<FeedPurchase | null>(null);
   const [purchaseForm, setPurchaseForm] = useState({
@@ -53,8 +57,11 @@ export default function FeedCalculatorPage() {
     unitPriceZmw: "",
     purchaseDate: new Date().toISOString().split("T")[0],
     notes: "",
+    supplierId: "",
+    fulfillsFeedType: "",
   });
   const [savingPurchase, setSavingPurchase] = useState(false);
+  const [bagActionId, setBagActionId] = useState<string | null>(null);
 
   const canEdit = user?.role === "owner" || user?.role === "manager";
 
@@ -67,6 +74,21 @@ export default function FeedCalculatorPage() {
   const loadPurchases = useCallback(() => {
     apiFetch<FeedPurchase[]>(`/api/v1/feed-purchases?flockId=${flockId}`)
       .then(setPurchases)
+      .catch(() => {});
+  }, [flockId]);
+
+  const loadFeedRecords = useCallback(() => {
+    apiFetch<FeedRecord[]>(`/api/v1/feed-records?flockId=${flockId}`)
+      .then((r) => setFeedRecords(Array.isArray(r) ? r : []))
+      .catch(() => {});
+  }, [flockId]);
+
+  const loadBags = useCallback(() => {
+    apiFetch<FeedBag[]>(`/api/v1/feed-bags?flockId=${flockId}`)
+      .then((b) => setBags(Array.isArray(b) ? b : []))
+      .catch(() => {});
+    apiFetch<FeedBagSummary>(`/api/v1/feed-bags/summary?flockId=${flockId}`)
+      .then(setBagSummary)
       .catch(() => {});
   }, [flockId]);
 
@@ -88,8 +110,13 @@ export default function FeedCalculatorPage() {
         .catch(() => {});
       loadProjection();
       loadPurchases();
+      loadFeedRecords();
+      loadBags();
+      apiFetch<any[]>("/api/v1/suppliers")
+        .then((s) => setSuppliers(Array.isArray(s) ? s : []))
+        .catch(() => {});
     }
-  }, [user, isLoading, flockId, router, loadProjection, loadPurchases]);
+  }, [user, isLoading, flockId, router, loadProjection, loadPurchases, loadFeedRecords, loadBags]);
 
   const feedStages = supplier?.feedStages
     ?.filter((s: any) => s.stageType === "feed" || s.stageType === "chick")
@@ -125,25 +152,28 @@ export default function FeedCalculatorPage() {
   function openAddPurchase(type?: FeedProjectionType) {
     setEditingPurchase(null);
     const primary = type?.sizes[0]; // largest configured bag size
+    const base = {
+      bagsPurchased: "",
+      purchaseDate: new Date().toISOString().split("T")[0],
+      notes: "",
+      supplierId: flock?.supplierId || "",
+      fulfillsFeedType: "",
+    };
     if (type && primary) {
       setPurchaseForm({
+        ...base,
         feedStageId: primary.feedStageId,
         stageName: type.typeName,
         bagSizeKg: String(primary.unitKg),
-        bagsPurchased: "",
         unitPriceZmw: String(primary.unitPriceZmw),
-        purchaseDate: new Date().toISOString().split("T")[0],
-        notes: "",
       });
     } else {
       setPurchaseForm({
+        ...base,
         feedStageId: "",
         stageName: "",
         bagSizeKg: "",
-        bagsPurchased: "",
         unitPriceZmw: "",
-        purchaseDate: new Date().toISOString().split("T")[0],
-        notes: "",
       });
     }
     setPurchaseOpen(true);
@@ -159,6 +189,8 @@ export default function FeedCalculatorPage() {
       unitPriceZmw: String(p.unitPriceZmw),
       purchaseDate: new Date(p.purchaseDate).toISOString().split("T")[0],
       notes: p.notes || "",
+      supplierId: p.supplierId || "",
+      fulfillsFeedType: p.fulfillsFeedType || "",
     });
     setPurchaseOpen(true);
   }
@@ -175,6 +207,8 @@ export default function FeedCalculatorPage() {
         unitPriceZmw: Number(purchaseForm.unitPriceZmw),
         purchaseDate: purchaseForm.purchaseDate,
         notes: purchaseForm.notes || undefined,
+        supplierId: purchaseForm.supplierId || undefined,
+        fulfillsFeedType: purchaseForm.fulfillsFeedType || undefined,
       };
       if (editingPurchase) {
         await apiFetch(`/api/v1/feed-purchases/${editingPurchase.id}`, {
@@ -190,6 +224,7 @@ export default function FeedCalculatorPage() {
       setPurchaseOpen(false);
       loadProjection();
       loadPurchases();
+      loadBags();
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -203,8 +238,22 @@ export default function FeedCalculatorPage() {
       await apiFetch(`/api/v1/feed-purchases/${id}`, { method: "DELETE" });
       loadProjection();
       loadPurchases();
+      loadBags();
     } catch (e: any) {
       alert(e.message);
+    }
+  }
+
+  async function handleBagAction(bagId: string, action: "open" | "finish" | "reseal") {
+    setBagActionId(bagId);
+    try {
+      await apiFetch(`/api/v1/feed-bags/${bagId}/${action}`, { method: "POST", body: "{}" });
+      loadBags();
+      loadProjection();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBagActionId(null);
     }
   }
 
@@ -223,7 +272,7 @@ export default function FeedCalculatorPage() {
       {error && <div className="mb-4 p-4 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
       {/* Feed Projection & Procurement */}
-      {(projection || purchases.length > 0) && (
+      {(projection || purchases.length > 0 || bags.length > 0 || feedRecords.length > 0) && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -267,7 +316,12 @@ export default function FeedCalculatorPage() {
                         {purchases.map((p) => (
                           <TableRow key={p.id}>
                             <TableCell>{new Date(p.purchaseDate).toLocaleDateString()}</TableCell>
-                            <TableCell className="font-medium">{p.stageName}</TableCell>
+                            <TableCell className="font-medium">
+                              {p.stageName}
+                              {p.fulfillsFeedType && p.fulfillsFeedType !== p.stageName && (
+                                <span className="ml-1 text-xs text-muted-foreground">(→ {p.fulfillsFeedType})</span>
+                              )}
+                            </TableCell>
                             <TableCell>{p.bagSizeKg}kg</TableCell>
                             <TableCell className="text-right">{p.bagsPurchased}</TableCell>
                             <TableCell className="text-right">ZMW {Number(p.unitPriceZmw).toFixed(2)}</TableCell>
@@ -292,6 +346,96 @@ export default function FeedCalculatorPage() {
                       </TableBody>
                     </Table>
                   </div>
+            )}
+
+            {/* Loose feed records (kg entries recorded without a purchase) */}
+            {feedRecords.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold mb-2">Loose Feed Records ({feedRecords.length})</h4>
+                <p className="text-xs text-muted-foreground mb-2">Kg entries logged via the feed form — counted as secured feed but not tracked as bags.</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Brand</TableHead>
+                      <TableHead className="text-right">Kg</TableHead>
+                      <TableHead className="text-right">Cost</TableHead>
+                      <TableHead>Supplier</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {feedRecords.map((r: any) => (
+                      <TableRow key={r.id}>
+                        <TableCell>{new Date(r.recordDate).toLocaleDateString()}</TableCell>
+                        <TableCell className="font-medium capitalize">{r.feedType}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.feedBrand || "-"}</TableCell>
+                        <TableCell className="text-right">{Number(r.quantityKg).toFixed(1)}</TableCell>
+                        <TableCell className="text-right">ZMW {Number(r.costZmw || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.supplier?.name || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Bag stock — sealed / open / finished per stage */}
+            {bags.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold mb-2">Feed Stock — Bags ({bags.filter((b) => b.status !== "finished").length} in stock)</h4>
+                {bagSummary && bagSummary.stages.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {bagSummary.stages.map((s) => (
+                      <span key={s.stageName} className="text-xs border rounded-full px-3 py-1 bg-muted/50">
+                        {s.stageName}: <b>{s.sealed}</b> sealed · <b>{s.open}</b> open · <b>{s.finished}</b> finished
+                        {s.suppliers.length > 0 && <span className="text-muted-foreground"> ({s.suppliers.join(", ")})</span>}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Bag</TableHead>
+                      <TableHead>Stage</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Status</TableHead>
+                      {canEdit && <TableHead>Action</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bags.map((b) => (
+                      <TableRow key={b.id} className={b.status === "finished" ? "opacity-50" : ""}>
+                        <TableCell className="font-medium">#{b.bagIndex}</TableCell>
+                        <TableCell>{b.stageName}</TableCell>
+                        <TableCell>{b.bagSizeKg}kg</TableCell>
+                        <TableCell className="text-muted-foreground">{b.supplier?.name || "-"}</TableCell>
+                        <TableCell>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${b.status === "sealed" ? "bg-blue-100 text-blue-800" : b.status === "open" ? "bg-amber-100 text-amber-800" : "bg-gray-200 text-gray-600"}`}>
+                            {b.status}
+                          </span>
+                        </TableCell>
+                        {canEdit && (
+                          <TableCell>
+                            {b.status === "sealed" && (
+                              <Button variant="outline" size="sm" disabled={bagActionId === b.id} onClick={() => handleBagAction(b.id, "open")}>Open</Button>
+                            )}
+                            {b.status === "open" && (
+                              <div className="flex gap-1">
+                                <Button variant="outline" size="sm" disabled={bagActionId === b.id} onClick={() => handleBagAction(b.id, "finish")}>Finish</Button>
+                                <Button variant="ghost" size="sm" disabled={bagActionId === b.id} onClick={() => handleBagAction(b.id, "reseal")}>Reseal</Button>
+                              </div>
+                            )}
+                            {b.status === "finished" && <span className="text-xs text-muted-foreground">done</span>}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -367,6 +511,24 @@ export default function FeedCalculatorPage() {
           </DialogHeader>
           <div className="overflow-y-auto px-6 py-4 space-y-4">
             <div>
+              <Label>Supplier</Label>
+              <select
+                className="w-full border rounded-md p-2 bg-background text-foreground"
+                value={purchaseForm.supplierId}
+                onChange={(e) => setPurchaseForm({ ...purchaseForm, supplierId: e.target.value })}
+              >
+                <option value="">— No supplier —</option>
+                {suppliers.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              {purchaseForm.supplierId && flock?.supplierId && purchaseForm.supplierId !== flock.supplierId && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Buying from a different supplier — set &ldquo;Counts as&rdquo; below so the projection credits the right feed type.
+                </p>
+              )}
+            </div>
+            <div>
               <Label>Feed Stage</Label>
               <select
                 className="w-full border rounded-md p-2 bg-background text-foreground"
@@ -392,6 +554,20 @@ export default function FeedCalculatorPage() {
             <div>
               <Label>Stage Name</Label>
               <Input value={purchaseForm.stageName} onChange={(e) => setPurchaseForm({ ...purchaseForm, stageName: e.target.value })} disabled={!!purchaseForm.feedStageId} />
+            </div>
+            <div>
+              <Label>Counts as (feed type)</Label>
+              <select
+                className="w-full border rounded-md p-2 bg-background text-foreground"
+                value={purchaseForm.fulfillsFeedType}
+                onChange={(e) => setPurchaseForm({ ...purchaseForm, fulfillsFeedType: e.target.value })}
+              >
+                <option value="">Auto (match stage name)</option>
+                {projection?.types.map((t) => (
+                  <option key={t.typeName} value={t.typeName}>{t.typeName}</option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">Use when the bag&rsquo;s label doesn&rsquo;t match a projection type — e.g. another brand&rsquo;s starter.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

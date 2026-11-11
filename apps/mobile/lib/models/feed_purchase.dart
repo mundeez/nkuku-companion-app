@@ -5,6 +5,7 @@ class FeedPurchase {
   final String? supplierId;
   final String? supplierName;
   final String? stageName;
+  final String? fulfillsFeedType;
   final DateTime purchaseDate;
   final double bagSizeKg;
   final int bagsPurchased;
@@ -19,6 +20,7 @@ class FeedPurchase {
     this.supplierId,
     this.supplierName,
     this.stageName,
+    this.fulfillsFeedType,
     required this.purchaseDate,
     required this.bagSizeKg,
     required this.bagsPurchased,
@@ -35,6 +37,7 @@ class FeedPurchase {
       supplierId: json['supplierId'] ?? json['supplier_id'],
       supplierName: json['supplier']?['name'],
       stageName: json['stageName'] ?? json['stage_name'] ?? json['feedStage']?['stageName'],
+      fulfillsFeedType: json['fulfillsFeedType'] ?? json['fulfills_feed_type'],
       purchaseDate: DateTime.parse(json['purchaseDate'] ?? json['purchase_date']),
       bagSizeKg: _toDouble(json['bagSizeKg'] ?? json['bag_size_kg']) ?? 0,
       bagsPurchased: json['bagsPurchased'] ?? json['bags_purchased'] ?? 0,
@@ -54,6 +57,8 @@ class FeedPurchase {
       'unitPriceZmw': unitPriceZmw,
       if (feedStageId != null) 'feedStageId': feedStageId,
       if (supplierId != null) 'supplierId': supplierId,
+      if (fulfillsFeedType != null && fulfillsFeedType!.isNotEmpty)
+        'fulfillsFeedType': fulfillsFeedType,
       if (notes != null && notes!.isNotEmpty) 'notes': notes,
     };
   }
@@ -65,6 +70,7 @@ class FeedPurchase {
     String? supplierId,
     String? supplierName,
     String? stageName,
+    String? fulfillsFeedType,
     DateTime? purchaseDate,
     double? bagSizeKg,
     int? bagsPurchased,
@@ -79,6 +85,7 @@ class FeedPurchase {
       supplierId: supplierId ?? this.supplierId,
       supplierName: supplierName ?? this.supplierName,
       stageName: stageName ?? this.stageName,
+      fulfillsFeedType: fulfillsFeedType ?? this.fulfillsFeedType,
       purchaseDate: purchaseDate ?? this.purchaseDate,
       bagSizeKg: bagSizeKg ?? this.bagSizeKg,
       bagsPurchased: bagsPurchased ?? this.bagsPurchased,

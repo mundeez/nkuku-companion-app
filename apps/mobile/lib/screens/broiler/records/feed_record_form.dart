@@ -36,8 +36,11 @@ class _FeedRecordFormState extends State<FeedRecordForm> {
 
   String? _selectedSupplierId;
   String? _selectedFeedStageId;
+  String? _fulfillsFeedType;
   List<Supplier> _suppliers = [];
   List<FeedStage> _feedStages = [];
+  List<String> _projectionTypeNames = [];
+  String? _flockSupplierId;
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -56,6 +59,7 @@ class _FeedRecordFormState extends State<FeedRecordForm> {
       _purchaseDate = r.purchaseDate;
       _selectedSupplierId = r.supplierId;
       _selectedFeedStageId = r.feedStageId;
+      _fulfillsFeedType = r.fulfillsFeedType;
     }
   }
 
@@ -71,6 +75,10 @@ class _FeedRecordFormState extends State<FeedRecordForm> {
 
   Future<void> _loadData() async {
     try {
+      FeedProjection? projection;
+      try {
+        projection = await BroilerService.getFeedProjection(widget.flockId);
+      } catch (_) {}
       final results = await Future.wait([
         BroilerService.getSuppliers(),
         BroilerService.getFlock(widget.flockId),
@@ -100,6 +108,9 @@ class _FeedRecordFormState extends State<FeedRecordForm> {
         _suppliers = suppliers;
         _selectedSupplierId = initialSupplier;
         _feedStages = stages;
+        _flockSupplierId = flock.supplierId;
+        _projectionTypeNames =
+            (projection?.types ?? []).map((t) => t.typeName).toList();
         _loading = false;
       });
     } catch (e) {
@@ -260,6 +271,7 @@ class _FeedRecordFormState extends State<FeedRecordForm> {
         feedStageId: _selectedFeedStageId,
         supplierId: _selectedSupplierId,
         stageName: _stageNameController.text.trim(),
+        fulfillsFeedType: _fulfillsFeedType,
         purchaseDate: _purchaseDate,
         bagSizeKg: double.parse(_bagSizeController.text),
         bagsPurchased: int.parse(_bagsPurchasedController.text),
@@ -356,6 +368,34 @@ class _FeedRecordFormState extends State<FeedRecordForm> {
                           v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 12),
+
+                    // ── Counts as (projection attribution) ──
+                    if (_projectionTypeNames.isNotEmpty)
+                      DropdownButtonFormField<String?>(
+                        value: _fulfillsFeedType,
+                        decoration: InputDecoration(
+                          labelText: 'Counts as (feed type)',
+                          helperText:
+                              _selectedSupplierId != null &&
+                                      _flockSupplierId != null &&
+                                      _selectedSupplierId != _flockSupplierId
+                                  ? 'Different supplier — pick the feed type this fulfills'
+                                  : 'Leave on auto unless the label doesn\'t match',
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                              value: null,
+                              child: Text('Auto (match stage name)')),
+                          ..._projectionTypeNames.map((t) => DropdownMenuItem(
+                                value: t,
+                                child: Text(t),
+                              )),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _fulfillsFeedType = v),
+                      ),
+                    if (_projectionTypeNames.isNotEmpty)
+                      const SizedBox(height: 12),
 
                     // ── Bag size + Bags purchased ────────────
                     Row(
