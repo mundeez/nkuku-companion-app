@@ -372,7 +372,7 @@ class _FeedRecordFormState extends State<FeedRecordForm> {
                     // ── Counts as (projection attribution) ──
                     if (_projectionTypeNames.isNotEmpty)
                       DropdownButtonFormField<String?>(
-                        value: _fulfillsFeedType,
+                        initialValue: _fulfillsFeedType,
                         decoration: InputDecoration(
                           labelText: 'Counts as (feed type)',
                           helperText:

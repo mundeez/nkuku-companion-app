@@ -57,3 +57,4 @@ key.properties
 release.keystore
 *.jks
 *.tsbuildinfo
+backups/

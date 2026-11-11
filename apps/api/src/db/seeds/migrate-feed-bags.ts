@@ -88,52 +88,58 @@ async function main() {
     const unitPrice = conv.bags > 0 ? new Decimal(r.costZmw ?? 0).div(conv.bags) : new Decimal(0);
     const total = unitPrice.mul(conv.bags);
 
-    const purchase = await prisma.feedPurchase.create({
-      data: {
-        organizationId: r.flock.organizationId,
-        flockId: r.flockId,
-        supplierId: r.supplierId,
-        purchaseDate: r.recordDate,
-        stageName,
-        fulfillsFeedType: stageName,
-        bagSizeKg: conv.bagSize,
-        bagsPurchased: conv.bags,
-        unitPriceZmw: unitPrice.toDecimalPlaces(2).toNumber(),
-        totalCostZmw: total.toDecimalPlaces(2).toNumber(),
-        notes: r.notes ? `Converted from feed record: ${r.notes}` : `Converted from feed record (${r.feedBrand ?? 'unknown brand'})`,
-      },
-    });
-
-    // Materialize bags (finished if the flock is completed)
-    const finished = r.flock.status === 'completed';
-    await prisma.feedBag.createMany({
-      data: Array.from({ length: conv.bags }, (_, i) => ({
-        organizationId: r.flock.organizationId,
-        flockId: r.flockId,
-        purchaseId: purchase.id,
-        supplierId: r.supplierId,
-        stageName,
-        bagSizeKg: conv.bagSize,
-        bagIndex: i + 1,
-        status: finished ? ('finished' as const) : ('sealed' as const),
-        ...(finished ? { finishedAt: r.recordDate, openedAt: r.recordDate } : {}),
-      })),
-    });
-
-    // Re-point the financial record at the purchase (journal untouched)
-    if (existing) {
-      await prisma.financialRecord.update({
-        where: { id: existing.id },
+    // One conversion = one atomic unit. If anything fails mid-way the
+    // record stays a feed_record and the next run retries it cleanly —
+    // no partial purchase + orphaned bags can survive a crash.
+    const purchase = await prisma.$transaction(async (tx) => {
+      const p = await tx.feedPurchase.create({
         data: {
-          sourceTable: 'feed_purchases',
-          sourceRecordId: purchase.id,
-          description: `Feed Purchase: ${conv.bags} × ${conv.bagSize}kg ${stageName} bags`,
-          notes: `${existing.notes ?? ''} [relinked to purchase ${purchase.id}]`.trim(),
+          organizationId: r.flock.organizationId,
+          flockId: r.flockId,
+          supplierId: r.supplierId,
+          purchaseDate: r.recordDate,
+          stageName,
+          fulfillsFeedType: stageName,
+          bagSizeKg: conv.bagSize,
+          bagsPurchased: conv.bags,
+          unitPriceZmw: unitPrice.toDecimalPlaces(2).toNumber(),
+          totalCostZmw: total.toDecimalPlaces(2).toNumber(),
+          notes: r.notes ? `Converted from feed record: ${r.notes}` : `Converted from feed record (${r.feedBrand ?? 'unknown brand'})`,
         },
       });
-    }
 
-    await prisma.feedRecord.delete({ where: { id: r.id } });
+      // Materialize bags (finished if the flock is completed)
+      const finished = r.flock.status === 'completed';
+      await tx.feedBag.createMany({
+        data: Array.from({ length: conv.bags }, (_, i) => ({
+          organizationId: r.flock.organizationId,
+          flockId: r.flockId,
+          purchaseId: p.id,
+          supplierId: r.supplierId,
+          stageName,
+          bagSizeKg: conv.bagSize,
+          bagIndex: i + 1,
+          status: finished ? ('finished' as const) : ('sealed' as const),
+          ...(finished ? { finishedAt: r.recordDate, openedAt: r.recordDate } : {}),
+        })),
+      });
+
+      // Re-point the financial record at the purchase (journal untouched)
+      if (existing) {
+        await tx.financialRecord.update({
+          where: { id: existing.id },
+          data: {
+            sourceTable: 'feed_purchases',
+            sourceRecordId: p.id,
+            description: `Feed Purchase: ${conv.bags} × ${conv.bagSize}kg ${stageName} bags`,
+            notes: `${existing.notes ?? ''} [relinked to purchase ${p.id}]`.trim(),
+          },
+        });
+      }
+
+      await tx.feedRecord.delete({ where: { id: r.id } });
+      return p;
+    });
     converted++;
     console.log(`  converted ${r.id} → purchase ${purchase.id} (${conv.bags}×${conv.bagSize}kg ${stageName}, ${r.feedBrand})`);
   }

@@ -464,8 +464,9 @@ class BroilerService {
       queryParameters: {'flockId': flockId},
     );
     _assertOk(res);
-    if (res.data is Map && res.data['error'] != null)
+    if (res.data is Map && res.data['error'] != null) {
       throw BroilerServiceException(res.data['error']);
+    }
     return (res.data as List).map((e) => FeedBag.fromJson(e)).toList();
   }
 

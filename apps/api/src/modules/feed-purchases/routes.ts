@@ -193,63 +193,90 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
     const unitPriceZmw = data.unitPriceZmw !== undefined ? Number(data.unitPriceZmw) : Number(existing.unitPriceZmw);
     const totalCostZmw = new Decimal(bagsPurchased).mul(unitPriceZmw).toNumber();
 
-    // Reducing bagsPurchased: ensure enough sealed bags exist to remove,
-    // BEFORE touching the purchase row.
-    let removableBags: any[] = [];
-    if (data.bagsPurchased !== undefined && data.bagsPurchased < existing.bagsPurchased) {
-      const bagCount = await prisma.feedBag.count({ where: { purchaseId: id } });
-      const excess = bagCount - data.bagsPurchased;
-      if (excess > 0) {
-        removableBags = await prisma.feedBag.findMany({
-          where: { purchaseId: id, status: 'sealed' },
-          orderBy: { bagIndex: 'desc' },
-          take: excess,
+    // Reducing bagsPurchased must not remove bags already opened/finished,
+    // and the check+delete has to be atomic — a concurrent open/finish
+    // between the two would delete a consumed bag. Everything below runs
+    // inside one transaction; the deleteMany re-checks status='sealed' and
+    // the final count is re-verified, throwing to roll back on mismatch.
+    let updated: any;
+    try {
+      updated = await prisma.$transaction(async (tx: any) => {
+        let removableIds: string[] = [];
+        if (data.bagsPurchased !== undefined && data.bagsPurchased < existing.bagsPurchased) {
+          const bagCount = await tx.feedBag.count({ where: { purchaseId: id } });
+          const excess = bagCount - data.bagsPurchased;
+          if (excess > 0) {
+            const sealed = await tx.feedBag.findMany({
+              where: { purchaseId: id, status: 'sealed' },
+              orderBy: { bagIndex: 'desc' },
+              take: excess,
+              select: { id: true },
+            });
+            if (sealed.length < excess) {
+              const err: any = new Error('BAGS_ALREADY_CONSUMED');
+              err.remaining = sealed.length;
+              throw err;
+            }
+            removableIds = sealed.map((b: any) => b.id);
+          }
+        }
+
+        const row = await tx.feedPurchase.update({
+          where: { id },
+          data: {
+            feedStageId: data.feedStageId,
+            supplierId: data.supplierId,
+            purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
+            stageName: data.stageName,
+            fulfillsFeedType: data.fulfillsFeedType,
+            bagSizeKg: data.bagSizeKg,
+            bagsPurchased: data.bagsPurchased,
+            unitPriceZmw: data.unitPriceZmw,
+            totalCostZmw,
+            notes: data.notes,
+          },
         });
-        if (removableBags.length < excess) {
-          return reply.status(400).send({
-            error: 'BAGS_ALREADY_CONSUMED',
-            message: `Only ${removableBags.length} sealed bag(s) can be removed — the rest are already open/finished.`,
+
+        // Keep materialized bags in sync with the purchase.
+        if (data.bagsPurchased !== undefined && data.bagsPurchased !== existing.bagsPurchased) {
+          const bagCount = await tx.feedBag.count({ where: { purchaseId: id } });
+          if (data.bagsPurchased > bagCount) {
+            await materializeBags(tx, { ...row, bagsPurchased: data.bagsPurchased }, bagCount + 1);
+          } else if (removableIds.length) {
+            const del = await tx.feedBag.deleteMany({
+              where: { id: { in: removableIds }, status: 'sealed' },
+            });
+            if (del.count !== removableIds.length) {
+              // A bag flipped open/finished between select and delete —
+              // rolling back leaves purchase + bags untouched.
+              const err: any = new Error('BAGS_ALREADY_CONSUMED');
+              err.remaining = removableIds.length - del.count;
+              throw err;
+            }
+          }
+        }
+        // Denormalized bag fields describe the physical item — keep them current.
+        if (data.stageName !== undefined || data.bagSizeKg !== undefined || data.feedStageId !== undefined || data.supplierId !== undefined) {
+          await tx.feedBag.updateMany({
+            where: { purchaseId: id },
+            data: {
+              stageName: row.stageName,
+              bagSizeKg: row.bagSizeKg,
+              feedStageId: row.feedStageId,
+              supplierId: row.supplierId,
+            },
           });
         }
-      }
-    }
-
-    const updated = await prisma.feedPurchase.update({
-      where: { id },
-      data: {
-        feedStageId: data.feedStageId,
-        supplierId: data.supplierId,
-        purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
-        stageName: data.stageName,
-        fulfillsFeedType: data.fulfillsFeedType,
-        bagSizeKg: data.bagSizeKg,
-        bagsPurchased: data.bagsPurchased,
-        unitPriceZmw: data.unitPriceZmw,
-        totalCostZmw,
-        notes: data.notes,
-      },
-    });
-
-    // Keep materialized bags in sync with the purchase.
-    if (data.bagsPurchased !== undefined && data.bagsPurchased !== existing.bagsPurchased) {
-      const bagCount = await prisma.feedBag.count({ where: { purchaseId: id } });
-      if (data.bagsPurchased > bagCount) {
-        await materializeBags(prisma, { ...updated, bagsPurchased: data.bagsPurchased }, bagCount + 1);
-      } else if (removableBags.length) {
-        await prisma.feedBag.deleteMany({ where: { id: { in: removableBags.map((b: any) => b.id) } } });
-      }
-    }
-    // Denormalized bag fields describe the physical item — keep them current.
-    if (data.stageName !== undefined || data.bagSizeKg !== undefined || data.feedStageId !== undefined || data.supplierId !== undefined) {
-      await prisma.feedBag.updateMany({
-        where: { purchaseId: id },
-        data: {
-          stageName: updated.stageName,
-          bagSizeKg: updated.bagSizeKg,
-          feedStageId: updated.feedStageId,
-          supplierId: updated.supplierId,
-        },
+        return row;
       });
+    } catch (e: any) {
+      if (e?.message === 'BAGS_ALREADY_CONSUMED') {
+        return reply.status(400).send({
+          error: 'BAGS_ALREADY_CONSUMED',
+          message: `Only ${e.remaining ?? 0} sealed bag(s) can be removed — the rest are already open/finished.`,
+        });
+      }
+      throw e;
     }
 
     // Sync the linked FinancialRecord
@@ -305,6 +332,18 @@ export async function buildFeedPurchaseModule(app: FastifyInstance) {
     if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
 
     if (assertFlockNotCompleted(reply, existing.flock.status, (request as any).authUser?.role)) return;
+
+    // Consumed bags are the feed-consumption audit trail — refuse to delete
+    // a purchase once any of its bags have left the sealed state.
+    const consumed = await prisma.feedBag.count({
+      where: { purchaseId: id, status: { not: 'sealed' } },
+    });
+    if (consumed > 0) {
+      return reply.status(400).send({
+        error: 'BAGS_ALREADY_CONSUMED',
+        message: `${consumed} bag(s) are already open/finished — the purchase can no longer be deleted.`,
+      });
+    }
 
     // Delete the linked FinancialRecord
     const finRecord = await prisma.financialRecord.findFirst({
