@@ -37,7 +37,7 @@ export default function SuspendedPage() {
         </p>
         <div className="flex flex-col gap-2">
           <a
-            href="mailto:support@zeendeefood.solutions"
+            href="mailto:support@deeztechnology.solutions"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             Contact support

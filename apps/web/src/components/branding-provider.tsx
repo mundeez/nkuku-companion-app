@@ -23,7 +23,7 @@ const defaultBranding: BrandingConfig = {
   faviconUrl: "",
   supportEmail: "support@nkuku.app",
   supportPhone: "",
-  websiteUrl: "https://nkuku.zeendeefood.solutions",
+  websiteUrl: "https://nkuku.deeztechnology.solutions",
   isWhiteLabel: false,
 };
 

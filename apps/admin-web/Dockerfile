@@ -27,9 +27,9 @@ COPY apps/admin-web/src ./src
 
 # NEXT_PUBLIC_* vars are inlined at build time. ARG must be declared
 # before `pnpm run build` for the flag to take effect.
-ARG NEXT_PUBLIC_API_URL=https://nkuku.zeendeefood.solutions
+ARG NEXT_PUBLIC_API_URL=https://nkuku.deeztechnology.solutions
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ARG NEXT_PUBLIC_TENANT_APP_URL=https://nkuku.zeendeefood.solutions
+ARG NEXT_PUBLIC_TENANT_APP_URL=https://nkuku.deeztechnology.solutions
 ENV NEXT_PUBLIC_TENANT_APP_URL=${NEXT_PUBLIC_TENANT_APP_URL}
 
 RUN pnpm run build

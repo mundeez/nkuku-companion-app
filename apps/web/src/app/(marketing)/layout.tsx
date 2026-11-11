@@ -72,7 +72,7 @@ export default function MarketingLayout({
               </Link>
             ))}
             <a
-              href="mailto:nkuku@zeendeefood.solutions"
+              href="mailto:nkuku@deeztechnology.solutions"
               className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               Contact

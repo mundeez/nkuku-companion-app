@@ -14,7 +14,7 @@ Status: **APPROVED 2026-11-09** — all open points resolved below. Companion to
 | Tenant actions | Plan override/comp · suspend/reactivate · account support ops · GDPR org delete |
 | Content mgmt | Reference catalogue · plans & pricing · announcements · feature flags |
 | Ops & support | System health panel · support inbox · growth analytics · email/SMS log |
-| Surfaces | **Separate** admin web app (`admin.nkuku.zeendeefood.solutions`) **and** separate admin Flutter app, internal distribution only (Play internal track + sideload), full parity with web (phased) |
+| Surfaces | **Separate** admin web app (`admin.nkuku.deeztechnology.solutions`) **and** separate admin Flutter app, internal distribution only (Play internal track + sideload), full parity with web (phased) |
 | Order | Prerequisites → tenant ops → support/health → content/plans/flags → analytics → mobile admin app (trails each web phase) |
 
 ## 1. Findings that shape the plan
@@ -105,7 +105,7 @@ apps/
                   (/api/v1/admin/* kept for one release as aliases, then removed)
   web/            - app/(app)/admin/**    (removed once console live)
                   + impersonation banner + "acting as" handling
-  admin-web/      NEW Next.js app — admin.nkuku.zeendeefood.solutions (own cookie domain, own CSP)
+  admin-web/      NEW Next.js app — admin.nkuku.deeztechnology.solutions (own cookie domain, own CSP)
   admin-mobile/   NEW Flutter app — com.deeztechnologysolutions.nkukuadmin, own keystore,
                   Play internal track only, same API
   mobile/         + announcements banner, + maintenance-mode screen, + support "Contact us" form
@@ -262,7 +262,7 @@ typed confirmation · all staff endpoints rate-limited · CSP/HSTS on admin host
 
 1. Role matrix approved as written — `tenants.suspend` stays with finance, not support.
 2. Allowlist escape hatch **approved**: super_admin + TOTP may bypass the IP allowlist for 1 h (audited).
-3. Named super_admin to seed: **admin@zeendeefood.solutions**.
+3. Named super_admin to seed: **admin@deeztechnology.solutions**.
 4. Impersonation denylist **kept as designed** (assumption — §5 was left open in the approval):
    password/MFA/email changes, billing checkout & cancellation, org delete, member delete,
    journal reversal, nested impersonation. Extendable via `denyImpersonation` route tags.

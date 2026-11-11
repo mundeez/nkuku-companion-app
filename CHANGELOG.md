@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.51.1] — 2026-11-11
+
+### Domain revert — zeendeefood.solutions → deeztechnology.solutions
+
+- All app references reverted to `deeztechnology.solutions`: app host `nkuku.deeztechnology.solutions`, staff console `admin.nkuku.deeztechnology.solutions`, push server `ntfy.deeztechnology.solutions`, and all `@deeztechnology.solutions` email identities (staff login `admin@deeztechnology.solutions`, demo owner + SMTP sender `nkuku@deeztechnology.solutions`).
+- New nginx vhosts (conf.d, non-ISPConfig) + LE certs for all three hosts; GoDaddy A records created for `admin.nkuku` and `ntfy`.
+- `zeendeefood` vhosts left serving (no redirect) so deployed mobile builds keep working; `CORS_ORIGINS` allows both domains during transition. `SMTP_HOST` remains `mailguy.zeendeefood.solutions` (the mail server's TLS identity; mailbox verified to share credentials).
+
 ## [1.51.0] — 2026-11-11
 
 ### P3 — support, comms & operations console

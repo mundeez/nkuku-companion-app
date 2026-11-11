@@ -11,7 +11,7 @@
 
 | Topic | Decision |
 |---|---|
-| Production domain | `nkuku.zeendeefood.solutions` (+ `ntfy.zeendeefood.solutions`). Finish the cutover. |
+| Production domain | `nkuku.deeztechnology.solutions` (+ `ntfy.deeztechnology.solutions`). Finish the cutover. |
 | Sequencing | **Production foundation first**, then parity. Every parity change ships through CI + migrations. |
 | Sales filter gap | Both: (a) add filter/sort to the **mobile per-flock Sales tab**, and (b) **UX/bug audit** of existing filters on both platforms. |
 | Search scope | Flocks, Alerts, Suppliers, Vaccine inventory, Customers (sales), Journal, Users — all need server-side search + pagination first. |
@@ -24,7 +24,7 @@
 | P-2 maintenance window | **Approved.** Verified backup (pulled forward from P-3) is a hard prerequisite. |
 | Versioning | `v2.0.0-rc.*` after Workstream A; `v2.0.0` at store launch. |
 | Repo hygiene | **Approved:** historical plan `.md` → `docs/plans/`; APKs out of the repo. |
-| Marketing site | **Approved (2026-10-20):** `/` becomes a public product marketing page; dashboard moves to `/dashboard`; `/login` is the app entry. C-1 after P-1, C-2 after P-5. Logged-in visitors to `/` see marketing + "Go to dashboard". Contact: `nkuku@zeendeefood.solutions` + business WhatsApp (number TBD by user). Analytics: self-hosted Umami. Screenshot source: see Q-C4 (§7). |
+| Marketing site | **Approved (2026-10-20):** `/` becomes a public product marketing page; dashboard moves to `/dashboard`; `/login` is the app entry. C-1 after P-1, C-2 after P-5. Logged-in visitors to `/` see marketing + "Go to dashboard". Contact: `nkuku@deeztechnology.solutions` + business WhatsApp (number TBD by user). Analytics: self-hosted Umami. Screenshot source: see Q-C4 (§7). |
 
 ---
 
@@ -107,12 +107,12 @@ Only `sale-records`, `journal`, `ledger` support server-side `limit/offset`, `so
 Each milestone ends with the standard `phase-closeout` (rebuild → full tests → tag → release). Tags: `v1.31.0-alpha` … then `v2.0.0-rc.N` → `v2.0.0`.
 
 ### P-1 ✅ *(done)* — Domain cutover + repo hygiene  *(small)*
-- Commit the 7-file `zeendeefood.solutions` rename; grep for any remaining `deeztechnology` in code/docs/compose/`infra/`.
+- Commit the 7-file `deeztechnology.solutions` rename; grep for any remaining `deeztechnology` in code/docs/compose/`infra/`.
 - Delete 8 `*.bak-premove` files and the stray `{apps/` directory; move the 13 APKs out of the repo (they're gitignored but on disk) to `~/DevWorkz/nkuku-releases/`; move historical plan `.md` files into `docs/plans/` (keep `AGENTS.md`, `README.md`, `CHANGELOG.md`, this file in root).
-- ISPConfig: new vhost(s) for `nkuku.` and `ntfy.zeendeefood.solutions`, paste `infra/ispconfig/nginx-directives.conf`, enable Let's Encrypt; 301 from old domain for a transition window.
+- ISPConfig: new vhost(s) for `nkuku.` and `ntfy.deeztechnology.solutions`, paste `infra/ispconfig/nginx-directives.conf`, enable Let's Encrypt; 301 from old domain for a transition window.
 - Update `WEB_BASE_URL`, `CORS_ORIGINS`, `NTFY_BASE_URL` in prod `.env`; rebuild; verify `/health`, web 200, ntfy SSE, invite links, billing `redirectUrl` allow-list.
 - Rebuild release APK with new `APP_API_BASE_URL`; verify Android `network_security_config.xml`.
-- **Verify:** `curl https://nkuku.zeendeefood.solutions/health`; login on web + mobile; ntfy test publish.
+- **Verify:** `curl https://nkuku.deeztechnology.solutions/health`; login on web + mobile; ntfy test publish.
 
 ### P-2 ✅ *(done)* — Prisma migrations baseline + safe startup  *(medium, highest-risk item in the plan)*
 - Generate a **baseline migration** from the live prod schema (`prisma migrate diff --from-empty --to-schema-datamodel … --script` → `migrations/0_baseline/migration.sql`), append the hand-written SQL (`journal-immutability.sql`, `documents-search.sql`, `multi-tenancy-foundation.sql` where still applicable) as subsequent migrations, then `prisma migrate resolve --applied 0_baseline` on prod and dev DBs.
@@ -212,8 +212,8 @@ Single long-form page at `/` (SSG, no client data fetching except the pricing bl
 - SEO: `metadata` export (title/description/canonical/OG/Twitter using existing `og-image.png`), `app/sitemap.ts`, `app/robots.ts` (disallow `/dashboard`, `/admin`, `/billing`, `/ledger`, `/broiler-flocks`…), JSON-LD `SoftwareApplication` + `Organization`, `<html lang="en">`.
 - Performance: static render, `next/image` for screenshots (AVIF/WebP), no QueryProvider/IndexedDB on marketing routes, Lighthouse ≥ 90 on Performance/SEO/Accessibility/Best-practices (mobile preset) as the acceptance bar.
 - Branding: reads the same `BrandingConfig` so a white-labelled host (if marketing is enabled) shows its own name/logo/colour.
-- Analytics: **self-hosted Umami** (approved) — `umami` service in `docker-compose.prod.yml` (own Postgres schema on the nkuku DB or a small sidecar DB), proxied at `analytics.zeendeefood.solutions` via ISPConfig; tracking script only on `(marketing)` routes, never inside the app; cookie-less so no consent banner.
-- Contact: `nkuku@zeendeefood.solutions` (mailto) + WhatsApp click-to-chat (`wa.me/<number>`, number TBD) in header CTA area and footer; enterprise "Talk to us" form posts to the same mailbox via the existing nodemailer transport.
+- Analytics: **self-hosted Umami** (approved) — `umami` service in `docker-compose.prod.yml` (own Postgres schema on the nkuku DB or a small sidecar DB), proxied at `analytics.deeztechnology.solutions` via ISPConfig; tracking script only on `(marketing)` routes, never inside the app; cookie-less so no consent banner.
+- Contact: `nkuku@deeztechnology.solutions` (mailto) + WhatsApp click-to-chat (`wa.me/<number>`, number TBD) in header CTA area and footer; enterprise "Talk to us" form posts to the same mailbox via the existing nodemailer transport.
 - Accessibility: semantic landmarks, keyboard-navigable carousel/accordion, contrast checked in both themes.
 - Tests: Playwright smoke (sections present, CTAs route correctly, pricing block renders plans from API), Lighthouse CI step in `ci.yml` for `/`.
 
@@ -248,7 +248,7 @@ Single long-form page at `/` (SSG, no client data fetching except the pricing bl
 - [ ] Supply/approve legal copy: Terms, Privacy, Refund policy, Data-protection notice (engineering provides drafts/placeholders).
 - [ ] Google Play Console developer account; Apple Developer Program enrolment; access to a macOS build machine or approval for GH macOS runners.
 - [ ] Sentry account (free tier is fine) and uptime monitor account.
-- [ ] Confirm ISPConfig access for the two new vhosts and DNS for `zeendeefood.solutions`.
+- [ ] Confirm ISPConfig access for the two new vhosts and DNS for `deeztechnology.solutions`.
 
 ---
 
@@ -256,7 +256,7 @@ Single long-form page at `/` (SSG, no client data fetching except the pricing bl
 
 All questions are **resolved** (recorded in §0).
 
-- **Q-C4 — resolved (a):** a dedicated **demo organisation on production** ("Nkuku Demo Farm", free tier, owned by `nkuku@zeendeefood.solutions`) seeded with fictional flocks/feed/sales/ledger data, used for marketing screenshots, as a live demo login for prospects, and as the target for post-deploy Playwright smoke tests. Requires `Organization.isDemo` flag (excluded from admin MRR/churn metrics, billing cron, and ad serving) — added in C-2. Real flocks are never touched (AGENTS.md rule).
+- **Q-C4 — resolved (a):** a dedicated **demo organisation on production** ("Nkuku Demo Farm", free tier, owned by `nkuku@deeztechnology.solutions`) seeded with fictional flocks/feed/sales/ledger data, used for marketing screenshots, as a live demo login for prospects, and as the target for post-deploy Playwright smoke tests. Requires `Organization.isDemo` flag (excluded from admin MRR/churn metrics, billing cron, and ad serving) — added in C-2. Real flocks are never touched (AGENTS.md rule).
 
 **Pending inputs (non-blocking):** business WhatsApp number for the marketing page (placeholder until supplied).
 
@@ -281,6 +281,6 @@ Workstreams A (P-4…P-6), B (M-1…M-5) and C-2 can run interleaved once P-3 is
 1. `docker compose down && docker compose up --build -d` (data preserved)
 2. API: `pnpm lint && pnpm typecheck && pnpm test` (≥330 passing, +new)
 3. Web: `pnpm lint && pnpm typecheck && pnpm build` (+Playwright smoke from P-3 onward)
-4. Mobile: `flutter analyze && flutter test && flutter build apk --release --dart-define=APP_API_BASE_URL=https://nkuku.zeendeefood.solutions`
+4. Mobile: `flutter analyze && flutter test && flutter build apk --release --dart-define=APP_API_BASE_URL=https://nkuku.deeztechnology.solutions`
 5. Manual: never modify existing real flocks — create test flocks/orgs (AGENTS.md rule)
 6. `phase-closeout`: changelog, version bump (api/web/mobile in lockstep), tag, GitHub Release

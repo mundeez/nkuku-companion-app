@@ -238,11 +238,11 @@ At each milestone conclusion:
 3. `git tag vX.Y.Z-phase-N` and push
 4. Create GitHub Release with auto-generated notes
 
-## Production Deployment at nkuku.zeendeefood.solutions
+## Production Deployment at nkuku.deeztechnology.solutions
 
 ### Prerequisites
 - VPS with Docker + Docker Compose installed
-- ISPConfig managing the domain `nkuku.zeendeefood.solutions`
+- ISPConfig managing the domain `nkuku.deeztechnology.solutions`
 - Git cloned to `/var/www/nkuku` (or your preferred path)
 
 ### Step 1 — Environment
@@ -266,25 +266,25 @@ curl -s http://127.0.0.1:30000 | head -c 100
 
 ### Step 4 — ISPConfig Nginx Directives
 In ISPConfig:
-1. Go to **Sites** → `nkuku.zeendeefood.solutions`
+1. Go to **Sites** → `nkuku.deeztechnology.solutions`
 2. Open the **Options** tab
 3. Paste the contents of `infra/ispconfig/nginx-directives.conf` into the **nginx Directives** field
 4. Save and wait for ISPConfig to rewrite the vhost (or run `ispconfig_update.sh`)
 
 ### Step 5 — SSL (Let's Encrypt)
 In ISPConfig:
-1. Go to **Sites** → `nkuku.zeendeefood.solutions` → **SSL**
+1. Go to **Sites** → `nkuku.deeztechnology.solutions` → **SSL**
 2. Enable **SSL** and **Let's Encrypt**
 3. Save — ISPConfig will request and install the certificate automatically
 
 The directives already include `X-Forwarded-Proto` so the backend correctly detects HTTPS.
 
 ### DNS, ntfy host and ISPConfig automation (verified 2026-10-21)
-- Public DNS for `zeendeefood.solutions` is at GoDaddy. The API PAT lives in `~/.config/devin/godaddy.env`
-  (single raw token). Use `Authorization: Bearer <token>` against `https://api.godaddy.com/v1/domains/zeendeefood.solutions/records`
+- Public DNS for `deeztechnology.solutions` is at GoDaddy. The API PAT lives in `~/.config/devin/godaddy.env`
+  (single raw token). Use `Authorization: Bearer <token>` against `https://api.godaddy.com/v1/domains/deeztechnology.solutions/records`
   — the legacy `sso-key` header style returns 401 for PAT tokens. Add records with
   `PATCH .../records` and a JSON array body.
-- `ntfy.zeendeefood.solutions` is ISPConfig site id 16 (proxies to `127.0.0.1:30085`), Let's Encrypt enabled.
+- `ntfy.deeztechnology.solutions` is ISPConfig site id 16 (proxies to `127.0.0.1:30085`), Let's Encrypt enabled.
 - ISPConfig remote API helper: `php ~/.godaddy_devin/ispc-api.php <function> '<json>'`
   (e.g. `sites_web_domain_get '{"primary_id":16}'`, `sites_web_domain_update '{"client_id":0,"primary_id":16,"params":{...}}'`).
   ISPConfig's cron applies changes within ~60 s; LE certs land in `/var/www/clients/client1/web<N>/ssl/`.
@@ -306,7 +306,7 @@ flutter build ios --debug --dart-define=APP_API_BASE_URL=http://localhost:30001
 **Production build**
 ```bash
 cd apps/mobile
-flutter build apk --release --dart-define=APP_API_BASE_URL=https://nkuku.zeendeefood.solutions
+flutter build apk --release --dart-define=APP_API_BASE_URL=https://nkuku.deeztechnology.solutions
 ```
 
 ### Updates (subsequent deploys)

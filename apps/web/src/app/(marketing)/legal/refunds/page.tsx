@@ -18,7 +18,7 @@ export default function RefundsPage() {
           contact us and we will resolve it promptly.</li>
       </ul>
       <h2>How to request</h2>
-      <p>Email <a href="mailto:nkuku@zeendeefood.solutions">nkuku@zeendeefood.solutions</a>
+      <p>Email <a href="mailto:nkuku@deeztechnology.solutions">nkuku@deeztechnology.solutions</a>
         with your organisation name and invoice number. Approved refunds return via the
         original payment method within 10 business days.</p>
     </>

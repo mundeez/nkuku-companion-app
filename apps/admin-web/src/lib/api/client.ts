@@ -10,9 +10,9 @@
 // (components/reauth-modal.tsx) opens the modal and retries.
 
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://nkuku.zeendeefood.solutions";
+  process.env.NEXT_PUBLIC_API_URL || "https://nkuku.deeztechnology.solutions";
 export const TENANT_APP_URL =
-  process.env.NEXT_PUBLIC_TENANT_APP_URL || "https://nkuku.zeendeefood.solutions";
+  process.env.NEXT_PUBLIC_TENANT_APP_URL || "https://nkuku.deeztechnology.solutions";
 
 export const PLATFORM_BASE = "/api/v1/platform";
 export const ADMIN_BASE = "/api/v1/admin"; // legacy surface kept as fallback

@@ -56,7 +56,7 @@ services:
       OWNER_EMAIL: ${OWNER_EMAIL}
       OWNER_PASSWORD: ${OWNER_PASSWORD}
       CORS_ORIGINS: ${CORS_ORIGINS}
-      NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.zeendeefood.solutions}
+      NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.deeztechnology.solutions}
       NTFY_DEFAULT_TOPIC: ${NTFY_DEFAULT_TOPIC:-nkuku-alerts}
       NTFY_AUTH_TOKEN: ${NTFY_AUTH_TOKEN:-}
       # ── S3 / MinIO object storage ──
@@ -126,7 +126,7 @@ services:
     restart: unless-stopped
 
   # Platform staff console (P2, super-admin) — separate Next.js app served
-  # at admin.nkuku.zeendeefood.solutions via ISPConfig nginx. Staff auth +
+  # at admin.nkuku.deeztechnology.solutions via ISPConfig nginx. Staff auth +
   # TOTP + IP allowlist enforced by the API; this is presentation only.
   admin-web:
     build:
@@ -134,14 +134,14 @@ services:
       dockerfile: apps/admin-web/Dockerfile
       target: production
       args:
-        NEXT_PUBLIC_API_URL: https://nkuku.zeendeefood.solutions
-        NEXT_PUBLIC_TENANT_APP_URL: https://nkuku.zeendeefood.solutions
+        NEXT_PUBLIC_API_URL: https://nkuku.deeztechnology.solutions
+        NEXT_PUBLIC_TENANT_APP_URL: https://nkuku.deeztechnology.solutions
     environment:
       NODE_ENV: production
       # Standalone server.js listens on PORT (default 3000)
       PORT: 3003
-      NEXT_PUBLIC_API_URL: https://nkuku.zeendeefood.solutions
-      NEXT_PUBLIC_TENANT_APP_URL: https://nkuku.zeendeefood.solutions
+      NEXT_PUBLIC_API_URL: https://nkuku.deeztechnology.solutions
+      NEXT_PUBLIC_TENANT_APP_URL: https://nkuku.deeztechnology.solutions
     # Bind to localhost only — ISPConfig nginx proxies in from the outside
     ports:
       - "127.0.0.1:30030:3003"
@@ -155,7 +155,7 @@ services:
     image: binwiederhier/ntfy:v2.11.0
     command: ["serve"]
     environment:
-      NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.zeendeefood.solutions}
+      NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.deeztechnology.solutions}
       NTFY_CACHE_FILE: "/var/cache/ntfy/cache.db"
       NTFY_ATTACHMENT_CACHE_DIR: "/var/cache/ntfy/attachments"
       # Access control: deny everything by default; anonymous read is granted

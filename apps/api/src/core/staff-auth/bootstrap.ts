@@ -1,7 +1,7 @@
 // ── PLATFORM STAFF BOOTSTRAP ─────────────────────────────
 // On API start, if there are zero StaffUser rows, create the initial
 // super_admin account (PLATFORM_SUPER_ADMIN_EMAIL, default
-// admin@zeendeefood.solutions) with a random one-time password logged
+// admin@deeztechnology.solutions) with a random one-time password logged
 // ONCE to stderr (and mailed when SMTP is configured). totpEnabledAt is
 // left null so the first login is forced through TOTP enrolment.
 // Idempotent: does nothing once any staff row exists.
@@ -11,9 +11,9 @@ import type { PrismaClient } from '@prisma/client';
 import { hashPassword } from './staff-auth.service.js';
 import { sendStaffInviteEmail } from '../security/email.service.js';
 
-export const DEFAULT_PLATFORM_ADMIN_EMAIL = 'admin@zeendeefood.solutions';
+export const DEFAULT_PLATFORM_ADMIN_EMAIL = 'admin@deeztechnology.solutions';
 export const PLATFORM_CONSOLE_BASE_URL =
-  process.env.PLATFORM_CONSOLE_BASE_URL || 'https://admin.nkuku.zeendeefood.solutions';
+  process.env.PLATFORM_CONSOLE_BASE_URL || 'https://admin.nkuku.deeztechnology.solutions';
 
 interface Logger {
   info: (msg: string) => void;

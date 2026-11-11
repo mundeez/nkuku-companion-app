@@ -21,7 +21,7 @@ Play Console checklist:
 - **Data safety**: collects email/phone/name; financial data; encrypted in
   transit; **deletion path**: in-app Settings → Delete organization
   (30-day purge) — declare it
-- **Privacy policy URL**: `https://nkuku.zeendeefood.solutions/legal/privacy`
+- **Privacy policy URL**: `https://nkuku.deeztechnology.solutions/legal/privacy`
 - Content rating questionnaire, target API level current
 - Track: internal → closed → production
 - Build the store APK/AAB with default `--dart-define=APP_STORE_MODE=link`

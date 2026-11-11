@@ -12,8 +12,8 @@ env_get() { grep -E "^$1=" "$REPO_ROOT/.env" 2>/dev/null | tail -1 | cut -d= -f2
 NTFY_BASE_URL="$(env_get NTFY_BASE_URL)"
 NTFY_AUTH_TOKEN="$(env_get NTFY_AUTH_TOKEN)"
 
-BASE="${NKUKU_UPTIME_BASE:-https://nkuku.zeendeefood.solutions}"
-NTFY="${NTFY_BASE_URL:-https://ntfy.zeendeefood.solutions}"
+BASE="${NKUKU_UPTIME_BASE:-https://nkuku.deeztechnology.solutions}"
+NTFY="${NTFY_BASE_URL:-https://ntfy.deeztechnology.solutions}"
 TOPIC="${NTFY_OPS_TOPIC:-nkuku-alerts}"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/nkuku-uptime"
 mkdir -p "$STATE_DIR"

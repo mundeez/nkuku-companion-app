@@ -192,7 +192,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="border-t p-3 text-[11px] text-muted-foreground">
-          admin.nkuku.zeendeefood.solutions
+          admin.nkuku.deeztechnology.solutions
         </div>
       </aside>
 

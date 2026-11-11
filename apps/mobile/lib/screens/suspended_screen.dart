@@ -40,10 +40,10 @@ class SuspendedScreen extends StatelessWidget {
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: () => launchUrl(
-                      Uri.parse('mailto:support@zeendeefood.solutions'),
+                      Uri.parse('mailto:support@deeztechnology.solutions'),
                     ),
                     icon: const Icon(Icons.mail_outline),
-                    label: const Text('Contact support@zeendeefood.solutions'),
+                    label: const Text('Contact support@deeztechnology.solutions'),
                   ),
                 ),
                 const SizedBox(height: 8),

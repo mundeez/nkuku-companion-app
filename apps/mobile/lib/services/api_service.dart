@@ -8,12 +8,12 @@ import 'billing_url.dart';
 ///
 /// Development (Android emulator):  --dart-define=APP_API_BASE_URL=http://10.0.2.2:30001
 /// Development (iOS simulator):     --dart-define=APP_API_BASE_URL=http://localhost:30001
-/// Production:                      --dart-define=APP_API_BASE_URL=https://nkuku.zeendeefood.solutions
+/// Production:                      --dart-define=APP_API_BASE_URL=https://nkuku.deeztechnology.solutions
 ///
 /// NOTE: Do NOT append "/api" here — route paths already include "/api/v1/...".
 const String _baseUrl = String.fromEnvironment(
   'APP_API_BASE_URL',
-  defaultValue: 'https://nkuku.zeendeefood.solutions',
+  defaultValue: 'https://nkuku.deeztechnology.solutions',
 );
 
 /// Parsed body of an HTTP 402 (PLAN_LIMIT_REACHED) response.

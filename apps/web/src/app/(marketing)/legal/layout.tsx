@@ -6,7 +6,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
       {children}
       <p className="mt-12 text-sm text-muted-foreground">
         Questions? Contact us at{" "}
-        <a className="underline" href="mailto:nkuku@zeendeefood.solutions">nkuku@zeendeefood.solutions</a>.
+        <a className="underline" href="mailto:nkuku@deeztechnology.solutions">nkuku@deeztechnology.solutions</a>.
         Last updated: October 2026.
       </p>
     </main>

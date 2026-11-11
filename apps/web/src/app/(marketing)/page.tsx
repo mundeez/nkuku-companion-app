@@ -202,7 +202,7 @@ export default function MarketingPage() {
             <Link href="/signup" className="rounded-lg bg-primary px-8 py-3 font-medium text-primary-foreground hover:opacity-90">
               Create account
             </Link>
-            <a href="mailto:nkuku@zeendeefood.solutions" className="rounded-lg border px-8 py-3 font-medium hover:bg-accent">
+            <a href="mailto:nkuku@deeztechnology.solutions" className="rounded-lg border px-8 py-3 font-medium hover:bg-accent">
               Talk to us
             </a>
           </div>

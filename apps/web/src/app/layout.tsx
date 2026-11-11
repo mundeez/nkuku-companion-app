@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Nkuku Companion App",
   description: "Broiler chicken production management",
-  metadataBase: new URL("https://nkuku.zeendeefood.solutions"),
+  metadataBase: new URL("https://nkuku.deeztechnology.solutions"),
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "48x48" },
