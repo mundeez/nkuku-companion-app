@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.51.0] — 2026-11-11
+
+### P3 — support, comms & operations console
+
+**Support tickets (tenant web + mobile):**
+- Tenant "Contact support" create/list/reply/close; app version (`1.51.0+153`)
+  and device info captured on every ticket; per-user rate limits; internal
+  staff notes hidden from tenants.
+- Admin console `/support` inbox: filters/search/assignment/status, thread view,
+  staff replies + internal notes, and impersonate-from-ticket.
+
+**Comms log:**
+- All outbound email routed through a comms-logging `deliver()` service.
+- Admin `/comms` viewer with channel/status/org/date filters, error inspection,
+  and resend-with-verbatim-body (reauth-gated).
+
+**Health & ops:**
+- `GET /platform/health` aggregates DB/Redis/MinIO/ClamAV/disk/uptime/
+  cron-freshness/DB-size/backup-marker into a RAG status.
+- Admin `/health` dashboard with auto-refresh, cron "run now", and
+  maintenance-mode toggle (both reauth-gated).
+
+**Cron registry & platform flags:**
+- `CronRun` tracking for `scheduled_reports`, `daily_recalc`, `billing_daily`,
+  and `tenant_purge` via the cron registry.
+- Maintenance mode platform flag returns `503 MAINTENANCE_MODE` on tenant routes
+  (auth and staff paths are unaffected); tenant web `/maintenance` page and
+  mobile maintenance screen; 10 s cache invalidated on write.
+- Staff alerts via ntfy topic `platform-ops` for new P1 tickets, cron failures,
+  red health, and payment-verification failures (consumed by admin-mobile in P6).
+
+**Database:**
+- New tables: `support_tickets`, `ticket_messages`, `comms_log`, `cron_runs`,
+  `platform_flags` (migration `20261112000000_p3_support_comms`).
+
+**Fixed:**
+- admin-web audit tables now render the nested `actor` object returned by the
+  API instead of treating it as a string (previously crashed with React #31,
+  `68663ca`).
+
+**Verification:**
+- 465/465 isolated tests, clean typecheck, all builds green.
+
 ## [1.50.0] — 2026-11-10
 
 ### Platform staff console — tenant operations (P2 of PLAN-super-admin-console)

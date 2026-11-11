@@ -6,11 +6,11 @@ import 'api_service.dart';
 /// (tenant JWT). The mobile app mirrors the web /support page.
 class SupportService {
   /// App version — keep in sync with `version:` in pubspec.yaml
-  /// (`1.50.0+152`). Sent as `x-app-version` on new tickets so staff know
+  /// (`1.51.0+153`). Sent as `x-app-version` on new tickets so staff know
   /// which build a report came from. package_info_plus is only a
   /// transitive dep (via sentry_flutter), so we use a constant instead of
   /// adding it as a direct dependency.
-  static const String appVersion = '1.50.0+152';
+  static const String appVersion = '1.51.0+153';
 
   /// `x-device-info` header — OS + version, e.g. "android Linux 5.x…".
   static String get deviceInfo =>
