@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.52.0] — 2026-11-11
+
+### Feed bag lifecycle + multi-supplier procurement
+
+**FeedBag lifecycle (`/api/v1/feed-bags`):**
+- New `FeedBag` model with statuses `sealed` → `open` → `finished`, materialized
+  from `FeedPurchase` records.
+- Endpoints for list, create, open, consume, finish, and delete with status
+  transition validation.
+- Loose `feed_records` are reconciled against finished bags; `looseRecord`
+  attribution is preserved where no bag exists.
+
+**Multi-supplier procurement:**
+- `FeedPurchase.fulfillsFeedType` lets a purchase explicitly fulfill one feed
+  type independent of supplier configuration, fixing projection attribution when
+  the same type is bought from different suppliers.
+- `FeedBag` creation resolves the target type from `fulfillsFeedType` (or
+  supplier fallback) and the chosen bag size.
+
+**Web + mobile UI:**
+- Supplier/type pickers on both platforms use the new `fulfillsFeedType` flow.
+- Flock Feed tab and `/feed` page show a dedicated **loose records** section.
+- Bag stock card displays sealed / open / finished counts and available feed
+  per type.
+
+**Security + data hardening:**
+- Transactional bag removal reverts feed records and journal impact atomically.
+- `DELETE /api/v1/feed-bags/:id` guard prevents removing consumed bags except
+  by the owner.
+- Atomic backfill converted 83 bags and 18 loose records without orphaning
+  purchases or journals.
+
+**Fixed:**
+- `JournalSourceType.feed_purchase` repair: 8 missing journal entries posted for
+  historical feed purchases that were not auto-journaled.
+
 ## [1.51.1] — 2026-11-11
 
 ### Domain revert — zeendeefood.solutions → deeztechnology.solutions
