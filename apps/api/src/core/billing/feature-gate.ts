@@ -7,6 +7,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
 import { getEffectivePlanCode, getEffectivePlanLimits, getOrCreateSubscription } from './billing.service.js';
 import { hasFeature, getPlan } from './plans.js';
+import { getPlanByCode } from './plan-store.js';
 import { hasActiveAddon } from './addons.js';
 
 /**
@@ -16,7 +17,10 @@ import { hasActiveAddon } from './addons.js';
  */
 export async function shouldShowAds(prisma: PrismaClient, organizationId: string): Promise<boolean> {
   const planCode = await getEffectivePlanCode(prisma, organizationId);
-  if (planCode !== 'free') return false;
+  // Ads are shown on the entry tier only ('basic' — the retired 'free'
+  // resolves to it via PLAN_CODE_ALIASES). Trial is ad-free: it's a
+  // sales funnel, not an ad surface.
+  if (planCode !== 'basic') return false;
   const adsRemoved = await hasActiveAddon(prisma, organizationId, 'remove_ads_addon');
   return !adsRemoved;
 }
@@ -80,7 +84,7 @@ export function requireFeature(feature: string) {
       ? limits.features.includes(feature)
       : hasFeature(planCode, feature);
     if (!enabled) {
-      const plan = getPlan(planCode);
+      const plan = (await getPlanByCode(prisma, planCode)) ?? getPlan(planCode);
       return reply.status(402).send({
         error: 'PLAN_LIMIT_REACHED',
         message: `This feature requires a higher plan. Your current plan (${plan?.name}) does not include "${feature}".`,
@@ -101,7 +105,7 @@ export async function checkFlockLimit(request: FastifyRequest, reply: FastifyRep
   if (!prisma || !organizationId) return;
 
   const planCode = await getEffectivePlanCode(prisma, organizationId);
-  const plan = getPlan(planCode);
+  const plan = (await getPlanByCode(prisma, planCode)) ?? getPlan(planCode);
   if (!plan) return;
 
   const limits = await getEffectivePlanLimits(prisma, organizationId);
@@ -134,7 +138,7 @@ export async function checkUserLimit(request: FastifyRequest, reply: FastifyRepl
   if (!prisma || !organizationId) return;
 
   const planCode = await getEffectivePlanCode(prisma, organizationId);
-  const plan = getPlan(planCode);
+  const plan = (await getPlanByCode(prisma, planCode)) ?? getPlan(planCode);
   if (!plan) return;
 
   const limits = await getEffectivePlanLimits(prisma, organizationId);
@@ -173,7 +177,7 @@ export async function checkDocumentLimit(
   currentDocCount: number,
 ): Promise<{ allowed: boolean; reason?: string; currentPlan?: string }> {
   const planCode = await getEffectivePlanCode(prisma, organizationId);
-  const plan = getPlan(planCode);
+  const plan = (await getPlanByCode(prisma, planCode)) ?? getPlan(planCode);
   if (!plan) return { allowed: false, reason: 'Unknown plan' };
 
   const limits = await getEffectivePlanLimits(prisma, organizationId);
@@ -201,7 +205,7 @@ export async function checkDocumentLimit(
  */
 export async function getPlanLimitsForOrg(prisma: PrismaClient, organizationId: string) {
   const planCode = await getEffectivePlanCode(prisma, organizationId);
-  const plan = getPlan(planCode);
+  const plan = (await getPlanByCode(prisma, planCode)) ?? getPlan(planCode);
   const sub = await getOrCreateSubscription(prisma, organizationId);
   const limits = await getEffectivePlanLimits(prisma, organizationId);
 

@@ -147,7 +147,8 @@ describe('Platform tenant ops (P2)', () => {
   describe('POST /tenants/:id/override', () => {
     it('comps the org to business — effectivePlanCode flips', async () => {
       const before = await get(`/api/v1/platform/tenants/${orgId}`, superToken);
-      expect(before.data.organization.effectivePlanCode).toBe('free');
+      // P4: fresh signups start on 'trial' (was 'free' pre-P4)
+      expect(before.data.organization.effectivePlanCode).toBe('trial');
 
       const res = await post(
         `/api/v1/platform/tenants/${orgId}/override`,

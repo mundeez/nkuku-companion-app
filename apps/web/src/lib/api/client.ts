@@ -17,8 +17,18 @@ export class ApiRequestError extends Error {
 }
 
 function notifyIfPlanLimit(status: number, body: any) {
-  if (typeof window !== "undefined" && status === 402 && body?.error === "PLAN_LIMIT_REACHED") {
+  if (typeof window === "undefined" || status !== 402) return;
+  if (body?.error === "PLAN_LIMIT_REACHED") {
     window.dispatchEvent(new CustomEvent("nkuku:plan-limit", { detail: body }));
+  } else if (
+    body?.code === "SUBSCRIPTION_REQUIRED" ||
+    body?.error === "SUBSCRIPTION_REQUIRED"
+  ) {
+    // P4: mutations on a locked org return 402 {code:'SUBSCRIPTION_REQUIRED'}.
+    // UpgradePromptProvider listens and surfaces a friendly prompt.
+    window.dispatchEvent(
+      new CustomEvent("nkuku:subscription-required", { detail: body })
+    );
   }
 }
 
@@ -552,6 +562,115 @@ export async function subscribeToAddon(code: string) {
 
 export async function cancelAddonApi(code: string) {
   return apiFetch<{ success: boolean }>(`/api/v1/billing/addons/${code}/cancel`, {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+// ── Organization access state (P4) ──
+
+export type OrgAccessState = "active" | "trialing" | "locked";
+
+export type OrgAccess = {
+  state: OrgAccessState;
+  planCode: "trial" | "basic" | "grower" | "business" | "enterprise" | string;
+  planName: string;
+  trialEndsAt: string | null;
+  daysLeftInTrial: number | null;
+  showAds: boolean;
+};
+
+/**
+ * Fetch the organization's access state.
+ *
+ * Primary: GET /api/v1/organizations/me/access (P4 contract). If that route
+ * isn't deployed yet (404), falls back to GET /api/v1/billing/subscription
+ * and maps its fields onto the same shape.
+ */
+export async function getOrgAccess(): Promise<OrgAccess> {
+  try {
+    return await apiFetch<OrgAccess>("/api/v1/organizations/me/access");
+  } catch (err) {
+    if (!(err instanceof ApiRequestError) || err.status !== 404) throw err;
+  }
+  // Fallback: derive access state from the existing billing status endpoint.
+  const sub = await apiFetch<{
+    planCode: string;
+    planName: string;
+    status: string;
+    trialEndsAt: string | null;
+    adsShown?: boolean;
+  }>("/api/v1/billing/subscription");
+  const trialEndsAt = sub.trialEndsAt ?? null;
+  const daysLeftInTrial =
+    sub.status === "trialing" && trialEndsAt
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(trialEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+          )
+        )
+      : null;
+  const state: OrgAccessState =
+    sub.status === "trialing"
+      ? "trialing"
+      : sub.status === "active"
+      ? "active"
+      : "locked";
+  return {
+    state,
+    planCode: sub.planCode,
+    planName: sub.planName,
+    trialEndsAt,
+    daysLeftInTrial,
+    showAds: sub.adsShown === true,
+  };
+}
+
+// ── Feature flags (P4) ──
+
+/**
+ * Per-user feature flags: GET /api/v1/me/flags → { [flagKey]: boolean }.
+ * Returns an empty map when the endpoint isn't available so callers can
+ * safely default to "flag off". Wire UI behind `useMyFlags()` (hooks.ts).
+ */
+export async function getMyFlags(): Promise<Record<string, boolean>> {
+  try {
+    const data = await apiFetch<Record<string, boolean> | { flags?: Record<string, boolean> }>(
+      "/api/v1/me/flags",
+    );
+    const flags = (data as { flags?: Record<string, boolean> })?.flags ?? data;
+    return flags && typeof flags === "object" ? (flags as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+// ── Announcements (P4) ──
+
+export type AnnouncementSeverity = "info" | "warning" | "critical";
+
+export type Announcement = {
+  id: string;
+  title: string;
+  body: string;
+  severity: AnnouncementSeverity;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  isDismissible: boolean;
+};
+
+export async function getActiveAnnouncements(): Promise<Announcement[]> {
+  const data = await apiFetch<Announcement[] | { items?: Announcement[] }>(
+    "/api/v1/announcements/active",
+  );
+  return Array.isArray(data) ? data : (data?.items ?? []);
+}
+
+export async function dismissAnnouncement(id: string) {
+  return apiFetch<void>(`/api/v1/announcements/${id}/dismiss`, {
     method: "POST",
     body: "{}",
   });

@@ -48,6 +48,9 @@ import { sendStaffInviteEmail } from '../../core/security/email.service.js';
 import { PLATFORM_CONSOLE_BASE_URL } from '../../core/staff-auth/bootstrap.js';
 import { buildPlatformTenantsModule } from './tenants.js';
 import { buildPlatformSupportModule } from './support.js';
+import { buildPlatformPlansModule } from './plans-admin.js';
+import { buildPlatformFlagsAnnouncementsModule } from './flags-announcements.js';
+import { buildPlatformCatalogueModule } from './catalogue.js';
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -695,4 +698,9 @@ export async function buildPlatformModule(app: FastifyInstance) {
 
   // ── P3: support inbox / comms log / health / ops actions ──
   await app.register(buildPlatformSupportModule);
+
+  // ── P4: plans & pricing admin, feature flags, announcements, catalogue ──
+  await app.register(buildPlatformPlansModule);
+  await app.register(buildPlatformFlagsAnnouncementsModule);
+  await app.register(buildPlatformCatalogueModule);
 }

@@ -56,6 +56,24 @@ describe('Advertising (Phase 4b)', () => {
     const regular = await registerUser(`regular-${Date.now()}`);
     regularToken = regular.accessToken;
     regularOrgId = regular.organization.id;
+
+    // P4: new signups land on 'trial' (ad-free). The ad-serving tests
+    // need the org on the entry tier — flip its trial sub to an active
+    // 'basic' row (the tier that carries ads; 'free' is a retired alias).
+    const sub = await prisma.subscription.findFirst({
+      where: { organizationId: regularOrgId, status: { in: ['trialing', 'active'] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (sub) {
+      await prisma.subscription.update({
+        where: { id: sub.id },
+        data: { planCode: 'basic', status: 'active', trialEndsAt: null },
+      });
+    }
+    await prisma.organization.update({
+      where: { id: regularOrgId },
+      data: { planCode: 'basic' },
+    });
   });
 
   afterAll(async () => {
@@ -162,7 +180,7 @@ describe('Advertising (Phase 4b)', () => {
   });
 
   describe('GET /ads/serve — house ad selection', () => {
-    it('serves the house ad to a Free-tier org on a matching page/placement', async () => {
+    it('serves the house ad to a Basic-tier org on a matching page/placement', async () => {
       const { status, data } = await authedRequest('/api/v1/ads/serve?page=dashboard&placement=banner', {}, regularToken);
       expect(status).toBe(200);
       expect(data.source).toBe('house');
@@ -187,7 +205,8 @@ describe('Advertising (Phase 4b)', () => {
       expect(status).toBe(200);
       expect(data.source).toBe('none');
 
-      // Downgrade back to free for subsequent tests
+      // Downgrade back to the entry tier (cancel lands on basic @ K0
+      // priceOverride — still an ad surface) for subsequent tests
       const cancelResult = await authedRequest('/api/v1/billing/cancel', { method: 'POST', body: '{}' }, regularToken);
       expect(cancelResult.status).toBe(200);
     });
@@ -283,10 +302,10 @@ describe('Advertising (Phase 4b)', () => {
       const { data: serveData } = await authedRequest('/api/v1/ads/serve?page=dashboard&placement=banner', {}, regularToken);
       expect(serveData.source).toBe('none');
 
-      // The org's actual plan must remain "free" — add-ons must never
+      // The org's actual plan must remain "basic" — add-ons must never
       // overwrite the org's plan tier.
       const { data: subData } = await authedRequest('/api/v1/billing/subscription', {}, regularToken);
-      expect(subData.planCode).toBe('free');
+      expect(subData.planCode).toBe('basic');
       expect(subData.addons.remove_ads_addon).toBe(true);
 
       await authedRequest('/api/v1/billing/addons/remove_ads_addon/cancel', { method: 'POST', body: '{}' }, regularToken);

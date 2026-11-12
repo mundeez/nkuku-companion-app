@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import '../models/announcement.dart';
 import '../models/dashboard_summary.dart';
+import '../services/announcement_service.dart';
+import '../services/billing_service.dart';
 import '../services/dashboard_service.dart';
+import '../services/flags_service.dart';
+import '../widgets/announcement_banner.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/ad_slot.dart';
+import '../widgets/trial_badge.dart';
 import 'alerts_screen.dart';
+import 'locked_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -19,10 +26,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _loading = true;
   String? _error;
 
+  // P4 tenant surfaces: platform announcements + org access state
+  // (trial badge / subscription lock).
+  List<Announcement> _announcements = const [];
+  OrgAccess? _access;
+
   @override
   void initState() {
     super.initState();
     _loadSummary();
+    _loadTenantSurface();
+  }
+
+  /// Fetch announcements, org access state and feature flags. All three
+  /// degrade silently — a failure must never block the dashboard.
+  Future<void> _loadTenantSurface() async {
+    // Fire-and-forget: cache the flags for any UI that consults them.
+    FlagsService.refresh();
+    final results = await Future.wait([
+      AnnouncementService.getActive(),
+      BillingService.getAccess(),
+    ]);
+    if (!mounted) return;
+    final access = results[1] as OrgAccess?;
+    setState(() {
+      _announcements = results[0] as List<Announcement>;
+      _access = access;
+    });
+    // Locked org → route to the lock screen (same shape as the
+    // suspended/maintenance flows). Mutations are also covered by the
+    // 402 SUBSCRIPTION_REQUIRED interceptor → LockedScreen.
+    if (access != null && access.isLocked) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LockedScreen()),
+        (route) => false,
+      );
+    }
+  }
+
+  Future<void> _dismissAnnouncement(Announcement a) async {
+    setState(() {
+      _announcements =
+          _announcements.where((x) => x.id != a.id).toList();
+    });
+    // Best-effort — the card is already hidden locally.
+    await AnnouncementService.dismiss(a.id);
   }
 
   Future<void> _loadSummary({bool forceRefresh = false}) async {
@@ -71,7 +119,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => _loadSummary(forceRefresh: true),
+        onRefresh: () async {
+          _loadTenantSurface();
+          await _loadSummary(forceRefresh: true);
+        },
         child: _buildBody(theme),
       ),
     );
@@ -123,6 +174,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // P4: trial badge + platform announcements above the KPIs.
+        if (_access?.isTrialing == true) ...[
+          TrialBadge(access: _access!),
+          const SizedBox(height: 12),
+        ],
+        for (final a in _announcements) ...[
+          AnnouncementCard(
+            announcement: a,
+            onDismissed: () => _dismissAnnouncement(a),
+          ),
+          const SizedBox(height: 12),
+        ],
         _KpiGrid(kpis: k),
         const SizedBox(height: 16),
         const AdSlot(page: 'dashboard'),

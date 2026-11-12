@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authenticate, requireRole, denyImpersonation } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
-import { SELF_SERVE_PLANS, getPlan, type PlanCode } from '../../core/billing/plans.js';
+import { getPlan, type PlanCode } from '../../core/billing/plans.js';
+import { getSelfServePlans } from '../../core/billing/plan-store.js';
 import {
   getSubscriptionInfo,
   subscribeToPlan,
@@ -15,8 +16,12 @@ import { allProvidersMock } from '../../core/billing/providers/index.js';
 import { getPlanLimitsForOrg, shouldShowAds } from '../../core/billing/feature-gate.js';
 import { ADDONS, hasActiveAddon, subscribeToAddon, cancelAddon, type AddonCode } from '../../core/billing/addons.js';
 
+// P4: 'free' stays in the enum for back-compat — it aliases to 'basic'
+// inside subscribeToPlan. 'trial' is auto-assigned at signup (not
+// purchasable); 'enterprise' is sales-assisted. Both are additionally
+// rejected by the isSelfServe check even if bypassed via aliases.
 const SubscribeSchema = z.object({
-  planCode: z.enum(['free', 'grower', 'business']),
+  planCode: z.enum(['free', 'basic', 'grower', 'business']),
   billingCycle: z.enum(['monthly', 'cycle_3mo', 'annual']).default('monthly'),
   // Mobile-money operator for ZMW push collections (lenco provider)
   momoOperator: z.enum(['mtn', 'airtel', 'zamtel']).optional(),
@@ -46,16 +51,20 @@ function validateRedirectUrl(redirectUrl: string | undefined): string | null {
 export async function buildBillingModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
 
-  // ── GET /plans — list all self-serve plans with pricing ──
+  // ── GET /plans — list self-serve plans with pricing ──
+  // P4: DB-backed via plan-store (staff edits at /platform/plans apply);
+  // 'trial' and 'enterprise' are excluded by isSelfServe.
   app.get('/plans', async () => {
+    const plans = await getSelfServePlans(prisma);
     return {
-      plans: SELF_SERVE_PLANS.map((p) => ({
+      plans: plans.map((p) => ({
         code: p.code,
         name: p.name,
         description: p.description,
         pricing: p.pricing,
         limits: p.limits,
         isSelfServe: p.isSelfServe,
+        sortOrder: p.sortOrder,
       })),
     };
   });
@@ -189,13 +198,15 @@ export async function buildBillingModule(app: FastifyInstance) {
     }
   });
 
-  // ── POST /cancel — cancel subscription (downgrade to free) ──
+  // ── POST /cancel — cancel subscription (downgrade to basic @ K0) ──
   // denyImpersonation: cancellation is on the P2 impersonation denylist.
+  // P4: lands on 'basic' with priceOverride=0 — same "free forever"
+  // semantics the old 'free' tier had.
   app.post('/cancel', { preHandler: [authenticate, denyImpersonation, requireRole('owner')] }, async (request, reply) => {
     const organizationId = getOrganizationId(request);
     try {
       const result = await cancelSubscription(prisma, organizationId);
-      return { success: true, subscription: result, message: 'Subscription cancelled. You have been moved to the Free plan.' };
+      return { success: true, subscription: result, message: 'Subscription cancelled. You have been moved to the Basic plan (no charge).' };
     } catch (err: any) {
       return reply.status(400).send({ error: err.message || 'CANCEL_FAILED' });
     }

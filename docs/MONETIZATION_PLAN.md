@@ -8,10 +8,13 @@ Status: **Approved — executing.** Locked 2026-08-06.
 
 | Tier | Target | ZMW | BWP | USD | Limits |
 |---|---|---|---|---|---|
-| **Free** | Smallholders / trial | K0 | P0 | $0 | 1 active flock, 1 user, 2 cycles of history, core tracking (growth/feed/water/mortality/vaccination), disease DB, basic alerts, no financial ledger/exports |
+| **Trial** | All new signups | K0 (14 days) | P0 | $0 | Business-level features for 14 days, then read-only lock until a plan is chosen. No permanent free tier (retired 2026-11-11). |
+| **Basic** | Smallholders graduating from trial | K150/mo (K400/3-mo cycle) | P55/mo (P150/cycle) | $8/mo ($22/cycle) | 12 active flocks, 1 user, core tracking + basic income/expense records, disease DB, basic alerts, no double-entry ledger/exports/documents |
 | **Grower** | Small commercial farmers | K250/mo (K650/3-mo cycle) | P95/mo (P250/cycle) | $12/mo ($32/cycle) | Unlimited flocks/cycles, financial dashboard, double-entry ledger, document attachments, full alerts, 2 users |
-| **Business** | Multi-site / larger operations | K800/mo (K2,100/cycle) | P300/mo (P800/cycle) | $40/mo ($105/cycle) | Everything in Grower + multi-site, up to 5 users, GAAP statements, CSV/PDF export, API access, priority support |
-| **Enterprise / White-label** | Agribusiness, co-ops, NGOs, feed companies | Custom quote | Custom quote | Custom quote | Unlimited users, white-label branding, dedicated onboarding, SLA, optional self-hosted deployment/license |
+| **Business** | Multi-site / larger operations | K800/mo (K2,100/cycle) | P300/mo (P800/cycle) | $40/mo ($105/cycle) | Everything in Grower + multi-site, up to 5 users, GAAP statements, CSV/PDF export, priority support |
+| **Enterprise / White-label** | Agribusiness, co-ops, NGOs, feed companies | Custom quote | Custom quote | Custom quote | Unlimited users, API access, white-label branding, dedicated onboarding, SLA, optional self-hosted deployment/license |
+
+> **Amended 2026-11-11 (P4):** five-tier model replaces the original four. `free` retired → new `trial` (14-day Business-level) + `basic` (K150, 12 flocks/1 user). `api_access` moved from Business to Enterprise. Legacy `free` orgs migrate to `basic` with `priceOverride=0` (grandfathered). Suspended/expired subscriptions get read-only lock (`402 SUBSCRIPTION_REQUIRED`).
 
 - Billing cadence: monthly or per-3-month-production-cycle (farmer's choice); cycle billing carries a discount (~13%, "2 months free" pattern matched to industry norm).
 - Currency is fixed per organization's home country (not live FX) to avoid farmer confusion — matches CoopSense/Farmwise practice. Additional country price rows added on demand (start: Zambia/ZMW, Botswana/BWP, generic/USD).

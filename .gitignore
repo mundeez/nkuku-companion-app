@@ -58,3 +58,4 @@ release.keystore
 *.jks
 *.tsbuildinfo
 backups/
+nkuku-releases/

@@ -7,7 +7,7 @@ import { getBillingPlans } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Zap, Crown, Loader2 } from "lucide-react";
+import { Check, X, Zap, Crown, Loader2, Sparkles, Building2, Sprout } from "lucide-react";
 
 interface Plan {
   code: string;
@@ -23,7 +23,25 @@ interface Plan {
   isSelfServe: boolean;
 }
 
-const PLAN_ICONS: Record<string, any> = { free: Check, grower: Zap, business: Crown };
+const PLAN_ICONS: Record<string, any> = {
+  trial: Sparkles,
+  basic: Sprout,
+  grower: Zap,
+  business: Crown,
+  enterprise: Building2,
+  // Legacy code kept so pre-P4 API responses still render sanely.
+  free: Check,
+};
+
+// trial → basic → grower → business → enterprise
+const PLAN_ORDER: Record<string, number> = {
+  trial: 0,
+  free: 0,
+  basic: 1,
+  grower: 2,
+  business: 3,
+  enterprise: 4,
+};
 
 const FEATURE_NAMES: Record<string, string> = {
   financial_dashboard: "Financial dashboard",
@@ -44,7 +62,13 @@ export default function PricingPage() {
 
   useEffect(() => {
     getBillingPlans()
-      .then((data) => setPlans(data.plans as Plan[]))
+      .then((data) =>
+        setPlans(
+          [...(data.plans as Plan[])].sort(
+            (a, b) => (PLAN_ORDER[a.code] ?? 99) - (PLAN_ORDER[b.code] ?? 99)
+          )
+        )
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -53,8 +77,8 @@ export default function PricingPage() {
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold mb-3">Simple, transparent pricing</h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Start free with core flock tracking. Upgrade as your farm grows — no hidden fees,
-          cancel anytime.
+          Start with a 14-day free trial at Business level. Pick a plan as your farm grows —
+          no hidden fees, cancel anytime.
         </p>
       </div>
 
@@ -63,11 +87,11 @@ export default function PricingPage() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-3 xl:grid-cols-5">
           {plans.map((plan) => {
             const Icon = PLAN_ICONS[plan.code] || Check;
             const price = plan.pricing.monthly?.ZMW ?? 0;
-            const isFree = plan.code === "free";
+            const isFreeTier = plan.code === "trial" || plan.code === "free";
             return (
               <Card key={plan.code} className={`relative ${plan.code === "grower" ? "border-primary" : ""}`}>
                 {plan.code === "grower" && (
@@ -85,9 +109,17 @@ export default function PricingPage() {
                 <CardContent>
                   <div className="mb-4">
                     <span className="text-3xl font-bold">
-                      {isFree ? "Free" : `ZMW ${price.toLocaleString()}`}
+                      {isFreeTier
+                        ? "Free"
+                        : price === 0
+                        ? "Custom"
+                        : `ZMW ${price.toLocaleString()}`}
                     </span>
-                    {!isFree && <span className="text-sm text-muted-foreground ml-1">/ month</span>}
+                    {isFreeTier ? (
+                      <span className="text-sm text-muted-foreground ml-1">14-day trial</span>
+                    ) : (
+                      price > 0 && <span className="text-sm text-muted-foreground ml-1">/ month</span>
+                    )}
                   </div>
                   <ul className="space-y-2 text-sm mb-6">
                     <FeatureRow
@@ -102,18 +134,26 @@ export default function PricingPage() {
                       included
                       text={plan.limits.maxUsers === -1 ? "Unlimited users" : `${plan.limits.maxUsers} user${plan.limits.maxUsers !== 1 ? "s" : ""}`}
                     />
-                    {isFree && <FeatureRow included={false} text="Ad-free experience" />}
-                    {isFree && <FeatureRow included={false} text="Financial dashboard & ledger" />}
-                    {!isFree &&
+                    {isFreeTier && <FeatureRow included={false} text="Ad-free experience" />}
+                    {isFreeTier && <FeatureRow included={false} text="Financial dashboard & ledger" />}
+                    {!isFreeTier &&
                       plan.limits.features
                         .filter((f) => FEATURE_NAMES[f])
                         .map((f) => <FeatureRow key={f} included text={FEATURE_NAMES[f]} />)}
                   </ul>
-                  <Link href={user ? "/billing" : "/signup"}>
-                    <Button className="w-full" variant={plan.code === "grower" ? "default" : "outline"}>
-                      {user ? "Manage plan" : isFree ? "Start free" : `Get ${plan.name}`}
-                    </Button>
-                  </Link>
+                  {plan.isSelfServe === false ? (
+                    <a href="mailto:nkuku@deeztechnology.solutions?subject=Enterprise%20plan%20enquiry">
+                      <Button className="w-full" variant="outline">
+                        Contact sales
+                      </Button>
+                    </a>
+                  ) : (
+                    <Link href={user ? "/billing" : "/signup"}>
+                      <Button className="w-full" variant={plan.code === "grower" ? "default" : "outline"}>
+                        {user ? "Manage plan" : isFreeTier ? "Start free trial" : `Get ${plan.name}`}
+                      </Button>
+                    </Link>
+                  )}
                 </CardContent>
               </Card>
             );

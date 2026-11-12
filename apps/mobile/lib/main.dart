@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'screens/locked_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/maintenance_screen.dart';
 import 'screens/suspended_screen.dart';
@@ -8,6 +9,7 @@ import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
 import 'services/connectivity_service.dart';
+import 'services/flags_service.dart';
 import 'services/offline_repository.dart';
 import 'services/sync_service.dart';
 import 'database/app_database.dart';
@@ -59,6 +61,7 @@ class _NkukuAppState extends State<NkukuApp> {
     AuthService.addAuthStateListener(_onAuthChanged);
     ApiService.onAuthFailure = _onAuthFailure;
     ApiService.onPlanLimitReached = _onPlanLimitReached;
+    ApiService.onSubscriptionRequired = _onSubscriptionRequired;
     ApiService.onOrgSuspended = _onOrgSuspended;
     ApiService.onMaintenanceMode = _onMaintenanceMode;
     if (AuthService.isLoggedIn) {
@@ -77,6 +80,7 @@ class _NkukuAppState extends State<NkukuApp> {
         NotificationService.startListening();
       } else {
         NotificationService.stop();
+        FlagsService.clear();
       }
     }
   }
@@ -96,6 +100,19 @@ class _NkukuAppState extends State<NkukuApp> {
     final ctx = ApiService.navigatorKey.currentContext;
     if (ctx != null) {
       UpgradeSheet.show(ctx, info);
+    }
+  }
+
+  /// HTTP 402 {code:'SUBSCRIPTION_REQUIRED'} (P4) — the org's subscription
+  /// ended and mutations are blocked. Route to the lock screen; the
+  /// session itself stays valid for billing/auth routes.
+  void _onSubscriptionRequired() {
+    final ctx = ApiService.navigatorKey.currentContext;
+    if (ctx != null) {
+      Navigator.of(ctx).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LockedScreen()),
+        (route) => false,
+      );
     }
   }
 
@@ -131,6 +148,7 @@ class _NkukuAppState extends State<NkukuApp> {
     AuthService.removeAuthStateListener(_onAuthChanged);
     ApiService.onAuthFailure = null;
     ApiService.onPlanLimitReached = null;
+    ApiService.onSubscriptionRequired = null;
     ApiService.onOrgSuspended = null;
     ApiService.onMaintenanceMode = null;
     super.dispose();

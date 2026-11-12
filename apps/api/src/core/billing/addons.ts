@@ -41,7 +41,9 @@ export const ADDONS: Record<AddonCode, Addon> = {
     pricing: {
       monthly: { ZMW: 40, BWP: 15, USD: 2 },
     },
-    eligiblePlans: ['free'],
+    // 'free' covers un-migrated legacy rows; 'basic' is its canonical
+    // replacement (free→basic alias, P4). Trial/paid tiers never see ads.
+    eligiblePlans: ['free', 'basic'],
   },
 };
 

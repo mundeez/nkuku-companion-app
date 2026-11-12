@@ -213,7 +213,7 @@ describe('Platform support / comms / health (P3)', () => {
       expect(res.status).toBe(200);
       expect(res.data.ticket.id).toBe(ticketId);
       expect(res.data.organization.name).toContain('P3 Farm');
-      expect(res.data.organization.planCode).toBe('free');
+      expect(res.data.organization.planCode).toBe('trial');
       expect(res.data.organization.suspended).toBe(false);
       expect(res.data.requester.email).toBe(ownerEmail);
       expect(res.data.messages).toHaveLength(1);

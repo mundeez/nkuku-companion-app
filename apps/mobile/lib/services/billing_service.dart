@@ -26,6 +26,7 @@ class SubscriptionInfo {
   final int activeFlocks;
   final int users;
   final bool adsShown;
+  final DateTime? trialEndsAt;
 
   const SubscriptionInfo({
     required this.planCode,
@@ -36,6 +37,7 @@ class SubscriptionInfo {
     required this.activeFlocks,
     required this.users,
     required this.adsShown,
+    this.trialEndsAt,
   });
 
   factory SubscriptionInfo.fromJson(Map<String, dynamic> json) {
@@ -44,8 +46,8 @@ class SubscriptionInfo {
     final usage = (json['usage'] as Map?)?.cast<String, dynamic>() ??
         const <String, dynamic>{};
     return SubscriptionInfo(
-      planCode: json['planCode']?.toString() ?? 'free',
-      planName: json['planName']?.toString() ?? 'Free',
+      planCode: json['planCode']?.toString() ?? 'trial',
+      planName: json['planName']?.toString() ?? 'Trial',
       // `subscriptionStatus` comes from getPlanLimitsForOrg; `status` from
       // getSubscriptionInfo — they carry the same value.
       status: (json['subscriptionStatus'] ?? json['status'])?.toString() ??
@@ -55,6 +57,7 @@ class SubscriptionInfo {
       activeFlocks: (usage['activeFlocks'] as num?)?.toInt() ?? 0,
       users: (usage['users'] as num?)?.toInt() ?? 0,
       adsShown: json['adsShown'] == true,
+      trialEndsAt: DateTime.tryParse(json['trialEndsAt']?.toString() ?? ''),
     );
   }
 
@@ -65,7 +68,102 @@ class SubscriptionInfo {
       (limits['maxDocumentsPerRecord'] as num?)?.toInt() ?? -1;
 }
 
+/// Organization access state (P4), as returned by
+/// `GET /api/v1/organizations/me/access`:
+/// ```
+/// { state: 'active'|'trialing'|'locked', planCode, planName,
+///   trialEndsAt, daysLeftInTrial, showAds }
+/// ```
+/// `planCode` is one of 'trial'|'basic'|'grower'|'business'|'enterprise'
+/// in the P4 tier model ('free' is retired).
+class OrgAccess {
+  /// 'active' | 'trialing' | 'locked'
+  final String state;
+  final String planCode;
+  final String planName;
+  final DateTime? trialEndsAt;
+  final int? daysLeftInTrial;
+  final bool showAds;
+
+  const OrgAccess({
+    required this.state,
+    required this.planCode,
+    required this.planName,
+    this.trialEndsAt,
+    this.daysLeftInTrial,
+    required this.showAds,
+  });
+
+  bool get isTrialing => state == 'trialing';
+  bool get isLocked => state == 'locked';
+
+  factory OrgAccess.fromJson(Map<String, dynamic> json) {
+    return OrgAccess(
+      state: json['state']?.toString() ?? 'active',
+      planCode: json['planCode']?.toString() ?? 'trial',
+      planName: json['planName']?.toString() ?? '',
+      trialEndsAt:
+          DateTime.tryParse(json['trialEndsAt']?.toString() ?? ''),
+      daysLeftInTrial: (json['daysLeftInTrial'] as num?)?.toInt(),
+      showAds: json['showAds'] == true,
+    );
+  }
+
+  /// Derive an equivalent object from the legacy
+  /// `GET /api/v1/billing/subscription` payload when the P4 access route
+  /// isn't deployed.
+  factory OrgAccess.fromSubscription(SubscriptionInfo sub) {
+    int? daysLeft;
+    if (sub.status == 'trialing' && sub.trialEndsAt != null) {
+      final ms = sub.trialEndsAt!.difference(DateTime.now()).inMilliseconds;
+      daysLeft = ms <= 0 ? 0 : (ms / 86400000).ceil();
+    }
+    return OrgAccess(
+      state: sub.status == 'trialing'
+          ? 'trialing'
+          : sub.status == 'active'
+              ? 'active'
+              : 'locked',
+      planCode: sub.planCode,
+      planName: sub.planName,
+      trialEndsAt: sub.trialEndsAt,
+      daysLeftInTrial: daysLeft,
+      showAds: sub.adsShown,
+    );
+  }
+}
+
 class BillingService {
+  /// Fetch the organization's access state.
+  ///
+  /// Primary: `GET /api/v1/organizations/me/access` (P4 contract). If that
+  /// route isn't deployed yet (404), falls back to
+  /// `GET /api/v1/billing/subscription` and maps its fields onto the same
+  /// shape. Returns null on any other failure — callers should degrade
+  /// (treat as active) rather than lock the UI on a flaky network.
+  static Future<OrgAccess?> getAccess() async {
+    try {
+      final res =
+          await ApiService.dio.get('/api/v1/organizations/me/access');
+      if (res.statusCode == 404) {
+        // Route not deployed yet — derive from billing subscription.
+        final sub = await getSubscription();
+        return sub == null ? null : OrgAccess.fromSubscription(sub);
+      }
+      if (res.statusCode == null || res.statusCode! >= 400) {
+        return null;
+      }
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        return null;
+      }
+      return OrgAccess.fromJson(data);
+    } catch (e) {
+      log('Failed to load org access state: $e', name: 'BillingService');
+      return null;
+    }
+  }
+
   /// Fetch the organization's current subscription. Returns null on any
   /// failure (offline, 4xx, malformed body) — callers should degrade to a
   /// "could not load" state rather than block the UI.

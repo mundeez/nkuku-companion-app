@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Check, X, Zap, Crown, Loader2, ShieldOff } from "lucide-react";
+import { CreditCard, Check, X, Zap, Crown, Loader2, ShieldOff, Sparkles, Building2 } from "lucide-react";
 
 interface Plan {
   code: string;
@@ -67,10 +67,29 @@ const CYCLE_LABELS: Record<BillingCycle, string> = {
 };
 
 const PLAN_ICONS: Record<string, any> = {
-  free: Check,
+  trial: Sparkles,
+  basic: Check,
   grower: Zap,
   business: Crown,
+  enterprise: Building2,
+  // Legacy code kept so pre-P4 API responses still render sanely.
+  free: Check,
 };
+
+// Display order for the tier cards — trial → basic → grower → business →
+// enterprise. Unknown codes sort to the end alphabetically.
+const PLAN_ORDER: Record<string, number> = {
+  trial: 0,
+  free: 0,
+  basic: 1,
+  grower: 2,
+  business: 3,
+  enterprise: 4,
+};
+
+function planSortValue(code: string): number {
+  return PLAN_ORDER[code] ?? 99;
+}
 
 export function BillingSettings() {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -94,7 +113,11 @@ export function BillingSettings() {
         getInvoices().catch(() => []),
         getAddons().catch(() => ({ addons: [] })),
       ]);
-      setPlans(plansData.plans);
+      setPlans(
+        [...plansData.plans].sort(
+          (a, b) => planSortValue(a.code) - planSortValue(b.code)
+        )
+      );
       setSubscription(subData);
       setInvoices(invoicesData);
       setAddons(addonsData.addons);
@@ -123,7 +146,7 @@ export function BillingSettings() {
   }
 
   async function handleAddonCancel(code: string) {
-    if (!confirm("Remove this add-on? Ads will resume on your Free plan.")) return;
+    if (!confirm("Remove this add-on? Ads will resume on your current plan.")) return;
     setActionLoading(`cancel-${code}`);
     setError(null);
     try {
@@ -144,7 +167,7 @@ export function BillingSettings() {
       if (result.checkout?.paymentLink) {
         window.location.href = result.checkout.paymentLink;
       } else {
-        // Free plan — no checkout needed
+        // Zero-priced plan — no checkout needed
         await loadData();
       }
     } catch (err: any) {
@@ -155,7 +178,7 @@ export function BillingSettings() {
   }
 
   async function handleCancel() {
-    if (!confirm("Are you sure you want to cancel your subscription? You will be moved to the Free plan.")) return;
+    if (!confirm("Are you sure you want to cancel your subscription? Your access will end at the end of the current period.")) return;
     setActionLoading("cancel");
     setError(null);
     try {
@@ -176,7 +199,7 @@ export function BillingSettings() {
     );
   }
 
-  const currentPlanCode = subscription?.planCode || "free";
+  const currentPlanCode = subscription?.planCode || "trial";
 
   return (
     <div className="space-y-8">
@@ -231,7 +254,7 @@ export function BillingSettings() {
                 </div>
               </div>
             </div>
-            {currentPlanCode !== "free" && (
+            {!["free", "trial", "enterprise"].includes(currentPlanCode) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -264,12 +287,14 @@ export function BillingSettings() {
       </div>
 
       {/* Plan Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3 xl:grid-cols-5">
         {plans.map((plan) => {
           const Icon = PLAN_ICONS[plan.code] || CreditCard;
           const isCurrent = plan.code === currentPlanCode;
-          const price = plan.pricing[selectedCycle]?.ZMW ?? 0;
-          const isFree = plan.code === "free";
+          const cyclePricing = plan.pricing[selectedCycle] ?? {};
+          const price = cyclePricing.ZMW ?? 0;
+          const isZeroPriced = price === 0;
+          const isTrial = plan.code === "trial" || plan.code === "free";
 
           return (
             <Card
@@ -293,12 +318,31 @@ export function BillingSettings() {
               <CardContent>
                 <div className="mb-4">
                   <span className="text-3xl font-bold">
-                    {isFree ? "Free" : `ZMW ${price.toLocaleString()}`}
+                    {isTrial
+                      ? "Free"
+                      : plan.code === "enterprise" && isZeroPriced
+                      ? "Custom"
+                      : `ZMW ${price.toLocaleString()}`}
                   </span>
-                  {!isFree && (
-                    <span className="text-sm text-muted-foreground ml-1">
-                      / {CYCLE_LABELS[selectedCycle].toLowerCase()}
-                    </span>
+                  {isTrial ? (
+                    <span className="text-sm text-muted-foreground ml-1">14-day trial</span>
+                  ) : (
+                    !isZeroPriced && (
+                      <span className="text-sm text-muted-foreground ml-1">
+                        / {CYCLE_LABELS[selectedCycle].toLowerCase()}
+                      </span>
+                    )
+                  )}
+                  {!isTrial && !isZeroPriced && (cyclePricing.BWP || cyclePricing.USD) && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ≈{" "}
+                      {[
+                        cyclePricing.BWP ? `BWP ${cyclePricing.BWP.toLocaleString()}` : null,
+                        cyclePricing.USD ? `USD ${cyclePricing.USD.toLocaleString()}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
                   )}
                 </div>
 
@@ -340,6 +384,17 @@ export function BillingSettings() {
                   <Button variant="outline" className="w-full" disabled>
                     Current Plan
                   </Button>
+                ) : !plan.isSelfServe ? (
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={() => {
+                      window.location.href =
+                        "mailto:nkuku@deeztechnology.solutions?subject=Enterprise%20plan%20enquiry";
+                    }}
+                  >
+                    Contact sales
+                  </Button>
                 ) : (
                   <Button
                     className="w-full"
@@ -350,7 +405,7 @@ export function BillingSettings() {
                     {actionLoading === plan.code ? (
                       <Loader2 className="h-4 w-4 animate-spin mr-1" />
                     ) : null}
-                    {isFree ? "Switch to Free" : `Upgrade to ${plan.name}`}
+                    {isTrial ? "Start trial" : `Upgrade to ${plan.name}`}
                   </Button>
                 )}
               </CardContent>
@@ -359,8 +414,9 @@ export function BillingSettings() {
         })}
       </div>
 
-      {/* Add-ons — only relevant while on the Free plan (ads only ever show there) */}
-      {currentPlanCode === "free" && addons.length > 0 && (
+      {/* Add-ons — relevant on tiers where ads are shown (trial/basic) */}
+      {(subscription?.adsShown ?? ["free", "trial", "basic"].includes(currentPlanCode)) &&
+        addons.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2">
           {addons.map((addon) => {
             const isActive = addon.code === "remove_ads_addon" && subscription?.addons?.remove_ads_addon;

@@ -28,6 +28,10 @@ import {
   ShieldCheck,
   Eye,
   XCircle,
+  CreditCard,
+  Flag,
+  Megaphone,
+  BookOpen,
 } from "lucide-react";
 
 interface NavItem {
@@ -38,6 +42,8 @@ interface NavItem {
   exact?: boolean;
   /** Show the open-support-ticket count badge on this item. */
   openTicketBadge?: boolean;
+  /** Group label rendered above the first visible item that carries it. */
+  section?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -45,7 +51,13 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/tenants", label: "Tenants", icon: Building2, permission: "tenants.read" },
   { href: "/support", label: "Support", icon: LifeBuoy, permission: "support.tickets.read", openTicketBadge: true },
   { href: "/comms", label: "Comms", icon: Mail, permission: "comms.log.read" },
-  { href: "/health", label: "Health", icon: HeartPulse, permission: "platform.dashboard.read" },
+  // ── Platform configuration (P4) ──
+  { href: "/plans", label: "Plans", icon: CreditCard, permission: "billing.read", section: "Platform" },
+  { href: "/flags", label: "Feature Flags", icon: Flag, permission: "flags.write" },
+  { href: "/announcements", label: "Announcements", icon: Megaphone, permission: "announcements.write" },
+  { href: "/catalogue", label: "Catalogue", icon: BookOpen, permission: "catalogue.write" },
+  // ── Ops ──
+  { href: "/health", label: "Health", icon: HeartPulse, permission: "platform.dashboard.read", section: "Ops" },
   { href: "/audit", label: "Audit Log", icon: ScrollText, permission: "audit.read" },
   { href: "/staff", label: "Staff", icon: UserCog, permission: "staff.manage" },
 ];
@@ -170,24 +182,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {visibleNav.map((item) => {
+          {visibleNav.map((item, i) => {
             const active = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
             const Icon = item.icon;
+            // Render the section label when this is the first visible item of
+            // a new section (skipped items don't leak labels for roles that
+            // can't see any of the section's entries).
+            const prevSection = i > 0 ? visibleNav[i - 1].section : undefined;
+            const showSection = item.section !== undefined && item.section !== prevSection;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary/15 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              <div key={item.href}>
+                {showSection && (
+                  <div className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    {item.section}
+                  </div>
                 )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-                {item.openTicketBadge && <OpenTicketBadge />}
-              </Link>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                  {item.openTicketBadge && <OpenTicketBadge />}
+                </Link>
+              </div>
             );
           })}
         </nav>

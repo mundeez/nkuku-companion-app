@@ -51,6 +51,8 @@ import { buildAdCampaignModule } from './modules/ad-campaigns/routes.js';
 import { buildAdminOpsModule } from './modules/admin-ops/routes.js';
 import { buildPlatformModule } from './modules/platform/routes.js';
 import { buildSupportModule } from './modules/support/routes.js';
+import { buildMeModule } from './modules/me/routes.js';
+import { buildAnnouncementsModule } from './modules/announcements/routes.js';
 import { bootstrapPlatformStaff } from './core/staff-auth/bootstrap.js';
 import { ensureBucket } from './core/storage/storage.service.js';
 import { getS3Client, getS3Bucket } from './core/storage/s3-client.js';
@@ -239,6 +241,8 @@ await app.register(buildAdCampaignModule, { prefix: '/api/v1/ad-campaigns' });
 await app.register(buildAdminOpsModule, { prefix: '/api/v1/admin' });
 await app.register(buildPlatformModule, { prefix: '/api/v1/platform' });
 await app.register(buildSupportModule, { prefix: '/api/v1/support' });
+await app.register(buildMeModule, { prefix: '/api/v1/me' });
+await app.register(buildAnnouncementsModule, { prefix: '/api/v1/announcements' });
 
 // ── Platform staff bootstrap ─────────────
 // Creates the first super_admin StaffUser (one-time password logged to

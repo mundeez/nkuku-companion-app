@@ -1,7 +1,13 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "./client";
+import {
+  apiFetch,
+  getOrgAccess,
+  getMyFlags,
+  type Announcement,
+  type OrgAccess,
+} from "./client";
 import { enqueueMutation } from "./offline-mutation-queue";
 import { isExcluded } from "./query-provider";
 
@@ -219,6 +225,55 @@ export function useSalesSummary(params?: {
     `/api/v1/sale-records/summary${query ? `?${query}` : ""}`,
     { staleTime: 30 * 1000 }
   );
+}
+
+// ─── Tenant surface hooks (P4) ───────────────────
+
+/**
+ * Active platform announcements. The banner refetches on mount (route
+ * change) and every 5 minutes via `refetchInterval`. Errors (e.g. the
+ * endpoint not being deployed yet) leave `data` undefined — callers
+ * should render nothing in that case.
+ */
+export function useActiveAnnouncements(options?: { enabled?: boolean }) {
+  return useApiQuery<Announcement[]>("/api/v1/announcements/active", {
+    enabled: options?.enabled,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Organization access state (active / trialing / locked + plan info).
+ * `getOrgAccess` transparently falls back to the billing subscription
+ * endpoint when the P4 access route isn't deployed.
+ */
+export function useOrgAccess(options?: { enabled?: boolean }) {
+  return useQuery<OrgAccess>({
+    queryKey: ["/api/v1/organizations/me/access"],
+    queryFn: getOrgAccess,
+    enabled: options?.enabled ?? true,
+    staleTime: 60 * 1000,
+    // Access state shouldn't go stale for long — a trial can expire or a
+    // subscription can lock mid-session.
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnMount: true,
+    retry: 1,
+  });
+}
+
+/**
+ * Per-user feature flags. `getMyFlags` never throws — it returns {} when
+ * the endpoint is missing/unreachable — so `data` is always a map.
+ */
+export function useMyFlags() {
+  return useQuery<Record<string, boolean>>({
+    queryKey: ["/api/v1/me/flags"],
+    queryFn: getMyFlags,
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: true,
+    retry: 0,
+  });
 }
 
 // ─── Mutation hooks ──────────────────────────────

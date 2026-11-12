@@ -4,10 +4,11 @@
 // Flutterwave payment provider abstraction.
 
 import type { PrismaClient } from '@prisma/client';
-import { PLANS, getPlan, getPlanPrice, type PlanCode } from './plans.js';
+import { PLANS, PLAN_CODES, getPlan, resolvePlanCode, type PlanCode } from './plans.js';
+import { getPlanByCode, getPrice } from './plan-store.js';
 import { getAddon, getAddonPrice, type AddonCode } from './addons.js';
 import { generateTxRef, verifyWebhookSignature, isMockMode } from './flutterwave.service.js';
-import { getProvider, providerForCurrency, allProvidersMock } from './providers/index.js';
+import { getProvider, providerForCurrency } from './providers/index.js';
 import { sendBillingReminderEmail } from '../security/email.service.js';
 import { notifyStaff } from '../comms/staff-notify.js';
 
@@ -30,7 +31,13 @@ export interface SubscriptionInfo {
 /**
  * Get or create the active subscription for an organization.
  * Every org should have exactly one subscription. If none exists (legacy
- * org from before billing), create a free-tier one.
+ * org from before billing, or an org created before the trial-subscription
+ * rows landed in P4), provision the signup trial (14 days, Business-level
+ * features — plan code 'trial').
+ *
+ * 'suspended' is deliberately IN the status filter: a suspended org must
+ * keep surfacing its suspended row — otherwise this function would mint a
+ * fresh trial and silently un-lock the account.
  */
 export async function getOrCreateSubscription(prisma: PrismaClient, organizationId: string) {
   // IMPORTANT: only consider real plan-tier subscriptions here, never
@@ -39,7 +46,7 @@ export async function getOrCreateSubscription(prisma: PrismaClient, organization
   // add-on); picking the most recently created one regardless of type
   // would let an add-on purchase silently masquerade as the org's plan.
   let sub = await prisma.subscription.findFirst({
-    where: { organizationId, status: { in: ['trialing', 'active', 'past_due'] }, planCode: { in: Object.keys(PLANS) } },
+    where: { organizationId, status: { in: ['trialing', 'active', 'past_due', 'suspended'] }, planCode: { in: PLAN_CODES } },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -50,20 +57,62 @@ export async function getOrCreateSubscription(prisma: PrismaClient, organization
       orderBy: { createdAt: 'desc' },
     });
 
-    // Create a new free-tier subscription
+    // Provision the signup trial (P4): plan code 'trial', 14 days,
+    // Business-level features. Expiry is handled by runDailyBillingCron
+    // (trialing → past_due → suspended → read-only lock).
+    const trialDays = await getTrialDays(prisma);
+    const now = new Date();
+    const trialEnd = addDays(now, trialDays);
     sub = await prisma.subscription.create({
       data: {
         organizationId,
-        planCode: 'free',
+        planCode: 'trial',
         billingCycle: 'monthly',
-        status: 'active',
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: addMonths(new Date(), 1),
+        status: 'trialing',
+        currentPeriodStart: now,
+        currentPeriodEnd: trialEnd,
+        trialEndsAt: trialEnd,
       },
     });
+    // Keep the org's denormalised plan code in sync for display/filters.
+    await prisma.organization.update({
+      where: { id: organizationId },
+      data: { planCode: 'trial' },
+    }).catch(() => {}); // best-effort — sub row is the authority
   }
 
   return sub;
+}
+
+/** Trial length for newly provisioned trial subscriptions. Reads the
+ *  staff-editable trial plan row (default 14 days when absent). */
+export async function getTrialDays(prisma: PrismaClient): Promise<number> {
+  const trialPlan = await getPlanByCode(prisma, 'trial');
+  return trialPlan?.trialDays ?? PLANS.trial.trialDays ?? TRIAL_DAYS;
+}
+
+/**
+ * Provision the signup trial subscription for a brand-new organization
+ * (P4): plan code 'trial', status 'trialing', trialEndsAt = now + the
+ * trial plan's trialDays, currentPeriod covering the same window.
+ * Safe to call inside the org-creation transaction (`tx` is duck-typed
+ * PrismaClient). Expiry → past_due → suspended is the billing cron's job.
+ */
+export async function createSignupTrialSubscription(prisma: any, organizationId: string) {
+  const trialDays = await getTrialDays(prisma);
+  const now = new Date();
+  const trialEnd = addDays(now, trialDays);
+  return prisma.subscription.create({
+    data: {
+      organizationId,
+      planCode: 'trial',
+      billingCycle: 'monthly',
+      status: 'trialing',
+      currentPeriodStart: now,
+      currentPeriodEnd: trialEnd,
+      trialEndsAt: trialEnd,
+    },
+  });
 }
 
 /**
@@ -93,12 +142,15 @@ export async function getActiveTenantOverride(prisma: PrismaClient, organization
  */
 export async function getEffectivePlanCode(prisma: PrismaClient, organizationId: string): Promise<PlanCode> {
   const override = await getActiveTenantOverride(prisma, organizationId);
-  if (override?.planCode) return override.planCode as PlanCode;
+  if (override?.planCode) {
+    return (resolvePlanCode(override.planCode) ?? 'basic') as PlanCode;
+  }
 
   const sub = await getOrCreateSubscription(prisma, organizationId);
-  // If suspended, downgrade to free
-  if (sub.status === 'suspended') return 'free';
-  return sub.planCode as PlanCode;
+  // Suspended orgs fall back to the floor tier for feature gating —
+  // mutations are already 402-locked by authenticate() (P4 read-only lock).
+  if (sub.status === 'suspended') return 'basic';
+  return (resolvePlanCode(sub.planCode) ?? 'basic') as PlanCode;
 }
 
 /**
@@ -109,7 +161,10 @@ export async function getEffectivePlanCode(prisma: PrismaClient, organizationId:
  */
 export async function getEffectivePlanLimits(prisma: PrismaClient, organizationId: string) {
   const planCode = await getEffectivePlanCode(prisma, organizationId);
-  const plan = getPlan(planCode);
+  // DB-backed plan store first (staff edits apply), falling back to the
+  // static PLANS const when the row is absent (un-seeded DB).
+  const dbPlan = await getPlanByCode(prisma, planCode);
+  const plan = dbPlan ?? getPlan(planCode);
   const limits: any = { ...(plan?.limits ?? {}) };
   const override = await getActiveTenantOverride(prisma, organizationId);
   if (override?.limitsJson && typeof override.limitsJson === 'object' && !Array.isArray(override.limitsJson)) {
@@ -123,7 +178,7 @@ export async function getEffectivePlanLimits(prisma: PrismaClient, organizationI
  */
 export async function getSubscriptionInfo(prisma: PrismaClient, organizationId: string): Promise<SubscriptionInfo> {
   const sub = await getOrCreateSubscription(prisma, organizationId);
-  const plan = getPlan(sub.planCode);
+  const plan = await getPlanByCode(prisma, sub.planCode);
   return {
     planCode: sub.planCode,
     planName: plan?.name || sub.planCode,
@@ -152,18 +207,20 @@ export async function subscribeToPlan(prisma: PrismaClient, params: {
   momoOperator?: string;
   redirectUrl: string;
 }): Promise<{ subscription: any; invoice: any; checkout: any }> {
-  const { organizationId, planCode, billingCycle, customerEmail, customerName, customerPhone, momoOperator, redirectUrl } = params;
+  const { organizationId, billingCycle, customerEmail, customerName, customerPhone, momoOperator, redirectUrl } = params;
+  // Write only canonical codes — 'free' resolves to 'basic' (P4 aliases).
+  const planCode = (resolvePlanCode(params.planCode) ?? params.planCode) as PlanCode;
 
-  const plan = getPlan(planCode);
-  if (!plan) throw new Error('INVALID_PLAN');
-  if (!plan.isSelfServe) throw new Error('PLAN_NOT_SELF_SERVE');
+  const plan = await getPlanByCode(prisma, planCode);
+  if (!plan || !plan.isActive) throw new Error('INVALID_PLAN');
+  if (!plan.isSelfServe || plan.isTrial) throw new Error('PLAN_NOT_SELF_SERVE');
 
   // Get the org to determine currency
   const org = await prisma.organization.findUnique({ where: { id: organizationId } });
   if (!org) throw new Error('ORGANIZATION_NOT_FOUND');
   const currency = org.currency || 'ZMW';
 
-  const amount = getPlanPrice(planCode, billingCycle, currency);
+  const amount = await getPrice(prisma, planCode, billingCycle, currency);
 
   // Free plan — no checkout needed
   if (amount === 0) {
@@ -252,8 +309,14 @@ export async function subscribeToPlan(prisma: PrismaClient, params: {
 }
 
 /**
- * Cancel a subscription (downgrade to free at end of current period).
+ * Cancel a subscription (downgrade to the floor tier at end of current period).
  * Voids any open invoices to prevent re-activation via stale payment links.
+ *
+ * P4 note: the 'free' tier is retired — a cancelled org lands on 'basic'
+ * with priceOverride = 0 (the same "free forever" representation the
+ * grandfathering backfill uses for legacy free orgs). This preserves the
+ * pre-P4 behaviour of "cancel → never billed again" while writing only
+ * canonical plan codes.
  */
 export async function cancelSubscription(prisma: PrismaClient, organizationId: string): Promise<any> {
   const sub = await getOrCreateSubscription(prisma, organizationId);
@@ -266,15 +329,18 @@ export async function cancelSubscription(prisma: PrismaClient, organizationId: s
     where: { subscriptionId: sub.id, status: 'open' },
     data: { status: 'void' },
   });
-  // Downgrade org to free
-  await prisma.organization.update({ where: { id: organizationId }, data: { planCode: 'free' } });
-  // Create a new free subscription for the next period
+  // Downgrade org to basic (canonical code; resolves the retired 'free')
+  await prisma.organization.update({ where: { id: organizationId }, data: { planCode: 'basic' } });
+  // Create a new basic subscription at a permanent K0 price override —
+  // the recurring-invoice cron skips priceOverride=0 rows, so this never
+  // bills the org again.
   await prisma.subscription.create({
     data: {
       organizationId,
-      planCode: 'free',
+      planCode: 'basic',
       billingCycle: 'monthly',
       status: 'active',
+      priceOverride: 0,
       currentPeriodStart: new Date(),
       currentPeriodEnd: addMonths(new Date(), 1),
     },
@@ -494,24 +560,25 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
       where: { id: sub.id },
       data: { status: 'suspended' },
     });
-    // Downgrade org to free — only applies to real plan subscriptions.
+    // Downgrade org to basic — only applies to real plan subscriptions.
     // An add-on (e.g. remove_ads_addon) lapsing must not touch the org's
     // actual plan tier.
     if (getPlan(sub.planCode)) {
       await prisma.organization.update({
         where: { id: sub.organizationId },
-        data: { planCode: 'free' },
+        data: { planCode: 'basic' },
       });
     }
     subscriptionsSuspended++;
   }
 
   // 3. Generate recurring invoices for active paid subscriptions (plans and
-  // add-ons alike) whose period has ended.
+  // add-ons alike) whose period has ended. Trial subs never reach 'active'
+  // on their own and 'free' only remains on un-migrated rows — exclude both.
   const activeSubs = await prisma.subscription.findMany({
     where: {
       status: 'active',
-      planCode: { not: 'free' },
+      planCode: { notIn: ['free', 'trial'] },
       currentPeriodEnd: { lt: now },
       organization: { isDemo: false, deletedAt: null },
     },
@@ -531,13 +598,29 @@ export async function runDailyBillingCron(prisma: PrismaClient): Promise<{
     });
     if (existingInvoice) continue; // already generated
 
-    const plan = getPlan(sub.planCode);
+    const plan = await getPlanByCode(prisma, sub.planCode);
     const addon = plan ? undefined : getAddon(sub.planCode);
     if (!plan && !addon) continue; // unknown planCode — skip rather than bill 0
 
-    const amount = plan
-      ? getPlanPrice(sub.planCode as PlanCode, sub.billingCycle as any, org.currency)
-      : getAddonPrice(sub.planCode as AddonCode, org.currency);
+    // priceOverride is a flat invoice amount set by staff (P4) — it wins
+    // over the plan's price matrix. A 0 override means "free forever":
+    // extend the period below but never generate an invoice (a K0 'open'
+    // invoice would still trigger dunning reminders).
+    const priceOverride = sub.priceOverride != null ? Number(sub.priceOverride) : null;
+    if (priceOverride === 0) {
+      const periodStart0 = sub.currentPeriodEnd || now;
+      await prisma.subscription.update({
+        where: { id: sub.id },
+        data: {
+          currentPeriodStart: periodStart0,
+          currentPeriodEnd: computePeriodEnd(periodStart0, sub.billingCycle as any),
+        },
+      });
+      continue;
+    }
+    const amount = priceOverride ?? (plan
+      ? await getPrice(prisma, sub.planCode, sub.billingCycle as any, org.currency)
+      : getAddonPrice(sub.planCode as AddonCode, org.currency));
     const txRef = generateTxRef();
     const invoiceNumber = generateInvoiceNumber();
     const provider = providerForCurrency(org.currency);
@@ -651,7 +734,7 @@ async function updateSubscription(prisma: PrismaClient, organizationId: string, 
   // backs subscribeToPlan/cancelSubscription and must never touch an
   // add-on's Subscription row.
   const existing = await prisma.subscription.findFirst({
-    where: { organizationId, status: { in: ['trialing', 'active', 'past_due', 'suspended'] }, planCode: { in: Object.keys(PLANS) } },
+    where: { organizationId, status: { in: ['trialing', 'active', 'past_due', 'suspended'] }, planCode: { in: PLAN_CODES } },
     orderBy: { createdAt: 'desc' },
   });
 

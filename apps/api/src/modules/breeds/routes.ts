@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { authenticate, requireRole } from '../auth/routes.js';
+import { authenticate } from '../auth/routes.js';
+import { requireStaffApi } from '../../core/staff-auth/staff-auth.service.js';
+
+// ── P4 catalogue lockdown ────────────────────────────────
+// Breeds + performance targets are GLOBAL reference data. Reads stay
+// org-authenticated; writes are staff-only (catalogue.write).
 
 const BreedCreateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -38,19 +43,19 @@ export async function buildBreedModule(app: FastifyInstance) {
     return breed;
   });
 
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request) => {
+  app.post('/', { preHandler: [requireStaffApi('catalogue.write')] }, async (request) => {
     const data = BreedCreateSchema.parse(request.body);
     return prisma.breed.create({ data });
   });
 
-  app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, _reply) => {
+  app.patch('/:id', { preHandler: [requireStaffApi('catalogue.write')] }, async (request, _reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const data = BreedUpdateSchema.parse(request.body);
     const breed = await prisma.breed.update({ where: { id }, data });
     return breed;
   });
 
-  app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, _reply) => {
+  app.delete('/:id', { preHandler: [requireStaffApi('catalogue.write')] }, async (request, _reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     await prisma.breed.delete({ where: { id } });
     return { deleted: true };

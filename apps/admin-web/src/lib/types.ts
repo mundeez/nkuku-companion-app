@@ -340,3 +340,174 @@ export interface PlatformHealth {
    *  normalised in lib/api/platform.ts from health payload). */
   maintenance?: { enabled: boolean; message?: string | null } | null;
 }
+
+// ── P4: plans & pricing ─────────────────────────────────
+
+export type BillingCycle = "monthly" | "cycle_3mo" | "annual";
+export type PriceCurrency = "ZMW" | "BWP" | "USD";
+
+export interface PlanPrice {
+  billingCycle: BillingCycle | string;
+  currency: PriceCurrency | string;
+  amount: number;
+}
+
+export interface PlanLimits {
+  maxActiveFlocks: number; // -1 = unlimited
+  maxUsers: number; // -1 = unlimited
+  maxCyclesHistory: number; // -1 = unlimited
+  maxDocumentsPerRecord: number; // -1 = unlimited
+}
+
+export interface PlatformPlan {
+  code: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  isSelfServe: boolean;
+  isActive: boolean;
+  isTrial: boolean;
+  trialDays: number | null;
+  limits: PlanLimits;
+  features: string[];
+  prices: PlanPrice[];
+}
+
+export interface PlanPatch {
+  name?: string;
+  description?: string | null;
+  sortOrder?: number;
+  isSelfServe?: boolean;
+  isActive?: boolean;
+  isTrial?: boolean;
+  trialDays?: number | null;
+  limits?: Partial<PlanLimits>;
+  features?: string[];
+}
+
+// ── P4: feature flags ───────────────────────────────────
+
+export interface FeatureFlag {
+  key: string;
+  description: string | null;
+  enabledByDefault: boolean;
+  planOverrides: Record<string, boolean>;
+  orgOverrides: Record<string, boolean>;
+}
+
+export interface FeatureFlagPatch {
+  description?: string | null;
+  enabledByDefault?: boolean;
+  planOverrides?: Record<string, boolean>;
+  orgOverrides?: Record<string, boolean>;
+}
+
+// ── P4: announcements ───────────────────────────────────
+
+export type AnnouncementSeverity = "info" | "warning" | "critical";
+export type AnnouncementAudience = "all" | "plans" | "orgs";
+
+export interface PlatformAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  severity: AnnouncementSeverity | string;
+  audience: AnnouncementAudience | string;
+  planCodes: string[] | null;
+  orgIds: string[] | null;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  isDismissible: boolean;
+  createdAt: string;
+  dismissalCount: number;
+}
+
+export interface AnnouncementPayload {
+  title: string;
+  body: string;
+  severity: AnnouncementSeverity;
+  audience: AnnouncementAudience;
+  planCodes?: string[] | null;
+  orgIds?: string[] | null;
+  linkUrl?: string | null;
+  linkLabel?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  isDismissible: boolean;
+}
+
+// ── P4: catalogue (global reference data) ───────────────
+
+export interface CatalogueDisease {
+  id: string;
+  name: string;
+  category: string;
+  incubation: string | null;
+  mortalityRate: string | null;
+  symptoms: string | null;
+  prevention: string | null;
+  treatment: string | null;
+  organicTreatments: string | null;
+}
+
+export interface CatalogueBreed {
+  id: string;
+  name: string;
+  supplier: string;
+  isPrimary: boolean;
+  performanceTargets?: CataloguePerformanceTarget[];
+}
+
+export interface CataloguePerformanceTarget {
+  id: string;
+  breedId: string;
+  ageDays: number;
+  targetWeight: number;
+  targetFeed: number;
+  targetFcr: number;
+  targetWater: number | null;
+  breed?: { id: string; name: string } | null;
+}
+
+export interface CatalogueScheduleItem {
+  id?: string;
+  vaccineName: string;
+  vaccineType: string;
+  ageDays: number;
+  adminMethod: string;
+  sortOrder: number;
+  notes?: string | null;
+}
+
+export interface CatalogueVaccinationSchedule {
+  id: string;
+  name: string;
+  breedId: string | null;
+  isDefault: boolean;
+  description: string | null;
+  items?: CatalogueScheduleItem[];
+}
+
+export type TemplateItemType = "feed" | "chick" | "medication" | "other";
+
+export interface CatalogueTemplateItem {
+  id?: string;
+  itemName: string;
+  itemType: TemplateItemType | string;
+  sortOrder: number;
+  defaultFields?: Record<string, any> | null;
+  isRequired: boolean;
+  isActive?: boolean;
+}
+
+export interface CatalogueSupplierTemplate {
+  id: string;
+  category: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  items?: CatalogueTemplateItem[];
+}

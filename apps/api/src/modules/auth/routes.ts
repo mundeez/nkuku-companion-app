@@ -20,6 +20,8 @@ import {
 import { authRateLimit } from '../../core/security/rate-limiter.js';
 import { tryDecodeStaffToken } from '../../core/staff-auth/staff-auth.service.js';
 import { getMaintenanceMode } from '../../core/platform-flags/flags.service.js';
+import { createSignupTrialSubscription } from '../../core/billing/billing.service.js';
+import { PLAN_CODES } from '../../core/billing/plans.js';
 
 const LoginSchema = z.object({
   email: z.string().email().optional(),
@@ -396,7 +398,9 @@ export async function buildAuthModule(app: FastifyInstance) {
             name: data.organizationName,
             country: data.country.toUpperCase(),
             currency: data.currency.toUpperCase(),
-            planCode: 'free',
+            // P4: new signups land on the 14-day 'trial' tier (Business-level
+            // features); the trial subscription row below is the authority.
+            planCode: 'trial',
           },
         });
         const user = await tx.user.create({
@@ -414,6 +418,7 @@ export async function buildAuthModule(app: FastifyInstance) {
         await tx.organizationMember.create({
           data: { organizationId: organization.id, userId: user.id, role: 'owner' },
         });
+        await createSignupTrialSubscription(tx, organization.id);
         return { user, organization };
       });
 
@@ -532,7 +537,8 @@ export async function buildAuthModule(app: FastifyInstance) {
           name: body.organizationName,
           country: body.country.toUpperCase(),
           currency: body.currency.toUpperCase(),
-          planCode: 'free',
+          // P4: new signups land on the 14-day 'trial' tier.
+          planCode: 'trial',
         },
       });
       const user = await tx.user.create({
@@ -552,6 +558,7 @@ export async function buildAuthModule(app: FastifyInstance) {
       await tx.organizationMember.create({
         data: { organizationId: organization.id, userId: user.id, role: 'owner' },
       });
+      await createSignupTrialSubscription(tx, organization.id);
       return { user, organization };
     });
 
@@ -1407,12 +1414,13 @@ export async function buildAuthModule(app: FastifyInstance) {
         },
       });
 
-      // Create organization
+      // Create organization — P4: new signups land on the 14-day 'trial' tier.
       const org = await tx.organization.create({
         data: {
           name: body.organizationName,
           country: body.country,
           currency: body.currency,
+          planCode: 'trial',
         },
       });
 
@@ -1424,6 +1432,8 @@ export async function buildAuthModule(app: FastifyInstance) {
           role: 'owner',
         },
       });
+
+      await createSignupTrialSubscription(tx, org.id);
 
       return { user, org };
     });
@@ -1594,6 +1604,56 @@ export async function authenticate(request: any, reply: any) {
               error: 'ORG_SUSPENDED',
               message: org.suspendedMessage || 'This organization has been suspended. Please contact support.',
             });
+          }
+        }
+
+        // Billing read-only lock (P4): when the org's newest plan-tier
+        // Subscription row is 'suspended' (dunning exhausted — the cron
+        // sweeps trialing → past_due → suspended), the org goes read-only:
+        // mutations 402 SUBSCRIPTION_REQUIRED while reads and the surfaces
+        // needed to fix billing stay live.
+        //
+        // Distinct from the 423 ORG_SUSPENDED platform lock above — that
+        // one is staff-initiated and blocks EVERYTHING.
+        //
+        // Allowlist (mutations only — GET/HEAD/OPTIONS always pass):
+        //   /api/v1/billing/*        subscribe, pay invoices, manage add-ons
+        //   /api/v1/support/*        talk to support
+        //   /api/v1/auth/*           me/refresh/logout stay alive
+        //   /api/v1/me*              caller's own flags/profile reads
+        //   /api/v1/announcements/*  dismissal of active announcements
+        // Impersonation tokens are exempt — staff must be able to inspect
+        // and repair a locked tenant (same rule as ORG_SUSPENDED).
+        const method = (request.method as string) || 'GET';
+        if (!payload.impersonation && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+          const url = (request.url as string) || '';
+          const exempt =
+            url.startsWith('/api/v1/auth/') ||
+            url.startsWith('/api/v1/billing/') ||
+            url.startsWith('/api/v1/support/') ||
+            url.startsWith('/api/v1/me') ||
+            url.startsWith('/api/v1/announcements/');
+          if (!exempt) {
+            const planSub = await prisma.subscription.findFirst({
+              where: {
+                organizationId: payload.organizationId,
+                planCode: { in: PLAN_CODES },
+                status: { in: ['trialing', 'active', 'past_due', 'suspended'] },
+              },
+              orderBy: { createdAt: 'desc' },
+              select: { status: true },
+            });
+            if (planSub?.status === 'suspended') {
+              return reply.status(402).send({
+                error: 'SUBSCRIPTION_REQUIRED',
+                // Both keys emitted: P4 clients read `code`, older clients
+                // and the generic error path read `error`.
+                code: 'SUBSCRIPTION_REQUIRED',
+                message:
+                  'Your subscription is suspended for non-payment. ' +
+                  'Your data is safe and read-only — settle your invoice under Billing to resume full access.',
+              });
+            }
           }
         }
       }

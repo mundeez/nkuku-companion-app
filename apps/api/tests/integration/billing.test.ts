@@ -51,11 +51,14 @@ describe('Billing Module', () => {
       expect(res.status).toBe(200);
       expect(data.plans).toHaveLength(3);
       const codes = data.plans.map((p: any) => p.code);
-      expect(codes).toContain('free');
+      // P4 five-tier model: basic/grower/business are self-serve; trial is
+      // auto-assigned at signup; enterprise is sales-assisted.
+      expect(codes).toContain('basic');
       expect(codes).toContain('grower');
       expect(codes).toContain('business');
-      // Enterprise should NOT be in self-serve list
       expect(codes).not.toContain('enterprise');
+      expect(codes).not.toContain('trial');
+      expect(codes).not.toContain('free'); // retired alias — canonical 'basic' is served
     });
 
     it('includes pricing for all currencies', async () => {
@@ -70,9 +73,9 @@ describe('Billing Module', () => {
     it('includes limits for each plan', async () => {
       const res = await fetch(`${API_URL}/api/v1/billing/plans`);
       const data = await res.json();
-      const free = data.plans.find((p: any) => p.code === 'free');
-      expect(free.limits.maxActiveFlocks).toBe(1);
-      expect(free.limits.maxUsers).toBe(1);
+      const basic = data.plans.find((p: any) => p.code === 'basic');
+      expect(basic.limits.maxActiveFlocks).toBe(12);
+      expect(basic.limits.maxUsers).toBe(1);
       const business = data.plans.find((p: any) => p.code === 'business');
       expect(business.limits.maxActiveFlocks).toBe(-1);
       expect(business.limits.maxUsers).toBe(5);
@@ -80,11 +83,13 @@ describe('Billing Module', () => {
   });
 
   describe('GET /subscription', () => {
-    it('returns current subscription with free plan on new org', async () => {
+    it('returns current subscription with trial plan on new org', async () => {
       const { status, data } = await authedRequest('/api/v1/billing/subscription', {}, token);
       expect(status).toBe(200);
-      expect(data.planCode).toBe('free');
-      expect(data.status).toBe('active');
+      // P4: new self-serve signups get the 14-day 'trial' tier
+      // (Business-level features), not the retired 'free' tier.
+      expect(data.planCode).toBe('trial');
+      expect(data.status).toBe('trialing');
       expect(data.limits).toBeDefined();
       expect(data.usage).toBeDefined();
       expect(data.usage.activeFlocks).toBe(0);
@@ -162,20 +167,22 @@ describe('Billing Module', () => {
       expect(status).toBe(200);
     });
 
-    it('subscribes to free plan (no checkout needed)', async () => {
-      const freshReg = await registerUser(`bill-free-${Date.now()}`);
+    it('subscribes to basic plan and returns checkout', async () => {
+      const freshReg = await registerUser(`bill-basic-${Date.now()}`);
       const { status, data } = await authedRequest(
         '/api/v1/billing/subscribe',
         {
           method: 'POST',
-          body: JSON.stringify({ planCode: 'free', billingCycle: 'monthly' }),
+          body: JSON.stringify({ planCode: 'basic', billingCycle: 'monthly' }),
         },
         freshReg.accessToken,
       );
       expect(status).toBe(200);
-      expect(data.subscription.planCode).toBe('free');
-      expect(data.invoice).toBeNull();
-      expect(data.checkout).toBeNull();
+      expect(data.subscription.planCode).toBe('basic');
+      // Basic is the paid entry tier (ZMW 150/mo) — checkout is required.
+      expect(data.invoice).toBeDefined();
+      expect(data.invoice.amountDue).toBe('150');
+      expect(data.checkout).toBeDefined();
     });
   });
 
@@ -227,7 +234,7 @@ describe('Billing Module', () => {
   });
 
   describe('POST /cancel', () => {
-    it('cancels subscription and downgrades to free', async () => {
+    it('cancels subscription and downgrades to basic (free forever)', async () => {
       const freshReg = await registerUser(`bill-cancel-${Date.now()}`);
       // Subscribe to grower (paid plan)
       const { data: subData } = await authedRequest(
@@ -259,9 +266,10 @@ describe('Billing Module', () => {
       expect(status).toBe(200);
       expect(data.success).toBe(true);
 
-      // Verify downgraded to free
+      // Verify downgraded to basic — the cancelled org lands on the
+      // entry tier with priceOverride=0 ("free forever", P4).
       const { data: subInfo } = await authedRequest('/api/v1/billing/subscription', {}, freshReg.accessToken);
-      expect(subInfo.planCode).toBe('free');
+      expect(subInfo.planCode).toBe('basic');
     });
   });
 
@@ -296,9 +304,18 @@ describe('Billing Module', () => {
 });
 
 describe('Feature Gating — Flock Limit', () => {
-  it('blocks second flock creation on free plan', async () => {
+  it('blocks the 13th flock on the basic plan (12 active max)', async () => {
     const reg = await registerUser(`gate-flock-${Date.now()}`);
     const token = reg.accessToken;
+
+    // P4: move the org off the unlimited trial onto paid 'basic'
+    // (12 active flocks) via subscribe → mock-pay.
+    const subData = await authedRequest(
+      '/api/v1/billing/subscribe',
+      { method: 'POST', body: JSON.stringify({ planCode: 'basic', billingCycle: 'monthly' }) },
+      token,
+    );
+    await authedRequest(`/api/v1/billing/dev/mock-pay?txRef=${subData.data.checkout.txRef}`, { method: 'GET' }, token);
 
     // Get a breed ID
     const breedsRes = await fetch(`${API_URL}/api/v1/breeds`, {
@@ -307,30 +324,32 @@ describe('Feature Gating — Flock Limit', () => {
     const breeds = await breedsRes.json();
     const breedId = breeds[0].id;
 
-    // Create first flock — should succeed
-    const { status: s1 } = await authedRequest(
-      '/api/v1/broiler-flocks',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          name: 'Flock 1',
-          breedId,
-          startDate: new Date().toISOString().split('T')[0],
-          initialCount: 100,
-          orderDate: new Date().toISOString().split('T')[0],
-        }),
-      },
-      token,
-    );
-    expect([200, 201]).toContain(s1);
+    // Create 12 flocks — all should succeed (new flocks for this test only)
+    for (let i = 1; i <= 12; i++) {
+      const { status } = await authedRequest(
+        '/api/v1/broiler-flocks',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name: `Flock ${i}`,
+            breedId,
+            startDate: new Date().toISOString().split('T')[0],
+            initialCount: 100,
+            orderDate: new Date().toISOString().split('T')[0],
+          }),
+        },
+        token,
+      );
+      expect([200, 201]).toContain(status);
+    }
 
-    // Create second flock — should be blocked (free plan = 1 flock)
+    // The 13th should be blocked (basic plan = 12 active flocks)
     const { status: s2, data: d2 } = await authedRequest(
       '/api/v1/broiler-flocks',
       {
         method: 'POST',
         body: JSON.stringify({
-          name: 'Flock 2',
+          name: 'Flock 13',
           breedId,
           startDate: new Date().toISOString().split('T')[0],
           initialCount: 100,
@@ -394,12 +413,19 @@ describe('Feature Gating — Flock Limit', () => {
 });
 
 describe('Feature Gating — User Limit', () => {
-  it('blocks second user invite on free plan', async () => {
+  it('blocks second user invite on the basic plan', async () => {
     const reg = await registerUser(`gate-user-${Date.now()}`);
     const token = reg.accessToken;
 
-    // Free plan = 1 user. The owner is already 1 user.
-    // Inviting another should be blocked.
+    // P4: new orgs start on 'trial' (5 users). Move to paid 'basic'
+    // (1 user) via subscribe → mock-pay, then the owner alone fills
+    // the seat — any invite must be blocked.
+    const subData = await authedRequest(
+      '/api/v1/billing/subscribe',
+      { method: 'POST', body: JSON.stringify({ planCode: 'basic', billingCycle: 'monthly' }) },
+      token,
+    );
+    await authedRequest(`/api/v1/billing/dev/mock-pay?txRef=${subData.data.checkout.txRef}`, { method: 'GET' }, token);
     const { status, data } = await authedRequest(
       '/api/v1/organizations/invites',
       {

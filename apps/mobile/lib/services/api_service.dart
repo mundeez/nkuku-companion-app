@@ -101,6 +101,26 @@ class ApiService {
   /// the upgrade bottom sheet.
   static void Function(PlanLimitInfo info)? onPlanLimitReached;
 
+  /// Optional callback invoked when a 402 carries
+  /// `{code: 'SUBSCRIPTION_REQUIRED'}` (P4 — mutation on a locked org).
+  /// The caller (usually `main.dart`) should route to the lock screen.
+  /// Falls back to [onPlanLimitReached] when unset.
+  static VoidCallback? onSubscriptionRequired;
+
+  /// Route a 402 response body to the right notification: subscription
+  /// lock (`SUBSCRIPTION_REQUIRED`) takes precedence over plan limits.
+  static void _notifyPlanLimit(dynamic data) {
+    if (data is Map &&
+        (data['code'] == 'SUBSCRIPTION_REQUIRED' ||
+            data['error'] == 'SUBSCRIPTION_REQUIRED')) {
+      if (onSubscriptionRequired != null) {
+        onSubscriptionRequired!.call();
+        return;
+      }
+    }
+    onPlanLimitReached?.call(PlanLimitInfo.fromResponse(data));
+  }
+
   /// Optional callback invoked on 423 ORG_SUSPENDED (platform suspension by
   /// support staff — P2 super-admin console). Carries the staff-set message;
   /// the caller should route to the suspended screen. Unlike 401 this does
@@ -155,8 +175,7 @@ class ApiService {
           }
         } else if (status == 402) {
           log('Plan limit reached on ${response.requestOptions.path}', name: 'ApiService');
-          onPlanLimitReached
-              ?.call(PlanLimitInfo.fromResponse(response.data));
+          _notifyPlanLimit(response.data);
         } else if (status == 423 &&
             response.data is Map &&
             response.data['error'] == 'ORG_SUSPENDED' &&
@@ -184,8 +203,7 @@ class ApiService {
           // Reached only when a call site overrides validateStatus — the
           // default path surfaces 402 via onResponse above.
           log('Plan limit reached (402) — notifying', name: 'ApiService');
-          onPlanLimitReached
-              ?.call(PlanLimitInfo.fromResponse(error.response?.data));
+          _notifyPlanLimit(error.response?.data);
         }
         // 503 MAINTENANCE_MODE lands here under the default validateStatus
         // (<500 throws) — the primary path for this notification.

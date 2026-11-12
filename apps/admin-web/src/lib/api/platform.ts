@@ -17,14 +17,21 @@ import {
   setStoredUser,
 } from "./client";
 import type {
+  AnnouncementPayload,
   AuditEvent,
   CommsLogItem,
   FailedPayments,
+  FeatureFlag,
+  FeatureFlagPatch,
   ImpersonationResult,
   ImpersonationSession,
   Paged,
+  PlanPatch,
+  PlanPrice,
+  PlatformAnnouncement,
   PlatformHealth,
   PlatformMetrics,
+  PlatformPlan,
   StaffRole,
   StaffUser,
   TenantDetail,
@@ -578,4 +585,198 @@ export async function setMaintenanceMode(body: {
     enabled: m?.enabled ?? data?.enabled ?? body.enabled,
     message: m?.message ?? data?.message ?? null,
   };
+}
+
+// ── P4: plans & pricing (billing.read / billing.plans.write) ──
+
+/** Plan/flag/announcement/catalogue lists may come back as a bare array
+ *  or wrapped in {items:[]} — tolerate both while the P4 routes settle. */
+function unwrapItems<T>(data: any): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (Array.isArray(data?.items)) return data.items as T[];
+  return [];
+}
+
+function normalizePlan(raw: any): PlatformPlan {
+  const limits = raw?.limits ?? {};
+  return {
+    code: raw?.code ?? "",
+    name: raw?.name ?? raw?.code ?? "",
+    description: raw?.description ?? null,
+    sortOrder: raw?.sortOrder ?? raw?.sort_order ?? 0,
+    isSelfServe: !!(raw?.isSelfServe ?? raw?.is_self_serve),
+    isActive: raw?.isActive ?? raw?.is_active ?? true,
+    isTrial: !!(raw?.isTrial ?? raw?.is_trial),
+    trialDays: raw?.trialDays ?? raw?.trial_days ?? null,
+    limits: {
+      maxActiveFlocks: limits.maxActiveFlocks ?? limits.max_active_flocks ?? 0,
+      maxUsers: limits.maxUsers ?? limits.max_users ?? 0,
+      maxCyclesHistory: limits.maxCyclesHistory ?? limits.max_cycles_history ?? 0,
+      maxDocumentsPerRecord:
+        limits.maxDocumentsPerRecord ?? limits.max_documents_per_record ?? 0,
+    },
+    features: raw?.features ?? limits.features ?? [],
+    prices: (raw?.prices ?? raw?.priceMatrix ?? []).map((p: any) => ({
+      billingCycle: p.billingCycle ?? p.billing_cycle,
+      currency: p.currency,
+      amount: Number(p.amount ?? 0),
+    })),
+  };
+}
+
+export async function listPlans(): Promise<PlatformPlan[]> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/plans`);
+  return unwrapItems<any>(data).map(normalizePlan);
+}
+
+export async function updatePlan(code: string, patch: PlanPatch): Promise<PlatformPlan> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/plans/${encodeURIComponent(code)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  return normalizePlan(data?.plan ?? data);
+}
+
+export async function replacePlanPrices(code: string, prices: PlanPrice[]): Promise<PlatformPlan> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/plans/${encodeURIComponent(code)}/prices`, {
+    method: "PUT",
+    body: JSON.stringify({ prices }),
+  });
+  return normalizePlan(data?.plan ?? data);
+}
+
+// ── P4: feature flags (flags.write — super_admin) ───────
+
+function normalizeFlag(raw: any): FeatureFlag {
+  return {
+    key: raw?.key ?? "",
+    description: raw?.description ?? null,
+    enabledByDefault: !!(raw?.enabledByDefault ?? raw?.enabled_by_default),
+    planOverrides: raw?.planOverrides ?? raw?.plan_overrides ?? {},
+    orgOverrides: raw?.orgOverrides ?? raw?.org_overrides ?? {},
+  };
+}
+
+export async function listFlags(): Promise<FeatureFlag[]> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/flags`);
+  return unwrapItems<any>(data).map(normalizeFlag);
+}
+
+export async function createFlag(body: {
+  key: string;
+  description?: string | null;
+  enabledByDefault: boolean;
+}): Promise<FeatureFlag> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/flags`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return normalizeFlag(data?.flag ?? data);
+}
+
+export async function updateFlag(key: string, patch: FeatureFlagPatch): Promise<FeatureFlag> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/flags/${encodeURIComponent(key)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  return normalizeFlag(data?.flag ?? data);
+}
+
+export async function deleteFlag(key: string) {
+  return apiFetch(`${PLATFORM_BASE}/flags/${encodeURIComponent(key)}`, { method: "DELETE" });
+}
+
+// ── P4: announcements (announcements.write — marketing) ─
+
+function normalizeAnnouncement(raw: any): PlatformAnnouncement {
+  return {
+    id: raw?.id ?? "",
+    title: raw?.title ?? "",
+    body: raw?.body ?? "",
+    severity: raw?.severity ?? "info",
+    audience: raw?.audience ?? "all",
+    planCodes: raw?.planCodes ?? raw?.plan_codes ?? null,
+    orgIds: raw?.orgIds ?? raw?.org_ids ?? null,
+    linkUrl: raw?.linkUrl ?? raw?.link_url ?? null,
+    linkLabel: raw?.linkLabel ?? raw?.link_label ?? null,
+    startsAt: raw?.startsAt ?? raw?.starts_at ?? null,
+    endsAt: raw?.endsAt ?? raw?.ends_at ?? null,
+    isDismissible: raw?.isDismissible ?? raw?.is_dismissible ?? true,
+    createdAt: raw?.createdAt ?? raw?.created_at ?? null,
+    dismissalCount: raw?.dismissalCount ?? raw?.dismissal_count ?? 0,
+  };
+}
+
+export async function listAnnouncements(): Promise<PlatformAnnouncement[]> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/announcements`);
+  return unwrapItems<any>(data).map(normalizeAnnouncement);
+}
+
+export async function createAnnouncement(body: AnnouncementPayload): Promise<PlatformAnnouncement> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/announcements`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return normalizeAnnouncement(data?.announcement ?? data);
+}
+
+export async function updateAnnouncement(
+  id: string,
+  patch: Partial<AnnouncementPayload>
+): Promise<PlatformAnnouncement> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/announcements/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  return normalizeAnnouncement(data?.announcement ?? data);
+}
+
+export async function deleteAnnouncement(id: string) {
+  return apiFetch(`${PLATFORM_BASE}/announcements/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+// ── P4: catalogue (catalogue.write — content_editor) ────
+// Global reference data managed by staff. The tenant-facing modules
+// (diseases/breeds/vaccination-*/supplier-templates) define the field
+// shapes; the platform surface mirrors them under /platform/catalogue/*.
+
+export type CatalogueEntity =
+  | "diseases"
+  | "breeds"
+  | "vaccination-schedules"
+  | "performance-targets"
+  | "supplier-category-templates";
+
+export async function listCatalogue<T = any>(entity: CatalogueEntity): Promise<T[]> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/catalogue/${entity}`);
+  return unwrapItems<T>(data);
+}
+
+export async function createCatalogueItem<T = any>(
+  entity: CatalogueEntity,
+  body: Record<string, any>
+): Promise<T> {
+  const data = await apiFetch<any>(`${PLATFORM_BASE}/catalogue/${entity}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return (data?.item ?? data) as T;
+}
+
+export async function updateCatalogueItem<T = any>(
+  entity: CatalogueEntity,
+  id: string,
+  body: Record<string, any>
+): Promise<T> {
+  const data = await apiFetch<any>(
+    `${PLATFORM_BASE}/catalogue/${entity}/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: JSON.stringify(body) }
+  );
+  return (data?.item ?? data) as T;
+}
+
+export async function deleteCatalogueItem(entity: CatalogueEntity, id: string) {
+  return apiFetch(`${PLATFORM_BASE}/catalogue/${entity}/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }

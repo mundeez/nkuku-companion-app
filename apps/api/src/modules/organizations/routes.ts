@@ -3,7 +3,9 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { authenticate, requireRole, verifyRestoreToken, denyImpersonation } from '../auth/routes.js';
 import { getOrganizationId } from '../../core/tenancy/scope.js';
-import { checkUserLimit } from '../../core/billing/feature-gate.js';
+import { checkUserLimit, shouldShowAds } from '../../core/billing/feature-gate.js';
+import { getEffectivePlanCode, getOrCreateSubscription } from '../../core/billing/billing.service.js';
+import { getPlanByCode } from '../../core/billing/plan-store.js';
 import { sendInviteEmail } from '../../core/security/email.service.js';
 import { exportOrganization, requestDeletion, cancelDeletion } from './lifecycle.service.js';
 
@@ -40,6 +42,43 @@ export async function buildOrganizationModule(app: FastifyInstance) {
     });
     if (!org) return reply.status(404).send({ error: 'NOT_FOUND' });
     return org;
+  });
+
+  // GET /api/v1/organizations/me/access — the org's access state (P4).
+  // Drives the trial banner, lock shell, and ad surfaces on web+mobile:
+  //   state: 'active' | 'trialing' | 'locked'
+  // 'locked' = org suspended by platform staff OR newest plan-tier
+  // subscription row is 'suspended' (dunning exhausted, read-only mode).
+  app.get('/me/access', { preHandler: [authenticate] }, async (request) => {
+    const organizationId = getOrganizationId(request);
+    const [org, sub, planCode, ads] = await Promise.all([
+      prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { suspendedAt: true },
+      }),
+      getOrCreateSubscription(prisma, organizationId),
+      getEffectivePlanCode(prisma, organizationId),
+      shouldShowAds(prisma, organizationId),
+    ]);
+    const plan = await getPlanByCode(prisma, planCode);
+    const trialEndsAt = sub.trialEndsAt?.toISOString() ?? null;
+    const daysLeftInTrial =
+      sub.status === 'trialing' && sub.trialEndsAt
+        ? Math.max(0, Math.ceil((sub.trialEndsAt.getTime() - Date.now()) / 86_400_000))
+        : null;
+    return {
+      state:
+        org?.suspendedAt || sub.status === 'suspended'
+          ? 'locked'
+          : sub.status === 'trialing'
+            ? 'trialing'
+            : 'active',
+      planCode,
+      planName: plan?.name ?? planCode,
+      trialEndsAt,
+      daysLeftInTrial,
+      showAds: ads,
+    };
   });
 
   // PATCH /api/v1/organizations/me — update org settings (owner only)

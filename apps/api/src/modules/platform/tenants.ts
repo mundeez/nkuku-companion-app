@@ -34,7 +34,7 @@ import {
   getActiveTenantOverride,
 } from '../../core/billing/billing.service.js';
 import { getPlanLimitsForOrg } from '../../core/billing/feature-gate.js';
-import { PLANS } from '../../core/billing/plans.js';
+import { PLANS, PLAN_CODES } from '../../core/billing/plans.js';
 import { sendVerificationEmail } from '../../core/security/email.service.js';
 import { requestDeletion } from '../organizations/lifecycle.service.js';
 
@@ -62,11 +62,23 @@ const OverrideSchema = z
     limitsJson: z.record(z.any()).optional(),
     compUntil: z.string().datetime().optional(),
     expiresAt: z.string().datetime().optional(),
+    // P4: flat invoice amount override on the org's active plan-tier
+    // Subscription. A NUMBER sets it (0 = grandfathered/free forever —
+    // the recurring-invoice cron extends the period without billing);
+    // null clears the override back to plan pricing; omitted = untouched.
+    priceOverride: z.number().min(0).nullable().optional(),
     reason: z.string().min(3).max(2000),
   })
-  .refine((d) => d.planCode !== undefined || d.limitsJson !== undefined || d.compUntil !== undefined, {
-    message: 'Provide at least one of planCode, limitsJson, or compUntil',
-  });
+  .refine(
+    (d) =>
+      d.planCode !== undefined ||
+      d.limitsJson !== undefined ||
+      d.compUntil !== undefined ||
+      d.priceOverride !== undefined,
+    {
+      message: 'Provide at least one of planCode, limitsJson, compUntil, or priceOverride',
+    },
+  );
 
 const SuspendSchema = z.object({
   reason: z.string().min(3).max(2000),
@@ -454,13 +466,24 @@ export async function buildPlatformTenantsModule(app: FastifyInstance) {
         orderBy: { createdAt: 'desc' },
       });
 
+      // Read the sub BEFORE the transaction for the audit trail.
+      const planSubBefore = await prisma.subscription.findFirst({
+        where: {
+          organizationId: id,
+          planCode: { in: PLAN_CODES },
+          status: { in: ['trialing', 'active', 'past_due', 'suspended'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, priceOverride: true, status: true },
+      });
+
       const override = await prisma.$transaction(async (tx: any) => {
         // Expire every currently-active override so exactly one is live.
         await tx.tenantOverride.updateMany({
           where: { organizationId: id, ...activeOverrideWhere(now) },
           data: { expiresAt: now },
         });
-        return tx.tenantOverride.create({
+        const row = await tx.tenantOverride.create({
           data: {
             organizationId: id,
             planCode: body.planCode ?? null,
@@ -471,6 +494,15 @@ export async function buildPlatformTenantsModule(app: FastifyInstance) {
             expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
           },
         });
+        // priceOverride lives on the Subscription row (flat invoice amount).
+        // Provided → set/clear on the newest active plan-tier sub.
+        if (body.priceOverride !== undefined && planSubBefore) {
+          await tx.subscription.update({
+            where: { id: planSubBefore.id },
+            data: { priceOverride: body.priceOverride },
+          });
+        }
+        return row;
       });
 
       await writePlatformAudit(prisma, {
@@ -481,14 +513,31 @@ export async function buildPlatformTenantsModule(app: FastifyInstance) {
         targetId: id,
         organizationId: id,
         reason: body.reason,
-        before: publicOverride(before),
-        after: publicOverride(override),
+        before: {
+          override: publicOverride(before),
+          priceOverride: planSubBefore ? Number(planSubBefore.priceOverride ?? null) : null,
+        },
+        after: {
+          override: publicOverride(override),
+          priceOverride:
+            body.priceOverride !== undefined
+              ? body.priceOverride
+              : planSubBefore
+                ? Number(planSubBefore.priceOverride ?? null)
+                : null,
+        },
         ...auditCtx(request),
       });
 
       return reply.status(201).send({
         override: publicOverride(override),
         effectivePlanCode: await getEffectivePlanCode(prisma, id),
+        priceOverride:
+          body.priceOverride !== undefined
+            ? body.priceOverride
+            : planSubBefore
+              ? Number(planSubBefore.priceOverride ?? null)
+              : null,
       });
     },
   );

@@ -369,6 +369,33 @@ export function requireStaff(...permissions: string[]) {
 }
 
 /**
+ * requireStaff variant for routes that live on the TENANT surface (e.g.
+ * the global-catalogue write routes under /api/v1/diseases, /api/v1/breeds,
+ * /api/v1/supplier-templates — P4 lockdown). Same verification and
+ * permission checks as requireStaff, but a well-formed NON-staff token
+ * (a tenant JWT) gets 403 FORBIDDEN instead of 401 INVALID_TOKEN — the
+ * caller IS authenticated, just the wrong audience for a staff-only route.
+ * Missing/empty credentials still 401 via requireStaff.
+ */
+export function requireStaffApi(...permissions: string[]) {
+  const inner = requireStaff(...permissions);
+  return async (request: any, reply: any) => {
+    const auth = request.headers?.authorization;
+    const token =
+      (auth && auth.startsWith('Bearer ') ? auth.slice(7) : null) ??
+      request.cookies?.[STAFF_ACCESS_COOKIE] ??
+      null;
+    if (token && !verifyStaffAccessToken(token)) {
+      return reply.status(403).send({
+        error: 'FORBIDDEN',
+        message: 'Platform staff access required',
+      });
+    }
+    return inner(request, reply);
+  };
+}
+
+/**
  * Require a fresh re-auth (password or TOTP within REAUTH_WINDOW_MS).
  * Chain AFTER requireStaff. Enforces plan §3: dangerous permissions
  * demand reauthAt ≤ 5 minutes old.

@@ -7,6 +7,7 @@ import { seedVaccinationSchedules } from './vaccination-schedules.js';
 import { seedLightingTemperatureSchedules } from './lighting-temperature-schedules.js';
 import { seedChartOfAccounts } from './chart-of-accounts.js';
 import { seedSupplierCategoryTemplates } from './supplier-templates.js';
+import { seedPlans } from './seed-plans.js';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -40,8 +41,8 @@ async function main() {
   if (!organization) {
     organization = await prisma.organization.create({
       // The seed/dev org gets the Business plan so integration tests
-      // aren't blocked by feature gates. New self-serve signups default
-      // to 'free' via the register endpoint.
+      // aren't blocked by feature gates. New self-serve signups get the
+      // 14-day 'trial' plan via the register endpoints (P4).
       data: { name: DEFAULT_ORG_NAME, country: 'ZM', currency: 'ZMW', planCode: 'business', isActive: true },
     });
   } else if (organization.planCode === 'free') {
@@ -285,6 +286,11 @@ async function main() {
     }
   }
   console.log('[SEED] Production cycles + batches:', expansionRows.length);
+
+  // ── P4: Plans + prices + free→basic backfill ──
+  // Runs after the org exists so the backfill also normalises the seed
+  // org if it was created with the retired 'free' code. Idempotent.
+  await seedPlans(prisma);
 
   // ── Broiler Management Seeds ──
   await seedBroilerBreeds(prisma);
