@@ -1,5 +1,56 @@
 # Changelog
 
+## [1.53.0] — 2026-11-12
+
+### P4 — Five-tier subscriptions, trial lock, feature flags, announcements, catalogue
+
+**DB-driven plans (replaces hardcoded `PLANS` map):**
+- New `Plan` + `PlanPrice` models; runtime reads via cached plan-store with the
+  `PLANS` const as seed authority and fallback.
+- Five tiers: **trial** (14-day, Business-level) → **basic** (K150/mo, 12
+  flocks/1 user, core + basic financials) → **grower** (K250) → **business**
+  (K800) → **enterprise** (custom). `free` retired (`PLAN_CODE_ALIASES`
+  free→basic); `api_access` moved business→enterprise.
+- `Subscription.priceOverride` — flat invoice amount for grandfathered/custom
+  deals; legacy free orgs migrated to basic @ 0; Nkuku Demo Farm comped to
+  business via TenantOverride.
+
+**Trial + read-only lock:**
+- New signups get a 14-day trial subscription; expiry flows through the
+  existing dunning sweep.
+- Suspended orgs: mutations return `402 SUBSCRIPTION_REQUIRED` (GETs,
+  billing/support/auth/announcements exempt; staff impersonation exempt).
+- `GET /api/v1/organizations/me/access` → state/plan/trial-days-left.
+
+**Feature flags:** `FeatureFlag` model, org > plan > default precedence;
+`GET /api/v1/me/flags` + platform CRUD under `flags.write`.
+
+**Announcements:** audience targeting (all/plans/orgs) + scheduling +
+per-user dismissal; tenant `GET /api/v1/announcements/active` + dismiss;
+platform CRUD. Web banner + mobile card wired on both apps.
+
+**Catalogue lockdown:** global reference data (diseases, breeds, performance
+targets, vaccination schedules, supplier category templates) writes now
+require staff (`catalogue.write`); platform `/platform/catalogue/:entity` CRUD.
+
+**Admin console:** `/plans` editor (limits, features, 3×3 price matrix),
+`/flags` tri-state overrides, `/announcements` scheduling/audience,
+`/catalogue` five-tab editor.
+
+**Web + mobile:** announcement banners, trial badge/countdown, locked-org
+shell, updated pricing surfaces for the new tier model.
+
+### Hatch-day counting convention (Day 0 vs Day 1)
+- New org setting `hatch_day_convention`: `day1` (default — hatch day labels
+  as Day 1, preserving existing display) or `day0` (raw elapsed days).
+- Applied across flock calendar, schedules, dashboards and labels on
+  web + mobile; display-only, internal logic unchanged.
+- Editable under Settings → Flock defaults.
+
+### Fixes
+- CORS now advertises PUT/PATCH/DELETE — unblocked the admin console's P4
+  editors (plans/flags/announcements/catalogue) cross-origin.
+
 ## [1.52.0] — 2026-11-11
 
 ### Feed bag lifecycle + multi-supplier procurement
