@@ -109,7 +109,11 @@ const corsOrigins = process.env.CORS_ORIGINS
     ? [] // fail closed in production if not configured
     : true;
 
-await app.register(cors, { origin: corsOrigins, credentials: true });
+await app.register(cors, {
+  origin: corsOrigins,
+  credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+});
 
 // Cookie support for HttpOnly auth tokens (web clients).
 // Mobile clients continue to use Bearer tokens from the JSON response body.
