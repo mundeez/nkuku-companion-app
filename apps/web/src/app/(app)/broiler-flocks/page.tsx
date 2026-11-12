@@ -197,7 +197,11 @@ export default function BroilerFlocksPage() {
   async function handleUpdate() {
     if (!editingFlock) return;
     try {
-      await updateFlock.mutateAsync({ path: `/api/v1/broiler-flocks/${editingFlock.id}`, body: prepareFlockBody(form) });
+      const body = prepareFlockBody(form);
+      // Bird counts are never editable here — they move only through
+      // Add Chicks, mortality and sales, keeping initial/current in sync.
+      delete body.initialCount;
+      await updateFlock.mutateAsync({ path: `/api/v1/broiler-flocks/${editingFlock.id}`, body });
       addToast("Flock updated successfully.", "success");
       setEditOpen(false);
       setEditingFlock(null);
@@ -465,12 +469,20 @@ export default function BroilerFlocksPage() {
                       <span className="font-medium">{flock.supplier.name}</span>
                     </div>
                   )}
-                  {flock.chickPriceZmw && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Chick Purchase</span>
-                      <span className="font-medium">ZMW {(Number(flock.chickPriceZmw) * flock.initialCount).toFixed(2)} ({flock.initialCount} birds @ ZMW {Number(flock.chickPriceZmw)})</span>
-                    </div>
-                  )}
+                  {flock.chickPriceZmw && (() => {
+                    // Free hatchery extras/corrections live inside initialCount — cost comes
+                    // from chick_purchase financial records when present, else price × count.
+                    const finCost = (flock.financialRecords ?? [])
+                      .filter((r) => r.category === "chick_purchase" && !r.isIncome)
+                      .reduce((s, r) => s + Number(r.amountZmw), 0);
+                    const cost = finCost > 0 ? finCost : Number(flock.chickPriceZmw) * flock.initialCount;
+                    return (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Chick Cost</span>
+                        <span className="font-medium">ZMW {cost.toFixed(2)} ({flock.initialCount} birds)</span>
+                      </div>
+                    );
+                  })()}
                   {flock.supplier && !flock.chicksCollected && (
                     <div className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded w-fit">
                       <span>Chicks Pending Collection</span>
@@ -739,8 +751,10 @@ export default function BroilerFlocksPage() {
               <Input type="date" value={form.orderDate || ""} onChange={(e) => setForm({ ...form, orderDate: e.target.value })} />
             </div>
             <div>
-              <Label>Initial Bird Count</Label>
-              <Input type="number" value={form.initialCount} onChange={(e) => setForm({ ...form, initialCount: Number(e.target.value) })} />
+              <Label>Bird Count</Label>
+              <p className="text-sm text-muted-foreground pt-2">
+                {editingFlock?.initialCount} received · {editingFlock?.currentCount} current — adjust via Add Chicks on the flock page.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

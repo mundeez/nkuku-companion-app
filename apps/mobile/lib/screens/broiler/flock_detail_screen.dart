@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/breed.dart';
+import '../../models/chick_addition.dart';
 import '../../models/document.dart';
 import '../../models/environmental_record.dart';
 import '../../models/financial_record.dart';
@@ -118,6 +119,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   bool _salesLoading = false;
   List<DocumentRecord> _documents = [];
   List<PerformanceTarget> _breedTargets = [];
+  List<ChickAddition> _chickAdditions = [];
 
   // Bulk selection for records
   bool _recordSelectMode = false;
@@ -227,6 +229,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             .catchError((_) => <SaleRecord>[]),
         BroilerService.getDocuments(widget.flockId)
             .catchError((_) => <DocumentRecord>[]),
+        BroilerService.getChickAdditions(widget.flockId)
+            .catchError((_) => <ChickAddition>[]),
       ]);
 
       final summariesFuture = Future.wait([
@@ -274,6 +278,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       final environment = results[9] as List<EnvironmentalRecord>;
       final sales = results[10] as List<SaleRecord>;
       final documents = results[11] as List<DocumentRecord>;
+      final chickAdditions = results[12] as List<ChickAddition>;
 
       final analysis = summaries[0] as GrowthRecordAnalysis?;
       final feedSummary = summaries[1] as FeedSummary?;
@@ -307,6 +312,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         _saleSummary = saleSummary;
         _documents = documents;
         _breedTargets = breedTargets;
+        _chickAdditions = chickAdditions;
         _loading = false;
       });
     } catch (e) {
@@ -409,6 +415,137 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Complete failed: $e')));
+    }
+  }
+
+  Future<void> _showAddChicksDialog() async {
+    final flock = _flock!;
+    final countCtrl = TextEditingController();
+    final priceCtrl = TextEditingController(
+        text: flock.chickPriceZmw?.toStringAsFixed(2) ?? '');
+    final notesCtrl = TextEditingController();
+    String reason = 'hatchery_extra';
+    DateTime additionDate = DateTime.now();
+    bool saving = false;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: const Text('Add chicks'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: reason,
+                  decoration: const InputDecoration(labelText: 'Reason'),
+                  items: ChickAddition.reasonLabels.entries
+                      .map((e) => DropdownMenuItem(
+                          value: e.key, child: Text(e.value)))
+                      .toList(),
+                  onChanged: (v) => setDlg(() => reason = v ?? reason),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  reason == 'hatchery_extra'
+                      ? 'Free bonus chicks — no cost is added.'
+                      : reason == 'purchase'
+                          ? 'Bought after the initial order — adds to chick cost.'
+                          : 'Fix a miscount — use a negative number to reduce.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: countCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Number of chicks',
+                    hintText: reason == 'correction' ? 'e.g. 16 or -5' : 'e.g. 16',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                      'Date: ${additionDate.toIso8601String().split('T').first}'),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: additionDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) setDlg(() => additionDate = picked);
+                  },
+                ),
+                if (reason == 'purchase') ...[
+                  TextField(
+                    controller: priceCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration:
+                        const InputDecoration(labelText: 'Price per chick (ZMW)'),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                TextField(
+                  controller: notesCtrl,
+                  decoration:
+                      const InputDecoration(labelText: 'Notes (optional)'),
+                  maxLength: 500,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: saving ? null : () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final count = int.tryParse(countCtrl.text.trim());
+                      if (count == null || count == 0) return;
+                      final price = double.tryParse(priceCtrl.text.trim());
+                      if (reason == 'purchase' &&
+                          (price == null || price <= 0)) {
+                        return;
+                      }
+                      setDlg(() => saving = true);
+                      try {
+                        await BroilerService.addChickAddition(
+                          widget.flockId,
+                          count: count,
+                          reason: reason,
+                          additionDate:
+                              additionDate.toIso8601String().split('T').first,
+                          unitPriceZmw:
+                              reason == 'purchase' ? price : null,
+                          notes: notesCtrl.text.trim(),
+                        );
+                        if (ctx.mounted) Navigator.pop(ctx, true);
+                      } catch (e) {
+                        setDlg(() => saving = false);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text('Failed: $e')));
+                        }
+                      }
+                    },
+              child: Text(saving ? 'Saving…' : 'Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chick addition recorded')));
+      _loadData();
     }
   }
 
@@ -936,6 +1073,17 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 ),
                 if (flock.soldDate != null)
                   Text('Sold: ${flock.soldDate!.split('T').first}'),
+                if (_chickAdditions.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  const Divider(height: 1),
+                  const SizedBox(height: 6),
+                  ..._chickAdditions.map((a) => Text(
+                        '${a.additionDate.split('T').first}: ${a.count > 0 ? '+' : ''}${a.count} ${ChickAddition.reasonLabels[a.reason] ?? a.reason}'
+                        '${a.reason == 'purchase' && a.unitPriceZmw != null ? ' · ZMW ${(a.count * a.unitPriceZmw!).toStringAsFixed(2)}' : ''}'
+                        '${a.notes != null && a.notes!.isNotEmpty ? ' (${a.notes})' : ''}',
+                        style: const TextStyle(fontSize: 12),
+                      )),
+                ],
                 const SizedBox(height: 6),
                 Row(children: [
                   const Text('Status: '),
@@ -969,6 +1117,15 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         ),
         if (AuthService.canEdit && flock.status == 'active') ...[
           const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Add Chicks'),
+              onPressed: _showAddChicksDialog,
+            ),
+          ),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(

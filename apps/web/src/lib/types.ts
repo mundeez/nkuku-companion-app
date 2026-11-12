@@ -178,6 +178,20 @@ export interface BroilerFlock {
   feedProjection?: FeedProjectionStageSummary[];
 }
 
+export type ChickAdditionReason = "hatchery_extra" | "purchase" | "correction";
+
+export interface ChickAddition {
+  id: string;
+  flockId: string;
+  additionDate: string;
+  count: number;
+  reason: ChickAdditionReason;
+  unitPriceZmw?: number | null;
+  notes?: string | null;
+  financialRecordId?: string | null;
+  createdAt: string;
+}
+
 export interface FeedProjectionStageSummary {
   feedStageId: string;
   stageName: string;

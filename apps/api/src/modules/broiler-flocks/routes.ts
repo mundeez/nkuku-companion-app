@@ -7,6 +7,9 @@ import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { checkFlockLimit } from '../../core/billing/feature-gate.js';
 import { calculateItemsRequired } from '../../core/calculation-engine/index.js';
 import { AuditService } from '../../core/finance/audit.service.js';
+import { JournalEngine } from '../../core/double-entry/journal.engine.js';
+import { AutoPostService } from '../../core/double-entry/auto-post.service.js';
+import { checkFlockNotLocked, assertFlockNotCompleted } from './check-flock-locked.js';
 import { ListQuerySchema, searchWhere, dateRange, orderBy } from '../../core/list-query.js';
 import { resolveVaccinationSchedule } from '../../core/vaccination-schedule.resolver.js';
 import { computeDailyWater, computeVaccineMixVolume, isWaterRoute } from '../../core/water-requirement.service.js';
@@ -54,14 +57,26 @@ const FlockUpdateSchema = z.object({
   status: z.enum(['active', 'sold', 'completed', 'cancelled']).optional(),
   salePriceZmw: z.number().nonnegative().optional().nullable(),
   soldDate: dateOrIso.nullable().optional(),
-  initialCount: z.number().int().min(0).optional(),
-  currentCount: z.number().int().min(0).optional(),
+  // initialCount/currentCount are intentionally absent: bird-count changes go
+  // through the audited chick-additions, mortality and sales flows so the two
+  // columns can't silently drift apart.
   vaccinationScheduleId: z.string().uuid().nullable().optional(),
+});
+
+const ChickAdditionCreateSchema = z.object({
+  count: z.number().int().refine((n) => n !== 0, { message: 'count must be non-zero' }),
+  reason: z.enum(['hatchery_extra', 'purchase', 'correction']),
+  additionDate: dateOrIso,
+  unitPriceZmw: z.number().nonnegative().optional(),
+  notes: z.string().max(500).optional(),
 });
 
 export async function buildBroilerFlockModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
   const audit = new AuditService(prisma);
+  const journalEngine = new JournalEngine(prisma);
+  const autoPost = new AutoPostService(journalEngine, prisma);
+  const flockLock = checkFlockNotLocked(prisma);
 
   app.get('/', { preHandler: [authenticate] }, async (request, reply) => {
     const _authUser = (request as any).authUser;
@@ -562,7 +577,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     // Auto-create sales financial record when flock is marked as sold
     if (raw.status === 'sold' && existing.status !== 'sold') {
       const salePrice = raw.salePriceZmw ?? existing.salePriceZmw ?? 0;
-      const soldCount = raw.currentCount ?? existing.currentCount ?? 0;
+      const soldCount = existing.currentCount ?? 0;
       if (salePrice > 0 && soldCount > 0) {
         await prisma.financialRecord.create({
           data: {
@@ -581,6 +596,154 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     }
 
     return prisma.broilerFlock.findUnique({ where: { id }, include: { breed: true, supplier: { select: { id: true, name: true, contact: true, chickenType: true, feedStages: true } } } });
+  });
+
+  // ── Chick additions (hatchery extras / purchased top-ups / corrections) ──
+
+  app.get('/:id/chick-additions', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const organizationId = getOrganizationId(request);
+    const flock = await prisma.broilerFlock.findFirst({ where: { id, organizationId }, select: { id: true } });
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+    const items = await prisma.flockChickAddition.findMany({
+      where: { flockId: id },
+      orderBy: [{ additionDate: 'asc' }, { createdAt: 'asc' }],
+    });
+    return { items };
+  });
+
+  app.post('/:id/chick-additions', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const data = ChickAdditionCreateSchema.parse(request.body);
+    const _authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    if (data.reason !== 'correction' && data.count <= 0) {
+      return reply.status(400).send({ error: 'INVALID_COUNT', message: 'Only corrections may reduce the bird count.' });
+    }
+    if (data.reason === 'purchase' && (data.unitPriceZmw === undefined || data.unitPriceZmw <= 0)) {
+      return reply.status(400).send({ error: 'UNIT_PRICE_REQUIRED', message: 'Purchased chicks require a unit price.' });
+    }
+    if (data.reason !== 'purchase') data.unitPriceZmw = undefined;
+
+    const flock = await prisma.broilerFlock.findFirst({ where: { id, organizationId } });
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    if (flock.initialCount + data.count < 0 || flock.currentCount + data.count < 0) {
+      return reply.status(400).send({ error: 'COUNT_UNDERFLOW', message: 'This change would take a bird count below zero.' });
+    }
+
+    const { addition, finRecord } = await prisma.$transaction(async (tx: any) => {
+      let addition = await tx.flockChickAddition.create({
+        data: {
+          flockId: id,
+          organizationId,
+          additionDate: new Date(data.additionDate),
+          count: data.count,
+          reason: data.reason,
+          unitPriceZmw: data.unitPriceZmw,
+          notes: data.notes,
+          createdBy: _authUser.userId,
+        },
+      });
+      await tx.broilerFlock.update({
+        where: { id },
+        data: { initialCount: { increment: data.count }, currentCount: { increment: data.count } },
+      });
+      let finRecord = null;
+      if (data.reason === 'purchase') {
+        const amount = new Decimal(data.count).mul(data.unitPriceZmw!).toNumber();
+        finRecord = await tx.financialRecord.create({
+          data: {
+            flockId: id,
+            sourceRecordId: addition.id,
+            sourceTable: 'flock_chick_additions',
+            recordDate: new Date(data.additionDate),
+            category: 'chick_purchase',
+            description: `Additional chicks - ${flock.name} (${data.count} birds @ ZMW ${data.unitPriceZmw})`,
+            amountZmw: amount,
+            isIncome: false,
+            isSystemGenerated: true,
+            notes: 'Auto-generated from chick addition',
+          },
+        });
+        addition = await tx.flockChickAddition.update({ where: { id: addition.id }, data: { financialRecordId: finRecord.id } });
+      }
+      return { addition, finRecord };
+    });
+
+    if (finRecord) {
+      try {
+        await autoPost.postFromFinancialRecord(finRecord.id, _authUser.userId, 'manual');
+      } catch (err: any) {
+        app.log.error(`[ChickAddition] Auto-post failed for FR ${finRecord.id}: ${err.message}`);
+      }
+    }
+
+    await audit.log({
+      organizationId,
+      userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
+      entityType: 'FlockChickAddition',
+      entityId: addition.id,
+      action: 'create',
+      newState: addition,
+      ipAddress: request.ip,
+    });
+
+    return addition;
+  });
+
+  app.delete('/:id/chick-additions/:additionId', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {
+    const { id, additionId } = z.object({ id: z.string().uuid(), additionId: z.string().uuid() }).parse(request.params);
+    const _authUser = (request as any).authUser;
+    const organizationId = getOrganizationId(request);
+
+    const addition = await prisma.flockChickAddition.findFirst({
+      where: { id: additionId, flockId: id, organizationId },
+      include: { flock: { select: { status: true, currentCount: true, initialCount: true } } },
+    });
+    if (!addition) return reply.status(404).send({ error: 'NOT_FOUND' });
+    if (assertFlockNotCompleted(reply, addition.flock.status, _authUser?.role)) return;
+
+    if (addition.flock.initialCount - addition.count < 0 || addition.flock.currentCount - addition.count < 0) {
+      return reply.status(400).send({ error: 'COUNT_UNDERFLOW', message: 'Reversing this addition would take a bird count below zero.' });
+    }
+
+    if (addition.financialRecordId) {
+      const je = await prisma.journalEntry.findFirst({
+        where: { sourceId: addition.financialRecordId, organizationId },
+      });
+      if (je) {
+        try {
+          await journalEngine.reverse(je.id, _authUser.userId, `Chick addition ${additionId} deleted`);
+        } catch (err: any) {
+          app.log.error(`[ChickAddition] Journal reversal failed for JE ${je.id}: ${err.message}`);
+        }
+      }
+      await prisma.financialRecord.delete({ where: { id: addition.financialRecordId } });
+    }
+
+    await prisma.$transaction([
+      prisma.flockChickAddition.delete({ where: { id: additionId } }),
+      prisma.broilerFlock.update({
+        where: { id },
+        data: { initialCount: { decrement: addition.count }, currentCount: { decrement: addition.count } },
+      }),
+    ]);
+
+    await audit.log({
+      organizationId,
+      userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
+      entityType: 'FlockChickAddition',
+      entityId: additionId,
+      action: 'delete',
+      previousState: addition,
+      ipAddress: request.ip,
+    });
+
+    return { deleted: true };
   });
 
   app.delete('/:id', { preHandler: [authenticate, requireRole('owner')] }, async (request, reply) => {

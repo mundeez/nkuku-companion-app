@@ -834,6 +834,7 @@ model BroilerFlock {
   feedPurchases        FeedPurchase[]
   feedBags             FeedBag[]
   vaccinationSchedule  VaccinationSchedule?  @relation("FlockVaccinationSchedule", fields: [vaccinationScheduleId], references: [id], onDelete: SetNull)
+  chickAdditions       FlockChickAddition[]
 
   @@index([breedId, status])
   @@index([supplierId])
@@ -852,6 +853,33 @@ enum FlockStatus {
 enum HousingType {
   whole_house
   spot_brooding
+}
+
+enum ChickAdditionReason {
+  hatchery_extra
+  purchase
+  correction
+}
+
+model FlockChickAddition {
+  id                String               @id @default(uuid()) @db.Uuid
+  flockId           String               @map("flock_id") @db.Uuid
+  organizationId    String               @map("organization_id") @db.Uuid
+  additionDate      DateTime             @map("addition_date") @db.Date
+  count             Int
+  reason            ChickAdditionReason
+  unitPriceZmw      Decimal?             @map("unit_price_zmw") @db.Decimal(14, 2)
+  notes             String?              @db.VarChar(500)
+  financialRecordId String?              @map("financial_record_id") @db.Uuid
+  createdBy         String?              @map("created_by") @db.Uuid
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  flock BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+
+  @@index([flockId])
+  @@index([organizationId])
+  @@map("flock_chick_additions")
 }
 
 model GrowthRecord {

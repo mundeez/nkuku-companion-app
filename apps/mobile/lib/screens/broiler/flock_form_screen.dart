@@ -176,6 +176,12 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
       );
 
       final body = flock.toJson();
+      // Counts are immutable on update — they move via chick additions,
+      // mortality and sales so initial/current stay consistent.
+      if (widget.flock != null) {
+        body.remove('initialCount');
+        body.remove('currentCount');
+      }
       // Explicitly clearing a previously set override requires sending null.
       if (_selectedScheduleId == null &&
           widget.flock?.vaccinationScheduleId != null) {
@@ -254,18 +260,20 @@ class _FlockFormScreenState extends State<FlockFormScreen> {
                       trailing: const Icon(Icons.calendar_today),
                       onTap: _pickStartDate,
                     ),
-                    TextFormField(
-                      controller: _initialCountController,
-                      decoration: const InputDecoration(labelText: 'Initial bird count'),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) {
-                        final n = int.tryParse(v ?? '');
-                        if (n == null || n < 1) return 'Enter at least 1';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
+                    if (widget.flock == null) ...[
+                      TextFormField(
+                        controller: _initialCountController,
+                        decoration: const InputDecoration(labelText: 'Initial bird count'),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        validator: (v) {
+                          final n = int.tryParse(v ?? '');
+                          if (n == null || n < 1) return 'Enter at least 1';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     TextFormField(
                       controller: _chickPriceController,
                       decoration: const InputDecoration(labelText: 'Chick price (ZMW)'),

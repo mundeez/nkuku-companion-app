@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'package:dio/dio.dart';
 import '../models/breed.dart';
+import '../models/chick_addition.dart';
 import '../models/document.dart';
 import '../models/environmental_record.dart';
 import '../models/financial_record.dart';
@@ -144,6 +145,49 @@ class BroilerService {
       }
       rethrow;
     }
+  }
+
+  // ── Chick additions ────────────────────────────────────────────────
+
+  static Future<List<ChickAddition>> getChickAdditions(String flockId) async {
+    final res = await ApiService.dio
+        .get('/api/v1/broiler-flocks/$flockId/chick-additions');
+    _assertOk(res);
+    final items = (res.data['items'] as List? ?? const []);
+    return items
+        .map((e) => ChickAddition.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<ChickAddition> addChickAddition(
+    String flockId, {
+    required int count,
+    required String reason,
+    required String additionDate,
+    double? unitPriceZmw,
+    String? notes,
+  }) async {
+    final res = await ApiService.dio.post(
+      '/api/v1/broiler-flocks/$flockId/chick-additions',
+      data: {
+        'count': count,
+        'reason': reason,
+        'additionDate': additionDate,
+        if (unitPriceZmw != null) 'unitPriceZmw': unitPriceZmw,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      },
+    );
+    _assertOk(res);
+    ConnectivityService.instance.markOnline();
+    return ChickAddition.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  static Future<void> deleteChickAddition(
+      String flockId, String additionId) async {
+    final res = await ApiService.dio.delete(
+        '/api/v1/broiler-flocks/$flockId/chick-additions/$additionId');
+    _assertOk(res);
+    ConnectivityService.instance.markOnline();
   }
 
   /// Marks a flock as completed (POST /:id/complete). Returns the decoded

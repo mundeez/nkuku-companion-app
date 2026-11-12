@@ -7,12 +7,13 @@ import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
 import { useFlock, useUpdateFlock, useApiQuery, useApiMutation } from "@/lib/api/hooks";
-import { BroilerFlock, GrowthRecord, FeedRecord, FeedPurchase, FeedProjectionResult, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
+import { BroilerFlock, GrowthRecord, FeedRecord, FeedPurchase, FeedProjectionResult, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier, ChickAddition, ChickAdditionReason } from "@/lib/types";
 import { FeedProjectionTable } from "@/components/feed-projection-table";
 import { FlockVaccinationSchedule } from "@/components/flock-vaccination-schedule";
 import { useHatchDayConvention, displayDay } from "@/lib/day-convention";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +32,12 @@ import { AttachmentPanel } from "@/components/attachments/AttachmentPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AdSlot } from "@/components/ads/AdSlot";
+
+const CHICK_ADDITION_LABELS: Record<ChickAdditionReason, string> = {
+  hatchery_extra: "Hatchery extras (free)",
+  purchase: "Purchased top-up",
+  correction: "Count correction",
+};
 
 function fmtCollectionDate(date: string | Date | undefined): string {
   if (!date) return "";
@@ -84,6 +91,11 @@ export default function FlockDetailPage() {
     { enabled: !!flockId }
   );
   const { data: suppliers = [], refetch: refetchSuppliers } = useApiQuery<Supplier[]>("/api/v1/suppliers");
+  const { data: chickAdditionsData, refetch: refetchChickAdditions } = useApiQuery<{ items: ChickAddition[] }>(
+    `/api/v1/broiler-flocks/${flockId}/chick-additions`,
+    { enabled: !!flockId }
+  );
+  const chickAdditions = chickAdditionsData?.items ?? [];
 
   const updateFlock = useUpdateFlock();
   const completeFlockMutation = useApiMutation("POST", {
@@ -101,6 +113,16 @@ export default function FlockDetailPage() {
   const [projectedSalePrice, setProjectedSalePrice] = useState<string>("");
   const [completeOpen, setCompleteOpen] = useState(false);
   const [completeWarning, setCompleteWarning] = useState<string | null>(null);
+  const [addChicksOpen, setAddChicksOpen] = useState(false);
+  const [addChicksForm, setAddChicksForm] = useState<{
+    count: string;
+    reason: ChickAdditionReason;
+    additionDate: string;
+    unitPriceZmw: string;
+    notes: string;
+  }>({ count: "", reason: "hatchery_extra", additionDate: new Date().toISOString().split("T")[0], unitPriceZmw: "", notes: "" });
+  const addChicksMutation = useApiMutation("POST");
+  const deleteAdditionMutation = useApiMutation("DELETE");
 
   const canCreateEdit = user?.role === "owner" || user?.role === "manager";
 
@@ -130,6 +152,58 @@ export default function FlockDetailPage() {
     refetchVaccination();
     refetchFinancial();
     refetchSuppliers();
+    refetchChickAdditions();
+  }
+
+  async function submitChickAddition() {
+    const count = parseInt(addChicksForm.count, 10);
+    if (!count) {
+      addToast("Enter a non-zero bird count.", "error");
+      return;
+    }
+    const body: any = {
+      count,
+      reason: addChicksForm.reason,
+      additionDate: addChicksForm.additionDate,
+      notes: addChicksForm.notes || undefined,
+    };
+    if (addChicksForm.reason === "purchase") {
+      const price = parseFloat(addChicksForm.unitPriceZmw);
+      if (!price || price <= 0) {
+        addToast("Purchased chicks require a unit price.", "error");
+        return;
+      }
+      body.unitPriceZmw = price;
+    }
+    try {
+      await addChicksMutation.mutateAsync({ path: `/api/v1/broiler-flocks/${flockId}/chick-additions`, body });
+      addToast("Chick addition recorded.", "success");
+      setAddChicksOpen(false);
+      refetchAll();
+    } catch (err: any) {
+      addToast(err.message || "Failed to record chick addition.", "error");
+    }
+  }
+
+  async function deleteChickAddition(addition: ChickAddition) {
+    try {
+      await deleteAdditionMutation.mutateAsync({ path: `/api/v1/broiler-flocks/${flockId}/chick-additions/${addition.id}` });
+      addToast("Chick addition removed.", "success");
+      refetchAll();
+    } catch (err: any) {
+      addToast(err.message || "Failed to remove chick addition.", "error");
+    }
+  }
+
+  function openAddChicks() {
+    setAddChicksForm({
+      count: "",
+      reason: "hatchery_extra",
+      additionDate: new Date().toISOString().split("T")[0],
+      unitPriceZmw: flock?.chickPriceZmw ? String(Number(flock.chickPriceZmw)) : "",
+      notes: "",
+    });
+    setAddChicksOpen(true);
   }
 
   async function saveCollectionStatus() {
@@ -273,7 +347,12 @@ export default function FlockDetailPage() {
   const totalMortality = mortalityEvents.reduce((sum, e) => sum + e.count, 0);
   const financialCost = financialRecords.filter((r) => !r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
   const hasChickFinancialRecord = financialRecords.some((r) => r.category === "chick_purchase" && !r.isIncome);
-  const chickPurchaseCost = !hasChickFinancialRecord && flock.chickPriceZmw ? Number(flock.chickPriceZmw) * flock.initialCount : 0;
+  // Fallback estimate when no chick financial record exists yet: paid birds are
+  // the received count minus free hatchery extras and corrections.
+  const unpaidAdditions = chickAdditions.filter((a) => a.reason !== "purchase").reduce((s, a) => s + a.count, 0);
+  const chickPurchaseCost = !hasChickFinancialRecord && flock.chickPriceZmw
+    ? Number(flock.chickPriceZmw) * Math.max(0, flock.initialCount - unpaidAdditions)
+    : 0;
   const totalCost = financialCost + chickPurchaseCost;
   const totalRevenue = financialRecords.filter((r) => r.isIncome).reduce((sum, r) => sum + Number(r.amountZmw), 0);
   const actualProfit = totalRevenue - totalCost;
@@ -524,22 +603,74 @@ export default function FlockDetailPage() {
         <TabsContent value="chicks">
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Package className="h-4 w-4" /> Chick Purchase
                 </CardTitle>
+                {canCreateEdit && flock.status !== "completed" && (
+                  <Button variant="outline" size="sm" onClick={openAddChicks}>Add Chicks</Button>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  {flock.chickPriceZmw ? (
-                    <>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Unit Price</span><span className="font-medium">ZMW {flock.chickPriceZmw}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span className="font-medium">{flock.initialCount} birds</span></div>
-                      <div className="flex justify-between border-t pt-2 mt-2"><span className="font-medium">Total Cost</span><span className="font-bold">ZMW {(flock.chickPriceZmw * flock.initialCount).toFixed(2)}</span></div>
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground">No chick purchase data recorded.</p>
+                  {flock.chickPriceZmw && (
+                    <div className="flex justify-between"><span className="text-muted-foreground">Unit Price</span><span className="font-medium">ZMW {flock.chickPriceZmw}</span></div>
                   )}
+                  <div className="flex justify-between"><span className="text-muted-foreground">Total Received</span><span className="font-medium">{flock.initialCount} birds</span></div>
+                  {chickAdditions.length > 0 && (
+                    <div className="border-t pt-2 mt-2 space-y-1">
+                      {chickAdditions.map((a) => (
+                        <div key={a.id} className="flex justify-between items-center gap-2">
+                          <span className="text-muted-foreground">
+                            {new Date(a.additionDate).toLocaleDateString()} — {CHICK_ADDITION_LABELS[a.reason]}
+                            {a.notes ? ` (${a.notes})` : ""}
+                          </span>
+                          <span className="font-medium flex items-center gap-1">
+                            {a.count > 0 ? "+" : ""}{a.count}
+                            {a.reason === "purchase" && a.unitPriceZmw != null && (
+                              <span className="text-muted-foreground">· ZMW {(a.count * Number(a.unitPriceZmw)).toFixed(2)}</span>
+                            )}
+                            {user?.role === "owner" && flock.status !== "completed" && (
+                              <button
+                                type="button"
+                                className="text-muted-foreground hover:text-destructive ml-1"
+                                onClick={() => deleteChickAddition(a)}
+                                disabled={deleteAdditionMutation.isPending}
+                                title="Remove addition"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(() => {
+                    const chickFinCost = financialRecords
+                      .filter((r) => r.category === "chick_purchase" && !r.isIncome)
+                      .reduce((s, r) => s + Number(r.amountZmw), 0);
+                    if (chickFinCost > 0) {
+                      return (
+                        <div className="flex justify-between border-t pt-2 mt-2">
+                          <span className="font-medium">Total Chick Cost</span>
+                          <span className="font-bold">ZMW {chickFinCost.toFixed(2)}</span>
+                        </div>
+                      );
+                    }
+                    if (flock.chickPriceZmw) {
+                      // No financial records yet — estimate paid birds as received minus free/correction additions
+                      const unpaid = chickAdditions.filter((a) => a.reason !== "purchase").reduce((s, a) => s + a.count, 0);
+                      const paidCount = Math.max(0, flock.initialCount - unpaid);
+                      return (
+                        <div className="flex justify-between border-t pt-2 mt-2">
+                          <span className="font-medium">Total Cost (est.)</span>
+                          <span className="font-bold">ZMW {(Number(flock.chickPriceZmw) * paidCount).toFixed(2)}</span>
+                        </div>
+                      );
+                    }
+                    return <p className="text-muted-foreground">No chick purchase data recorded.</p>;
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -791,6 +922,87 @@ export default function FlockDetailPage() {
             <Button variant="outline" onClick={() => setCompleteOpen(false)}>Cancel</Button>
             <Button onClick={handleCompleteFlock} disabled={completing} className="bg-green-600 hover:bg-green-700">
               {completing ? "Completing..." : "Complete Flock"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addChicksOpen} onOpenChange={setAddChicksOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Chicks</DialogTitle>
+            <DialogDescription>
+              Record extra chicks placed in <strong>{flock.name}</strong> after the initial order. Both the received and current counts are updated.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Reason</Label>
+              <Select
+                value={addChicksForm.reason}
+                onValueChange={(v) => setAddChicksForm({ ...addChicksForm, reason: v as ChickAdditionReason })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hatchery_extra">Hatchery extras (free)</SelectItem>
+                  <SelectItem value="purchase">Purchased top-up</SelectItem>
+                  <SelectItem value="correction">Count correction</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {addChicksForm.reason === "hatchery_extra" && "Free bonus chicks from the hatchery — no cost is added."}
+                {addChicksForm.reason === "purchase" && "Chicks bought after the initial order — adds to chick cost."}
+                {addChicksForm.reason === "correction" && "Fix a miscount — use a negative number to reduce the count."}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Number of Chicks</Label>
+                <Input
+                  type="number"
+                  value={addChicksForm.count}
+                  placeholder={addChicksForm.reason === "correction" ? "e.g., 16 or -5" : "e.g., 16"}
+                  onChange={(e) => setAddChicksForm({ ...addChicksForm, count: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={addChicksForm.additionDate}
+                  onChange={(e) => setAddChicksForm({ ...addChicksForm, additionDate: e.target.value })}
+                />
+              </div>
+            </div>
+            {addChicksForm.reason === "purchase" && (
+              <div>
+                <Label>Price per Chick (ZMW)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={addChicksForm.unitPriceZmw}
+                  onChange={(e) => setAddChicksForm({ ...addChicksForm, unitPriceZmw: e.target.value })}
+                />
+                {addChicksForm.unitPriceZmw && addChicksForm.count && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total: ZMW {(parseFloat(addChicksForm.unitPriceZmw) * parseInt(addChicksForm.count || "0", 10)).toFixed(2)}
+                  </p>
+                )}
+              </div>
+            )}
+            <div>
+              <Label>Notes (optional)</Label>
+              <Input
+                value={addChicksForm.notes}
+                maxLength={500}
+                onChange={(e) => setAddChicksForm({ ...addChicksForm, notes: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddChicksOpen(false)}>Cancel</Button>
+            <Button onClick={submitChickAddition} disabled={addChicksMutation.isPending}>
+              {addChicksMutation.isPending ? "Saving..." : "Add Chicks"}
             </Button>
           </DialogFooter>
         </DialogContent>
