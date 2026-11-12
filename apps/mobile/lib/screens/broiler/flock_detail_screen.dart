@@ -9,6 +9,7 @@ import '../../models/feed_bag.dart';
 import '../../models/feed_record.dart';
 import '../../models/feed_purchase.dart';
 import '../../models/flock.dart';
+import '../../utils/display.dart';
 import '../../models/growth_record.dart';
 import '../../models/medication_record.dart';
 import '../../models/mortality_event.dart';
@@ -188,6 +189,10 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
       // path from ~17 sequential/partially-parallel round-trips down to a
       // handful of concurrent batches.
       final flockFuture = BroilerService.getFlock(widget.flockId);
+      // Refresh the org day-counting convention for displayDay() labels.
+      final orgFuture = BroilerService.getOrganization()
+          .then((_) {})
+          .catchError((_) {});
 
       final calendarFuture = ApiService.dio
           .get('/api/v1/broiler-flocks/${widget.flockId}/summary')
@@ -239,6 +244,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               filter: _salesFilter));
 
       final flock = await flockFuture;
+      await orgFuture;
 
       // Fetch breed performance targets for growth chart — the only truly
       // sequential dependency (needs flock.breedId) — while everything else
@@ -913,7 +919,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   Text(
                       'Est. Collection: ${flock.expectedCollectionStart!.split('T').first} – ${flock.expectedCollectionEnd!.split('T').first}'),
                 Text(
-                    'Age: ${flock.startDate == null ? 'Pending collection' : 'Day ${flock.ageDays ?? 0}'}'),
+                    'Age: ${flock.startDate == null ? 'Pending collection' : 'Day ${displayDay(flock.ageDays ?? 0)}'}'),
                 Text(
                     'Harvest Date: ${flock.harvestDateStr ?? 'Pending collection'}'),
                 Text(
@@ -988,20 +994,20 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 const SizedBox(height: 8),
                 FeedPhaseRow(
                     phase: 'Starter',
-                    dayRange: 'Day 1 - $feedTransition',
+                    dayRange: 'Day ${displayDay(0)} - ${displayDay(feedTransition - 1)}',
                     color: Colors.orange),
                 FeedPhaseRow(
                     phase: 'Grower',
-                    dayRange: 'Day ${feedTransition + 1} - $finisherDay',
+                    dayRange: 'Day ${displayDay(feedTransition)} - ${displayDay(finisherDay - 1)}',
                     color: Colors.teal),
                 FeedPhaseRow(
                     phase: 'Finisher',
-                    dayRange: 'Day ${finisherDay + 1}+',
+                    dayRange: 'Day ${displayDay(finisherDay)}+',
                     color: Colors.brown),
                 const SizedBox(height: 8),
-                Text('Transition day: Day $feedTransition (configurable)',
+                Text('Transition day: Day ${displayDay(feedTransition)} (configurable)',
                     style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                Text('Finisher start: Day $finisherDay (configurable)',
+                Text('Finisher start: Day ${displayDay(finisherDay)} (configurable)',
                     style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
@@ -1022,7 +1028,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   if (flock.targetWeight != null)
                     Text('Target weight: ${flock.targetWeight} kg'),
                   if (flock.targetAge != null)
-                    Text('Target age: Day ${flock.targetAge}'),
+                    Text('Target age: Day ${displayDay(flock.targetAge ?? 42)}'),
                 ],
               ),
             ),
@@ -1124,7 +1130,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         children: [
           if (analysis != null)
             SummaryCard(children: [
-              SummaryRow('Current age', 'Day ${analysis.ageDays}'),
+              SummaryRow('Current age', 'Day ${displayDay(analysis.ageDays)}'),
               SummaryRow('Records', '${analysis.records.length}'),
               SummaryRow('FCR', analysis.fcr?.toStringAsFixed(2) ?? '-'),
             ]),
@@ -1157,7 +1163,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               ),
             ..._growthRecords.reversed.map((r) => RecordCard(
                   title:
-                      'Day ${r.recordDate.difference(DateTime.parse(_flock!.startDate ?? r.recordDate.toIso8601String())).inDays}',
+                      'Day ${displayDay(r.recordDate.difference(DateTime.parse(_flock!.startDate ?? r.recordDate.toIso8601String())).inDays)}',
                   subtitle: '${r.avgWeight}g avg · ${r.sampleSize} sampled',
                   trailing:
                       Text(r.recordDate.toIso8601String().split('T').first),
@@ -1212,7 +1218,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   Widget _projectionStageRow(FeedProjectionStage s) {
     final remainingColor = s.bagsRemaining > 0 ? Colors.orange : Colors.green;
     final dayRange = s.dayRangeStart != null
-        ? 'Day ${s.dayRangeStart}${s.dayRangeEnd != null ? '-${s.dayRangeEnd}' : '+'}'
+        ? 'Day ${displayDay(s.dayRangeStart!)}${s.dayRangeEnd != null ? '-${displayDay(s.dayRangeEnd!)}' : '+'}'
         : '-';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1265,7 +1271,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             ? Colors.orange
             : Colors.grey[400];
     final dayRange = t.dayRangeStart != null
-        ? 'Day ${t.dayRangeStart}${t.dayRangeEnd != null ? '–${t.dayRangeEnd}' : '+'}'
+        ? 'Day ${displayDay(t.dayRangeStart!)}${t.dayRangeEnd != null ? '–${displayDay(t.dayRangeEnd!)}' : '+'}'
         : null;
     String fmt(num v) => v.toStringAsFixed(0).replaceAllMapped(
         RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
@@ -1915,7 +1921,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             ...completed.reversed.map((r) => RecordCard(
                   title: r.vaccineName,
                   subtitle:
-                      '${r.adminMethod} · Day ${r.ageDays}${r.batchNumber != null ? ' · Batch ${r.batchNumber}' : ''}',
+                      '${r.adminMethod} · Day ${displayDay(r.ageDays)}${r.batchNumber != null ? ' · Batch ${r.batchNumber}' : ''}',
                   trailing:
                       Text(r.adminDate.toIso8601String().split('T').first),
                   onEdit: AuthService.canEdit
@@ -2260,11 +2266,11 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                         backgroundColor: isCurrent
                             ? primary.withAlpha(60)
                             : Colors.orange.withAlpha(30),
-                        child: Text('${day.day}'),
+                        child: Text('${day.displayDay}'),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text('Day ${day.day}',
+                        child: Text('Day ${day.displayDay}',
                             style: const TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.bold)),
                       ),

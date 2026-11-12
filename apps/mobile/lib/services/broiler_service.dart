@@ -8,6 +8,7 @@ import '../models/feed_bag.dart';
 import '../models/feed_record.dart';
 import '../models/feed_purchase.dart';
 import '../models/flock.dart';
+import '../utils/display.dart';
 import '../models/flock_task.dart';
 import '../models/growth_record.dart';
 import '../models/medication_record.dart';
@@ -740,12 +741,16 @@ class BroilerService {
         .toList();
   }
 
-  /// Current organization settings (includes defaultVaccinationScheduleId and
-  /// ambientTempC).
+  /// Current organization settings (includes defaultVaccinationScheduleId,
+  /// ambientTempC and hatchDayConvention). Also refreshes the global
+  /// DayConvention used by the displayDay() helper.
   static Future<Map<String, dynamic>> getOrganization() async {
     final res = await ApiService.dio.get('/api/v1/organizations/me');
     _assertOk(res);
-    return Map<String, dynamic>.from(res.data as Map);
+    final org = Map<String, dynamic>.from(res.data as Map);
+    final conv = org['hatchDayConvention']?.toString();
+    if (conv == 'day0' || conv == 'day1') DayConvention.current = conv!;
+    return org;
   }
 
   static Future<Map<String, dynamic>> updateOrganization(

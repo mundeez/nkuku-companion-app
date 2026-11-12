@@ -1,4 +1,5 @@
 import { isWaterRoute } from './water-requirement.service.js';
+import { displayDayOf } from './day-convention.js';
 
 type ScheduleItemLike = {
   vaccineName: string;
@@ -25,6 +26,7 @@ export function buildVaccinationDayNotes(
   scheduleItems: ScheduleItemLike[],
   d: number,
   vaccineEntries: VaccineEntryLike[] = [],
+  convention: string = 'day1',
 ): string {
   const parts: string[] = [];
 
@@ -39,7 +41,7 @@ export function buildVaccinationDayNotes(
   // PRE/POST — derived from every farm-administered item (ageDays > 0)
   for (const item of scheduleItems) {
     if (item.ageDays <= 0) continue; // hatchery D0 — no on-farm pre/post
-    const displayDay = item.ageDays + 1;
+    const displayDay = displayDayOf(item.ageDays, convention);
     const waterRoute = isWaterRoute(item.adminMethod);
 
     if (d === item.ageDays - 2 && waterRoute) {

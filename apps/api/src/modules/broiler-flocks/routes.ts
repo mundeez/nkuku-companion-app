@@ -11,6 +11,7 @@ import { ListQuerySchema, searchWhere, dateRange, orderBy } from '../../core/lis
 import { resolveVaccinationSchedule } from '../../core/vaccination-schedule.resolver.js';
 import { computeDailyWater, computeVaccineMixVolume, isWaterRoute } from '../../core/water-requirement.service.js';
 import { buildVaccinationDayNotes } from '../../core/vaccination-notes.js';
+import { displayDayOf } from '../../core/day-convention.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -962,13 +963,14 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
     const [schedule, org, mortalityEvents, feedTargets, completedVaccines] = await Promise.all([
       resolveVaccinationSchedule(prisma, flock),
-      prisma.organization.findUnique({ where: { id: organizationId }, select: { ambientTempC: true } }),
+      prisma.organization.findUnique({ where: { id: organizationId }, select: { ambientTempC: true, hatchDayConvention: true } }),
       prisma.mortalityEvent.findMany({ where: { flockId: id }, select: { eventDate: true, count: true } }),
       prisma.performanceTarget.findMany({ where: { breedId: flock.breedId }, select: { ageDays: true, targetFeed: true } }),
       prisma.vaccinationEvent.findMany({ where: { flockId: id }, orderBy: { adminDate: 'asc' } }),
     ]);
 
     const ambientTempC = Number(org?.ambientTempC ?? 25);
+    const conv = org?.hatchDayConvention ?? 'day1';
     const birdsAliveAt = (age: number) => {
       const date = new Date(startDate.getTime() + age * 24 * 60 * 60 * 1000);
       const deaths = mortalityEvents.reduce((sum: number, m: any) => sum + (new Date(m.eventDate) <= date ? m.count : 0), 0);
@@ -994,7 +996,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     // Placement / brooding start
     events.push({
       ageDays: 0,
-      displayDay: 1,
+      displayDay: displayDayOf(0, conv),
       date: startDate.toISOString().split('T')[0],
       type: 'management',
       title: 'Chick placement / brooding starts',
@@ -1008,7 +1010,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const completed = completedVaccines.some((v: any) => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - 0) <= 1);
       events.push({
         ageDays: 1,
-        displayDay: 2,
+        displayDay: displayDayOf(1, conv),
         date: date.toISOString().split('T')[0],
         type: 'vaccination',
         title: `Vaccination: ${item.vaccineName}`,
@@ -1021,7 +1023,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     // Feed transitions
     events.push({
       ageDays: feedTransitionDay,
-      displayDay: feedTransitionDay + 1,
+      displayDay: displayDayOf(feedTransitionDay, conv),
       date: new Date(startDate.getTime() + feedTransitionDay * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       type: 'feed',
       title: 'Feed transition: Starter to Grower',
@@ -1030,7 +1032,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     });
     events.push({
       ageDays: finisherDay,
-      displayDay: finisherDay + 1,
+      displayDay: displayDayOf(finisherDay, conv),
       date: new Date(startDate.getTime() + finisherDay * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       type: 'feed',
       title: 'Feed transition: Grower to Finisher',
@@ -1044,7 +1046,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const completed = completedVaccines.some((v: any) => v.vaccineName === item.vaccineName && Math.abs(v.ageDays - item.ageDays) <= 1);
       events.push({
         ageDays: item.ageDays,
-        displayDay: item.ageDays + 1,
+        displayDay: displayDayOf(item.ageDays, conv),
         date: date.toISOString().split('T')[0],
         type: 'vaccination',
         title: `Vaccination: ${item.vaccineName}`,
@@ -1057,7 +1059,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     // Pre-slaughter withdrawal
     events.push({
       ageDays: targetAge - 7,
-      displayDay: targetAge - 6,
+      displayDay: displayDayOf(targetAge - 7, conv),
       date: new Date(startDate.getTime() + (targetAge - 7) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       type: 'management',
       title: 'Pre-slaughter withdrawal (coccidiostats)',
@@ -1068,7 +1070,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     // Market / processing
     events.push({
       ageDays: targetAge,
-      displayDay: targetAge + 1,
+      displayDay: displayDayOf(targetAge, conv),
       date: new Date(startDate.getTime() + targetAge * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       type: 'management',
       title: 'Market / processing date',
@@ -1111,12 +1113,13 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         where: { flockId: id },
         orderBy: { adminDate: 'asc' },
       }),
-      prisma.organization.findUnique({ where: { id: organizationId }, select: { ambientTempC: true } }),
+      prisma.organization.findUnique({ where: { id: organizationId }, select: { ambientTempC: true, hatchDayConvention: true } }),
       prisma.mortalityEvent.findMany({ where: { flockId: id }, select: { eventDate: true, count: true } }),
       prisma.performanceTarget.findMany({ where: { breedId: flock.breedId }, select: { ageDays: true, targetFeed: true } }),
     ]);
 
     const ambientTempC = Number(org?.ambientTempC ?? 25);
+    const conv = org?.hatchDayConvention ?? 'day1';
     const birdsAliveAt = (date: Date) => {
       const deaths = mortalityEvents.reduce((sum: number, m: any) => sum + (new Date(m.eventDate) <= date ? m.count : 0), 0);
       return Math.max(0, flock.initialCount - deaths);
@@ -1134,7 +1137,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         const waterRoute = isWaterRoute(item.adminMethod);
         return {
           ...item,
-          displayDay: item.ageDays + 1,
+          displayDay: displayDayOf(item.ageDays, conv),
           adminMethod: item.adminMethod,
           isWaterRoute: waterRoute,
           vaccineWater: waterRoute && water
@@ -1159,7 +1162,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
       // Vaccination-day guidance is derived from the resolved schedule so it
       // stays correct when a flock overrides its schedule.
-      const vaccineNotes = buildVaccinationDayNotes(schedule?.items ?? [], d, vaccines);
+      const vaccineNotes = buildVaccinationDayNotes(schedule?.items ?? [], d, vaccines, conv);
 
       const healthSupport = d === 0
         ? 'Day 1-3: Stress pack (glucose + electrolytes + vitamins A/D3/E/C) in drinking water. Rehydrates chicks, stimulates appetite, jumpstarts yolk-sac absorption. Hatchery vaccination complete.'
@@ -1189,8 +1192,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
       days.push({
         day: d,
-        displayDay: d + 1,
-        age: `Day ${d + 1}`,
+        displayDay: displayDayOf(d, conv),
+        age: `Day ${displayDayOf(d, conv)}`,
         date: date.toISOString().split('T')[0],
         birdsAlive,
         water,

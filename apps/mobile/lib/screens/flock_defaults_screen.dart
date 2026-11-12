@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/flock.dart';
 import '../services/broiler_service.dart';
+import '../utils/display.dart';
 
 /// Owner-only organization defaults: the vaccination schedule applied to new
 /// flocks and the ambient temperature used for daily water estimates.
@@ -18,6 +19,7 @@ class _FlockDefaultsScreenState extends State<FlockDefaultsScreen> {
   List<VaccinationSchedule> _schedules = [];
   String? _scheduleId; // null = auto (breed default)
   final _ambientController = TextEditingController(text: '25');
+  String _hatchDayConvention = 'day1';
 
   @override
   void initState() {
@@ -46,6 +48,8 @@ class _FlockDefaultsScreenState extends State<FlockDefaultsScreen> {
         _ambientController.text =
             (double.tryParse(org['ambientTempC']?.toString() ?? '') ?? 25)
                 .toString();
+        _hatchDayConvention =
+            org['hatchDayConvention']?.toString() == 'day0' ? 'day0' : 'day1';
         _loading = false;
       });
     } catch (e) {
@@ -71,7 +75,9 @@ class _FlockDefaultsScreenState extends State<FlockDefaultsScreen> {
       await BroilerService.updateOrganization({
         'defaultVaccinationScheduleId': _scheduleId,
         'ambientTempC': temp,
+        'hatchDayConvention': _hatchDayConvention,
       });
+      DayConvention.current = _hatchDayConvention;
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Flock defaults saved')));
@@ -122,6 +128,25 @@ class _FlockDefaultsScreenState extends State<FlockDefaultsScreen> {
                   ),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  key: ValueKey(_hatchDayConvention),
+                  initialValue: _hatchDayConvention,
+                  decoration: const InputDecoration(
+                    labelText: 'Day counting',
+                    helperText:
+                        'How flock age is labelled on calendars, schedules and dashboards.',
+                    helperMaxLines: 2,
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'day1', child: Text('Hatch day is Day 1')),
+                    DropdownMenuItem(
+                        value: 'day0', child: Text('Hatch day is Day 0')),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _hatchDayConvention = v ?? 'day1'),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),

@@ -603,6 +603,47 @@ describe('Broiler Management API', () => {
       expect(Number(org.ambientTempC)).toBe(30);
     });
 
+    it('hatchDayConvention day0 makes schedule displayDay equal ageDays; day1 restores +1', async () => {
+      // Switch to day0
+      let res = await fetch(`${API_URL}/api/v1/organizations/me`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hatchDayConvention: 'day0' }),
+      });
+      expect(res.status).toBe(200);
+      let org = await res.json();
+      expect(org.hatchDayConvention).toBe('day0');
+
+      // Schedules and flock schedule now show raw elapsed days
+      const scheds = await fetch(`${API_URL}/api/v1/vaccination-events/schedules`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await scheds.json();
+      const item = data[0].items[0];
+      expect(item.displayDay).toBe(item.ageDays);
+
+      const flockSched = await fetch(`${API_URL}/api/v1/vaccination-events/schedule?flockId=${overrideFlockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const flockData = await flockSched.json();
+      expect(flockData.schedule.items[0].displayDay).toBe(flockData.schedule.items[0].ageDays);
+
+      // Restore day1
+      res = await fetch(`${API_URL}/api/v1/organizations/me`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hatchDayConvention: 'day1' }),
+      });
+      expect(res.status).toBe(200);
+      org = await res.json();
+      expect(org.hatchDayConvention).toBe('day1');
+      const scheds2 = await fetch(`${API_URL}/api/v1/vaccination-events/schedules`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data2 = await scheds2.json();
+      expect(data2[0].items[0].displayDay).toBe(data2[0].items[0].ageDays + 1);
+    });
+
     it('cleans up test flocks and resets org defaults', async () => {
       for (const id of [overrideFlockId, orgDefaultFlockId]) {
         await fetch(`${API_URL}/api/v1/broiler-flocks/${id}`, {

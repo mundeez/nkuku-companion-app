@@ -5,8 +5,9 @@ import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 import { resolveVaccinationSchedule } from '../../core/vaccination-schedule.resolver.js';
+import { displayDayOf, getHatchDayConvention } from '../../core/day-convention.js';
 
-const withDisplayDay = (item: any) => ({ ...item, displayDay: item.ageDays + 1 });
+const withDisplayDay = (item: any, convention: string) => ({ ...item, displayDay: displayDayOf(item.ageDays, convention) });
 
 const VaccinationEventCreateSchema = z.object({
   flockId: z.string().uuid(),
@@ -28,16 +29,19 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
   const flockLock = checkFlockNotLocked(prisma);
 
   // GET /api/v1/vaccination-events/schedules - list all vaccination schedules
-  app.get('/schedules', { preHandler: [authenticate] }, async (_request, reply) => {
+  app.get('/schedules', { preHandler: [authenticate] }, async (request, reply) => {
     // Vaccination schedules are global reference data; cache briefly.
+    // (displayDay is org-convention aware but the response varies only by
+    // convention, not by content — the cache window is short enough.)
     reply.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
+    const convention = await getHatchDayConvention(prisma, getOrganizationId(request));
     const schedules = await prisma.vaccinationSchedule.findMany({
       include: { items: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { isDefault: 'desc' },
     });
     return schedules.map((s: any) => ({
       ...s,
-      items: s.items.map(withDisplayDay),
+      items: s.items.map((i: any) => withDisplayDay(i, convention)),
     }));
   });
 
@@ -76,10 +80,12 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     });
     if (!flock) return { error: 'NOT_FOUND' };
 
+    const convention = await getHatchDayConvention(prisma, organizationId);
+
     // If chicks not yet collected (no startDate), return empty schedule
     if (!flock.startDate) {
       const emptySchedule = await resolveVaccinationSchedule(prisma, flock);
-      return { schedule: emptySchedule ? { id: emptySchedule.id, name: emptySchedule.name, items: emptySchedule.items.map(withDisplayDay) } : null, completed: [], upcoming: [], overdue: [], ageDays: null };
+      return { schedule: emptySchedule ? { id: emptySchedule.id, name: emptySchedule.name, items: emptySchedule.items.map((i: any) => withDisplayDay(i, convention)) } : null, completed: [], upcoming: [], overdue: [], ageDays: null };
     }
 
     const today = new Date();
@@ -99,10 +105,10 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     const overdue = schedule?.items.filter((item: any) => item.ageDays <= ageDays && !completed.some((c: any) => c.vaccineName === item.vaccineName && Math.abs(c.ageDays - item.ageDays) <= 2)) ?? [];
 
     return {
-      schedule: schedule ? { id: schedule.id, name: schedule.name, items: schedule.items.map(withDisplayDay) } : null,
+      schedule: schedule ? { id: schedule.id, name: schedule.name, items: schedule.items.map((i: any) => withDisplayDay(i, convention)) } : null,
       completed,
-      upcoming: upcoming.map(withDisplayDay),
-      overdue: overdue.map(withDisplayDay),
+      upcoming: upcoming.map((i: any) => withDisplayDay(i, convention)),
+      overdue: overdue.map((i: any) => withDisplayDay(i, convention)),
       ageDays,
     };
   });

@@ -1,3 +1,5 @@
+import '../utils/display.dart' as display_utils;
+
 class BroilerFlock {
   final String id;
   final String name;
@@ -376,7 +378,7 @@ class VaccinationScheduleItem {
     this.isWaterRoute = false,
     this.vaccineWater,
     this.notes,
-  }) : displayDay = displayDay ?? ageDays + 1;
+  }) : displayDay = displayDay ?? display_utils.displayDay(ageDays);
 
   factory VaccinationScheduleItem.fromJson(Map<String, dynamic> json) {
     final age = json['ageDays'] ?? json['age_days'] ?? 0;
@@ -385,7 +387,7 @@ class VaccinationScheduleItem {
       vaccineName: json['vaccineName'] ?? json['vaccine_name'] ?? '',
       vaccineType: json['vaccineType'] ?? json['vaccine_type'] ?? '',
       ageDays: age,
-      displayDay: json['displayDay'] ?? (age is int ? age + 1 : null),
+      displayDay: json['displayDay'] ?? (age is int ? display_utils.displayDay(age) : null),
       adminMethod: json['adminMethod'] ?? json['admin_method'] ?? '',
       isWaterRoute: json['isWaterRoute'] ?? false,
       vaccineWater: json['vaccineWater'] != null
@@ -551,7 +553,7 @@ class CalendarDay {
     this.lightingTemperature,
     required this.managementTasks,
     required this.healthSupport,
-  }) : displayDay = displayDay ?? day + 1;
+  }) : displayDay = displayDay ?? display_utils.displayDay(day);
 
   factory CalendarDay.fromJson(Map<String, dynamic> json) {
     return CalendarDay(

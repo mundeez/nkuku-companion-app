@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OrganizationSettings, VaccinationSchedule } from "@/lib/types";
+import { setHatchDayConventionCache } from "@/lib/day-convention";
 import { Sun, Moon, Monitor, TrendingUp, HeartPulse, Syringe, DollarSign, CreditCard, Download, Trash2, UserX, LifeBuoy } from "lucide-react";
 import { AccountSettings } from "@/components/auth/account-settings";
 
@@ -37,6 +38,7 @@ export default function SettingsPage() {
   // Flock defaults (owner only)
   const [defaultScheduleId, setDefaultScheduleId] = useState<string>("__auto__");
   const [ambientTempC, setAmbientTempC] = useState<string>("25");
+  const [hatchDayConvention, setHatchDayConvention] = useState<string>("day1");
   const [flockDefaultsSaving, setFlockDefaultsSaving] = useState(false);
   const [flockDefaultsMsg, setFlockDefaultsMsg] = useState("");
 
@@ -57,6 +59,7 @@ export default function SettingsPage() {
           setOrgName(org.name);
           setDefaultScheduleId(org.defaultVaccinationScheduleId ?? "__auto__");
           setAmbientTempC(String(Number(org.ambientTempC ?? 25)));
+          setHatchDayConvention(org.hatchDayConvention ?? "day1");
         }
         setLoading(false);
       }).catch(() => setLoading(false));
@@ -119,8 +122,10 @@ export default function SettingsPage() {
         body: JSON.stringify({
           defaultVaccinationScheduleId: defaultScheduleId === "__auto__" ? null : defaultScheduleId,
           ambientTempC: Number(ambientTempC),
+          hatchDayConvention,
         }),
       });
+      setHatchDayConventionCache(hatchDayConvention === "day0" ? "day0" : "day1");
       setFlockDefaultsMsg("Saved.");
     } catch (err: any) {
       setFlockDefaultsMsg(err.message || "Failed to save.");
@@ -273,6 +278,19 @@ export default function SettingsPage() {
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Used to estimate daily drinking-water ranges on flock calendars.
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm">Day counting</Label>
+                  <Select value={hatchDayConvention} onValueChange={setHatchDayConvention}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="day1">Hatch day is Day 1</SelectItem>
+                      <SelectItem value="day0">Hatch day is Day 0</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    How flock age is labelled on calendars, schedules and dashboards.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

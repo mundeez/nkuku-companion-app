@@ -10,6 +10,7 @@ import { useFlock, useUpdateFlock, useApiQuery, useApiMutation } from "@/lib/api
 import { BroilerFlock, GrowthRecord, FeedRecord, FeedPurchase, FeedProjectionResult, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier } from "@/lib/types";
 import { FeedProjectionTable } from "@/components/feed-projection-table";
 import { FlockVaccinationSchedule } from "@/components/flock-vaccination-schedule";
+import { useHatchDayConvention, displayDay } from "@/lib/day-convention";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,7 @@ export default function FlockDetailPage() {
   const ageDays = flock?.startDate
     ? Math.floor((new Date().getTime() - new Date(flock.startDate).getTime()) / 86400000)
     : -1;
+  const dayConvention = useHatchDayConvention();
 
   useEffect(() => {
     if (flock) {
@@ -289,7 +291,7 @@ export default function FlockDetailPage() {
         <div className="flex-1">
           <h1 className="text-3xl font-bold">{flock.name}</h1>
           <div className="text-muted-foreground">
-            {flock.breed?.name} | {ageDays < 0 ? "Pending collection" : `Day ${ageDays}`} | {getStatusBadge(flock.status, flock.chicksCollected)}
+            {flock.breed?.name} | {ageDays < 0 ? "Pending collection" : `Day ${displayDay(ageDays, dayConvention)}`} | {getStatusBadge(flock.status, flock.chicksCollected)}
             {flock.startDate && (() => {
               const target = flock.targetAge ?? 42;
               const harvest = new Date(flock.startDate);
@@ -440,9 +442,9 @@ export default function FlockDetailPage() {
                 <div className="flex justify-between"><span>Total Water</span><span className="font-medium">{totalWater.toFixed(1)} liters</span></div>
                 <div className="flex justify-between"><span>Total Cost</span><span className="font-medium">ZMW {totalCost.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Total Revenue</span><span className="font-medium">ZMW {totalRevenue.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Feed Transition Day</span><span className="font-medium">Day {flock.feedTransitionDay || 18}</span></div>
-                <div className="flex justify-between"><span>Finisher Start Day</span><span className="font-medium">Day {flock.finisherDay || 29}</span></div>
-                <div className="flex justify-between"><span>Target Weight</span><span className="font-medium">{flock.targetWeight || "-"} kg @ Day {flock.targetAge || "-"}</span></div>
+                <div className="flex justify-between"><span>Feed Transition Day</span><span className="font-medium">Day {displayDay(flock.feedTransitionDay || 18, dayConvention)}</span></div>
+                <div className="flex justify-between"><span>Finisher Start Day</span><span className="font-medium">Day {displayDay(flock.finisherDay || 29, dayConvention)}</span></div>
+                <div className="flex justify-between"><span>Target Weight</span><span className="font-medium">{flock.targetWeight || "-"} kg @ Day {flock.targetAge ? displayDay(flock.targetAge, dayConvention) : "-"}</span></div>
               </div>
             </CardContent></Card>
 

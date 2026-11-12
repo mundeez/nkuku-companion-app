@@ -15,6 +15,9 @@ const OrgUpdateSchema = z.object({
   currency: z.string().length(3).optional(),
   defaultVaccinationScheduleId: z.string().uuid().nullable().optional(),
   ambientTempC: z.number().min(10).max(45).optional(),
+  // 'day1' = hatch day counts as Day 1 (default, current display behavior);
+  // 'day0' = hatch day counts as Day 0 (raw elapsed-days display).
+  hatchDayConvention: z.enum(['day0', 'day1']).optional(),
 });
 
 const InviteCreateSchema = z.object({
@@ -37,6 +40,7 @@ export async function buildOrganizationModule(app: FastifyInstance) {
         isActive: true, createdAt: true,
         defaultVaccinationScheduleId: true,
         ambientTempC: true,
+        hatchDayConvention: true,
         _count: { select: { members: true } },
       },
     });

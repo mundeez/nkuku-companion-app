@@ -610,6 +610,8 @@ export interface OrganizationSettings {
   planCode: string;
   defaultVaccinationScheduleId?: string | null;
   ambientTempC?: number | string;
+  // 'day1' = hatch day counts as Day 1 (default); 'day0' = hatch day is Day 0
+  hatchDayConvention?: 'day0' | 'day1';
 }
 
 // ── Dashboard Summary ─────────────────────────

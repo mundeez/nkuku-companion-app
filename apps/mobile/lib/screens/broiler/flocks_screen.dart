@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/flock.dart';
+import '../../utils/display.dart';
 import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
 import '../../widgets/empty_state.dart';
@@ -33,6 +34,12 @@ class _FlocksScreenState extends State<FlocksScreen> {
       _error = null;
     });
     try {
+      // Refresh the org day-counting convention before rendering labels.
+      await Future.wait([
+        BroilerService.getOrganization()
+            .then((_) {})
+            .catchError((_) {}),
+      ]);
       final flocks = await BroilerService.getFlocks(
         q: _searchQuery,
         forceRefresh: forceRefresh,
@@ -244,7 +251,7 @@ class _FlocksScreenState extends State<FlocksScreen> {
                                         label: Text(
                                           flock.startDate == null
                                               ? 'Pending'
-                                              : 'Day ${flock.ageDays ?? 0}',
+                                              : 'Day ${displayDay(flock.ageDays ?? 0)}',
                                         ),
                                         visualDensity: VisualDensity.compact,
                                       ),

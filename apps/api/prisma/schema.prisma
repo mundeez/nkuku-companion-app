@@ -168,6 +168,11 @@ model Organization {
   // that picks one) and ambient temperature used for daily water estimates.
   defaultVaccinationScheduleId String?   @map("default_vaccination_schedule_id") @db.Uuid
   ambientTempC                 Decimal   @default(25) @map("ambient_temp_c") @db.Decimal(4, 1)
+  // Day counting convention: 'day1' = hatch day is Day 1 (farmer convention,
+  // preserves existing displayDay = ageDays+1 behavior); 'day0' = hatch day
+  // is Day 0 (raw elapsed-days display). Display-only; internal logic stays
+  // 0-based everywhere.
+  hatchDayConvention           String    @default("day1") @map("hatch_day_convention") @db.VarChar(10)
 
   members                      OrganizationMember[]
   invites                      Invite[]

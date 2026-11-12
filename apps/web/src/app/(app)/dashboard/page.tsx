@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useApiQuery } from "@/lib/api/hooks";
 import { DashboardSummary } from "@/lib/types";
+import { useHatchDayConvention, displayDay } from "@/lib/day-convention";
 import { AdSlot } from "@/components/ads/AdSlot";
 import {
   TrendingUp, Users, DollarSign, HeartPulse, Scale, AlertTriangle,
@@ -79,6 +80,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const dayConvention = useHatchDayConvention();
 
   const { data, error, isLoading: dataLoading } = useApiQuery<DashboardSummary>(
     `/api/v1/dashboard/summary?range=${dateRange}`,
@@ -494,7 +496,7 @@ export default function DashboardPage() {
                     <tr key={f.flockId} className="border-b last:border-0 hover:bg-accent transition-colors cursor-pointer" onClick={() => router.push(`/broiler-flocks/${f.flockId}`)}>
                       <td className="py-2 pr-4 font-medium">{f.flockName}</td>
                       <td className="py-2 pr-4 text-muted-foreground">{f.breedName}</td>
-                      <td className="py-2 pr-4">{f.ageDays}</td>
+                      <td className="py-2 pr-4">{f.ageDays != null ? displayDay(f.ageDays, dayConvention) : "-"}</td>
                       <td className="py-2 pr-4">{f.currentCount.toLocaleString()}</td>
                       <td className="py-2 pr-4">
                         <span className={f.mortalityRate > 10 ? "text-red-600 font-medium" : f.mortalityRate > 5 ? "text-amber-600" : ""}>
