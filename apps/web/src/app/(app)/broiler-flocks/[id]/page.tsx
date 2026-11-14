@@ -1492,6 +1492,16 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
             <DialogDescription>{isEditing ? "Update the record details below." : "Enter the new record details."}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4 px-6 overflow-y-auto">
+            {/* Feed records log consumption — purchases are a separate flow */}
+            {type === "feed" && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 text-xs text-amber-900 dark:text-amber-200">
+                This records feed <strong>given to the birds</strong> (consumption). To add bags you{" "}
+                <strong>bought</strong> to stock, use{" "}
+                <Link href={`/broiler-flocks/${flockId}/feed`} className="underline font-medium">Record purchase</Link>{" "}
+                on the Feed page instead.
+              </div>
+            )}
+
             {/* Standard fields */}
             {config.fields.map((f: any) => (
               <div key={f.key}><label className="text-sm font-medium">{f.label}</label>{renderField(f)}</div>
@@ -1500,14 +1510,14 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
             {/* Bag count field (only for feed with supplier) */}
             {type === "feed" && hasSupplier && (
               <div>
-                <label className="text-sm font-medium">Number of Bags ({form._bagSizeKg}kg each @ ZMW {form._bagPriceZmw}/bag)</label>
+                <label className="text-sm font-medium">Bags fed ({form._bagSizeKg}kg each @ ZMW {form._bagPriceZmw}/bag)</label>
                 <input
                   type="number"
                   min="0"
                   step="1"
                   className="w-full border rounded-md p-2 bg-background text-foreground"
                   value={form.bagCount || ""}
-                  placeholder={`Enter number of ${form._bagSizeKg}kg bags`}
+                  placeholder={`Enter number of ${form._bagSizeKg}kg bags fed`}
                   onChange={(e) => {
                     const bags = Number(e.target.value) || 0;
                     const newForm = { ...form, bagCount: bags };
@@ -1516,7 +1526,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
                   }}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Auto: {form.quantityKg || 0}kg @ ZMW {form.costZmw || 0}
+                  Auto: {form.quantityKg || 0}kg fed @ ZMW {form.costZmw || 0}
                 </p>
               </div>
             )}
@@ -1541,7 +1551,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
                 <textarea
                   className="w-full border rounded-md p-2 min-h-[60px] resize-y bg-background text-foreground"
                   value={form.notes || ""}
-                  placeholder="Optional notes about this feed purchase"
+                  placeholder="Optional notes (e.g. opened bag 3, mixed batches)"
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 />
               </div>
