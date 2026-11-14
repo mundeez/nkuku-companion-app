@@ -629,11 +629,10 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     const flock = await prisma.broilerFlock.findFirst({ where: { id, organizationId } });
     if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
 
-    if (flock.initialCount + data.count < 0 || flock.currentCount + data.count < 0) {
-      return reply.status(400).send({ error: 'COUNT_UNDERFLOW', message: 'This change would take a bird count below zero.' });
-    }
-
-    const { addition, finRecord } = await prisma.$transaction(async (tx: any) => {
+    let addition: any;
+    let finRecord: any;
+    try {
+      ({ addition, finRecord } = await prisma.$transaction(async (tx: any) => {
       let addition = await tx.flockChickAddition.create({
         data: {
           flockId: id,
@@ -646,10 +645,16 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
           createdBy: _authUser.userId,
         },
       });
-      await tx.broilerFlock.update({
-        where: { id },
+      // Underflow guard lives inside the atomic update so two concurrent
+      // corrections can't jointly drive a count below zero.
+      const floor = Math.max(0, -data.count);
+      const moved = await tx.broilerFlock.updateMany({
+        where: { id, initialCount: { gte: floor }, currentCount: { gte: floor } },
         data: { initialCount: { increment: data.count }, currentCount: { increment: data.count } },
       });
+      if (moved.count === 0) {
+        throw Object.assign(new Error('COUNT_UNDERFLOW'), { code: 'COUNT_UNDERFLOW' });
+      }
       let finRecord = null;
       if (data.reason === 'purchase') {
         const amount = new Decimal(data.count).mul(data.unitPriceZmw!).toNumber();
@@ -670,7 +675,13 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         addition = await tx.flockChickAddition.update({ where: { id: addition.id }, data: { financialRecordId: finRecord.id } });
       }
       return { addition, finRecord };
-    });
+      }));
+    } catch (err: any) {
+      if (err?.code === 'COUNT_UNDERFLOW') {
+        return reply.status(400).send({ error: 'COUNT_UNDERFLOW', message: 'This change would take a bird count below zero.' });
+      }
+      throw err;
+    }
 
     if (finRecord) {
       try {
@@ -706,10 +717,27 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     if (!addition) return reply.status(404).send({ error: 'NOT_FOUND' });
     if (assertFlockNotCompleted(reply, addition.flock.status, _authUser?.role)) return;
 
-    if (addition.flock.initialCount - addition.count < 0 || addition.flock.currentCount - addition.count < 0) {
-      return reply.status(400).send({ error: 'COUNT_UNDERFLOW', message: 'Reversing this addition would take a bird count below zero.' });
+    try {
+      await prisma.$transaction(async (tx: any) => {
+        await tx.flockChickAddition.delete({ where: { id: additionId } });
+        // Atomic underflow guard — reversing +N must not take either count < 0.
+        const floor = Math.max(0, addition.count);
+        const moved = await tx.broilerFlock.updateMany({
+          where: { id, initialCount: { gte: floor }, currentCount: { gte: floor } },
+          data: { initialCount: { decrement: addition.count }, currentCount: { decrement: addition.count } },
+        });
+        if (moved.count === 0) {
+          throw Object.assign(new Error('COUNT_UNDERFLOW'), { code: 'COUNT_UNDERFLOW' });
+        }
+      });
+    } catch (err: any) {
+      if (err?.code === 'COUNT_UNDERFLOW') {
+        return reply.status(400).send({ error: 'COUNT_UNDERFLOW', message: 'Reversing this addition would take a bird count below zero.' });
+      }
+      throw err;
     }
 
+    // Counts + row are committed — now unwind the financial trail.
     if (addition.financialRecordId) {
       const je = await prisma.journalEntry.findFirst({
         where: { sourceId: addition.financialRecordId, organizationId },
@@ -723,14 +751,6 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       }
       await prisma.financialRecord.delete({ where: { id: addition.financialRecordId } });
     }
-
-    await prisma.$transaction([
-      prisma.flockChickAddition.delete({ where: { id: additionId } }),
-      prisma.broilerFlock.update({
-        where: { id },
-        data: { initialCount: { decrement: addition.count }, currentCount: { decrement: addition.count } },
-      }),
-    ]);
 
     await audit.log({
       organizationId,
