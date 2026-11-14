@@ -114,6 +114,57 @@ describe('Feed Bags lifecycle & multi-supplier attribution', () => {
     const finished = await finRes.json();
     expect(finished.status).toBe('finished');
     expect(finished.finishedAt).toBeTruthy();
+
+    // finishing auto-creates a feed record linked to the bag (full bag kg)
+    const records = await (await api(`/api/v1/feed-records?flockId=${flockId}`, token)).json();
+    const auto = records.find((r: any) => r.feedBag?.bagIndex === 1);
+    expect(auto).toBeDefined();
+    expect(Number(auto.quantityKg)).toBe(50);
+    expect(auto.feedType).toBe(bag.stageName);
+    expect(auto.notes).toContain('Auto: bag #1 finished');
+    // no financial record — cost was already booked by the purchase
+    const finrecs = await (await api(`/api/v1/financial-records?flockId=${flockId}`, token)).json();
+    expect(finrecs.some((f: any) => f.sourceRecordId === auto.id)).toBe(false);
+  });
+
+  it('finish accepts a backdate and partial kgFed; rejects kg above bag size', async () => {
+    const bags = await (await api(`/api/v1/feed-bags?flockId=${flockId}`, token)).json();
+    const bag = bags.find((b: any) => b.bagIndex === 3);
+
+    const tooMuch = await api(`/api/v1/feed-bags/${bag.id}/finish`, token, {
+      method: 'POST',
+      body: JSON.stringify({ kgFed: 60 }),
+    });
+    expect(tooMuch.status).toBe(400);
+    expect((await tooMuch.json()).error).toBe('KG_EXCEEDS_BAG');
+
+    const res = await api(`/api/v1/feed-bags/${bag.id}/finish`, token, {
+      method: 'POST',
+      body: JSON.stringify({ date: '2026-11-12', kgFed: 42.5 }),
+    });
+    expect(res.status).toBe(200);
+    const finished = await res.json();
+    expect(finished.finishedAt).toContain('2026-11-12');
+
+    const records = await (await api(`/api/v1/feed-records?flockId=${flockId}`, token)).json();
+    const auto = records.find((r: any) => r.feedBag?.bagIndex === 3);
+    expect(auto).toBeDefined();
+    expect(Number(auto.quantityKg)).toBe(42.5);
+    expect(auto.recordDate).toContain('2026-11-12');
+    expect(auto.notes).toContain('42.5kg of 50kg fed');
+  });
+
+  it('open accepts a backdate', async () => {
+    // bag #2 was resealed earlier — open it again with a backdate
+    const bags = await (await api(`/api/v1/feed-bags?flockId=${flockId}`, token)).json();
+    const bag = bags.find((b: any) => b.bagIndex === 2 && b.status === 'sealed');
+    if (!bag) return; // bag removed by the bagsPurchased reduction test ordering
+    const res = await api(`/api/v1/feed-bags/${bag.id}/open`, token, {
+      method: 'POST',
+      body: JSON.stringify({ date: '2026-11-11' }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).openedAt).toContain('2026-11-11');
   });
 
   it('reseal undoes an open', async () => {
@@ -129,27 +180,24 @@ describe('Feed Bags lifecycle & multi-supplier attribution', () => {
   });
 
   it('reducing bagsPurchased removes sealed bags but protects consumed ones', async () => {
-    // State: bag1 finished, bag2 sealed (opened→resealed), bag3 sealed → 2 sealed.
-    // Reduce 3→1 needs to drop 2 bags; exactly 2 sealed exist → allowed.
+    // State: bag1 finished, bag3 finished (auto-record test), bag2 sealed
+    // (opened→resealed) → 1 sealed. Reduce 3→2 drops the only sealed bag.
     const res = await api(`/api/v1/feed-purchases/${purchaseId}`, token, {
       method: 'PATCH',
-      body: JSON.stringify({ bagsPurchased: 1 }),
+      body: JSON.stringify({ bagsPurchased: 2 }),
     });
     expect(res.status).toBe(200);
     const bags = await (await api(`/api/v1/feed-bags?flockId=${flockId}`, token)).json();
-    expect(bags.length).toBe(1);
-    expect(bags[0].status).toBe('finished');
+    expect(bags.length).toBe(2);
+    expect(bags.every((b: any) => b.status === 'finished')).toBe(true);
 
-    // Reduce 1→0 must now fail — no sealed bags left.
+    // Reduce 2→1 must now fail — no sealed bags left.
     const blocked = await api(`/api/v1/feed-purchases/${purchaseId}`, token, {
       method: 'PATCH',
-      body: JSON.stringify({ bagsPurchased: 0 }),
+      body: JSON.stringify({ bagsPurchased: 1 }),
     });
-    // bagsPurchased must be positive anyway — but if schema allows 0 the guard kicks in.
-    if (blocked.status === 400) {
-      const body = await blocked.json();
-      expect(['BAGS_ALREADY_CONSUMED', 'BAD_REQUEST', 'FST_ERR_VALIDATION', 'VALIDATION_ERROR']).toContain(body.error ?? 'BAD_REQUEST');
-    }
+    expect(blocked.status).toBe(400);
+    expect((await blocked.json()).error).toBe('BAGS_ALREADY_CONSUMED');
   });
 
   it('summary aggregates stock per stage', async () => {

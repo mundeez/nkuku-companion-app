@@ -1643,11 +1643,11 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text('Loose feed records',
+                child: Text('Feed records',
                     style: Theme.of(context).textTheme.titleSmall),
               ),
               Text(
-                'Kg entries logged via the feed form — counted as secured feed, not tracked as bags.',
+                'Consumption log — manual entries plus auto-records from finished bags.',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
               const SizedBox(height: 4),
@@ -1676,6 +1676,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
 
   String? _feedRecordSubtitle(FeedRecord r) {
     final parts = [
+      if (r.feedBagIndex != null) 'bag #${r.feedBagIndex}',
       if (r.feedBrand != null && r.feedBrand!.isNotEmpty) r.feedBrand!,
       if (r.supplierName != null) 'Supplier: ${r.supplierName}',
     ];
@@ -1692,17 +1693,90 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
   }
 
   Future<void> _bagAction(FeedBag bag, String action) async {
+    if (action == 'open' || action == 'finish') {
+      return _bagActionDialog(bag, action);
+    }
     try {
-      switch (action) {
-        case 'open':
-          await BroilerService.openFeedBag(bag.id);
-          break;
-        case 'finish':
-          await BroilerService.finishFeedBag(bag.id);
-          break;
-        case 'reseal':
-          await BroilerService.resealFeedBag(bag.id);
-          break;
+      await BroilerService.resealFeedBag(bag.id);
+      await _loadData();
+    } on DioException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.response?.data?['message'] ??
+                e.response?.data?['error'] ??
+                'Bag update failed')));
+      }
+    }
+  }
+
+  /// Open/finish dialog — optional backdate, kg-fed prompt on finish.
+  /// Finishing auto-creates a feed record linked to the bag.
+  Future<void> _bagActionDialog(FeedBag bag, String action) async {
+    DateTime date = DateTime.now();
+    final kgCtrl = TextEditingController(text: bag.bagSizeKg.toStringAsFixed(0));
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: Text(
+              '${action == 'open' ? 'Open' : 'Finish'} bag #${bag.bagIndex} — ${bag.stageName} ${bag.bagSizeKg}kg'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(action == 'open' ? 'Opened on' : 'Finished on'),
+                subtitle: Text(date.toIso8601String().split('T').first),
+                trailing: const Icon(Icons.calendar_today, size: 18),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: date,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setDlg(() => date = picked);
+                },
+              ),
+              if (action == 'finish') ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: kgCtrl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Kg actually fed',
+                    helperText:
+                        'Defaults to the full ${bag.bagSizeKg}kg — lower it for spillage.',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text('A feed record will be created automatically.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(action == 'open' ? 'Open Bag' : 'Finish Bag')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final kgFed = action == 'finish' ? double.tryParse(kgCtrl.text) : null;
+      if (action == 'open') {
+        await BroilerService.openFeedBag(bag.id, date: date);
+      } else {
+        await BroilerService.finishFeedBag(bag.id, date: date, kgFed: kgFed);
       }
       await _loadData();
     } on DioException catch (e) {
@@ -1761,6 +1835,17 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                             Text(b.supplierName!,
                                 style: TextStyle(
                                     fontSize: 12, color: Colors.grey[600])),
+                          if (b.openedAt != null || b.finishedAt != null)
+                            Text(
+                              [
+                                if (b.openedAt != null)
+                                  'opened ${b.openedAt!.toIso8601String().split('T').first}',
+                                if (b.finishedAt != null)
+                                  'finished ${b.finishedAt!.toIso8601String().split('T').first}',
+                              ].join(' · '),
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey[500]),
+                            ),
                         ],
                       ),
                     ),

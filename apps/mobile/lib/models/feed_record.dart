@@ -9,6 +9,7 @@ class FeedRecord {
   final double quantityKg;
   final double? costZmw;
   final String? notes;
+  final int? feedBagIndex; // set when auto-created by a bag finishing
 
   FeedRecord({
     required this.id,
@@ -21,6 +22,7 @@ class FeedRecord {
     required this.quantityKg,
     this.costZmw,
     this.notes,
+    this.feedBagIndex,
   });
 
   factory FeedRecord.fromJson(Map<String, dynamic> json) {
@@ -37,6 +39,7 @@ class FeedRecord {
           : double.tryParse((json['quantityKg'] ?? json['quantity_kg'] ?? 0).toString()) ?? 0,
       costZmw: _toDouble(json['costZmw'] ?? json['cost_zmw']),
       notes: json['notes'],
+      feedBagIndex: json['feedBag']?['bagIndex'] ?? json['feed_bag']?['bag_index'],
     );
   }
 
@@ -64,6 +67,7 @@ class FeedRecord {
     double? quantityKg,
     double? costZmw,
     String? notes,
+    int? feedBagIndex,
   }) {
     return FeedRecord(
       id: id ?? this.id,
@@ -76,6 +80,7 @@ class FeedRecord {
       quantityKg: quantityKg ?? this.quantityKg,
       costZmw: costZmw ?? this.costZmw,
       notes: notes ?? this.notes,
+      feedBagIndex: feedBagIndex ?? this.feedBagIndex,
     );
   }
 

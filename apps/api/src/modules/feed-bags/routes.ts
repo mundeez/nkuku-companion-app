@@ -8,7 +8,10 @@ import { assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js
 // Individual feed bags: sealed → open → finished.
 // Open/finished can be stepped back one level for mistake recovery.
 
-const StatusBodySchema = z.object({});
+const StatusBodySchema = z.object({
+  date: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  kgFed: z.coerce.number().positive().optional(),
+});
 
 export async function buildFeedBagModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -19,7 +22,7 @@ export async function buildFeedBagModule(app: FastifyInstance) {
     const organizationId = getOrganizationId(request);
     const bag = await prisma.feedBag.findFirst({
       where: { id, organizationId },
-      include: { flock: { select: { status: true } } },
+      include: { flock: { select: { status: true } }, supplier: { select: { name: true } } },
     });
     if (!bag) {
       reply.status(404).send({ error: 'NOT_FOUND' });
@@ -35,19 +38,25 @@ export async function buildFeedBagModule(app: FastifyInstance) {
 
     if (assertFlockNotCompleted(reply, bag.flock.status, _authUser?.role)) return;
 
-    const now = new Date();
+    const body = StatusBodySchema.parse(request.body ?? {});
+    const at = body.date ? new Date(body.date) : new Date();
+    const bagKg = Number(bag.bagSizeKg);
+    if (action === 'finish' && body.kgFed !== undefined && body.kgFed > bagKg) {
+      return reply.status(400).send({ error: 'KG_EXCEEDS_BAG', message: `A ${bagKg}kg bag can't yield ${body.kgFed}kg.` });
+    }
+
     let data: any;
     if (action === 'open') {
       if (bag.status !== 'sealed') return reply.status(409).send({ error: 'INVALID_TRANSITION', message: `Bag is already ${bag.status}.` });
-      data = { status: 'open', openedAt: now, openedById: _authUser.userId };
+      data = { status: 'open', openedAt: at, openedById: _authUser.userId };
     } else if (action === 'finish') {
       if (bag.status === 'finished') return reply.status(409).send({ error: 'INVALID_TRANSITION', message: 'Bag is already finished.' });
       // sealed → finished allowed (bag used without an explicit open tap)
       data = {
         status: 'finished',
-        finishedAt: now,
+        finishedAt: at,
         finishedById: _authUser.userId,
-        ...(bag.status === 'sealed' ? { openedAt: bag.openedAt ?? now, openedById: bag.openedById ?? _authUser.userId } : {}),
+        ...(bag.status === 'sealed' ? { openedAt: bag.openedAt ?? at, openedById: bag.openedById ?? _authUser.userId } : {}),
       };
     } else {
       // reseal: open → sealed (undo an accidental open)
@@ -56,6 +65,34 @@ export async function buildFeedBagModule(app: FastifyInstance) {
     }
 
     const updated = await prisma.feedBag.update({ where: { id: bag.id }, data });
+
+    // Finishing a bag is consumption — record it as a feed record linked to
+    // the bag. No cost/finrec here: the purchase already booked the expense
+    // (Dr 5020 / Cr 1010) when the bag entered stock.
+    if (action === 'finish') {
+      const kgFed = body.kgFed ?? bagKg;
+      const feedRecord = await prisma.feedRecord.create({
+        data: {
+          flockId: bag.flockId,
+          supplierId: bag.supplierId,
+          feedBagId: bag.id,
+          recordDate: at,
+          feedType: bag.stageName,
+          feedBrand: bag.supplier?.name ?? null,
+          quantityKg: kgFed,
+          notes: `Auto: bag #${bag.bagIndex} finished${kgFed < bagKg ? ` (${kgFed}kg of ${bagKg}kg fed)` : ''}`,
+        },
+      });
+      await audit.log({
+        organizationId: bag.organizationId,
+        userId: _authUser.userId,
+        entityType: 'FeedRecord',
+        entityId: feedRecord.id,
+        action: 'create',
+        newState: feedRecord,
+        ipAddress: request.ip,
+      });
+    }
 
     await audit.log({
       organizationId: bag.organizationId,
@@ -130,21 +167,18 @@ export async function buildFeedBagModule(app: FastifyInstance) {
     };
   });
 
-  // POST /api/v1/feed-bags/:id/open   (sealed → open)
+  // POST /api/v1/feed-bags/:id/open   (sealed → open; optional backdate)
   app.post('/:id/open', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
-    StatusBodySchema.parse(request.body ?? {});
     return transition(request, reply, 'open');
   });
 
-  // POST /api/v1/feed-bags/:id/finish  (sealed|open → finished)
+  // POST /api/v1/feed-bags/:id/finish  (sealed|open → finished; optional date + kgFed)
   app.post('/:id/finish', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
-    StatusBodySchema.parse(request.body ?? {});
     return transition(request, reply, 'finish');
   });
 
   // POST /api/v1/feed-bags/:id/reseal  (open → sealed, undo)
   app.post('/:id/reseal', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
-    StatusBodySchema.parse(request.body ?? {});
     return transition(request, reply, 'reseal');
   });
 }

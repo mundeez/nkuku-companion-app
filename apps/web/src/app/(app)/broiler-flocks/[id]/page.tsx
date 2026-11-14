@@ -1382,7 +1382,8 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
               </span>
             )}
             <span className="font-medium">{r.quantityKg}kg</span>
-            {bagInfo && <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{bagInfo}</span>}
+            {r.feedBag && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">bag #{r.feedBag.bagIndex}</span>}
+            {!r.feedBag && bagInfo && <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{bagInfo}</span>}
             {r.costZmw && <span className="text-muted-foreground text-sm">@ ZMW {r.costZmw}</span>}
             {r.feedBrand && <span className="text-muted-foreground text-sm">| {r.feedBrand}</span>}
           </div>

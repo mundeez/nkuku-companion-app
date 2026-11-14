@@ -905,6 +905,7 @@ model FeedRecord {
   recordDate DateTime @map("record_date") @db.Date
   feedType   String   @db.VarChar(50)
   feedBrand  String?  @map("feed_brand") @db.VarChar(100)
+  feedBagId  String?  @map("feed_bag_id") @db.Uuid // set when auto-created by a bag finishing
   quantityKg Decimal  @map("quantity_kg") @db.Decimal(10, 3)
   costZmw    Decimal? @map("cost_zmw") @db.Decimal(14, 2)
   notes      String?  @db.Text
@@ -913,8 +914,10 @@ model FeedRecord {
 
   flock    BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
   supplier Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull) // NEW
+  feedBag  FeedBag?     @relation(fields: [feedBagId], references: [id], onDelete: SetNull)
 
   @@index([flockId, recordDate])
+  @@index([feedBagId])
   @@map("feed_records")
 }
 
@@ -988,6 +991,7 @@ model FeedBag {
   purchase     FeedPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   feedStage    FeedStage?   @relation(fields: [feedStageId], references: [id], onDelete: SetNull)
   supplier     Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  feedRecords  FeedRecord[]
 
   @@index([flockId, status])
   @@index([purchaseId])

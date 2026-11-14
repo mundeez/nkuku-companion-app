@@ -526,18 +526,22 @@ class BroilerService {
     return stages.map((e) => FeedBagStageSummary.fromJson(e)).toList();
   }
 
-  static Future<FeedBag> _transitionFeedBag(String id, String action) async {
-    final res = await ApiService.dio
-        .post('/api/v1/feed-bags/$id/$action', data: {});
+  static Future<FeedBag> _transitionFeedBag(String id, String action,
+      {DateTime? date, double? kgFed}) async {
+    final res = await ApiService.dio.post('/api/v1/feed-bags/$id/$action', data: {
+      if (date != null) 'date': date.toIso8601String().split('T').first,
+      if (kgFed != null) 'kgFed': kgFed,
+    });
     _assertOk(res);
     ConnectivityService.instance.markOnline();
     return FeedBag.fromJson(res.data);
   }
 
-  static Future<FeedBag> openFeedBag(String id) =>
-      _transitionFeedBag(id, 'open');
-  static Future<FeedBag> finishFeedBag(String id) =>
-      _transitionFeedBag(id, 'finish');
+  static Future<FeedBag> openFeedBag(String id, {DateTime? date}) =>
+      _transitionFeedBag(id, 'open', date: date);
+  static Future<FeedBag> finishFeedBag(String id,
+          {DateTime? date, double? kgFed}) =>
+      _transitionFeedBag(id, 'finish', date: date, kgFed: kgFed);
   static Future<FeedBag> resealFeedBag(String id) =>
       _transitionFeedBag(id, 'reseal');
 

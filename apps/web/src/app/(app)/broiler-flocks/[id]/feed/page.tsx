@@ -62,6 +62,8 @@ export default function FeedCalculatorPage() {
   });
   const [savingPurchase, setSavingPurchase] = useState(false);
   const [bagActionId, setBagActionId] = useState<string | null>(null);
+  const [bagDialog, setBagDialog] = useState<{ bag: FeedBag; action: "open" | "finish" } | null>(null);
+  const [bagForm, setBagForm] = useState({ date: "", kgFed: "" });
 
   const canEdit = user?.role === "owner" || user?.role === "manager";
 
@@ -244,6 +246,31 @@ export default function FeedCalculatorPage() {
     }
   }
 
+  function openBagDialog(bag: FeedBag, action: "open" | "finish") {
+    setBagForm({ date: new Date().toISOString().split("T")[0], kgFed: String(Number(bag.bagSizeKg)) });
+    setBagDialog({ bag, action });
+  }
+
+  async function submitBagAction() {
+    if (!bagDialog) return;
+    const { bag, action } = bagDialog;
+    setBagActionId(bag.id);
+    try {
+      const body: any = {};
+      if (bagForm.date) body.date = bagForm.date;
+      if (action === "finish" && bagForm.kgFed) body.kgFed = Number(bagForm.kgFed);
+      await apiFetch(`/api/v1/feed-bags/${bag.id}/${action}`, { method: "POST", body: JSON.stringify(body) });
+      setBagDialog(null);
+      loadBags();
+      loadFeedRecords();
+      loadProjection();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBagActionId(null);
+    }
+  }
+
   async function handleBagAction(bagId: string, action: "open" | "finish" | "reseal") {
     setBagActionId(bagId);
     try {
@@ -256,6 +283,8 @@ export default function FeedCalculatorPage() {
       setBagActionId(null);
     }
   }
+
+  const fmtBagDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
 
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
@@ -351,8 +380,8 @@ export default function FeedCalculatorPage() {
             {/* Loose feed records (kg entries recorded without a purchase) */}
             {feedRecords.length > 0 && (
               <div className="mt-6">
-                <h4 className="text-sm font-semibold mb-2">Loose Feed Records ({feedRecords.length})</h4>
-                <p className="text-xs text-muted-foreground mb-2">Kg entries logged via the feed form — counted as secured feed but not tracked as bags.</p>
+                <h4 className="text-sm font-semibold mb-2">Feed Records ({feedRecords.length})</h4>
+                <p className="text-xs text-muted-foreground mb-2">Consumption log — manual entries plus auto-records created when a bag is finished.</p>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -362,6 +391,7 @@ export default function FeedCalculatorPage() {
                       <TableHead className="text-right">Kg</TableHead>
                       <TableHead className="text-right">Cost</TableHead>
                       <TableHead>Supplier</TableHead>
+                      <TableHead>Source</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -371,8 +401,15 @@ export default function FeedCalculatorPage() {
                         <TableCell className="font-medium capitalize">{r.feedType}</TableCell>
                         <TableCell className="text-muted-foreground">{r.feedBrand || "-"}</TableCell>
                         <TableCell className="text-right">{Number(r.quantityKg).toFixed(1)}</TableCell>
-                        <TableCell className="text-right">ZMW {Number(r.costZmw || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{r.costZmw ? `ZMW ${Number(r.costZmw).toFixed(2)}` : "—"}</TableCell>
                         <TableCell className="text-muted-foreground">{r.supplier?.name || "-"}</TableCell>
+                        <TableCell>
+                          {r.feedBag ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">bag #{r.feedBag.bagIndex}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">manual</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -402,6 +439,8 @@ export default function FeedCalculatorPage() {
                       <TableHead>Size</TableHead>
                       <TableHead>Supplier</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Opened</TableHead>
+                      <TableHead>Finished</TableHead>
                       {canEdit && <TableHead>Action</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -417,14 +456,19 @@ export default function FeedCalculatorPage() {
                             {b.status}
                           </span>
                         </TableCell>
+                        <TableCell className="text-muted-foreground">{fmtBagDate(b.openedAt)}</TableCell>
+                        <TableCell className="text-muted-foreground">{fmtBagDate(b.finishedAt)}</TableCell>
                         {canEdit && (
                           <TableCell>
                             {b.status === "sealed" && (
-                              <Button variant="outline" size="sm" disabled={bagActionId === b.id} onClick={() => handleBagAction(b.id, "open")}>Open</Button>
+                              <div className="flex gap-1">
+                                <Button variant="outline" size="sm" disabled={bagActionId === b.id} onClick={() => openBagDialog(b, "open")}>Open</Button>
+                                <Button variant="ghost" size="sm" disabled={bagActionId === b.id} onClick={() => openBagDialog(b, "finish")}>Finish</Button>
+                              </div>
                             )}
                             {b.status === "open" && (
                               <div className="flex gap-1">
-                                <Button variant="outline" size="sm" disabled={bagActionId === b.id} onClick={() => handleBagAction(b.id, "finish")}>Finish</Button>
+                                <Button variant="outline" size="sm" disabled={bagActionId === b.id} onClick={() => openBagDialog(b, "finish")}>Finish</Button>
                                 <Button variant="ghost" size="sm" disabled={bagActionId === b.id} onClick={() => handleBagAction(b.id, "reseal")}>Reseal</Button>
                               </div>
                             )}
@@ -637,6 +681,43 @@ export default function FeedCalculatorPage() {
               disabled={savingPurchase || !purchaseForm.stageName || !purchaseForm.bagsPurchased || !purchaseForm.unitPriceZmw || !purchaseForm.bagSizeKg}
             >
               {savingPurchase ? "Saving..." : editingPurchase ? "Save Changes" : "Record Purchase"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bag open/finish dialog — date (backdating) + kg fed on finish */}
+      <Dialog open={!!bagDialog} onOpenChange={(o) => { if (!o) setBagDialog(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {bagDialog?.action === "open" ? "Open" : "Finish"} bag #{bagDialog?.bag.bagIndex} — {bagDialog?.bag.stageName} {bagDialog?.bag.bagSizeKg}kg
+            </DialogTitle>
+            <DialogDescription>
+              {bagDialog?.action === "open"
+                ? "Mark this bag as opened (in use)."
+                : "Mark this bag as finished — a feed record is created automatically."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>{bagDialog?.action === "open" ? "Opened on" : "Finished on"}</Label>
+              <Input type="date" value={bagForm.date} onChange={(e) => setBagForm({ ...bagForm, date: e.target.value })} />
+            </div>
+            {bagDialog?.action === "finish" && (
+              <div>
+                <Label>Kg actually fed</Label>
+                <Input type="number" step="0.1" min="0.1" max={Number(bagDialog.bag.bagSizeKg)} value={bagForm.kgFed} onChange={(e) => setBagForm({ ...bagForm, kgFed: e.target.value })} />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Defaults to the full {bagDialog.bag.bagSizeKg}kg — lower it for spillage or bags emptied early.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBagDialog(null)}>Cancel</Button>
+            <Button onClick={submitBagAction} disabled={!!bagActionId}>
+              {bagActionId ? "Saving..." : bagDialog?.action === "open" ? "Open Bag" : "Finish Bag"}
             </Button>
           </DialogFooter>
         </DialogContent>
