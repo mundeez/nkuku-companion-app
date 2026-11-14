@@ -1789,6 +1789,149 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     }
   }
 
+  /// Owner/manager correction dialog: change bag status/dates directly.
+  /// Leaving 'finished' with linked records asks whether to delete them.
+  Future<void> _bagEditDialog(FeedBag bag) async {
+    String status = bag.status;
+    DateTime? openedAt = bag.openedAt;
+    DateTime? finishedAt = bag.finishedAt;
+    final kgCtl = TextEditingController();
+    bool removeRecords = false;
+    String fmt(DateTime d) => d.toIso8601String().split('T').first;
+
+    Future<void> pick(bool opened) async {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: (opened ? openedAt : finishedAt) ?? DateTime.now(),
+        firstDate: DateTime(2020),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
+      );
+      if (picked != null) {
+        if (opened) {
+          openedAt = picked;
+        } else {
+          finishedAt = picked;
+        }
+      }
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: Text(
+              'Edit bag #${bag.bagIndex} — ${bag.stageName} ${bag.bagSizeKg}kg'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'sealed', child: Text('Sealed')),
+                    DropdownMenuItem(value: 'open', child: Text('Open')),
+                    DropdownMenuItem(value: 'finished', child: Text('Finished')),
+                  ],
+                  onChanged: (v) => setDlg(() => status = v ?? status),
+                ),
+                if (status != 'sealed')
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Opened on'),
+                    subtitle: Text(
+                        openedAt != null ? fmt(openedAt!) : 'set on finish'),
+                    trailing: const Icon(Icons.calendar_today, size: 18),
+                    onTap: () async {
+                      await pick(true);
+                      setDlg(() {});
+                    },
+                  ),
+                if (status == 'finished') ...[
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Finished on'),
+                    subtitle:
+                        Text(finishedAt != null ? fmt(finishedAt!) : 'today'),
+                    trailing: const Icon(Icons.calendar_today, size: 18),
+                    onTap: () async {
+                      await pick(false);
+                      setDlg(() {});
+                    },
+                  ),
+                  TextField(
+                    controller: kgCtl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Kg fed (blank keeps existing)',
+                      helperText: '${bag.bagSizeKg}kg bag — records regenerate if dates change',
+                    ),
+                  ),
+                ],
+                if (status != 'finished' && bag.feedRecordCount > 0)
+                  CheckboxListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    value: removeRecords,
+                    onChanged: (v) => setDlg(() => removeRecords = v ?? false),
+                    title: Text(
+                        'Delete ${bag.feedRecordCount} linked feed record(s)?'),
+                    subtitle:
+                        const Text('Unchecked keeps them as consumption'),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await BroilerService.patchFeedBag(
+        bag.id,
+        status: status != bag.status ? status : null,
+        openedAt: openedAt?.toIso8601String() !=
+                bag.openedAt?.toIso8601String()
+            ? openedAt
+            : null,
+        finishedAt: finishedAt?.toIso8601String() !=
+                bag.finishedAt?.toIso8601String()
+            ? finishedAt
+            : null,
+        kgFed: kgCtl.text.trim().isNotEmpty
+            ? double.tryParse(kgCtl.text.trim())
+            : null,
+        removeFeedRecords: status != 'finished' && bag.feedRecordCount > 0
+            ? removeRecords
+            : null,
+      );
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Bag updated')));
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.response?.data?['message'] ??
+                e.response?.data?['error'] ??
+                'Bag update failed')));
+      }
+    }
+  }
+
   Color _bagStatusColor(String status) {
     switch (status) {
       case 'open':
@@ -1861,14 +2004,14 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                         style: TextStyle(
                             fontSize: 11, color: _bagStatusColor(b.status))),
                   ),
-                  if (AuthService.canEdit && b.status != 'finished') ...[
+                  if (AuthService.canEdit) ...[
                     const SizedBox(width: 8),
                     if (b.status == 'sealed')
                       TextButton(
                         onPressed: () => _bagAction(b, 'open'),
                         child: const Text('Open'),
                       )
-                    else
+                    else if (b.status == 'open')
                       PopupMenuButton<String>(
                         onSelected: (v) => _bagAction(b, v),
                         itemBuilder: (_) => const [
@@ -1880,6 +2023,13 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                           child: Icon(Icons.more_vert, size: 18),
                         ),
                       ),
+                    InkWell(
+                      onTap: () => _bagEditDialog(b),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.edit_outlined, size: 18),
+                      ),
+                    ),
                   ],
                 ]),
               );

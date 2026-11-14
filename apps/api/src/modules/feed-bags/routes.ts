@@ -8,10 +8,54 @@ import { assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js
 // Individual feed bags: sealed → open → finished.
 // Open/finished can be stepped back one level for mistake recovery.
 
+const DateStr = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
+
 const StatusBodySchema = z.object({
-  date: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  date: DateStr.optional(),
   kgFed: z.coerce.number().positive().optional(),
 });
+
+const BagEditSchema = z.object({
+  status: z.enum(['sealed', 'open', 'finished']).optional(),
+  openedAt: DateStr.optional(),
+  finishedAt: DateStr.optional(),
+  kgFed: z.coerce.number().positive().optional(),
+  removeFeedRecords: z.boolean().optional(),
+});
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Consumption of a finished bag is spread evenly across its opened→finished
+// days so daily / per-chick / overall consumption analytics stay honest.
+// Rebuilds the bag's linked feed records: caller provides totalKg.
+async function syncBagRecords(prisma: any, bag: any, totalKg: number) {
+  const finished = new Date(bag.finishedAt);
+  const opened = bag.openedAt ? new Date(bag.openedAt) : finished;
+  const span = Math.max(1, Math.floor((finished.getTime() - opened.getTime()) / DAY_MS) + 1);
+
+  await prisma.feedRecord.deleteMany({ where: { feedBagId: bag.id } });
+
+  const per = Math.floor((totalKg / span) * 1000) / 1000;
+  const rows = [];
+  let acc = 0;
+  for (let i = 0; i < span; i++) {
+    const d = new Date(opened.getTime() + i * DAY_MS);
+    const qty = i === span - 1 ? Math.round((totalKg - acc) * 1000) / 1000 : per;
+    acc += qty;
+    rows.push({
+      flockId: bag.flockId,
+      supplierId: bag.supplierId,
+      feedBagId: bag.id,
+      recordDate: d,
+      feedType: bag.stageName,
+      feedBrand: bag.supplier?.name ?? null,
+      quantityKg: qty,
+      notes: `Auto: bag #${bag.bagIndex} finished${span > 1 ? ` (day ${i + 1}/${span})` : ''}${totalKg < Number(bag.bagSizeKg) ? ` (${totalKg}kg of ${bag.bagSizeKg}kg fed)` : ''}`,
+    });
+  }
+  if (rows.length) await prisma.feedRecord.createMany({ data: rows });
+  return rows.length;
+}
 
 export async function buildFeedBagModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -66,30 +110,19 @@ export async function buildFeedBagModule(app: FastifyInstance) {
 
     const updated = await prisma.feedBag.update({ where: { id: bag.id }, data });
 
-    // Finishing a bag is consumption — record it as a feed record linked to
-    // the bag. No cost/finrec here: the purchase already booked the expense
-    // (Dr 5020 / Cr 1010) when the bag entered stock.
+    // Finishing a bag is consumption — spread it across its opened→finished
+    // days as linked feed records. No cost/finrec: the purchase already
+    // booked the expense (Dr 5020 / Cr 1010) when the bag entered stock.
     if (action === 'finish') {
       const kgFed = body.kgFed ?? bagKg;
-      const feedRecord = await prisma.feedRecord.create({
-        data: {
-          flockId: bag.flockId,
-          supplierId: bag.supplierId,
-          feedBagId: bag.id,
-          recordDate: at,
-          feedType: bag.stageName,
-          feedBrand: bag.supplier?.name ?? null,
-          quantityKg: kgFed,
-          notes: `Auto: bag #${bag.bagIndex} finished${kgFed < bagKg ? ` (${kgFed}kg of ${bagKg}kg fed)` : ''}`,
-        },
-      });
+      const created = await syncBagRecords(prisma, { ...updated, supplier: bag.supplier }, kgFed);
       await audit.log({
         organizationId: bag.organizationId,
         userId: _authUser.userId,
-        entityType: 'FeedRecord',
-        entityId: feedRecord.id,
-        action: 'create',
-        newState: feedRecord,
+        entityType: 'FeedBag',
+        entityId: bag.id,
+        action: 'update',
+        newState: { feedRecordsCreated: created, kgFed },
         ipAddress: request.ip,
       });
     }
@@ -127,6 +160,7 @@ export async function buildFeedBagModule(app: FastifyInstance) {
       include: {
         supplier: { select: { name: true } },
         purchase: { select: { purchaseDate: true, unitPriceZmw: true } },
+        _count: { select: { feedRecords: true } },
       },
     });
   });
@@ -165,6 +199,91 @@ export async function buildFeedBagModule(app: FastifyInstance) {
       flockId,
       stages: [...stages.values()].map((s) => ({ ...s, suppliers: [...s.suppliers] })),
     };
+  });
+
+  // PATCH /api/v1/feed-bags/:id — owner/manager override: correct status +
+  // dates directly. Transitioning to finished (re)generates the linked feed
+  // records; leaving finished keeps or deletes them per removeFeedRecords.
+  app.patch('/:id', { preHandler: [authenticate, requireRole('owner', 'manager')] }, async (request, reply) => {
+    const body = BagEditSchema.parse(request.body ?? {});
+    const bag = await loadBag(request, reply);
+    if (!bag) return;
+    const _authUser = (request as any).authUser;
+
+    if (assertFlockNotCompleted(reply, bag.flock.status, _authUser?.role)) return;
+
+    const bagKg = Number(bag.bagSizeKg);
+    if (body.kgFed !== undefined && body.kgFed > bagKg) {
+      return reply.status(400).send({ error: 'KG_EXCEEDS_BAG', message: `A ${bagKg}kg bag can't yield ${body.kgFed}kg.` });
+    }
+
+    const newStatus = body.status ?? bag.status;
+    const now = new Date();
+    const finishedAt = newStatus === 'finished'
+      ? (body.finishedAt ? new Date(body.finishedAt) : bag.finishedAt ?? now)
+      : null;
+    const openedAt = newStatus === 'sealed'
+      ? null
+      : body.openedAt
+        ? new Date(body.openedAt)
+        : (newStatus === 'finished' && !bag.openedAt ? finishedAt : bag.openedAt);
+
+    const datesChanged =
+      (body.openedAt !== undefined && openedAt?.getTime() !== bag.openedAt?.getTime()) ||
+      (body.finishedAt !== undefined && finishedAt?.getTime() !== bag.finishedAt?.getTime());
+    const becameFinished = newStatus === 'finished' && bag.status !== 'finished';
+    const leftFinished = bag.status === 'finished' && newStatus !== 'finished';
+
+    // How many linked records exist / their total kg (for resync on date edits)
+    const existing = await prisma.feedRecord.aggregate({
+      where: { feedBagId: bag.id },
+      _sum: { quantityKg: true },
+      _count: { _all: true },
+    });
+    const recordCount = existing._count._all;
+    const existingKg = Number(existing._sum.quantityKg ?? 0);
+
+    const { updated, recordsCreated, recordsRemoved } = await prisma.$transaction(async (tx: any) => {
+      const updated = await tx.feedBag.update({
+        where: { id: bag.id },
+        data: {
+          status: newStatus,
+          openedAt,
+          finishedAt,
+          ...(becameFinished && !bag.finishedById ? { finishedById: _authUser.userId } : {}),
+          ...(newStatus === 'sealed' ? { openedById: null, finishedById: null } : {}),
+        },
+      });
+
+      let recordsCreated = 0;
+      let recordsRemoved = 0;
+      if (newStatus === 'finished') {
+        const needSync = becameFinished || body.kgFed !== undefined || datesChanged || recordCount === 0;
+        if (needSync) {
+          const totalKg = body.kgFed ?? (recordCount > 0 ? existingKg : bagKg);
+          const synced = { ...updated, supplier: bag.supplier };
+          recordsCreated = await syncBagRecords(tx, synced, totalKg);
+        }
+      } else if (leftFinished && recordCount > 0 && body.removeFeedRecords) {
+        const del = await tx.feedRecord.deleteMany({ where: { feedBagId: bag.id } });
+        recordsRemoved = del.count;
+      }
+      return { updated, recordsCreated, recordsRemoved };
+    });
+
+    await audit.log({
+      organizationId: bag.organizationId,
+      userId: _authUser.userId,
+      impersonatedByStaffId: _authUser.impersonation?.staffId,
+      entityType: 'FeedBag',
+      entityId: bag.id,
+      action: 'update',
+      previousState: { status: bag.status, openedAt: bag.openedAt, finishedAt: bag.finishedAt, recordCount },
+      newState: { status: newStatus, openedAt, finishedAt, recordsCreated, recordsRemoved },
+      ipAddress: request.ip,
+    });
+
+    return updated;
   });
 
   // POST /api/v1/feed-bags/:id/open   (sealed → open; optional backdate)

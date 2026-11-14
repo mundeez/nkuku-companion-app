@@ -36,7 +36,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
       return prisma.feedRecord.findMany({
         where: { flockId },
         orderBy: { recordDate: 'asc' },
-        include: { supplier: { select: { name: true } }, feedBag: { select: { bagIndex: true } } },
+        include: { supplier: { select: { name: true } }, feedBag: { select: { id: true, bagIndex: true } } },
       });
     }
 
@@ -44,7 +44,7 @@ export async function buildFeedRecordModule(app: FastifyInstance) {
     return prisma.feedRecord.findMany({
       where: { flock: { organizationId } },
       orderBy: { recordDate: 'asc' },
-      include: { supplier: { select: { name: true } }, feedBag: { select: { bagIndex: true } } },
+      include: { supplier: { select: { name: true } }, feedBag: { select: { id: true, bagIndex: true } } },
     });
   });
 

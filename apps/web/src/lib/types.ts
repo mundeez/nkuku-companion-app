@@ -300,6 +300,7 @@ export interface FeedBag {
   updatedAt: string;
   supplier?: { name: string } | null;
   purchase?: { purchaseDate: string; unitPriceZmw: number } | null;
+  _count?: { feedRecords: number };
 }
 
 export interface FeedBagStageSummary {

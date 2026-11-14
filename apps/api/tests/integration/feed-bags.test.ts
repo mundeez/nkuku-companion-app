@@ -179,6 +179,79 @@ describe('Feed Bags lifecycle & multi-supplier attribution', () => {
     expect(resealed.openedAt).toBeNull();
   });
 
+  it('PATCH: finished bags spread kg across days; un-finish asks about records; date edits resync', async () => {
+    // Isolated purchase + bag for the override flow
+    const pRes = await api('/api/v1/feed-purchases', token, {
+      method: 'POST',
+      body: JSON.stringify({
+        flockId, feedStageId: starterStage.id, supplierId,
+        purchaseDate: '2026-11-10', stageName: starterStage.stageName,
+        bagSizeKg: 50, bagsPurchased: 1, unitPriceZmw: 600,
+      }),
+    });
+    const purchase = await pRes.json();
+    const bags = await (await api(`/api/v1/feed-bags?flockId=${flockId}`, token)).json();
+    const bag = bags.find((b: any) => b.purchaseId === purchase.id);
+
+    // kgFed above bag size rejected
+    const tooMuch = await api(`/api/v1/feed-bags/${bag.id}`, token, {
+      method: 'PATCH', body: JSON.stringify({ kgFed: 999 }),
+    });
+    expect(tooMuch.status).toBe(400);
+
+    // Open backdated to 2026-11-10, finish on 2026-11-13 → 4-day spread of 40kg
+    let res = await api(`/api/v1/feed-bags/${bag.id}`, token, {
+      method: 'PATCH', body: JSON.stringify({ status: 'open', openedAt: '2026-11-10' }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).openedAt).toBeTruthy();
+    res = await api(`/api/v1/feed-bags/${bag.id}`, token, {
+      method: 'PATCH', body: JSON.stringify({ status: 'finished', finishedAt: '2026-11-13', kgFed: 40 }),
+    });
+    expect(res.status).toBe(200);
+
+    let records = await (await api(`/api/v1/feed-records?flockId=${flockId}`, token)).json();
+    let linked = records.filter((r: any) => r.feedBag?.bagIndex === bag.bagIndex && r.feedBag?.id === bag.id);
+    expect(linked.length).toBe(4); // Nov 10,11,12,13
+    expect(linked.reduce((s: number, r: any) => s + Number(r.quantityKg), 0)).toBeCloseTo(40, 2);
+    const dates = linked.map((r: any) => new Date(r.recordDate).getTime()).sort();
+    for (let i = 1; i < dates.length; i++) expect(dates[i] - dates[i - 1]).toBe(86400000);
+    expect(linked.every((r: any) => r.notes.includes('day '))).toBe(true);
+
+    // Un-finish WITHOUT removeFeedRecords → records kept
+    res = await api(`/api/v1/feed-bags/${bag.id}`, token, {
+      method: 'PATCH', body: JSON.stringify({ status: 'open' }),
+    });
+    expect((await res.json()).status).toBe('open');
+    records = await (await api(`/api/v1/feed-records?flockId=${flockId}`, token)).json();
+    expect(records.filter((r: any) => r.feedBag?.id === bag.id).length).toBe(4);
+
+    // Re-finish, then un-finish WITH removeFeedRecords → records deleted
+    await api(`/api/v1/feed-bags/${bag.id}`, token, {
+      method: 'PATCH', body: JSON.stringify({ status: 'finished' }),
+    });
+    res = await api(`/api/v1/feed-bags/${bag.id}`, token, {
+      method: 'PATCH', body: JSON.stringify({ status: 'open', removeFeedRecords: true }),
+    });
+    expect(res.status).toBe(200);
+    records = await (await api(`/api/v1/feed-records?flockId=${flockId}`, token)).json();
+    expect(records.filter((r: any) => r.feedBag?.id === bag.id).length).toBe(0);
+
+    // Re-finish (records were deleted → kgFed must be re-entered; it resets
+    // to bag size otherwise), then move finishedAt +2 days → resync to 6 days
+    await api(`/api/v1/feed-bags/${bag.id}`, token, {
+      method: 'PATCH', body: JSON.stringify({ status: 'finished', kgFed: 40 }),
+    });
+    res = await api(`/api/v1/feed-bags/${bag.id}`, token, {
+      method: 'PATCH', body: JSON.stringify({ finishedAt: '2026-11-15' }),
+    });
+    expect(res.status).toBe(200);
+    records = await (await api(`/api/v1/feed-records?flockId=${flockId}`, token)).json();
+    linked = records.filter((r: any) => r.feedBag?.id === bag.id);
+    expect(linked.length).toBe(6); // Nov 10 → Nov 15
+    expect(linked.reduce((s: number, r: any) => s + Number(r.quantityKg), 0)).toBeCloseTo(40, 2);
+  });
+
   it('reducing bagsPurchased removes sealed bags but protects consumed ones', async () => {
     // State: bag1 finished, bag3 finished (auto-record test), bag2 sealed
     // (opened→resealed) → 1 sealed. Reduce 3→2 drops the only sealed bag.
@@ -187,7 +260,8 @@ describe('Feed Bags lifecycle & multi-supplier attribution', () => {
       body: JSON.stringify({ bagsPurchased: 2 }),
     });
     expect(res.status).toBe(200);
-    const bags = await (await api(`/api/v1/feed-bags?flockId=${flockId}`, token)).json();
+    const bags = (await (await api(`/api/v1/feed-bags?flockId=${flockId}`, token)).json())
+      .filter((b: any) => b.purchaseId === purchaseId);
     expect(bags.length).toBe(2);
     expect(bags.every((b: any) => b.status === 'finished')).toBe(true);
 

@@ -545,6 +545,29 @@ class BroilerService {
   static Future<FeedBag> resealFeedBag(String id) =>
       _transitionFeedBag(id, 'reseal');
 
+  /// Owner/manager correction: set status and/or dates directly.
+  static Future<FeedBag> patchFeedBag(
+    String id, {
+    String? status,
+    DateTime? openedAt,
+    DateTime? finishedAt,
+    double? kgFed,
+    bool? removeFeedRecords,
+  }) async {
+    final res = await ApiService.dio.patch('/api/v1/feed-bags/$id', data: {
+      if (status != null) 'status': status,
+      if (openedAt != null)
+        'openedAt': openedAt.toIso8601String().split('T').first,
+      if (finishedAt != null)
+        'finishedAt': finishedAt.toIso8601String().split('T').first,
+      if (kgFed != null) 'kgFed': kgFed,
+      if (removeFeedRecords != null) 'removeFeedRecords': removeFeedRecords,
+    });
+    _assertOk(res);
+    ConnectivityService.instance.markOnline();
+    return FeedBag.fromJson(res.data);
+  }
+
   static Future<void> deleteFeedPurchase(String id) async {
     try {
       final res = await ApiService.dio.delete('/api/v1/feed-purchases/$id');

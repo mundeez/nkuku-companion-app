@@ -13,6 +13,7 @@ class FeedBag {
   final String status; // 'sealed' | 'open' | 'finished'
   final DateTime? openedAt;
   final DateTime? finishedAt;
+  final int feedRecordCount; // linked auto feed records (_count)
 
   FeedBag({
     required this.id,
@@ -27,6 +28,7 @@ class FeedBag {
     required this.status,
     this.openedAt,
     this.finishedAt,
+    this.feedRecordCount = 0,
   });
 
   factory FeedBag.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,7 @@ class FeedBag {
       finishedAt: json['finishedAt'] != null
           ? DateTime.tryParse(json['finishedAt'])
           : null,
+      feedRecordCount: json['_count']?['feedRecords'] ?? 0,
     );
   }
 

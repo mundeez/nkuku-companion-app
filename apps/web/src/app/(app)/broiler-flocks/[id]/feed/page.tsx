@@ -64,6 +64,10 @@ export default function FeedCalculatorPage() {
   const [bagActionId, setBagActionId] = useState<string | null>(null);
   const [bagDialog, setBagDialog] = useState<{ bag: FeedBag; action: "open" | "finish" } | null>(null);
   const [bagForm, setBagForm] = useState({ date: "", kgFed: "" });
+  const [bagEdit, setBagEdit] = useState<FeedBag | null>(null);
+  const [bagEditForm, setBagEditForm] = useState({ status: "", openedAt: "", finishedAt: "", kgFed: "", removeFeedRecords: false });
+  const [recordEdit, setRecordEdit] = useState<any | null>(null);
+  const [recordForm, setRecordForm] = useState({ recordDate: "", quantityKg: "", notes: "" });
 
   const canEdit = user?.role === "owner" || user?.role === "manager";
 
@@ -285,6 +289,60 @@ export default function FeedCalculatorPage() {
   }
 
   const fmtBagDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
+  const toDateInput = (d?: string | null) => (d ? new Date(d).toISOString().split("T")[0] : "");
+
+  function openBagEdit(bag: FeedBag) {
+    setBagEditForm({
+      status: bag.status,
+      openedAt: toDateInput(bag.openedAt),
+      finishedAt: toDateInput(bag.finishedAt),
+      kgFed: "",
+      removeFeedRecords: false,
+    });
+    setBagEdit(bag);
+  }
+
+  async function submitBagEdit() {
+    if (!bagEdit) return;
+    setBagActionId(bagEdit.id);
+    try {
+      const body: any = {};
+      if (bagEditForm.status && bagEditForm.status !== bagEdit.status) body.status = bagEditForm.status;
+      if (bagEditForm.openedAt !== toDateInput(bagEdit.openedAt)) body.openedAt = bagEditForm.openedAt || null;
+      if (bagEditForm.finishedAt !== toDateInput(bagEdit.finishedAt)) body.finishedAt = bagEditForm.finishedAt || null;
+      if (bagEditForm.kgFed) body.kgFed = Number(bagEditForm.kgFed);
+      if (body.status && body.status !== "finished" && (bagEdit._count?.feedRecords ?? 0) > 0) {
+        body.removeFeedRecords = bagEditForm.removeFeedRecords;
+      }
+      await apiFetch(`/api/v1/feed-bags/${bagEdit.id}`, { method: "PATCH", body: JSON.stringify(body) });
+      setBagEdit(null);
+      loadBags();
+      loadFeedRecords();
+      loadProjection();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBagActionId(null);
+    }
+  }
+
+  async function submitRecordEdit() {
+    if (!recordEdit) return;
+    try {
+      await apiFetch(`/api/v1/feed-records/${recordEdit.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          recordDate: recordForm.recordDate || undefined,
+          quantityKg: recordForm.quantityKg ? Number(recordForm.quantityKg) : undefined,
+          notes: recordForm.notes,
+        }),
+      });
+      setRecordEdit(null);
+      loadFeedRecords();
+    } catch (e: any) {
+      alert(e.message);
+    }
+  }
 
   if (isLoading) return <div className="p-8">Loading...</div>;
   if (!user) return null;
@@ -392,6 +450,7 @@ export default function FeedCalculatorPage() {
                       <TableHead className="text-right">Cost</TableHead>
                       <TableHead>Supplier</TableHead>
                       <TableHead>Source</TableHead>
+                      {canEdit && <TableHead></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -410,6 +469,14 @@ export default function FeedCalculatorPage() {
                             <span className="text-xs text-muted-foreground">manual</span>
                           )}
                         </TableCell>
+                        {canEdit && (
+                          <TableCell>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
+                              setRecordForm({ recordDate: toDateInput(r.recordDate), quantityKg: String(r.quantityKg), notes: r.notes || "" });
+                              setRecordEdit(r);
+                            }}><Pencil className="h-3.5 w-3.5" /></Button>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -473,6 +540,9 @@ export default function FeedCalculatorPage() {
                               </div>
                             )}
                             {b.status === "finished" && <span className="text-xs text-muted-foreground">done</span>}
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-1" title="Edit bag (owner correction)" onClick={() => openBagEdit(b)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
                           </TableCell>
                         )}
                       </TableRow>
@@ -719,6 +789,81 @@ export default function FeedCalculatorPage() {
             <Button onClick={submitBagAction} disabled={!!bagActionId}>
               {bagActionId ? "Saving..." : bagDialog?.action === "open" ? "Open Bag" : "Finish Bag"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bag edit dialog — owner/manager correction of status + dates */}
+      <Dialog open={!!bagEdit} onOpenChange={(o) => { if (!o) setBagEdit(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit bag #{bagEdit?.bagIndex} — {bagEdit?.stageName} {bagEdit?.bagSizeKg}kg</DialogTitle>
+            <DialogDescription>Correct status and dates. Feed records regenerate when dates change on a finished bag.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Status</Label>
+              <select className="w-full border rounded-md p-2 bg-background" value={bagEditForm.status} onChange={(e) => setBagEditForm({ ...bagEditForm, status: e.target.value })}>
+                <option value="sealed">sealed</option>
+                <option value="open">open</option>
+                <option value="finished">finished</option>
+              </select>
+            </div>
+            {bagEditForm.status !== "sealed" && (
+              <div>
+                <Label>Opened on</Label>
+                <Input type="date" value={bagEditForm.openedAt} onChange={(e) => setBagEditForm({ ...bagEditForm, openedAt: e.target.value })} />
+              </div>
+            )}
+            {bagEditForm.status === "finished" && (
+              <>
+                <div>
+                  <Label>Finished on</Label>
+                  <Input type="date" value={bagEditForm.finishedAt} onChange={(e) => setBagEditForm({ ...bagEditForm, finishedAt: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Kg fed (optional — keeps existing total if blank)</Label>
+                  <Input type="number" step="0.1" min="0.1" max={Number(bagEdit?.bagSizeKg)} value={bagEditForm.kgFed} onChange={(e) => setBagEditForm({ ...bagEditForm, kgFed: e.target.value })} placeholder={String(Number(bagEdit?.bagSizeKg ?? 0))} />
+                </div>
+              </>
+            )}
+            {bagEditForm.status !== "finished" && (bagEdit?._count?.feedRecords ?? 0) > 0 && (
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-0.5" checked={bagEditForm.removeFeedRecords} onChange={(e) => setBagEditForm({ ...bagEditForm, removeFeedRecords: e.target.checked })} />
+                <span>Delete the {bagEdit?._count?.feedRecords} linked feed record(s)? Unchecked keeps them as consumption.</span>
+              </label>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBagEdit(null)}>Cancel</Button>
+            <Button onClick={submitBagEdit} disabled={!!bagActionId}>{bagActionId ? "Saving..." : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Feed record edit — corrections to date/kg/notes */}
+      <Dialog open={!!recordEdit} onOpenChange={(o) => { if (!o) setRecordEdit(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit feed record{recordEdit?.feedBag ? ` (bag #${recordEdit.feedBag.bagIndex})` : ""}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Date</Label>
+              <Input type="date" value={recordForm.recordDate} onChange={(e) => setRecordForm({ ...recordForm, recordDate: e.target.value })} />
+            </div>
+            <div>
+              <Label>Quantity (kg)</Label>
+              <Input type="number" step="0.1" min="0" value={recordForm.quantityKg} onChange={(e) => setRecordForm({ ...recordForm, quantityKg: e.target.value })} />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Input value={recordForm.notes} onChange={(e) => setRecordForm({ ...recordForm, notes: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecordEdit(null)}>Cancel</Button>
+            <Button onClick={submitRecordEdit}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
