@@ -39,19 +39,20 @@ function ross308WholeHouse(ageDays: number): DayValues {
   else if (weight <= 1.260) targetTempC = 21;
   else targetTempC = 20;
 
-  // Light step-down per Ross 2025.
+  // Light step-down per Ross 2025: 23h light for the first ~4-5 days,
+  // then gradually transition to 4-6h continuous darkness by day 7.
   let lightHours: number;
   let darkHours: number;
   let lightIntensityLux: number;
-  if (ageDays <= 3) {
+  if (ageDays <= 4) {
     lightHours = 23;
     darkHours = 1;
     lightIntensityLux = 35;
   } else if (ageDays <= 7) {
-    // Gradual step-down from 22L/2D to 19L/5D.
-    const step = ageDays - 3;
-    lightHours = 22 - 0.75 * step;
-    darkHours = 2 + 0.75 * step;
+    // Gradual step-down landing on 19L/5D by day 7.
+    const step = ageDays - 4;
+    lightHours = 22 - step;
+    darkHours = 2 + step;
     lightIntensityLux = 35;
   } else if (ageDays >= 40) {
     // Pre-catch: 23L:1D for the last 3 days.
@@ -64,7 +65,9 @@ function ross308WholeHouse(ageDays: number): DayValues {
     lightIntensityLux = 7;
   }
 
-  const [rhMin, rhMax] = ageDays <= 3 ? [60, 70] : [50, 60];
+  // Ross 2025: 60-70% RH during brooding; 50-70% through grow-out
+  // (below 50% risks dust/dehydration, above 70% wet litter).
+  const [rhMin, rhMax] = ageDays <= 3 ? [60, 70] : [50, 70];
 
   return {
     targetTempC,
@@ -76,8 +79,8 @@ function ross308WholeHouse(ageDays: number): DayValues {
     darkHours,
     lightIntensityLux,
     darkIntensityLux: 0,
-    notes: ageDays <= 3
-      ? 'Brooding: 23h light, 1h dark. Intensity at least 30-40 lux for whole-house.'
+    notes: ageDays <= 4
+      ? 'Brooding: 23h light, 1h dark. Intensity at least 30-40 lux for whole-house. Drinking water at placement should be 18-21°C.'
       : ageDays <= 7
       ? 'Gradually step down to 4-6 hours continuous darkness by day 7.'
       : ageDays >= 40
@@ -106,8 +109,9 @@ function ross308SpotBrooding(ageDays: number): DayValues {
 
 function genericBroiler(ageDays: number, housingType: HousingType): DayValues {
   // Generic fallback derived from common extension guidance (WRC South Africa, UGA).
+  // UGA/extension: ~32-35°C at chick level in week 1, reducing ~2.8°C/week.
   let targetTempC: number;
-  if (ageDays <= 7) targetTempC = 32;
+  if (ageDays <= 7) targetTempC = 33;
   else if (ageDays <= 14) targetTempC = 29;
   else if (ageDays <= 21) targetTempC = 27;
   else if (ageDays <= 28) targetTempC = 24;
@@ -120,14 +124,14 @@ function genericBroiler(ageDays: number, housingType: HousingType): DayValues {
   let lightHours: number;
   let darkHours: number;
   let lightIntensityLux: number;
-  if (ageDays <= 3) {
+  if (ageDays <= 4) {
     lightHours = 23;
     darkHours = 1;
     lightIntensityLux = housingType === 'spot_brooding' ? 90 : 35;
   } else if (ageDays <= 7) {
-    const step = ageDays - 3;
-    lightHours = 22 - 0.75 * step;
-    darkHours = 2 + 0.75 * step;
+    const step = ageDays - 4;
+    lightHours = 22 - step;
+    darkHours = 2 + step;
     lightIntensityLux = 35;
   } else if (ageDays >= 40) {
     lightHours = 23;
@@ -139,7 +143,7 @@ function genericBroiler(ageDays: number, housingType: HousingType): DayValues {
     lightIntensityLux = 7;
   }
 
-  const [rhMin, rhMax] = ageDays <= 3 ? [60, 70] : [50, 60];
+  const [rhMin, rhMax] = ageDays <= 3 ? [60, 70] : [50, 70];
 
   return {
     targetTempC,

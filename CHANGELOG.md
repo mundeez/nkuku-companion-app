@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.55.0] — Unreleased
+
+### Husbandry guidance corrections (R-1 audit vs Ross 2025 / UGA extension)
+
+- **Grow-out RH band widened** 50–60% → **50–70%** (Ross 2025 acceptable
+  grow-out band; below 50% risks dust/dehydration, above 70% wet litter).
+- **Brooding light** now holds 23L/1D through **day 4** (was day 3), then
+  steps down days 5–7 landing on 19L/5D — matching "23h for the first days,
+  gradually reaching 4–6h darkness by day 7".
+- **Generic fallback week-1 temp** 32°C → **33°C** (middle of the UGA
+  32–35°C extension range; spot-brooding edge stays +2°C).
+- **Placement water temperature** guidance added to brooding notes
+  (18–21°C per Ross 2025).
+- Prod schedules regenerated for all organizations via
+  `src/db/seeds/reseed-lighting-schedules.ts` (idempotent — deleteMany +
+  regenerate on name-keyed upserts).
+
 ## [1.54.1] — 2026-11-14
 
 ### Mobile bug fixes + sales figure drill-downs
