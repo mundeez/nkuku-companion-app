@@ -135,3 +135,22 @@ jobs:
       - name: Tests
         working-directory: apps/mobile
         run: flutter test
+
+  admin-mobile:
+    name: Admin Mobile (analyze + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Pub get
+        working-directory: apps/admin-mobile
+        run: flutter pub get
+      - name: Analyze
+        working-directory: apps/admin-mobile
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Tests
+        working-directory: apps/admin-mobile
+        run: flutter test
