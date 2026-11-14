@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.54.0] — 2026-11-15
+
+### P5 — Growth & finance analytics (admin console)
+
+**`platform_daily_stats` materialised rollups** via a new `platform_analytics`
+cron (00:30, 90-day rolling backfill in the `cronJobs` registry — manual run
+through `POST /platform/ops/cron/platform_analytics/run`, freshness tracked by
+the health panel):
+
+- Signups, first-flock **activations**, WAU/MAU (tenant audit activity,
+  impersonated actions excluded)
+- **MRR by plan** — paid-invoice coverage normalized to monthly ZMW, plus a
+  live-sub fallback for fresh upgrades; **new / expansion / churned MRR**
+- **Dunning touches + failed-payment recoveries**; active-org **country split**;
+  live **subscription funnel** (trialing/active/past_due/suspended/cancelled +
+  ever-paid orgs)
+- Demo orgs and staff excluded everywhere
+
+**Endpoints** (`analytics.read`, staff): `GET /platform/analytics/overview`,
+`/cohorts`, `/export.csv` — cohorts compute live (signup-month × months-active
+retention from audit activity).
+
+**Console `/analytics`** under a new Insights nav section: KPI cards, MRR-by-
+plan stacked area, signups/activations bars, WAU/MAU lines, funnel + country
+split, cohort heat-map, date range + CSV export.
+
+_No mobile changes — v1.53.2+158 remains the current app build._
+
 ## [1.53.2] — 2026-11-14
 
 ### Feed-bag consumption: daily spread + owner/manager bag override
