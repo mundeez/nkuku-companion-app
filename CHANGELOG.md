@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.53.2] — 2026-11-14
+
+### Feed-bag consumption: daily spread + owner/manager bag override
+
+**Daily spread on finish:** a finished bag's consumption is now spread evenly
+across its opened→finished days — one linked feed record per calendar day —
+instead of a single spike on the finish date. Daily, per-chick, and overall
+consumption analytics now reflect when the feed was actually eaten. Partial
+`kgFed` spreads the same way; row notes mark `day N/M`.
+
+**New `PATCH /api/v1/feed-bags/:id` (owner+manager):**
+- Direct status correction: sealed / open / finished.
+- Editable `openedAt` / `finishedAt`; changing either on a finished bag
+  resyncs the linked records' dates and span while preserving total kg.
+- Leaving `finished` asks each time what to do with the linked auto-records:
+  `removeFeedRecords` deletes them, omitted keeps them as consumption.
+- `kgFed` stays capped at bag size (`KG_EXCEEDS_BAG`); a bag re-finished
+  after record deletion resets to bag size unless kg is re-entered.
+
+**UI:** pencil on every bag row → edit dialog (status, dates, kg fed,
+delete-records prompt); pencil on feed records → correction dialog
+(date/kg/notes). Mobile mirrors both via `patchFeedBag`; `FeedBag` carries
+`feedRecordCount`. Feed-record responses now include `feedBag.id` so
+auto-sourced rows stay distinguishable per bag.
+
 ## [1.53.1] — 2026-11-14
 
 ### Audited chick additions — fixes initial/current count drift
