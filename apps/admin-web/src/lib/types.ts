@@ -511,3 +511,43 @@ export interface CatalogueSupplierTemplate {
   isActive: boolean;
   items?: CatalogueTemplateItem[];
 }
+
+// ── P5 platform analytics ─────────────────────────────
+export interface AnalyticsDay {
+  date: string;
+  signups: number;
+  activations: number;
+  wau: number;
+  mau: number;
+  mrrBasic: number;
+  mrrGrower: number;
+  mrrBusiness: number;
+  mrrEnterprise: number;
+  mrrTotal: number;
+  newMrr: number;
+  expansionMrr: number;
+  churnedMrr: number;
+  failedPayments: number;
+  failedPaymentRecoveries: number;
+  countries: Record<string, number> | null;
+  funnel: {
+    trialing: number;
+    active: number;
+    past_due: number;
+    suspended: number;
+    cancelled: number;
+    everPaid: number;
+  } | null;
+}
+
+export interface AnalyticsOverview {
+  latest: AnalyticsDay | null;
+  prior: AnalyticsDay | null;
+  series: AnalyticsDay[];
+}
+
+export interface AnalyticsCohort {
+  cohort: string; // "YYYY-MM"
+  size: number;
+  months: Record<number, number>; // elapsed-month → % retained
+}

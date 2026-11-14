@@ -2143,6 +2143,33 @@ model CronRun {
   @@map("cron_runs")
 }
 
+// P5 growth & finance analytics — materialised daily rollups written by the
+// 00:30 'platform_analytics' cron. Demo orgs and staff are excluded upstream;
+// this table is append/upsert-only and read by /api/v1/platform/analytics/*.
+model PlatformDailyStats {
+  id                      String   @id @default(uuid()) @db.Uuid
+  statDate                DateTime @unique @map("stat_date") @db.Date
+  signups                 Int      @default(0)
+  activations             Int      @default(0)
+  wau                     Int      @default(0)
+  mau                     Int      @default(0)
+  mrrBasic                Decimal  @default(0) @map("mrr_basic") @db.Decimal(12, 2)
+  mrrGrower               Decimal  @default(0) @map("mrr_grower") @db.Decimal(12, 2)
+  mrrBusiness             Decimal  @default(0) @map("mrr_business") @db.Decimal(12, 2)
+  mrrEnterprise           Decimal  @default(0) @map("mrr_enterprise") @db.Decimal(12, 2)
+  newMrr                  Decimal  @default(0) @map("new_mrr") @db.Decimal(12, 2)
+  expansionMrr            Decimal  @default(0) @map("expansion_mrr") @db.Decimal(12, 2)
+  churnedMrr              Decimal  @default(0) @map("churned_mrr") @db.Decimal(12, 2)
+  failedPayments          Int      @default(0) @map("failed_payments")
+  failedPaymentRecoveries Int      @default(0) @map("failed_payment_recoveries")
+  countriesJson           Json?    @map("countries_json")
+  funnelJson              Json?    @map("funnel_json")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("platform_daily_stats")
+}
+
 // Generic key→JSON platform settings store. Currently holds
 // 'maintenance_mode' ({ enabled, message, by, at }); P4 feature flags
 // reuse this table.

@@ -306,6 +306,7 @@ const marketPrice = parseFloat(process.env.MARKET_PRICE_PER_KG || '25');
 
 import { runDailyBillingCron } from './core/billing/billing.service.js';
 import { purgeExpiredOrganizations } from './modules/organizations/lifecycle.service.js';
+import { backfillDailyStats } from './core/platform-analytics/analytics.service.js';
 
 const DAY_BUDGET_SEC = 26 * 3600; // daily jobs go stale after ~26 h
 export const cronJobs: CronJobDef[] = [
@@ -355,6 +356,18 @@ export const cronJobs: CronJobDef[] = [
         throw new Error(`Failed to purge ${failed.length} org(s): ${failed.map((f: any) => f.name).join(', ')}`);
       }
       return { purged };
+    },
+  },
+  {
+    // 00:30 — P5 growth/finance analytics: materialise daily rollups into
+    // platform_daily_stats (yesterday + rolling 90d backfill so late-arriving
+    // payments/activity correct recent rows).
+    name: 'platform_analytics',
+    schedule: '30 0 * * *',
+    maxAgeSec: DAY_BUDGET_SEC,
+    run: async () => {
+      const rows = await backfillDailyStats(prisma, 90);
+      return { days: rows.length };
     },
   },
 ];

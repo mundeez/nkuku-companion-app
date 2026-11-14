@@ -10,6 +10,7 @@ import {
   PLATFORM_BASE,
   apiFetch,
   clearSession,
+  getAccessToken,
   getReauthAt,
   getRefreshToken,
   setReauthAt,
@@ -17,6 +18,8 @@ import {
   setStoredUser,
 } from "./client";
 import type {
+  AnalyticsCohort,
+  AnalyticsOverview,
   AnnouncementPayload,
   AuditEvent,
   CommsLogItem,
@@ -779,4 +782,36 @@ export async function deleteCatalogueItem(entity: CatalogueEntity, id: string) {
   return apiFetch(`${PLATFORM_BASE}/catalogue/${entity}/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
+}
+
+// ── P5: growth & finance analytics ────────────────────
+export async function getAnalyticsOverview(from?: string, to?: string): Promise<AnalyticsOverview> {
+  const qs = new URLSearchParams();
+  if (from) qs.set("from", from);
+  if (to) qs.set("to", to);
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return apiFetch(`${PLATFORM_BASE}/analytics/overview${suffix}`);
+}
+
+export async function getAnalyticsCohorts(): Promise<{ cohorts: AnalyticsCohort[] }> {
+  return apiFetch(`${PLATFORM_BASE}/analytics/cohorts`);
+}
+
+/** CSV export — apiFetch is JSON-only, so this uses a raw fetch + blob. */
+export async function downloadAnalyticsCsv(from?: string, to?: string) {
+  const qs = new URLSearchParams();
+  if (from) qs.set("from", from);
+  if (to) qs.set("to", to);
+  const res = await fetch(`${PLATFORM_BASE}/analytics/export.csv?${qs}`, {
+    headers: { Authorization: `Bearer ${getAccessToken()}` },
+    credentials: "include",
+  });
+  if (!res.ok) throw new ApiRequestError(res.status, await res.json().catch(() => null));
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `platform-analytics-${from ?? ""}_${to ?? ""}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }

@@ -32,6 +32,7 @@ import {
   Flag,
   Megaphone,
   BookOpen,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
@@ -56,6 +57,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/flags", label: "Feature Flags", icon: Flag, permission: "flags.write" },
   { href: "/announcements", label: "Announcements", icon: Megaphone, permission: "announcements.write" },
   { href: "/catalogue", label: "Catalogue", icon: BookOpen, permission: "catalogue.write" },
+  // ── Insights (P5) ──
+  { href: "/analytics", label: "Analytics", icon: BarChart3, permission: "analytics.read", section: "Insights" },
   // ── Ops ──
   { href: "/health", label: "Health", icon: HeartPulse, permission: "platform.dashboard.read", section: "Ops" },
   { href: "/audit", label: "Audit Log", icon: ScrollText, permission: "audit.read" },

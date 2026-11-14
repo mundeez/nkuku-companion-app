@@ -51,6 +51,7 @@ import { buildPlatformSupportModule } from './support.js';
 import { buildPlatformPlansModule } from './plans-admin.js';
 import { buildPlatformFlagsAnnouncementsModule } from './flags-announcements.js';
 import { buildPlatformCatalogueModule } from './catalogue.js';
+import { buildPlatformAnalyticsModule } from './analytics.js';
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -703,4 +704,5 @@ export async function buildPlatformModule(app: FastifyInstance) {
   await app.register(buildPlatformPlansModule);
   await app.register(buildPlatformFlagsAnnouncementsModule);
   await app.register(buildPlatformCatalogueModule);
+  await app.register(buildPlatformAnalyticsModule);
 }
