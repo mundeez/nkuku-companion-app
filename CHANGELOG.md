@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.53.1] — 2026-11-14
+
+### Audited chick additions — fixes initial/current count drift
+
+**Bug fix:** editing "Initial Bird Count" updated `initialCount` but never
+`currentCount` (mortality only decrements `currentCount`), so the two drifted —
+e.g. Flock A October showed `279 of 295`. Raw count fields are removed from
+`PATCH /broiler-flocks/:id`; all count changes now flow through audited
+additions on web and mobile.
+
+**New `FlockChickAddition` ledger + endpoints:**
+- `GET/POST/DELETE /api/v1/broiler-flocks/:id/chick-additions` — every addition
+  records count, date, reason, notes, and creator; POST bumps both
+  `initialCount` and `currentCount`, DELETE reverses both.
+- Reasons: `hatchery_extra` (free — no cost), `purchase` (editable unit price →
+  `chick_purchase` financial record + auto-posted journal Dr 1030 / Cr 1010),
+  `correction` (the only reason allowed to go negative).
+- Underflow guards are atomic `updateMany` conditions inside the transaction;
+  DELETE commits counts before unwinding the journal so failures can't strand
+  a finrec-less addition.
+- Chick-cost display now sums `chick_purchase` financial records instead of
+  `price × initialCount`, so free extras no longer inflate cost.
+
+**Production repair:** Flock A October corrected to 280 ordered + 5 hatchery
+extras + 11 purchased @ K17.50 (K192.50) = **296 received, 295 current** after
+1 mortality. Script: `apps/api/src/db/seeds/repair-flock-a-october-additions.ts`.
+
 ## [1.53.0] — 2026-11-12
 
 ### P4 — Five-tier subscriptions, trial lock, feature flags, announcements, catalogue
