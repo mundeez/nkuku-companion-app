@@ -2,6 +2,28 @@
 
 ## [1.55.0] — Unreleased
 
+### P6 — admin-mobile staff console (Wave 1, new package `apps/admin-mobile`)
+
+- New Flutter app `solutions.deeztechnology.nkuku_admin` — the staff
+  console companion to admin-web:
+  - **Staff auth** — password login → TOTP verify or first-time enrollment
+    (secret + recovery-code display), persisted access/refresh tokens,
+    401→refresh→retry interceptor, logout.
+  - **Overview** — growth KPIs (MRR, sub funnel, signups, WAU/MAU, dunning)
+    + platform health RAG strip.
+  - **Tenants** — search + plan/suspension list → org dossier (members,
+    plan, subscription, flock + support summary).
+  - **Support** — inbox (status chips, awaiting-reply badge) → thread with
+    public reply / internal note + lifecycle status actions.
+  - **Ops** — cron freshness board, active impersonation sessions
+    (end-session action), comms log.
+  - Global bottom SafeArea; `INTERNET` permission in main manifest; CI job
+    (analyze + test).
+- Impersonation *start* and re-auth-gated mutations stay web-only for
+  Wave 1 — the minted tenant token has no consumer inside this app.
+- Artifact: `nkuku-releases/admin-v1.0.0/nkuku-admin-v1.0.0.apk` (48 MB,
+  SHA256SUMS alongside).
+
 ### Husbandry guidance corrections (R-1 audit vs Ross 2025 / UGA extension)
 
 - **Grow-out RH band widened** 50–60% → **50–70%** (Ross 2025 acceptable
