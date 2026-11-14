@@ -62,7 +62,9 @@ export default function GrowthAnalysisPage() {
         </CardContent></Card>
         <Card><CardContent className="pt-6">
           <p className="text-sm text-muted-foreground">FCR (Feed Conversion)</p>
-          <p className="text-2xl font-bold">{fcr ? fcr.toFixed(2) : "N/A"}</p>
+          <p className="text-2xl font-bold">
+            {fcr ? `${fcr.toFixed(2)}${data.fcrEstimated ? " (est)" : ""}` : data.fcrHint === "no_feed" ? "— no feed logged" : data.fcrHint === "no_weight" ? "— add a weight record" : "N/A"}
+          </p>
         </CardContent></Card>
       </div>
 

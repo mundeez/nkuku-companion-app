@@ -1554,6 +1554,8 @@ class GrowthRecordAnalysis {
   final int ageDays;
   final List<PerformanceTarget> targets;
   final double? fcr;
+  final bool fcrEstimated;
+  final String? fcrHint;
   final int currentCount;
 
   GrowthRecordAnalysis({
@@ -1561,6 +1563,8 @@ class GrowthRecordAnalysis {
     required this.ageDays,
     required this.targets,
     this.fcr,
+    this.fcrEstimated = false,
+    this.fcrHint,
     required this.currentCount,
   });
 
@@ -1574,6 +1578,8 @@ class GrowthRecordAnalysis {
           .map((e) => PerformanceTarget.fromJson(e))
           .toList(),
       fcr: json['fcr'] != null ? double.tryParse(json['fcr'].toString()) : null,
+      fcrEstimated: json['fcrEstimated'] == true,
+      fcrHint: json['fcrHint'] as String?,
       currentCount: json['currentCount'] ?? 0,
     );
   }

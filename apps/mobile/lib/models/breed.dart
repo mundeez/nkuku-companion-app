@@ -49,9 +49,9 @@ class PerformanceTarget {
     return PerformanceTarget(
       id: json['id'],
       ageDays: json['ageDays'] ?? json['age_days'] ?? 0,
-      targetWeightG: _toDouble(json['targetWeightG'] ?? json['target_weight_g']),
+      targetWeightG: _toDouble(json['targetWeightG'] ?? json['target_weight_g'] ?? json['targetWeight'] ?? json['target_weight']),
       dailyWeightGainG: _toDouble(json['dailyWeightGainG'] ?? json['daily_weight_gain_g']),
-      feedConversionRatio: _toDouble(json['feedConversionRatio'] ?? json['feed_conversion_ratio']),
+      feedConversionRatio: _toDouble(json['feedConversionRatio'] ?? json['feed_conversion_ratio'] ?? json['targetFcr'] ?? json['target_fcr']),
       cumulativeFeedIntakeG: _toDouble(json['cumulativeFeedIntakeG'] ?? json['cumulative_feed_intake_g']),
       mortalityRatePct: _toDouble(json['mortalityRatePct'] ?? json['mortality_rate_pct']),
     );

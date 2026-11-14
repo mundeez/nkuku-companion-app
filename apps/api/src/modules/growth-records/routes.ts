@@ -81,19 +81,44 @@ export async function buildGrowthRecordModule(app: FastifyInstance) {
 
     const latestRecord = records[records.length - 1];
     let fcr = null;
-    if (latestRecord && totalFeed._sum.quantityKg && flock.currentCount > 0) {
+    let fcrEstimated = false;
+    if (totalFeed._sum.quantityKg && flock.currentCount > 0) {
       const totalFeedKg = Number(totalFeed._sum.quantityKg);
-      const totalWeightGain = (Number(latestRecord.avgWeight) * flock.currentCount) / 1000;
-      if (totalWeightGain > 0) {
-        fcr = totalFeedKg / totalWeightGain;
+      let avgWeightG = latestRecord ? Number(latestRecord.avgWeight) : null;
+      if (avgWeightG == null && ageDays != null) {
+        // No weigh-in yet — estimate biomass from the breed target weight
+        // at the flock's current age so FCR still shows something useful.
+        const eligible = targets.filter((t: any) => t.ageDays <= ageDays);
+        const t = eligible[eligible.length - 1];
+        if (t?.targetWeight != null) {
+          avgWeightG = Number(t.targetWeight);
+          fcrEstimated = true;
+        }
+      }
+      if (avgWeightG != null) {
+        const totalWeightGain = (avgWeightG * flock.currentCount) / 1000;
+        if (totalWeightGain > 0) {
+          fcr = totalFeedKg / totalWeightGain;
+        }
       }
     }
+
+    const hasFeed = (totalFeed._sum.quantityKg ?? 0) > 0;
+    const fcrHint = fcr != null
+      ? null
+      : !hasFeed
+        ? 'no_feed'
+        : !latestRecord
+          ? 'no_weight'
+          : 'unavailable';
 
     return {
       records,
       ageDays,
       targets,
       fcr,
+      fcrEstimated,
+      fcrHint,
       currentCount: flock.currentCount,
     };
   });

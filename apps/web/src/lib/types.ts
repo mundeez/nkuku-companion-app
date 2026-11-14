@@ -778,7 +778,8 @@ export interface PaginatedSales {
 export interface SalesFilter {
   fromDate?: string;
   toDate?: string;
-  paymentStatus?: PaymentStatus;
+  /** Single status or 'outstanding' (pending + partial on the API). */
+  paymentStatus?: PaymentStatus | "outstanding";
   flockId?: string;
   customer?: string;
   q?: string;

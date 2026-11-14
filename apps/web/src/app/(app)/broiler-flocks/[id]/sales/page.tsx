@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
 import { useApiQuery, useApiMutation, useFlock } from "@/lib/api/hooks";
@@ -36,7 +36,7 @@ function buildFilterParams(flockId: string, filter: SalesFilter): string {
   params.set("flockId", flockId);
   if (filter.fromDate) params.set("fromDate", filter.fromDate);
   if (filter.toDate) params.set("toDate", filter.toDate);
-  if (filter.paymentStatus) params.set("paymentStatus", filter.paymentStatus);
+  if (filter.paymentStatus) params.set("paymentStatus", filter.paymentStatus === "outstanding" ? "pending,partial" : filter.paymentStatus);
   if (filter.customer) params.set("customer", filter.customer);
   params.set("limit", String(filter.limit ?? PAGE_SIZE));
   params.set("offset", String(filter.offset ?? 0));
@@ -52,7 +52,14 @@ export default function SalesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [drawerSale, setDrawerSale] = useState<SaleRecord | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [filter, setFilter] = useState<SalesFilter>({ limit: PAGE_SIZE, offset: 0 });
+  const searchParams = useSearchParams();
+  const [filter, setFilter] = useState<SalesFilter>(() => {
+    const initial: SalesFilter = { limit: PAGE_SIZE, offset: 0 };
+    const ps = searchParams.get("paymentStatus");
+    if (ps === "outstanding" || ps === "pending,partial" || ps === "partial,pending") initial.paymentStatus = "outstanding";
+    else if (ps === "pending" || ps === "partial" || ps === "paid") initial.paymentStatus = ps;
+    return initial;
+  });
 
   const [form, setForm] = useState({
     saleDate: new Date().toISOString().split("T")[0],
@@ -76,7 +83,7 @@ export default function SalesPage() {
   summarySearchParams.set("flockId", flockId);
   if (filter.fromDate) summarySearchParams.set("fromDate", filter.fromDate);
   if (filter.toDate) summarySearchParams.set("toDate", filter.toDate);
-  if (filter.paymentStatus) summarySearchParams.set("paymentStatus", filter.paymentStatus);
+  if (filter.paymentStatus) summarySearchParams.set("paymentStatus", filter.paymentStatus === "outstanding" ? "pending,partial" : filter.paymentStatus);
   if (filter.customer) summarySearchParams.set("customer", filter.customer);
   const summaryPath = `/api/v1/sale-records/summary?${summarySearchParams.toString()}`;
 
@@ -238,7 +245,10 @@ export default function SalesPage() {
             <p className="text-2xl font-bold mt-1">{summary?.totalBirdsSold ?? 0}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className={cn("cursor-pointer hover:ring-2 hover:ring-primary/30 transition-shadow", !filter.paymentStatus && "ring-2 ring-primary/40")}
+          onClick={() => setFilter({ ...filter, paymentStatus: undefined, offset: 0 })}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -247,7 +257,10 @@ export default function SalesPage() {
             <p className="text-2xl font-bold mt-1">{fmtZmw(summary?.totalRevenue ?? 0)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className={cn("cursor-pointer hover:ring-2 hover:ring-primary/30 transition-shadow", filter.paymentStatus === "paid" && "ring-2 ring-primary/40")}
+          onClick={() => setFilter({ ...filter, paymentStatus: "paid", offset: 0 })}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-green-600" />
@@ -256,7 +269,10 @@ export default function SalesPage() {
             <p className="text-2xl font-bold mt-1 text-green-600">{fmtZmw(summary?.totalPaid ?? 0)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card
+          className={cn("cursor-pointer hover:ring-2 hover:ring-primary/30 transition-shadow", filter.paymentStatus === "outstanding" && "ring-2 ring-primary/40")}
+          onClick={() => setFilter({ ...filter, paymentStatus: "outstanding", offset: 0 })}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-red-600" />

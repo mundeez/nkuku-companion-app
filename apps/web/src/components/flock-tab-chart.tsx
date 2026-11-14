@@ -64,17 +64,21 @@ export function FlockTabChart({ type, records, flockId, breedId, startDate }: Fl
   // ── Growth: Weight vs Target Line Chart ──────────
   if (type === "growth") {
     const sorted = [...records].sort((a, b) => new Date(a.recordDate).getTime() - new Date(b.recordDate).getTime());
-    const chartData = sorted.map((r) => {
+    const byAge = new Map<number, { actual: number | null; target: number | null }>();
+    for (const r of sorted) {
       const ageDays = startDate
         ? Math.floor((new Date(r.recordDate).getTime() - new Date(startDate).getTime()) / 86400000)
         : 0;
-      const target = targets.find((t) => t.ageDays === ageDays);
-      return {
-        day: `D${ageDays}`,
-        actual: Number(r.avgWeight),
-        target: target ? Number(target.targetWeight) : null,
-      };
-    });
+      byAge.set(ageDays, { actual: Number(r.avgWeight), target: null });
+    }
+    for (const t of targets) {
+      const existing = byAge.get(t.ageDays);
+      const tw = t.targetWeight != null ? Number(t.targetWeight) : null;
+      byAge.set(t.ageDays, { actual: existing?.actual ?? null, target: tw });
+    }
+    const chartData = [...byAge.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([ageDays, v]) => ({ day: `D${ageDays}`, actual: v.actual, target: v.target }));
 
     return (
       <Card className="mb-4">
@@ -93,7 +97,7 @@ export function FlockTabChart({ type, records, flockId, breedId, startDate }: Fl
                 formatter={(v: number, name: string) => [`${v}g`, name === "actual" ? "Actual" : "Target"]}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="actual" name="Actual" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="actual" name="Actual" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} connectNulls />
               <Line type="monotone" dataKey="target" name="Target" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />
             </LineChart>
           </ResponsiveContainer>

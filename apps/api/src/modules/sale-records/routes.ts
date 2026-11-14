@@ -69,7 +69,8 @@ function serializeSaleRecord(record: any): any {
 function buildFilterWhere(organizationId: string, query: {
   fromDate?: string;
   toDate?: string;
-  paymentStatus?: 'pending' | 'partial' | 'paid';
+  /** Single status or comma-separated list ("pending,partial"). */
+  paymentStatus?: string;
   flockId?: string;
   customer?: string;
   q?: string;
@@ -92,7 +93,8 @@ function buildFilterWhere(organizationId: string, query: {
   }
 
   if (query.paymentStatus) {
-    where.paymentStatus = query.paymentStatus;
+    const statuses = query.paymentStatus.split(',').filter(Boolean);
+    where.paymentStatus = statuses.length > 1 ? { in: statuses } : statuses[0];
   }
 
   if (query.customer) {
@@ -115,7 +117,8 @@ function buildFilterWhere(organizationId: string, query: {
 const FilterQuerySchema = z.object({
   fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  paymentStatus: z.enum(['pending', 'partial', 'paid']).optional(),
+  // Single status or comma-separated list (e.g. "pending,partial" for outstanding)
+  paymentStatus: z.string().regex(/^(pending|partial|paid)(,(pending|partial|paid))*$/).optional(),
   flockId: z.string().uuid().optional(),
   customer: z.string().max(200).optional(),
   q: z.string().max(200).optional(),

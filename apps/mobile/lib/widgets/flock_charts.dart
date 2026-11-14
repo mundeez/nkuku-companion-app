@@ -74,10 +74,17 @@ class GrowthChart extends StatelessWidget {
       final weight = r.avgWeight;
       spots.add(FlSpot(ageDays.toDouble(), weight));
       if (weight > maxY) maxY = weight;
-      final target = targets.where((t) => t.ageDays == ageDays).firstOrNull;
-      if (target?.targetWeightG != null) {
-        final tw = target!.targetWeightG!;
-        targetSpots.add(FlSpot(ageDays.toDouble(), tw));
+    }
+
+    // Target curve spans the full breed schedule (all ages), not just
+    // the ages where weigh-ins happen — otherwise it renders as a few
+    // disconnected dots and looks invisible.
+    final sortedTargets = [...targets]
+      ..sort((a, b) => a.ageDays.compareTo(b.ageDays));
+    for (final t in sortedTargets) {
+      final tw = t.targetWeightG;
+      if (tw != null) {
+        targetSpots.add(FlSpot(t.ageDays.toDouble(), tw));
         if (tw > maxY) maxY = tw;
       }
     }
@@ -85,7 +92,10 @@ class GrowthChart extends StatelessWidget {
     if (spots.isEmpty) return const SizedBox.shrink();
 
     final minX = spots.first.x;
-    final maxX = spots.last.x;
+    final maxX = [
+      spots.last.x,
+      if (targetSpots.isNotEmpty) targetSpots.last.x,
+    ].reduce((a, b) => a > b ? a : b);
 
     return _ChartCard(
       title: 'Weight vs Target',

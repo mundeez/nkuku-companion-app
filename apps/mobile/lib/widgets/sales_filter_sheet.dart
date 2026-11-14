@@ -128,6 +128,7 @@ class _SalesFilterSheetState extends State<SalesFilterSheet> {
               spacing: 8,
               children: [
                 _buildStatusChip(null, 'All'),
+                _buildStatusChip('pending,partial', 'Outstanding'),
                 _buildStatusChip('pending', 'Pending'),
                 _buildStatusChip('partial', 'Partial'),
                 _buildStatusChip('paid', 'Paid'),

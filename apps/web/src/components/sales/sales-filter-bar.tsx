@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { SalesFilter, PaymentStatus, BroilerFlock } from "@/lib/types";
+import { SalesFilter, BroilerFlock } from "@/lib/types";
 import { Filter, X, ChevronDown, ChevronUp } from "lucide-react";
 
 interface SalesFilterBarProps {
@@ -95,9 +95,10 @@ export function SalesFilterBar({ filter, onChange, flocks = [], showFlockFilter 
                 <select
                   className="flex h-9 w-full mt-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
                   value={filter.paymentStatus ?? ""}
-                  onChange={(e) => update({ paymentStatus: (e.target.value || undefined) as PaymentStatus | undefined })}
+                  onChange={(e) => update({ paymentStatus: (e.target.value || undefined) as SalesFilter["paymentStatus"] })}
                 >
                   <option value="">All</option>
+                  <option value="outstanding">Outstanding (pending + partial)</option>
                   <option value="pending">Pending</option>
                   <option value="partial">Partial</option>
                   <option value="paid">Paid</option>

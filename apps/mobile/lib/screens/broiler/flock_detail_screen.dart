@@ -28,6 +28,7 @@ import '../../widgets/sales_filter_sheet.dart';
 import '../../widgets/skeleton.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/summary_card.dart';
+import '../sales_dashboard_screen.dart';
 import 'calendar_screen.dart';
 import 'flock_form_screen.dart';
 import 'medication_screen.dart';
@@ -1232,17 +1233,30 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     final avgPrice = flock.actualAverageSalesPrice ?? 0;
     final unrealised = flock.unrealisedProfit ?? 0;
 
-    Widget row(String label, String value, {Color? color}) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
-              Text(value,
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w500, color: color)),
-            ],
+    void openSales(String? paymentStatus) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => SalesDashboardScreen(
+          initialFlockId: flock.id,
+          initialPaymentStatus: paymentStatus,
+        ),
+      ));
+    }
+
+    Widget row(String label, String value, {Color? color, VoidCallback? onTap}) =>
+        InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(label,
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                Text(value,
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500, color: color)),
+              ],
+            ),
           ),
         );
 
@@ -1256,11 +1270,13 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             row('Revenue collected', 'ZMW ${collected.toStringAsFixed(2)}',
-                color: collected > 0 ? Colors.green.shade700 : null),
+                color: collected > 0 ? Colors.green.shade700 : null,
+                onTap: () => openSales(null)),
             row('Outstanding payments', 'ZMW ${outstanding.toStringAsFixed(2)}',
                 color: outstanding > 0
                     ? Colors.red.shade700
-                    : Colors.green.shade700),
+                    : Colors.green.shade700,
+                onTap: () => openSales('pending,partial')),
             row('Profit less outstanding', 'ZMW ${profitNet.toStringAsFixed(2)}',
                 color: profitNet > 0
                     ? Colors.green.shade700
@@ -1289,7 +1305,15 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
             SummaryCard(children: [
               SummaryRow('Current age', 'Day ${displayDay(analysis.ageDays)}'),
               SummaryRow('Records', '${analysis.records.length}'),
-              SummaryRow('FCR', analysis.fcr?.toStringAsFixed(2) ?? '-'),
+              SummaryRow(
+                  'FCR',
+                  analysis.fcr != null
+                      ? '${analysis.fcr!.toStringAsFixed(2)}${analysis.fcrEstimated ? ' (est)' : ''}'
+                      : switch (analysis.fcrHint) {
+                          'no_feed' => '— no feed logged',
+                          'no_weight' => '— add a weight record',
+                          _ => '—',
+                        }),
             ]),
           const SizedBox(height: 12),
           if (_growthRecords.isNotEmpty) ...[

@@ -165,6 +165,10 @@ class _NkukuAppState extends State<NkukuApp> {
         themeMode: _themeProvider.flutterThemeMode,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
+        builder: (context, child) => SafeArea(
+          top: false,
+          child: child ?? const SizedBox.shrink(),
+        ),
         home: _isLoggedIn ? const BottomNavShell() : const LoginScreen(),
       ),
     );

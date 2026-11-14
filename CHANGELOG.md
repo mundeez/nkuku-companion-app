@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.54.1] — 2026-11-14
+
+### Mobile bug fixes + sales figure drill-downs
+
+- **Android navigation overlap (B-1):** global `SafeArea(top: false)` wrapper
+  in `MaterialApp.builder` — every screen now clears the gesture/3-button nav
+  bar instead of drawing content under it.
+- **Weight-vs-target chart (B-2):** the mobile `PerformanceTarget` model was
+  parsing `targetWeightG`/`feedConversionRatio` but the API returns
+  `targetWeight`/`targetFcr`, so the target series was always empty. Model now
+  accepts both key sets, and both charts (mobile + web) draw the target as a
+  continuous 0–56 day curve instead of dots only at weigh-in ages.
+- **FCR dash (B-3):** `/growth-records/analysis` now estimates FCR from the
+  breed target weight when no weigh-in exists (`fcrEstimated: true`, shown as
+  `1.72 (est)`), and returns `fcrHint` (`no_feed` / `no_weight`) so the UI can
+  say *why* it's blank instead of a bare dash. Applied on web + mobile.
+- **Clickable figure cards (F-1):** `paymentStatus` filter now accepts a
+  comma-separated list (`pending,partial` = "Outstanding"). Web: flock
+  Total Cost/Total Revenue/Sales & Outstanding rows link to the financial and
+  filtered sales views; sales-page KPI cards (Revenue/Paid/Outstanding)
+  toggle the filter; filter bar gained an "Outstanding" option; the sales
+  list honours `?paymentStatus=` deep links. Mobile: flock "Sales &
+  Outstanding" rows and sales-dashboard KPI cards are tappable;
+  `SalesDashboardScreen` accepts initial flock/status presets; filter sheet
+  gained an "Outstanding" chip.
+
 ## [1.54.0] — 2026-11-15
 
 ### P5 — Growth & finance analytics (admin console)

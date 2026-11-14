@@ -14,7 +14,16 @@ import 'broiler/records/sale_record_form.dart';
 /// Shows org-wide sales KPIs, payment breakdown, and a sortable list of
 /// all sale records across flocks. Accessible from the Finance Hub.
 class SalesDashboardScreen extends StatefulWidget {
-  const SalesDashboardScreen({super.key});
+  /// Optional presets so other screens can deep-link here with a filter
+  /// already applied (e.g. the flock "Outstanding" figure).
+  final String? initialFlockId;
+  final String? initialPaymentStatus;
+
+  const SalesDashboardScreen({
+    super.key,
+    this.initialFlockId,
+    this.initialPaymentStatus,
+  });
 
   @override
   State<SalesDashboardScreen> createState() => _SalesDashboardScreenState();
@@ -28,7 +37,12 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   bool _loadingMore = false;
   String? _error;
   String _searchQuery = '';
-  SalesFilter _filter = const SalesFilter(limit: 20, offset: 0);
+  late SalesFilter _filter = SalesFilter(
+    limit: 20,
+    offset: 0,
+    flockId: widget.initialFlockId,
+    paymentStatus: widget.initialPaymentStatus,
+  );
   final List<Map<String, dynamic>> _flocks = [];
 
   @override
@@ -98,6 +112,13 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     } catch (_) {
       if (mounted) setState(() => _loadingMore = false);
     }
+  }
+
+  void _applyStatusFilter(String? status) {
+    setState(() => _filter = status == null
+        ? _filter.copyWith(clearPaymentStatus: true, offset: 0)
+        : _filter.copyWith(paymentStatus: status, offset: 0));
+    _load();
   }
 
   Future<void> _openFilter() async {
@@ -202,8 +223,12 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           })));
     }
     if (_filter.paymentStatus != null && _filter.paymentStatus!.isNotEmpty) {
+      final ps = _filter.paymentStatus!;
+      final label = ps.contains(',')
+          ? 'Outstanding'
+          : '${ps[0].toUpperCase()}${ps.substring(1)}';
       chips.add(_filterChip(
-          'Payment: ${_filter.paymentStatus![0].toUpperCase()}${_filter.paymentStatus!.substring(1)}',
+          'Payment: $label',
           () => setState(() {
             _filter = _filter.copyWith(clearPaymentStatus: true);
             _load();
@@ -257,6 +282,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                 label: 'Total Revenue',
                 value: 'ZMW ${totalRevenue.toStringAsFixed(2)}',
                 color: Colors.green,
+                onTap: () => _applyStatusFilter(null),
               ),
             ),
             const SizedBox(width: 8),
@@ -277,6 +303,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                 label: 'Paid',
                 value: 'ZMW ${totalPaid.toStringAsFixed(2)}',
                 color: Colors.blue,
+                onTap: () => _applyStatusFilter('paid'),
               ),
             ),
             const SizedBox(width: 8),
@@ -285,6 +312,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                 label: 'Outstanding',
                 value: 'ZMW ${outstanding.toStringAsFixed(2)}',
                 color: Colors.orange,
+                onTap: () => _applyStatusFilter('pending,partial'),
               ),
             ),
           ],

@@ -126,6 +126,90 @@ describe('Broiler Management API', () => {
       const data = await res.json();
       expect(data.length).toBeGreaterThan(0);
     });
+
+    it('returns analysis with real FCR when weight + feed records exist', async () => {
+      // flockId already has a growth record (850g) — feed record is added below in Feed Records,
+      // but test ordering means we need feed; add one here to be safe (idempotent enough for FCR).
+      await fetch(`${API_URL}/api/v1/feed-records`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flockId, recordDate: '2026-06-11', feedType: 'starter', quantityKg: 10 }),
+      });
+      const res = await fetch(`${API_URL}/api/v1/growth-records/analysis?flockId=${flockId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.fcr).not.toBeNull();
+      expect(data.fcrEstimated).toBe(false);
+      expect(data.fcrHint).toBeNull();
+    });
+
+    it('returns estimated FCR when feed exists but no growth records', async () => {
+      const flockRes = await fetch(`${API_URL}/api/v1/broiler-flocks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'FCR Estimate Flock',
+          breedId,
+          orderDate: '2026-06-01',
+          initialCount: 100,
+          targetWeight: 2.5,
+          targetAge: 42,
+          feedTransitionDay: 11,
+          chicksCollected: true,
+          collectionDate: '2026-06-02',
+        }),
+      });
+      expect(flockRes.status).toBe(200);
+      const f = await flockRes.json();
+      await fetch(`${API_URL}/api/v1/feed-records`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flockId: f.id, recordDate: '2026-06-10', feedType: 'starter', quantityKg: 20 }),
+      });
+      const res = await fetch(`${API_URL}/api/v1/growth-records/analysis?flockId=${f.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.fcr).not.toBeNull();
+      expect(data.fcrEstimated).toBe(true);
+      await fetch(`${API_URL}/api/v1/broiler-flocks/${f.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    });
+
+    it('returns no_feed hint when the flock has no feed records', async () => {
+      const flockRes = await fetch(`${API_URL}/api/v1/broiler-flocks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'FCR Empty Flock',
+          breedId,
+          orderDate: '2026-06-01',
+          initialCount: 50,
+          targetWeight: 2.5,
+          targetAge: 42,
+          feedTransitionDay: 11,
+          chicksCollected: true,
+          collectionDate: '2026-06-02',
+        }),
+      });
+      const f = await flockRes.json();
+      const res = await fetch(`${API_URL}/api/v1/growth-records/analysis?flockId=${f.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.fcr).toBeNull();
+      expect(data.fcrHint).toBe('no_feed');
+      await fetch(`${API_URL}/api/v1/broiler-flocks/${f.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    });
   });
 
   describe('Feed Records', () => {

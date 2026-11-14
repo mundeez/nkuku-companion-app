@@ -519,8 +519,8 @@ export default function FlockDetailPage() {
                 }`}>{!flock.startDate ? "Pending collection" : (() => { const r = (flock.targetAge ?? 42) - ageDays; return r <= 0 ? "Due now" : `${r} day${r === 1 ? "" : "s"}`; })()}</span></div>
                 <div className="flex justify-between"><span>Total Feed</span><span className="font-medium">{totalFeed.toFixed(1)} kg</span></div>
                 <div className="flex justify-between"><span>Total Water</span><span className="font-medium">{totalWater.toFixed(1)} liters</span></div>
-                <div className="flex justify-between"><span>Total Cost</span><span className="font-medium">ZMW {totalCost.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Total Revenue</span><span className="font-medium">ZMW {totalRevenue.toFixed(2)}</span></div>
+                <Link href={`/broiler-flocks/${flockId}/financial`} className="flex justify-between rounded px-1 -mx-1 hover:bg-muted/60 transition-colors"><span>Total Cost</span><span className="font-medium">ZMW {totalCost.toFixed(2)}</span></Link>
+                <Link href={`/broiler-flocks/${flockId}/sales`} className="flex justify-between rounded px-1 -mx-1 hover:bg-muted/60 transition-colors"><span>Total Revenue</span><span className="font-medium">ZMW {totalRevenue.toFixed(2)}</span></Link>
                 <div className="flex justify-between"><span>Feed Transition Day</span><span className="font-medium">Day {displayDay(flock.feedTransitionDay || 18, dayConvention)}</span></div>
                 <div className="flex justify-between"><span>Finisher Start Day</span><span className="font-medium">Day {displayDay(flock.finisherDay || 29, dayConvention)}</span></div>
                 <div className="flex justify-between"><span>Target Weight</span><span className="font-medium">{flock.targetWeight || "-"} kg @ Day {flock.targetAge ? displayDay(flock.targetAge, dayConvention) : "-"}</span></div>
@@ -531,24 +531,24 @@ export default function FlockDetailPage() {
               <CardHeader><CardTitle className="text-base">Sales & Outstanding</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
+                  <Link href={`/broiler-flocks/${flockId}/sales`} className="flex justify-between rounded px-1 -mx-1 hover:bg-muted/60 transition-colors">
                     <span>Revenue Collected</span>
                     <span className={`font-medium ${(flock.actualRevenueCollected ?? 0) > 0 ? "text-green-600" : ""}`}>
                       ZMW {(flock.actualRevenueCollected ?? 0).toFixed(2)}
                     </span>
-                  </div>
-                  <div className="flex justify-between">
+                  </Link>
+                  <Link href={`/broiler-flocks/${flockId}/sales?paymentStatus=outstanding`} className="flex justify-between rounded px-1 -mx-1 hover:bg-muted/60 transition-colors">
                     <span>Outstanding Payments</span>
                     <span className={`font-medium ${(flock.totalOutstandingPayments ?? 0) > 0 ? "text-red-600" : "text-green-600"}`}>
                       ZMW {(flock.totalOutstandingPayments ?? 0).toFixed(2)}
                     </span>
-                  </div>
-                  <div className="flex justify-between">
+                  </Link>
+                  <Link href={`/broiler-flocks/${flockId}/financial`} className="flex justify-between rounded px-1 -mx-1 hover:bg-muted/60 transition-colors">
                     <span>Profit Less Outstanding</span>
                     <span className={`font-medium ${(flock.actualProfitLessOutstanding ?? 0) > 0 ? "text-green-600" : (flock.actualProfitLessOutstanding ?? 0) < 0 ? "text-red-600" : ""}`}>
                       ZMW {(flock.actualProfitLessOutstanding ?? 0).toFixed(2)}
                     </span>
-                  </div>
+                  </Link>
                   <div className="flex justify-between">
                     <span>Avg Sale Price/Bird</span>
                     <span className="font-medium">

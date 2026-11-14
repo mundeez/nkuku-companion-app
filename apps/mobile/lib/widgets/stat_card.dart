@@ -7,19 +7,24 @@ class StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
+  final VoidCallback? onTap;
 
   const StatCard({
     super.key,
     required this.label,
     required this.value,
     this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -43,6 +48,7 @@ class StatCard extends StatelessWidget {
                   TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
+        ),
         ),
       ),
     );

@@ -181,6 +181,23 @@ describe('Sale Records API', () => {
       expect(data.data.every((s: any) => s.paymentStatus === 'paid')).toBe(true);
     });
 
+    it('filters by comma-separated paymentStatus (outstanding = pending,partial)', async () => {
+      const res = await fetch(`${API_URL}/api/v1/sale-records/all?paymentStatus=pending,partial`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.data.length).toBeGreaterThan(0);
+      expect(data.data.every((s: any) => ['pending', 'partial'].includes(s.paymentStatus))).toBe(true);
+    });
+
+    it('rejects an invalid paymentStatus list value', async () => {
+      const res = await fetch(`${API_URL}/api/v1/sale-records/all?paymentStatus=pending,bogus`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(400);
+    });
+
     it('filters by flockId', async () => {
       const res = await fetch(`${API_URL}/api/v1/sale-records/all?flockId=${flockId}`, {
         headers: { Authorization: `Bearer ${token}` },
