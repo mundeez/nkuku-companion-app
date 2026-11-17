@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.55.0] — Unreleased
+## [1.55.0] — 2026-11-16
 
 ### P6 — admin-mobile staff console (Wave 2, P4+P5 parity)
 
