@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.56.0] — Unreleased
+## [1.56.0] — 2026-11-17
 
 ### P7 — platform console hardening & docs
 
