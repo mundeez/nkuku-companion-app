@@ -45,6 +45,7 @@ import { permissionsForRole } from '../../core/staff-auth/permissions.js';
 import { writePlatformAudit } from '../../core/staff-auth/audit.service.js';
 import { platformIpAllowlist } from '../../core/staff-auth/ip-allowlist.js';
 import { sendStaffInviteEmail } from '../../core/security/email.service.js';
+import { notifyStaff } from '../../core/comms/staff-notify.js';
 import { PLATFORM_CONSOLE_BASE_URL } from '../../core/staff-auth/bootstrap.js';
 import { buildPlatformTenantsModule } from './tenants.js';
 import { buildPlatformSupportModule } from './support.js';
@@ -118,6 +119,42 @@ export async function buildPlatformModule(app: FastifyInstance) {
 
   // IP allowlist applies to every /api/v1/platform/* route.
   app.addHook('onRequest', platformIpAllowlist);
+
+  // ── P7: denied-call alerting ───────────────────────────
+  // Count 403 responses per client IP in a Redis window; when the count
+  // reaches PLATFORM_DENIED_ALERT_THRESHOLD inside the window, fire a
+  // one-shot ntfy alert to the platform-ops topic. 401s are excluded —
+  // expired access tokens are routine (clients refresh); a 403 means an
+  // authenticated caller hit a permission wall or the allowlist denied.
+  // Alerting is best-effort and must never break a request.
+  const DENIED_WINDOW_SECONDS = 300;
+  const DENIED_ALERT_THRESHOLD = Number.parseInt(
+    process.env.PLATFORM_DENIED_ALERT_THRESHOLD || '20',
+    10,
+  );
+  app.addHook('onResponse', async (request, reply) => {
+    if (reply.statusCode !== 403 || Number.isNaN(DENIED_ALERT_THRESHOLD) || DENIED_ALERT_THRESHOLD <= 0) {
+      return;
+    }
+    try {
+      const redis = (request.server as any).redis;
+      if (!redis) return;
+      const ip = getClientIp(request);
+      const key = `platform_denied:${ip}`;
+      const count = await redis.incr(key);
+      if (count === 1) await redis.expire(key, DENIED_WINDOW_SECONDS);
+      if (count === DENIED_ALERT_THRESHOLD) {
+        notifyStaff(
+          'Platform console: repeated denied calls',
+          `${count}+ HTTP 403 responses from ${ip} within ${DENIED_WINDOW_SECONDS}s — possible probing or misconfigured client.`,
+          4,
+          ['warning', 'rotating_light'],
+        );
+      }
+    } catch {
+      // Swallow — observability must not affect request handling.
+    }
+  });
 
   // ── POST /auth/login ───────────────────────────────────
   // Step 1: email + password. Always returns a ticket — either for TOTP
@@ -480,6 +517,65 @@ export async function buildPlatformModule(app: FastifyInstance) {
       orderBy: { createdAt: 'asc' },
     });
     return { items: staff.map(publicStaff), count: staff.length };
+  });
+
+  // ── GET /staff/access-review.csv ───────────────────────
+  // P7: quarterly staff-access review export. Read-only snapshot of
+  // every StaffUser plus live session/recovery-code counts, for the
+  // periodic access-certification review (plan §6). Gated by audit.read
+  // so auditors can pull it; the export itself is audited.
+  app.get('/staff/access-review.csv', { preHandler: [requireStaff('audit.read')] }, async (request, reply) => {
+    const actor = (request as any).staffUser;
+    const staff = await prisma.staffUser.findMany({ orderBy: { createdAt: 'asc' } });
+    const sessionCounts = await prisma.staffSession.groupBy({
+      by: ['staffUserId'],
+      where: { revokedAt: null, expiresAt: { gt: new Date() } },
+      _count: { _all: true },
+    });
+    const sessionsByUser = new Map(sessionCounts.map((s: any) => [s.staffUserId, s._count._all]));
+    const recoveryCounts = await prisma.staffRecoveryCode.groupBy({
+      by: ['staffUserId'],
+      where: { usedAt: null },
+      _count: { _all: true },
+    });
+    const recoveryByUser = new Map(recoveryCounts.map((s: any) => [s.staffUserId, s._count._all]));
+
+    const esc = (v: unknown) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = 'email,name,role,isActive,totpEnrolled,lastLoginAt,createdAt,createdById,activeSessions,unusedRecoveryCodes';
+    const rows = staff.map((s: any) =>
+      [
+        s.email,
+        s.name,
+        s.role,
+        s.isActive,
+        !!s.totpEnabledAt,
+        s.lastLoginAt?.toISOString() ?? '',
+        s.createdAt?.toISOString() ?? '',
+        s.createdById ?? '',
+        sessionsByUser.get(s.id) ?? 0,
+        recoveryByUser.get(s.id) ?? 0,
+      ]
+        .map(esc)
+        .join(','),
+    );
+    const csv = [header, ...rows].join('\n') + '\n';
+
+    await writePlatformAudit(prisma, {
+      actorStaffId: actor.staffId,
+      actorRole: actor.role,
+      action: 'staff.access_review_export',
+      targetType: 'staff_user',
+      after: { rowCount: staff.length },
+      ...auditCtx(request),
+    });
+
+    reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header('Content-Disposition', `attachment; filename="staff-access-review-${new Date().toISOString().slice(0, 10)}.csv"`);
+    return reply.send(csv);
   });
 
   // ── POST /staff/invite ─────────────────────────────────

@@ -290,6 +290,27 @@ The directives already include `X-Forwarded-Proto` so the backend correctly dete
   ISPConfig's cron applies changes within ~60 s; LE certs land in `/var/www/clients/client1/web<N>/ssl/`.
 - Release APKs are archived outside the repo in `~/DevWorkz/nkuku-releases/`.
 
+## Platform Console (staff super-admin, P1–P7)
+
+Separate staff-only surface — NEVER mix with tenant auth. Staff are
+`StaffUser` rows (not tenant `User`); staff JWTs use audience `platform`
+signed with `PLATFORM_JWT_SECRET`. All routes live under
+`/api/v1/platform/*` (`apps/api/src/modules/platform/`), behind the
+`platformIpAllowlist` onRequest hook (`PLATFORM_ALLOWED_CIDRS`).
+
+- Roles/permissions: `apps/api/src/core/staff-auth/permissions.ts`
+  (super_admin `*`, plus support/finance/content_editor/marketing/auditor).
+  Dangerous permissions need a fresh `reauthAt` (≤5 min) — see
+  `REAUTH_REQUIRED_PERMISSIONS`.
+- Surfaces: `apps/admin-web` (Next.js, admin.nkuku…:30030→ISPConfig) and
+  `apps/admin-mobile` (Flutter, internal distribution only).
+- Staff alerts: ntfy topic `platform-ops` via `notifyStaff()`; P7 adds
+  403-denied-call alerting (`PLATFORM_DENIED_ALERT_THRESHOLD`, default 20/5min/IP).
+- Quarterly access review: `GET /api/v1/platform/staff/access-review.csv`
+  (`audit.read`; export is itself audited).
+- Full ops/security doc: `docs/PLATFORM_CONSOLE.md` (roles matrix,
+  runbooks, break-glass, ASVS L2 checklist).
+
 ### Step 6 — Mobile APK for Production
 The API base URL is set at build time via `--dart-define=APP_API_BASE_URL=...`. No source edit is required.
 

@@ -194,3 +194,20 @@ The application supports subscription-based billing with tiered plans.
 ## Troubleshooting
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
+
+## Platform Console (Staff / Super Admin)
+
+The platform console is a **separate staff-only back-office** — it is not
+the tenant admin guide above. Tenant users never see it.
+
+- **Web:** `https://admin.nkuku.deeztechnology.solutions` (`apps/admin-web`)
+- **Mobile:** `apps/admin-mobile` (Flutter, internal distribution only)
+- **API:** `/api/v1/platform/*` — staff JWTs (audience `platform`),
+  mandatory TOTP, IP allowlist, per-role permissions, re-auth for
+  dangerous actions.
+
+Roles: `super_admin`, `support`, `finance`, `content_editor`,
+`marketing`, `auditor` — see the full permission matrix, runbooks
+(invite/offboard/break-glass/allowlist/secret rotation), quarterly
+access-review export, and the OWASP ASVS L2 checklist in
+[PLATFORM_CONSOLE.md](PLATFORM_CONSOLE.md).

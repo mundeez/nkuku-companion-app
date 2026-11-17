@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.56.0] — Unreleased
+
+### P7 — platform console hardening & docs
+
+- **Denied-call alerting** — every HTTP 403 on `/api/v1/platform/*` is
+  counted per client IP in a 5-minute Redis window; at
+  `PLATFORM_DENIED_ALERT_THRESHOLD` (default 20) a priority-4 ntfy alert
+  fires to `platform-ops`. Best-effort, never breaks requests.
+- **Staff-access review export** — `GET /api/v1/platform/staff/access-review.csv`
+  (`audit.read`) returns a CSV snapshot of all StaffUsers with role,
+  active status, TOTP enrolment, last login, live session count and
+  unused recovery codes — for the quarterly access-certification review.
+  The export itself is audit-logged (`staff.access_review_export`).
+- **`docs/PLATFORM_CONSOLE.md`** — full staff-console operations doc:
+  role/permission matrix, auth flow, env vars, runbooks (invite,
+  offboard, break-glass TOTP reset, IP allowlist, secret rotation,
+  quarterly review, denied-call alerts), audit-trail description, and an
+  OWASP ASVS L2 pen-test checklist.
+- **Admin-mobile release signing** — `android/key.properties` + release
+  keystore support mirroring the tenant app; release builds now fail
+  without a keystore instead of silently using the debug key.
+- Fixed a pre-existing `tsc` error in
+  `src/db/seeds/reseed-lighting-schedules.ts` that was breaking Docker
+  builds.
+- Docs: `ADMIN_GUIDE.md` platform-console section; `AGENTS.md`
+  platform-console notes.
+
 ## [1.55.0] — 2026-11-16
 
 ### P6 — admin-mobile staff console (Wave 2, P4+P5 parity)

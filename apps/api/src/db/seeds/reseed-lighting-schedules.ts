@@ -15,7 +15,7 @@ async function main() {
   const sched = await prisma.lightingTemperatureSchedule.findFirst({ where: { name: 'Ross 308 Whole House' } });
   const d4 = await prisma.lightingTemperatureScheduleItem.findFirst({ where: { ageDays: 4, scheduleId: sched!.id } });
   const d10 = await prisma.lightingTemperatureScheduleItem.findFirst({ where: { ageDays: 10, scheduleId: sched!.id } });
-  console.log('day4 light:', d4?.lightHours.toString(), '| day10 RH:', d10?.targetRhMinPct.toString(), '-', d10?.targetRhMaxPct.toString());
+  console.log('day4 light:', d4?.lightHours?.toString(), '| day10 RH:', d10?.targetRhMinPct?.toString(), '-', d10?.targetRhMaxPct?.toString());
   await prisma.$disconnect();
 }
 

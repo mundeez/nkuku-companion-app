@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { TEST_DATABASE_URL } from '../helpers/env.js';
+import { TEST_API_URL, TEST_DATABASE_URL } from '../helpers/env.js';
 import {
   api,
   post,
@@ -188,6 +188,46 @@ describe('Platform staff auth (P1)', () => {
       const me = await api('/api/v1/platform/auth/me', {}, auditorToken);
       expect(me.status).toBe(200);
       expect(me.data.user.role).toBe('auditor');
+    });
+  });
+
+  // ── P7: staff-access review export ───────────────────
+
+  describe('staff access review export', () => {
+    async function getCsv(token?: string) {
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`${TEST_API_URL}/api/v1/platform/staff/access-review.csv`, { headers });
+      return { status: res.status, contentType: res.headers.get('content-type'), body: await res.text() };
+    }
+
+    it('auditor can export the CSV snapshot', async () => {
+      const res = await getCsv(auditorToken);
+      expect(res.status).toBe(200);
+      expect(res.contentType).toContain('text/csv');
+      const lines = res.body.trim().split('\n');
+      expect(lines[0]).toContain('email,name,role,isActive,totpEnrolled');
+      expect(res.body).toContain(superEmail);
+      expect(res.body).toContain('super_admin');
+    });
+
+    it('writes an audit event for the export', async () => {
+      const audit = await prisma.platformAuditEvent.findFirst({
+        where: { action: 'staff.access_review_export' },
+        orderBy: { occurredAt: 'desc' },
+      });
+      expect(audit).toBeTruthy();
+      expect((audit?.after as any)?.rowCount).toBeGreaterThanOrEqual(3);
+    });
+
+    it('support role is denied (403)', async () => {
+      const res = await getCsv(supportToken);
+      expect(res.status).toBe(403);
+    });
+
+    it('unauthenticated callers get 401', async () => {
+      const res = await getCsv();
+      expect(res.status).toBe(401);
     });
   });
 
