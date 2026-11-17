@@ -2,6 +2,34 @@
 
 ## [1.55.0] — Unreleased
 
+### P6 — admin-mobile staff console (Wave 2, P4+P5 parity)
+
+- New **Manage** tab (5th nav destination) hosting the P4/P5 surfaces,
+  each gated by staff permissions client-side (API still enforces):
+  - **Catalogue** — all five global reference-data entities (diseases,
+    breeds, vaccination schedules with item lists, performance targets,
+    supplier-category templates) with search, create/edit forms and
+    delete. CSV import/export stays web-only.
+  - **Plans & Pricing** — tier list with limits/features/price chips,
+    full editor (metadata, limits, feature checkboxes incl. preserving
+    unlisted keys, self-serve/active/trial toggles, per-currency price
+    matrix PUT).
+  - **Announcements** — list with severity/audience/window/dismissal
+    info, composer (severity, audience all/plans/orgs with plan chips
+    and org-id entry, link, schedule window, dismissible).
+  - **Feature Flags** — default toggle, expandable tri-state plan
+    overrides (inherit/on/off) and org overrides, create/delete.
+  - **Analytics** — date-range KPIs (MRR, signups, WAU/MAU, net MRR
+    movement), fl_chart MRR-by-plan area, signups/activations bars,
+    WAU/MAU lines, subscription funnel + country split, retention
+    cohort grid, CSV export (copied to clipboard).
+- **Re-auth on mobile** — `ensureReauth()` helper + dialog (password
+  or TOTP) wrapping every dangerous write, matching the web console's
+  `withReauth`; fresh login counts as re-auth (`markReauth`), server
+  `reauthAt` claim decoded from the access token for freshness.
+- Role→permission map mirrors PLAN-super-admin-console §3 for the
+  Wave 2 permissions.
+
 ### P6 — admin-mobile staff console (Wave 1, new package `apps/admin-mobile`)
 
 - New Flutter app `solutions.deeztechnology.nkuku_admin` — the staff

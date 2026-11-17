@@ -3,6 +3,7 @@ import '../api.dart';
 import 'tenants.dart';
 import 'tickets.dart';
 import 'ops.dart';
+import 'manage.dart';
 
 /// Dashboard shell — overview KPIs + health strip + nav to tenants/tickets.
 class HomeScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const _DashboardTab(),
       const TenantsScreen(),
       const TicketsScreen(),
+      const ManageScreen(),
       const OpsScreen(),
     ];
     return Scaffold(
@@ -49,6 +51,8 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icon(Icons.business_outlined), label: 'Tenants'),
           NavigationDestination(
               icon: Icon(Icons.support_agent_outlined), label: 'Support'),
+          NavigationDestination(
+              icon: Icon(Icons.tune_outlined), label: 'Manage'),
           NavigationDestination(
               icon: Icon(Icons.monitor_heart_outlined), label: 'Ops'),
         ],

@@ -29,6 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (res['accessToken'] != null) {
           await Api.setSession(res['accessToken'], res['refreshToken'],
               res['user'] as Map<String, dynamic>?);
+          await Api.markReauth(); // fresh login counts as re-auth
           widget.onLoggedIn();
           return;
         }
@@ -50,6 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (res['accessToken'] != null) {
           await Api.setSession(res['accessToken'], res['refreshToken'],
               res['user'] as Map<String, dynamic>?);
+          await Api.markReauth(); // fresh login counts as re-auth
           if (_enrolling && res['recoveryCodes'] is List) {
             setState(() =>
                 _recoveryCodes = (res['recoveryCodes'] as List).cast<String>());
