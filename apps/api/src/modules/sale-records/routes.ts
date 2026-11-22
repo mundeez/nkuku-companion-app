@@ -168,6 +168,7 @@ function profitFields(totalRevenue: number, totalPaid: number, outstanding: numb
     // Cash-basis profit: money actually collected minus costs.
     cashProfit: totalPaid - totalCosts,
     avgProfitPerBird: totalBirdsSold > 0 ? totalProfit / totalBirdsSold : 0,
+    avgCostsPerBird: totalBirdsSold > 0 ? totalCosts / totalBirdsSold : 0,
   };
 }
 

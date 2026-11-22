@@ -284,7 +284,7 @@ export default function SalesPage() {
       </div>
 
       {/* Profit Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
@@ -331,6 +331,15 @@ export default function SalesPage() {
               <span className="text-sm text-muted-foreground">Avg Profit/Bird</span>
             </div>
             <p className={cn("text-2xl font-bold mt-1", (summary?.avgProfitPerBird ?? 0) >= 0 ? "text-green-600" : "text-red-600")}>{fmtZmw(summary?.avgProfitPerBird ?? 0)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Avg Costs/Bird</span>
+            </div>
+            <p className="text-2xl font-bold mt-1">{fmtZmw(summary?.avgCostsPerBird ?? 0)}</p>
           </CardContent>
         </Card>
       </div>

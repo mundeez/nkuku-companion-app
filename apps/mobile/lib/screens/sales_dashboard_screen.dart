@@ -277,6 +277,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     final profitLessOutstanding = _toDouble(s?['profitLessOutstanding']);
     final cashProfit = _toDouble(s?['cashProfit']);
     final avgProfitPerBird = _toDouble(s?['avgProfitPerBird']);
+    final avgCostsPerBird = _toDouble(s?['avgCostsPerBird']);
     final marginPct = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0.0;
     Color profitColor(double v) => v >= 0 ? Colors.green : Colors.red;
 
@@ -385,25 +386,23 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: StatCard(
-                label: 'Avg Profit/Bird',
-                value: 'ZMW ${avgProfitPerBird.toStringAsFixed(2)}',
-                color: profitColor(avgProfitPerBird),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: StatCard(
-                label: 'Margin',
-                value: '${marginPct.toStringAsFixed(1)}%',
-                color: profitColor(marginPct),
-              ),
-            ),
-          ],
-        ),
+        StatCardRow(cards: [
+          StatCard(
+            label: 'Avg Costs/Bird',
+            value: 'ZMW ${avgCostsPerBird.toStringAsFixed(2)}',
+            color: Colors.grey[700],
+          ),
+          StatCard(
+            label: 'Avg Profit/Bird',
+            value: 'ZMW ${avgProfitPerBird.toStringAsFixed(2)}',
+            color: profitColor(avgProfitPerBird),
+          ),
+          StatCard(
+            label: 'Margin',
+            value: '${marginPct.toStringAsFixed(1)}%',
+            color: profitColor(marginPct),
+          ),
+        ]),
       ],
     );
   }

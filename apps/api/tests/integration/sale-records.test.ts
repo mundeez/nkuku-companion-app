@@ -637,6 +637,7 @@ describe('Sale Records API', () => {
       // collected 800 − costs 1700
       expect(data.cashProfit).toBe(-900);
       expect(data.avgProfitPerBird).toBe(30);
+      expect(data.avgCostsPerBird).toBe(170);
     });
 
     it('GET /dashboard returns the same cost & profit fields', async () => {
@@ -652,6 +653,7 @@ describe('Sale Records API', () => {
       expect(data.profitLessOutstanding).toBe(-900);
       expect(data.cashProfit).toBe(-900);
       expect(data.avgProfitPerBird).toBe(30);
+      expect(data.avgCostsPerBird).toBe(170);
     });
 
     it('respects the date filter for costs (chick fallback + expenses)', async () => {
@@ -671,6 +673,7 @@ describe('Sale Records API', () => {
       expect(data.profitLessOutstanding).toBe(600);
       expect(data.cashProfit).toBe(600);
       expect(data.avgProfitPerBird).toBe(180);
+      expect(data.avgCostsPerBird).toBe(20);
     });
   });
 });

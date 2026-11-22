@@ -758,6 +758,7 @@ export interface SaleProfitFields {
   profitLessOutstanding: number;
   cashProfit: number;
   avgProfitPerBird: number;
+  avgCostsPerBird: number;
 }
 
 export interface SaleRecordSummary extends SaleProfitFields {

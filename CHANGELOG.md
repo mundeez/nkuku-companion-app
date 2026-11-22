@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.57.1] — 2026-11-22
+
+### Additions — avg costs per bird on sales profit fields
+
+- **API** — `profitFields()` on sale-records endpoints now returns
+  `avgCostsPerBird` (totalCosts ÷ birdsSold), alongside the existing
+  `avgProfitPerBird`. Integration tests updated.
+- **Web** — `SaleProfitFields` type extended; an "Avg Costs/Bird" stat card
+  added to the global `/sales` page and the per-flock
+  `broiler-flocks/[id]/sales` page.
+- **Mobile** — Avg Costs/Bird stat on the sales dashboard screen.
+
 ## [1.57.0] — 2026-11-22
 
 ### Sales cost & profit KPIs — cost basis, profit, and cash-profit across API, web, mobile
