@@ -752,7 +752,15 @@ export interface SalePayment {
   createdAt: string;
 }
 
-export interface SaleRecordSummary {
+export interface SaleProfitFields {
+  totalCosts: number;
+  totalProfit: number;
+  profitLessOutstanding: number;
+  cashProfit: number;
+  avgProfitPerBird: number;
+}
+
+export interface SaleRecordSummary extends SaleProfitFields {
   totalBirdsSold: number;
   totalRevenue: number;
   totalPaid: number;
@@ -761,7 +769,7 @@ export interface SaleRecordSummary {
   paymentBreakdown: Array<{ paymentStatus: string; count: number; totalAmount: number; outstandingAmount?: number }>;
 }
 
-export interface SalesDashboardSummary {
+export interface SalesDashboardSummary extends SaleProfitFields {
   totalRevenue: number;
   totalBirdsSold: number;
   totalPaid: number;

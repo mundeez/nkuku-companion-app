@@ -568,4 +568,109 @@ describe('Sale Records API', () => {
       expect(partial.outstandingAmount + pending.outstandingAmount).toBe(data.outstanding);
     });
   });
+
+  describe('Cost & profit fields (dashboard + summary)', () => {
+    let profitFlockId: string;
+    let profitSaleId: string;
+
+    async function addExpense(recordDate: string, amountZmw: number) {
+      const res = await fetch(`${API_URL}/api/v1/financial-records`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flockId: profitFlockId,
+          recordDate,
+          category: 'feed',
+          description: `Test expense ${amountZmw}`,
+          amountZmw,
+          isIncome: false,
+        }),
+      });
+      expect(res.status).toBe(200);
+    }
+
+    beforeAll(async () => {
+      profitFlockId = await createTestFlock(token, breedId, 'Sale Profit Flock');
+      // Chick-cost fallback: chickPriceZmw × initialCount (100 × 10 = 1000),
+      // no chick_purchase financial record is created by the test flock POST.
+      const patch = await fetch(`${API_URL}/api/v1/broiler-flocks/${profitFlockId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chickPriceZmw: 10 }),
+      });
+      expect(patch.status).toBe(200);
+
+      await addExpense('2026-09-05', 500);  // outside the period-filter test below
+      await addExpense('2026-09-15', 200);  // inside it
+
+      const { status, data } = await createSale(token, profitFlockId, {
+        saleDate: '2026-09-10',
+        birdCount: 10,
+        pricePerBirdZmw: 200,
+        totalAmountZmw: 2000,
+        paymentStatus: 'partial',
+        amountPaidZmw: 800,
+      });
+      expect(status).toBe(200);
+      profitSaleId = data.id;
+      saleIds.push(profitSaleId);
+    });
+
+    afterAll(async () => {
+      await deleteFlock(token, profitFlockId);
+    });
+
+    it('GET /summary returns cost & profit fields', async () => {
+      const res = await fetch(
+        `${API_URL}/api/v1/sale-records/summary?flockId=${profitFlockId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      // Costs: chick fallback 1000 + feed 500 + feed 200 = 1700
+      expect(data.totalCosts).toBe(1700);
+      // Revenue 2000 − costs 1700 = 300 accrual profit
+      expect(data.totalProfit).toBe(300);
+      // 300 − outstanding 1200
+      expect(data.profitLessOutstanding).toBe(-900);
+      // collected 800 − costs 1700
+      expect(data.cashProfit).toBe(-900);
+      expect(data.avgProfitPerBird).toBe(30);
+    });
+
+    it('GET /dashboard returns the same cost & profit fields', async () => {
+      const res = await fetch(
+        `${API_URL}/api/v1/sale-records/dashboard?flockId=${profitFlockId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      expect(data.totalCosts).toBe(1700);
+      expect(data.totalProfit).toBe(300);
+      expect(data.profitLessOutstanding).toBe(-900);
+      expect(data.cashProfit).toBe(-900);
+      expect(data.avgProfitPerBird).toBe(30);
+    });
+
+    it('respects the date filter for costs (chick fallback + expenses)', async () => {
+      // Period 2026-09-06 → 2026-09-30: sale (09-10) and the 200 feed expense
+      // (09-15) are inside; chick orderDate (09-01) and the 500 expense (09-05)
+      // are outside → costs = 200 only.
+      const res = await fetch(
+        `${API_URL}/api/v1/sale-records/summary?flockId=${profitFlockId}&fromDate=2026-09-06&toDate=2026-09-30`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      expect(data.totalRevenue).toBe(2000);
+      expect(data.totalCosts).toBe(200);
+      expect(data.totalProfit).toBe(1800);
+      expect(data.profitLessOutstanding).toBe(600);
+      expect(data.cashProfit).toBe(600);
+      expect(data.avgProfitPerBird).toBe(180);
+    });
+  });
 });

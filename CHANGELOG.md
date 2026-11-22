@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.57.0] — 2026-11-22
+
+### Sales cost & profit KPIs — cost basis, profit, and cash-profit across API, web, mobile
+
+- **API: cost & profit fields on sales endpoints** — `GET /sale-records/dashboard`
+  and `GET /sale-records/summary` now return `totalCosts`, `totalProfit`
+  (accrual), `profitLessOutstanding`, `cashProfit`, and `avgProfitPerBird`.
+  New `computeCostTotals()` sums non-income/non-projection `FinancialRecord`s
+  for the flocks behind the filtered sales (or an explicit `flockId`), with a
+  chick-price × count fallback plus `FlockOverheadAllocation` sums; it is
+  period-aware via `fromDate`/`toDate`. `profitFields()` derives the profit
+  metrics from those totals.
+- **Tests** — 3 new integration tests covering the summary fields, dashboard
+  fields, and date-filter behaviour (442 integration + 96 unit tests green).
+- **Web** — `SaleProfitFields` type added; the global `/sales` page and the
+  per-flock `broiler-flocks/[id]/sales` page each gained 5 profit cards
+  (costs, profit, profit less outstanding, cash profit, avg profit/bird).
+- **Mobile** — `sales_dashboard_screen.dart` gained Total Costs, Total Profit,
+  Profit less Outstanding, Cash Profit, Avg Profit/Bird, and Margin stat
+  cards.
+
 ## [1.56.1] — 2026-11-22
 
 ### Fixes — feed stock counts & sales outstanding totals

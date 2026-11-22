@@ -20,7 +20,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, ChevronLeft, ChevronRight as ChevronRightIcon, ArrowUp, ArrowDown } from "lucide-react";
+import { DollarSign, Bird, TrendingUp, AlertCircle, Plus, Trash2, Pencil, ChevronLeft, ChevronRight as ChevronRightIcon, ArrowUp, ArrowDown, Wallet, PiggyBank, Calculator, Banknote } from "lucide-react";
 import { SalesFilterBar } from "@/components/sales/sales-filter-bar";
 import { SaleDetailDrawer } from "@/components/sales/sale-detail-drawer";
 import { SearchInput } from "@/components/search-input";
@@ -279,6 +279,33 @@ export default function SalesDashboardPage() {
         <Card><CardContent className="pt-6">
           <div className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Outstanding</span></div>
           <p className="text-2xl font-bold mt-1 text-amber-600">ZMW {summary?.outstanding?.toFixed(2) || "0.00"}</p>
+        </CardContent></Card>
+      </div>
+
+      {/* Profit Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        <Card><CardContent className="pt-6">
+          <div className="flex items-center gap-2"><Wallet className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Total Costs</span></div>
+          <p className="text-2xl font-bold mt-1">ZMW {summary?.totalCosts?.toFixed(2) || "0.00"}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6">
+          <div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Total Profit</span></div>
+          <p className={`text-2xl font-bold mt-1 ${(summary?.totalProfit ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>ZMW {summary?.totalProfit?.toFixed(2) || "0.00"}</p>
+          <p className="text-xs text-muted-foreground mt-1">Revenue − Costs (accrual)</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6">
+          <div className="flex items-center gap-2"><PiggyBank className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Profit less Outstanding</span></div>
+          <p className={`text-2xl font-bold mt-1 ${(summary?.profitLessOutstanding ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>ZMW {summary?.profitLessOutstanding?.toFixed(2) || "0.00"}</p>
+          <p className="text-xs text-muted-foreground mt-1">If unpaid sales never collect</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6">
+          <div className="flex items-center gap-2"><Banknote className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Cash Profit</span></div>
+          <p className={`text-2xl font-bold mt-1 ${(summary?.cashProfit ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>ZMW {summary?.cashProfit?.toFixed(2) || "0.00"}</p>
+          <p className="text-xs text-muted-foreground mt-1">Collected − Costs</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6">
+          <div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-muted-foreground" /><span className="text-sm text-muted-foreground">Avg Profit/Bird</span></div>
+          <p className={`text-2xl font-bold mt-1 ${(summary?.avgProfitPerBird ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>ZMW {summary?.avgProfitPerBird?.toFixed(2) || "0.00"}</p>
         </CardContent></Card>
       </div>
 

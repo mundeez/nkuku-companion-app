@@ -82,6 +82,95 @@ function aggregatePaymentBreakdown(records: { paymentStatus?: string | null; tot
   return [...map.values()];
 }
 
+/** Compute total production costs for a set of flocks, respecting an
+ *  optional [fromDate, toDate] period on the underlying cost dates.
+ *  Costs = Σ non-income, non-projection FinancialRecord amounts
+ *  (feed purchases/records, medication, vaccination, chick_purchase, … —
+ *  the same basis the flock list uses for totalCost) + chick-cost fallback
+ *  (chickPriceZmw × initialCount when no chick_purchase record exists) +
+ *  Σ FlockOverheadAllocation.allocatedAmount (ledger overhead allocations).
+ *  The chick fallback has no cost date of its own, so with a period filter
+ *  it is included only when the flock's startDate/orderDate/createdAt
+ *  falls inside the period. */
+async function computeCostTotals(
+  prisma: any,
+  flockIds: string[],
+  opts: { fromDate?: string; toDate?: string },
+): Promise<number> {
+  if (flockIds.length === 0) return 0;
+
+  const periodStart = opts.fromDate ? new Date(opts.fromDate) : null;
+  const periodEnd = opts.toDate ? new Date(opts.toDate) : null;
+  if (periodEnd) periodEnd.setDate(periodEnd.getDate() + 1); // exclusive, mirrors saleDate filter
+  const dateCond: any = {};
+  if (periodStart) dateCond.gte = periodStart;
+  if (periodEnd) dateCond.lt = periodEnd;
+  const hasPeriod = !!(periodStart || periodEnd);
+  const inPeriod = hasPeriod ? dateCond : undefined;
+
+  const [expenseRecs, overheadAllocs, chickFinRecs, flocks] = await Promise.all([
+    prisma.financialRecord.findMany({
+      where: {
+        flockId: { in: flockIds },
+        isIncome: false,
+        isProjection: false,
+        ...(inPeriod ? { recordDate: inPeriod } : {}),
+      },
+      select: { flockId: true, amountZmw: true },
+    }),
+    prisma.flockOverheadAllocation.findMany({
+      where: {
+        flockId: { in: flockIds },
+        ...(inPeriod ? { allocationDate: inPeriod } : {}),
+      },
+      select: { flockId: true, allocatedAmount: true },
+    }),
+    // All-time chick_purchase expenses — decides who needs the price×count fallback
+    prisma.financialRecord.findMany({
+      where: { flockId: { in: flockIds }, category: 'chick_purchase', isIncome: false },
+      select: { flockId: true },
+      distinct: ['flockId'],
+    }),
+    prisma.broilerFlock.findMany({
+      where: { id: { in: flockIds } },
+      select: { id: true, chickPriceZmw: true, initialCount: true, startDate: true, orderDate: true, createdAt: true },
+    }),
+  ]);
+
+  const costByFlock = new Map<string, number>();
+  const add = (flockId: string, amount: number) =>
+    costByFlock.set(flockId, (costByFlock.get(flockId) ?? 0) + amount);
+
+  for (const r of expenseRecs) add(r.flockId, Number(r.amountZmw));
+  for (const o of overheadAllocs) add(o.flockId, Number(o.allocatedAmount));
+
+  const hasChickRecord = new Set(chickFinRecs.map((r: any) => r.flockId));
+  for (const f of flocks) {
+    if (hasChickRecord.has(f.id) || !f.chickPriceZmw || !f.initialCount) continue;
+    if (hasPeriod) {
+      const d = f.startDate ?? f.orderDate ?? f.createdAt;
+      if (d && ((periodStart && d < periodStart) || (periodEnd && d >= periodEnd))) continue;
+    }
+    add(f.id, Number(f.chickPriceZmw) * f.initialCount);
+  }
+
+  return [...costByFlock.values()].reduce((s, v) => s + v, 0);
+}
+
+/** Profit figures shared by /dashboard and /summary. */
+function profitFields(totalRevenue: number, totalPaid: number, outstanding: number, totalCosts: number, totalBirdsSold: number) {
+  const totalProfit = totalRevenue - totalCosts;
+  return {
+    totalCosts,
+    totalProfit,
+    // Accrual profit minus the outstanding receivable — worst case if unpaid sales never collect.
+    profitLessOutstanding: totalProfit - Math.max(0, outstanding),
+    // Cash-basis profit: money actually collected minus costs.
+    cashProfit: totalPaid - totalCosts,
+    avgProfitPerBird: totalBirdsSold > 0 ? totalProfit / totalBirdsSold : 0,
+  };
+}
+
 /** Serialize a sale record for API responses — strips [FR:] prefix from notes
  *  and adds derived payment fields. paymentStatus is overridden with the
  *  read-time derivation so badges reflect monetary values, not the possibly
@@ -492,13 +581,25 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       dailySales[dateKey].revenue += Number(s.totalAmountZmw);
     }
 
+    // Cost/profit scope: the flocks that produced the filtered sales
+    // (or the explicitly filtered flock). Costs respect the same period.
+    const scopeFlocks = query.flockId
+      ? [query.flockId]
+      : (await prisma.saleRecord.findMany({ where, select: { flockId: true }, distinct: ['flockId'] })).map((r: any) => r.flockId);
+    const totalRevenue = totals._sum.totalAmountZmw ? Number(totals._sum.totalAmountZmw) : 0;
+    const totalPaid = totals._sum.amountPaidZmw ? Number(totals._sum.amountPaidZmw) : 0;
+    const outstanding = totalRevenue - totalPaid;
+    const totalBirdsSold = totals._sum.birdCount ?? 0;
+    const totalCosts = await computeCostTotals(prisma, scopeFlocks, query);
+
     return {
-      totalRevenue: totals._sum.totalAmountZmw ? Number(totals._sum.totalAmountZmw) : 0,
-      totalBirdsSold: totals._sum.birdCount ?? 0,
-      totalPaid: totals._sum.amountPaidZmw ? Number(totals._sum.amountPaidZmw) : 0,
-      outstanding: (totals._sum.totalAmountZmw ? Number(totals._sum.totalAmountZmw) : 0) - (totals._sum.amountPaidZmw ? Number(totals._sum.amountPaidZmw) : 0),
+      totalRevenue,
+      totalBirdsSold,
+      totalPaid,
+      outstanding,
+      ...profitFields(totalRevenue, totalPaid, outstanding, totalCosts, totalBirdsSold),
       salesCount: totals._count._all,
-      avgPricePerBird: totals._sum.birdCount ? Number(totals._sum.totalAmountZmw ?? 0) / totals._sum.birdCount : 0,
+      avgPricePerBird: totalBirdsSold ? totalRevenue / totalBirdsSold : 0,
       paymentBreakdown,
       topCustomers: topCustomers.map((row: any) => ({
         customerName: row.customerName,
@@ -616,11 +717,18 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       : 0;
     const outstanding = new Decimal(totalRevenue).minus(totalPaid).toNumber();
 
+    // Same cost/profit scope as /dashboard — flocks behind the filtered sales.
+    const scopeFlocks = query.flockId
+      ? [query.flockId]
+      : (await prisma.saleRecord.findMany({ where, select: { flockId: true }, distinct: ['flockId'] })).map((r: any) => r.flockId);
+    const totalCosts = await computeCostTotals(prisma, scopeFlocks, query);
+
     return {
       totalBirdsSold,
       totalRevenue,
       totalPaid,
       outstanding,
+      ...profitFields(totalRevenue, totalPaid, outstanding, totalCosts, totalBirdsSold),
       salesCount,
       paymentBreakdown,
     };
