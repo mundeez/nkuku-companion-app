@@ -454,7 +454,7 @@ export default function BroilerFlocksPage() {
                             <span
                               key={fp.feedStageId}
                               className={`text-xs px-2 py-0.5 rounded ${colorClass}`}
-                              title={`${fp.stageName}: ${fp.bagsPurchased}/${fp.bagsRequired} bags purchased (${fp.bagsRemaining} remaining)`}
+                              title={`${fp.stageName}: ${fp.bagsPurchased}/${fp.bagsRequired} bags purchased (${fp.bagsRemaining} in stock)`}
                             >
                               {fp.stageName}: {fp.bagsPurchased}/{fp.bagsRequired}
                             </span>

@@ -357,7 +357,13 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
             ...breakdown.map((b) {
               final status = b['paymentStatus'] ?? '';
               final count = b['count'] ?? 0;
-              final amount = _toDouble(b['totalAmount']);
+              // Pending/partial show the unpaid remainder so the buckets
+              // reconcile with the Outstanding total; paid shows collected.
+              final totalAmount = _toDouble(b['totalAmount']);
+              final outstandingAmt = b['outstandingAmount'];
+              final amount = status == 'paid' || outstandingAmt == null
+                  ? totalAmount
+                  : _toDouble(outstandingAmt);
               final color = status == 'paid'
                   ? Colors.green
                   : status == 'partial'

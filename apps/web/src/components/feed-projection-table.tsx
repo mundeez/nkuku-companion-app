@@ -62,7 +62,10 @@ export function FeedProjectionTable({
               Purchased
             </th>
             <th className="px-2 font-medium text-center border-l" colSpan={n}>
-              Remaining
+              In stock
+            </th>
+            <th className="px-2 font-medium text-center border-l" colSpan={n}>
+              To buy
             </th>
             <th className="px-2 font-medium text-center border-l" colSpan={n}>
               Proj. Cost
@@ -73,6 +76,7 @@ export function FeedProjectionTable({
             {onPurchase && <th className="py-2 pl-2 font-medium align-bottom" rowSpan={2} />}
           </tr>
           <tr className="border-b text-muted-foreground">
+            {sizeSubHeads()}
             {sizeSubHeads()}
             {sizeSubHeads()}
             {sizeSubHeads()}
@@ -94,6 +98,7 @@ export function FeedProjectionTable({
                 {sizeUnits.map((u) => cell(t, u, (s) => s.requiredBags, "font-medium"))}
                 {sizeUnits.map((u) => cell(t, u, (s) => s.purchasedBags))}
                 {sizeUnits.map((u) => cell(t, u, (s) => s.remainingBags, `font-medium ${over || t.remainingKg <= 0 ? "text-green-600" : "text-amber-600"}`))}
+                {sizeUnits.map((u) => cell(t, u, (s) => s.bagsToPurchase ?? 0, "text-muted-foreground"))}
                 {sizeUnits.map((u) => cell(t, u, (s) => s.projectedCostZmw.toLocaleString()))}
                 <td className="py-2 pl-3 pr-1 min-w-[140px]">
                   <div className="relative h-5 w-full rounded bg-muted overflow-hidden">
@@ -137,6 +142,9 @@ export function FeedProjectionTable({
             ))}
             {sizeUnits.map((u) => (
               <td key={u} className="py-2 px-2 text-right border-l">{totalFor(u, (s) => s.remainingBags)}</td>
+            ))}
+            {sizeUnits.map((u) => (
+              <td key={u} className="py-2 px-2 text-right border-l">{totalFor(u, (s) => s.bagsToPurchase ?? 0)}</td>
             ))}
             {sizeUnits.map((u) => (
               <td key={u} className="py-2 px-2 text-right border-l">{totalFor(u, (s) => s.projectedCostZmw).toLocaleString()}</td>

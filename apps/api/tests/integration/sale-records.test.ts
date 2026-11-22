@@ -464,4 +464,108 @@ describe('Sale Records API', () => {
       expect(data).toHaveProperty('limit', 5);
     });
   });
+
+  describe('Derived paymentStatus in breakdowns (read-time)', () => {
+    // Uses flock2Id — created in beforeAll, not used by any other test — so
+    // the paymentBreakdown assertions are isolated to this describe's sales.
+    let partialSaleId: string;
+
+    it('partially-paid sale appears under "partial" with its full total', async () => {
+      const { status, data } = await createSale(token, flock2Id, {
+        customerName: 'Breakdown Partial',
+        totalAmountZmw: 1000,
+        paymentStatus: 'pending',
+      });
+      expect(status).toBe(200);
+      partialSaleId = data.id;
+      saleIds.push(partialSaleId);
+
+      // Record a SalePayment of 400 via the payments endpoint.
+      const payRes = await fetch(`${API_URL}/api/v1/sale-records/${partialSaleId}/payments`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amountZmw: 400, method: 'cash' }),
+      });
+      expect(payRes.status).toBe(201);
+
+      // Serialized record exposes the derived status.
+      const getRes = await fetch(`${API_URL}/api/v1/sale-records/${partialSaleId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const sale = await getRes.json();
+      expect(sale.paymentStatus).toBe('partial');
+      expect(Number(sale.amountPaidZmw)).toBe(400);
+      expect(sale.remainingDueZmw).toBe(600);
+    });
+
+    it('unpaid sale appears under "pending" with its full total', async () => {
+      const { status, data } = await createSale(token, flock2Id, {
+        customerName: 'Breakdown Pending',
+        totalAmountZmw: 600,
+        paymentStatus: 'pending',
+      });
+      expect(status).toBe(200);
+      saleIds.push(data.id);
+
+      const getRes = await fetch(`${API_URL}/api/v1/sale-records/${data.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const sale = await getRes.json();
+      expect(sale.paymentStatus).toBe('pending');
+      expect(Number(sale.amountPaidZmw)).toBe(0);
+      expect(sale.remainingDueZmw).toBe(600);
+    });
+
+    it('GET /summary paymentBreakdown buckets by derived status', async () => {
+      const res = await fetch(
+        `${API_URL}/api/v1/sale-records/summary?flockId=${flock2Id}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.paymentBreakdown).toBeDefined();
+
+      const partial = data.paymentBreakdown.find((b: any) => b.paymentStatus === 'partial');
+      expect(partial).toBeDefined();
+      expect(partial.count).toBe(1);
+      expect(partial.totalAmount).toBe(1000);
+      // outstandingAmount = unpaid remainder only (1000 − 400 paid)
+      expect(partial.outstandingAmount).toBe(600);
+
+      const pending = data.paymentBreakdown.find((b: any) => b.paymentStatus === 'pending');
+      expect(pending).toBeDefined();
+      expect(pending.count).toBe(1);
+      expect(pending.totalAmount).toBe(600);
+      expect(pending.outstandingAmount).toBe(600);
+
+      // pending + partial outstanding reconcile with the Outstanding KPI
+      expect(partial.outstandingAmount + pending.outstandingAmount).toBe(data.outstanding);
+
+      // No "paid" bucket for these two sales.
+      expect(data.paymentBreakdown.find((b: any) => b.paymentStatus === 'paid')).toBeUndefined();
+    });
+
+    it('GET /dashboard paymentBreakdown buckets by derived status', async () => {
+      const res = await fetch(
+        `${API_URL}/api/v1/sale-records/dashboard?flockId=${flock2Id}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      const partial = data.paymentBreakdown.find((b: any) => b.paymentStatus === 'partial');
+      expect(partial).toBeDefined();
+      expect(partial.count).toBe(1);
+      expect(partial.totalAmount).toBe(1000);
+      expect(partial.outstandingAmount).toBe(600);
+
+      const pending = data.paymentBreakdown.find((b: any) => b.paymentStatus === 'pending');
+      expect(pending).toBeDefined();
+      expect(pending.count).toBe(1);
+      expect(pending.totalAmount).toBe(600);
+      expect(pending.outstandingAmount).toBe(600);
+
+      expect(partial.outstandingAmount + pending.outstandingAmount).toBe(data.outstanding);
+    });
+  });
 });

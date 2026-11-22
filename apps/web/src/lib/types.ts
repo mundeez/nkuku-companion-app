@@ -198,6 +198,8 @@ export interface FeedProjectionStageSummary {
   bagsRequired: number;
   bagsPurchased: number;
   bagsRemaining: number;
+  bagsToPurchase?: number;
+  consumedKg?: number;
   status: "complete" | "partial" | "not_started";
 }
 
@@ -219,6 +221,7 @@ export interface FeedProjectionTypeSize {
   requiredBags: number;
   purchasedBags: number;
   remainingBags: number;
+  bagsToPurchase?: number;
   projectedCostZmw: number;
   unitPriceZmw: number;
 }
@@ -229,6 +232,7 @@ export interface FeedProjectionType {
   dayRangeEnd: number | null;
   requiredKg: number;
   purchasedKg: number;
+  consumedKg: number;
   remainingKg: number;
   spentZmw: number;
   remainingCostZmw: number;
@@ -252,6 +256,7 @@ export interface FeedProjectionResult {
     bagsRemaining: number;
     requiredKg: number;
     purchasedKg: number;
+    consumedKg: number;
     remainingKg: number;
     projectedCostZmw: number;
     purchasedCostZmw: number;
@@ -753,7 +758,7 @@ export interface SaleRecordSummary {
   totalPaid: number;
   outstanding: number;
   salesCount: number;
-  paymentBreakdown: Array<{ paymentStatus: string; count: number; totalAmount: number }>;
+  paymentBreakdown: Array<{ paymentStatus: string; count: number; totalAmount: number; outstandingAmount?: number }>;
 }
 
 export interface SalesDashboardSummary {
@@ -763,7 +768,7 @@ export interface SalesDashboardSummary {
   outstanding: number;
   salesCount: number;
   avgPricePerBird: number;
-  paymentBreakdown: { paymentStatus: string; count: number; totalAmount: number }[];
+  paymentBreakdown: { paymentStatus: string; count: number; totalAmount: number; outstandingAmount?: number }[];
   topCustomers: { customerName: string | null; totalAmount: number; saleCount: number }[];
   dailySales: { date: string; birds: number; revenue: number }[];
 }

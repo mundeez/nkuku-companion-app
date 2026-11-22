@@ -32,7 +32,9 @@ function buildFilterParams(filter: SalesFilter): string {
   const params = new URLSearchParams();
   if (filter.fromDate) params.set("fromDate", filter.fromDate);
   if (filter.toDate) params.set("toDate", filter.toDate);
-  if (filter.paymentStatus) params.set("paymentStatus", filter.paymentStatus);
+  // 'outstanding' is a UI-only alias for pending + partial (same mapping the
+  // flock sales page applies) — the API rejects it otherwise.
+  if (filter.paymentStatus) params.set("paymentStatus", filter.paymentStatus === "outstanding" ? "pending,partial" : filter.paymentStatus);
   if (filter.flockId) params.set("flockId", filter.flockId);
   if (filter.customer) params.set("customer", filter.customer);
   if (filter.q) params.set("q", filter.q);
@@ -286,14 +288,20 @@ export default function SalesDashboardPage() {
           <CardHeader><CardTitle>Payment Status</CardTitle></CardHeader>
           <CardContent>
             <div className="flex gap-4 flex-wrap">
-              {summary.paymentBreakdown.map((p) => (
+              {summary.paymentBreakdown.map((p) => {
+                // Pending/partial show the unpaid remainder so the buckets
+                // reconcile with the Outstanding KPI; paid shows the full
+                // collected total.
+                const amt = p.paymentStatus === "paid" ? p.totalAmount : (p.outstandingAmount ?? p.totalAmount);
+                return (
                 <div key={p.paymentStatus} className="flex items-center gap-2">
                   <Badge variant={p.paymentStatus === "paid" ? "default" : p.paymentStatus === "partial" ? "secondary" : "outline"}>
                     {p.paymentStatus}
                   </Badge>
-                  <span className="text-sm">{p.count} sales — ZMW {p.totalAmount.toFixed(2)}</span>
+                  <span className="text-sm">{p.count} sales — ZMW {amt.toFixed(2)}</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

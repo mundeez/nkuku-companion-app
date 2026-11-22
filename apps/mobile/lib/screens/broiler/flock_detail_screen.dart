@@ -1390,7 +1390,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           const Expanded(flex: 2, child: Text('Day', style: style, textAlign: TextAlign.center)),
           const Expanded(flex: 2, child: Text('Req', style: style, textAlign: TextAlign.end)),
           const Expanded(flex: 2, child: Text('Bought', style: style, textAlign: TextAlign.end)),
-          const Expanded(flex: 2, child: Text('Left', style: style, textAlign: TextAlign.end)),
+          const Expanded(flex: 2, child: Text('Stock', style: style, textAlign: TextAlign.end)),
         ],
       ),
     );
@@ -1409,10 +1409,19 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
           Expanded(flex: 2, child: Text(dayRange, style: TextStyle(fontSize: 11, color: Colors.grey[600]), textAlign: TextAlign.center)),
           Expanded(flex: 2, child: Text('${s.bagsRequired}', style: const TextStyle(fontSize: 13), textAlign: TextAlign.end)),
           Expanded(flex: 2, child: Text('${s.bagsPurchased}', style: const TextStyle(fontSize: 13), textAlign: TextAlign.end)),
-          Expanded(flex: 2, child: Text(
-            '${s.bagsRemaining}',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: remainingColor),
-            textAlign: TextAlign.end,
+          Expanded(flex: 2, child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${s.bagsRemaining}',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: remainingColor),
+                textAlign: TextAlign.end,
+              ),
+              if (s.bagsToPurchase > 0)
+                Text('need ${s.bagsToPurchase}',
+                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    textAlign: TextAlign.end),
+            ],
           )),
         ],
       ),
@@ -1503,7 +1512,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                               fontSize: 12, fontWeight: FontWeight.w600))),
                   Expanded(
                       child: Text(
-                    'Req ${s.requiredBags} · Bought ${s.purchasedBags} · Left ${s.remainingBags}',
+                    'Req ${s.requiredBags} · Bought ${s.purchasedBags} · Stock ${s.remainingBags} · Need ${s.bagsToPurchase}',
                     style: TextStyle(fontSize: 12, color: Colors.grey[800]),
                   )),
                 ]),

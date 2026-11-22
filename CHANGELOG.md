@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.56.1] — 2026-11-22
+
+### Fixes — feed stock counts & sales outstanding totals
+
+- **Feed "In stock" now counts physical bags** — per-(flock, stage) stock is
+  computed from `FeedBag` rows not marked `finished`, so the projection
+  table shows real bag counts (e.g. 1×50kg instead of the kg-math mix of
+  2@50kg + 4@25kg). Added `bagsToPurchase` (procurement deficit) to the
+  feed-projection API; web `feed-projection-table` gained a "To buy"
+  column; mobile models/UI updated to match. `FeedRecord` consumption no
+  longer inflates purchased-bag counts — `consumedKg` is reported
+  separately. Flock-card mini-projection uses the same semantics.
+- **Sales outstanding totals** — `paymentBreakdown` now returns
+  `outstandingAmount` (unpaid remainder = max(0, total − paid)) alongside
+  `totalAmount`; web and mobile sales dashboards show the outstanding
+  remainder for pending/partial buckets and the full total for paid.
+  Also in this batch: payment status is now derived at read time (the
+  persisted column could go stale vs `amountPaidZmw`), the global sales
+  page maps `outstanding` → pending/partial correctly, and a
+  `fieldReference` filter bug was fixed (Prisma `fieldReference`
+  preview feature enabled client-side only — no migration).
+
 ## [1.56.0] — 2026-11-17
 
 ### P7 — platform console hardening & docs

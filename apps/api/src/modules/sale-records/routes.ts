@@ -50,14 +50,49 @@ function stripFrPrefix(notes: string | null | undefined): string | null {
   return stripped || null;
 }
 
+/** Derive the effective payment status from monetary values at read time.
+ *  The persisted paymentStatus column can go stale relative to
+ *  amountPaidZmw / payment rows, so all read paths use this derivation:
+ *  paid when amountPaid covers the total (and total > 0),
+ *  pending when nothing is paid, partial otherwise. */
+function derivePaymentStatus(totalAmountZmw: unknown, amountPaidZmw: unknown): 'pending' | 'partial' | 'paid' {
+  const total = Number(totalAmountZmw ?? 0);
+  const paid = Number(amountPaidZmw ?? 0);
+  if (paid >= total && total > 0) return 'paid';
+  if (paid <= 0) return 'pending';
+  return 'partial';
+}
+
+/** Aggregate payment breakdown in JS from records selected under the
+ *  existing `where` scope. Returns { paymentStatus, count, totalAmount,
+ *  outstandingAmount }[] — outstandingAmount sums only the unpaid remainder
+ *  (total − paid) so pending+partial reconcile with the Outstanding KPI. */
+function aggregatePaymentBreakdown(records: { paymentStatus?: string | null; totalAmountZmw: unknown; amountPaidZmw: unknown }[]): { paymentStatus: string; count: number; totalAmount: number; outstandingAmount: number }[] {
+  const map = new Map<string, { paymentStatus: string; count: number; totalAmount: number; outstandingAmount: number }>();
+  for (const r of records) {
+    const status = derivePaymentStatus(r.totalAmountZmw, r.amountPaidZmw);
+    const total = Number(r.totalAmountZmw ?? 0);
+    const paid = Number(r.amountPaidZmw ?? 0);
+    const entry = map.get(status) ?? { paymentStatus: status, count: 0, totalAmount: 0, outstandingAmount: 0 };
+    entry.count += 1;
+    entry.totalAmount += total;
+    entry.outstandingAmount += Math.max(0, total - paid);
+    map.set(status, entry);
+  }
+  return [...map.values()];
+}
+
 /** Serialize a sale record for API responses — strips [FR:] prefix from notes
- *  and adds derived payment fields. */
+ *  and adds derived payment fields. paymentStatus is overridden with the
+ *  read-time derivation so badges reflect monetary values, not the possibly
+ *  stale persisted column. */
 function serializeSaleRecord(record: any): any {
   const total = Number(record.totalAmountZmw ?? 0);
   const paid = Number(record.amountPaidZmw ?? 0);
   const paymentsCount = record._count?.payments ?? record.payments?.length;
   return {
     ...record,
+    paymentStatus: derivePaymentStatus(total, paid),
     notes: stripFrPrefix(record.notes),
     remainingDueZmw: Math.max(0, total - paid),
     paidPct: total > 0 ? Math.round((paid / total) * 1000) / 10 : 0,
@@ -65,8 +100,35 @@ function serializeSaleRecord(record: any): any {
   };
 }
 
+/** Prisma `where` fragments reproducing derivePaymentStatus() at the DB
+ *  level, so list/summary filters match the read-time derivation — the
+ *  persisted paymentStatus column can go stale vs amountPaidZmw /
+ *  totalAmountZmw. Requires the fieldReference preview feature.
+ *  Mirrors derivePaymentStatus: paid ⇔ paid ≥ total ∧ total > 0,
+ *  pending ⇔ paid ≤ 0, partial otherwise. */
+function paymentStatusConditions(prisma: any, statuses: string[]): any[] {
+  const fields = prisma.saleRecord.fields;
+  const byStatus: Record<string, any> = {
+    paid: {
+      AND: [
+        { totalAmountZmw: { gt: 0 } },
+        { amountPaidZmw: { gte: fields.totalAmountZmw } },
+      ],
+    },
+    pending: { amountPaidZmw: { lte: 0 } },
+    partial: {
+      AND: [
+        { amountPaidZmw: { gt: 0 } },
+        { OR: [{ totalAmountZmw: { lte: 0 } }, { amountPaidZmw: { lt: fields.totalAmountZmw } }] },
+      ],
+    },
+  };
+  const conds = statuses.map((s) => byStatus[s] ?? byStatus.pending);
+  return conds.length === 1 ? conds : [{ OR: conds }];
+}
+
 /** Build a Prisma `where` clause from common filter params. */
-function buildFilterWhere(organizationId: string, query: {
+function buildFilterWhere(prisma: any, organizationId: string, query: {
   fromDate?: string;
   toDate?: string;
   /** Single status or comma-separated list ("pending,partial"). */
@@ -94,7 +156,7 @@ function buildFilterWhere(organizationId: string, query: {
 
   if (query.paymentStatus) {
     const statuses = query.paymentStatus.split(',').filter(Boolean);
-    where.paymentStatus = statuses.length > 1 ? { in: statuses } : statuses[0];
+    where.AND = [...(where.AND ?? []), ...paymentStatusConditions(prisma, statuses)];
   }
 
   if (query.customer) {
@@ -205,7 +267,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     const paid = Number(sum._sum.amountZmw ?? 0);
     const sale = await prisma.saleRecord.findUnique({ where: { id: saleId } });
     const total = Number(sale?.totalAmountZmw ?? 0);
-    const paymentStatus = paid >= total && total > 0 ? 'paid' : paid > 0 ? 'partial' : 'pending';
+    const paymentStatus = derivePaymentStatus(total, paid);
     return prisma.saleRecord.update({
       where: { id: saleId },
       data: { amountPaidZmw: paid, paymentStatus },
@@ -272,7 +334,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
         _sum: { amountZmw: true },
       });
       const paid = Number(sum._sum.amountZmw ?? 0);
-      const paymentStatus = paid >= total ? 'paid' : paid > 0 ? 'partial' : 'pending';
+      const paymentStatus = derivePaymentStatus(total, paid);
       await tx.saleRecord.update({
         where: { id },
         data: { amountPaidZmw: paid, paymentStatus },
@@ -340,7 +402,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       offset: z.coerce.number().int().min(0).default(0),
     }).parse(request.query);
 
-    const where = buildFilterWhere(organizationId, query);
+    const where = buildFilterWhere(prisma, organizationId, query);
 
     const sortBy = query.sortBy ?? 'saleDate';
     const sortDir = query.sortDir ?? 'desc';
@@ -382,7 +444,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
     reply.header('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     const query = FilterQuerySchema.parse(request.query);
 
-    const where = buildFilterWhere(organizationId, query);
+    const where = buildFilterWhere(prisma, organizationId, query);
 
     const totals = await prisma.saleRecord.aggregate({
       where,
@@ -390,12 +452,13 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       _count: { _all: true },
     });
 
-    const paymentBreakdown = await prisma.saleRecord.groupBy({
-      by: ['paymentStatus'],
+    // Derive payment breakdown at read time from monetary values — the
+    // persisted paymentStatus column can go stale vs amountPaidZmw.
+    const breakdownRecords = await prisma.saleRecord.findMany({
       where,
-      _count: { _all: true },
-      _sum: { totalAmountZmw: true },
+      select: { paymentStatus: true, totalAmountZmw: true, amountPaidZmw: true },
     });
+    const paymentBreakdown = aggregatePaymentBreakdown(breakdownRecords);
 
     // Top customers by revenue
     const topCustomers = await prisma.saleRecord.groupBy({
@@ -436,11 +499,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       outstanding: (totals._sum.totalAmountZmw ? Number(totals._sum.totalAmountZmw) : 0) - (totals._sum.amountPaidZmw ? Number(totals._sum.amountPaidZmw) : 0),
       salesCount: totals._count._all,
       avgPricePerBird: totals._sum.birdCount ? Number(totals._sum.totalAmountZmw ?? 0) / totals._sum.birdCount : 0,
-      paymentBreakdown: paymentBreakdown.map((row: any) => ({
-        paymentStatus: row.paymentStatus,
-        count: row._count._all,
-        totalAmount: row._sum.totalAmountZmw ? Number(row._sum.totalAmountZmw) : 0,
-      })),
+      paymentBreakdown,
       topCustomers: topCustomers.map((row: any) => ({
         customerName: row.customerName,
         totalAmount: row._sum.totalAmountZmw ? Number(row._sum.totalAmountZmw) : 0,
@@ -462,7 +521,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       sortDir: z.enum(['asc', 'desc']).optional(),
     }).parse(request.query);
 
-    const where = buildFilterWhere(organizationId, query);
+    const where = buildFilterWhere(prisma, organizationId, query);
 
     if (query.flockId) {
       const flock = await prisma.broilerFlock.findFirst({
@@ -531,7 +590,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
     }
 
-    const where = buildFilterWhere(organizationId, query);
+    const where = buildFilterWhere(prisma, organizationId, query);
 
     const birdSum = await prisma.saleRecord.aggregate({
       where,
@@ -540,12 +599,13 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
 
     const salesCount = await prisma.saleRecord.count({ where });
 
-    const paymentBreakdown = await prisma.saleRecord.groupBy({
-      by: ['paymentStatus'],
+    // Derive payment breakdown at read time from monetary values — the
+    // persisted paymentStatus column can go stale vs amountPaidZmw.
+    const breakdownRecords = await prisma.saleRecord.findMany({
       where,
-      _count: { _all: true },
-      _sum: { totalAmountZmw: true },
+      select: { paymentStatus: true, totalAmountZmw: true, amountPaidZmw: true },
     });
+    const paymentBreakdown = aggregatePaymentBreakdown(breakdownRecords);
 
     const totalBirdsSold = birdSum._sum.birdCount ?? 0;
     const totalRevenue = birdSum._sum.totalAmountZmw
@@ -562,11 +622,7 @@ export async function buildSaleRecordModule(app: FastifyInstance) {
       totalPaid,
       outstanding,
       salesCount,
-      paymentBreakdown: paymentBreakdown.map((row: any) => ({
-        paymentStatus: row.paymentStatus,
-        count: row._count._all,
-        totalAmount: row._sum.totalAmountZmw ? Number(row._sum.totalAmountZmw) : 0,
-      })),
+      paymentBreakdown,
     };
   });
 

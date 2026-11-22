@@ -118,6 +118,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     let mortalityByFlock = new Map<string, number>();
     let mortalityEventsByFlock = new Map<string, any[]>();
     let purchasesByFlockStage = new Map<string, number>();
+    let stockByFlockStage = new Map<string, number>();
     let feedRecordsByFlock = new Map<string, any[]>();
     let salesByFlock = new Map<string, any[]>();
 
@@ -144,19 +145,33 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     // Batch-load feed purchases grouped by (flockId, feedStageId) for the flock card mini-list
     const feedPurchases = await prisma.feedPurchase.findMany({
       where: { flockId: { in: flockIds } },
-      select: { flockId: true, feedStageId: true, bagsPurchased: true },
+      select: { id: true, flockId: true, feedStageId: true, bagsPurchased: true },
     });
     purchasesByFlockStage = new Map<string, number>();
+    // In-stock bags per (flockId, feedStageId) = purchased bags minus bags
+    // already marked finished. FeedBag rows are the physical truth.
+    const finishedByPurchase = new Map<string, number>();
+    const feedBags = await prisma.feedBag.findMany({
+      where: { flockId: { in: flockIds } },
+      select: { purchaseId: true, status: true },
+    });
+    for (const b of feedBags) {
+      if (b.status === 'finished' && b.purchaseId) {
+        finishedByPurchase.set(b.purchaseId, (finishedByPurchase.get(b.purchaseId) ?? 0) + 1);
+      }
+    }
+    stockByFlockStage = new Map<string, number>();
     for (const p of feedPurchases) {
       if (!p.feedStageId) continue;
       const key = `${p.flockId}:${p.feedStageId}`;
       purchasesByFlockStage.set(key, (purchasesByFlockStage.get(key) ?? 0) + p.bagsPurchased);
+      const inStock = Math.max(0, p.bagsPurchased - (finishedByPurchase.get(p.id) ?? 0));
+      stockByFlockStage.set(key, (stockByFlockStage.get(key) ?? 0) + inStock);
     }
 
-    // Also batch-load existing FeedRecord entries (the old feed tracking system)
-    // and convert them to purchased bags by matching feedType → stageName.
-    // This ensures feed recorded before the FeedPurchase system shows up in
-    // the procurement mini-list.
+    // Also batch-load FeedRecord entries — the feed CONSUMPTION log (feed
+    // actually fed), matched to stages by name below for the consumedKg
+    // display field. In-stock bag counts come from FeedBag statuses instead.
     const feedRecords = await prisma.feedRecord.findMany({
       where: { flockId: { in: flockIds } },
       select: { flockId: true, feedType: true, quantityKg: true },
@@ -242,9 +257,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       // Compact per-stage feed projection for the flock card mini-list.
       // Applies per-stage mortality adjustment: birdsAlive = initialCount −
       // mortality events on/before the stage's dayRangeStart.
-      // Bags purchased aggregates both FeedPurchase records AND existing
-      // FeedRecord entries (converted from kg to bags using the stage's
-      // unit_size_kg, matched by feedType → stageName).
+      // Bags purchased counts FeedPurchase records only; matching FeedRecord
+      // entries are consumption and reduce the physical stock remaining.
       const flockMortalityEvents = mortalityEventsByFlock.get(f.id) ?? [];
       const flockFeedRecords = feedRecordsByFlock.get(f.id) ?? [];
       const feedStages = (f.supplier?.feedStages || []).filter((fs: any) => fs.stageType === 'feed');
@@ -265,16 +279,18 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         const { itemsRoundedUp } = calculateItemsRequired(birdsAlive, fs.intakePerBirdKg, fs.unitSizeKg);
         const bagsRequired = itemsRoundedUp ?? 0;
 
-        // Start with FeedPurchase bags
-        let bagsPurchased = purchasesByFlockStage.get(`${f.id}:${fs.id}`) ?? 0;
+        // Start with FeedPurchase bags — physical bags bought for this stage.
+        const bagsPurchased = purchasesByFlockStage.get(`${f.id}:${fs.id}`) ?? 0;
 
-        // Add bags from FeedRecord entries that match this stage by name.
-        // Match by case-insensitive exact name, or feedType startsWith stageName
-        // (e.g., "Starter" matches "Starter" and "Starter (25kg)").
-        // For stages with "(25kg)" suffix, only match if the feedType also
-        // contains "25" to avoid double-counting across 50kg and 25kg variants.
+        // FeedRecord entries matching this stage by name are CONSUMPTION
+        // (feed actually fed), not purchases. Match by case-insensitive exact
+        // name, or feedType startsWith stageName (e.g., "Starter" matches
+        // "Starter" and "Starter (25kg)"). For stages with "(25kg)" suffix,
+        // only match if the feedType also contains "25" to avoid
+        // double-counting across 50kg and 25kg variants.
         const stageLower = fs.stageName.toLowerCase();
         const is25kgVariant = stageLower.includes('25');
+        let consumedKg = 0;
         for (const fr of flockFeedRecords) {
           const ftLower = (fr.feedType || '').toLowerCase();
           if (!ftLower) continue;
@@ -287,13 +303,13 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
           if (is25kgVariant && !ftLower.includes('25')) continue;
           // For non-25kg stages, skip if feedType mentions 25 (it belongs to the 25kg variant)
           if (!is25kgVariant && ftLower.includes('25')) continue;
-          const unitSize = Number(fs.unitSizeKg);
-          if (unitSize > 0) {
-            bagsPurchased += Math.ceil(Number(fr.quantityKg) / unitSize);
-          }
+          consumedKg += Number(fr.quantityKg);
         }
 
-        const bagsRemaining = bagsRequired - bagsPurchased;
+        // In-stock bags = physical FeedBag rows not yet finished, attributed
+        // to this stage — NOT kg math and NOT the procurement deficit.
+        const bagsRemaining = stockByFlockStage.get(`${f.id}:${fs.id}`) ?? 0;
+        const bagsToPurchase = Math.max(0, bagsRequired - bagsPurchased);
         let status: 'complete' | 'partial' | 'not_started';
         if (bagsPurchased >= bagsRequired && bagsRequired > 0) status = 'complete';
         else if (bagsPurchased > 0) status = 'partial';
@@ -304,6 +320,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
           bagsRequired,
           bagsPurchased,
           bagsRemaining,
+          bagsToPurchase,
+          consumedKg,
           status,
         };
       });
@@ -905,7 +923,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       include: {
         supplier: { include: { feedStages: { orderBy: { sortOrder: 'asc' } } } },
         mortalityEvents: { select: { eventDate: true, count: true, ageDays: true } },
-        feedPurchases: { select: { feedStageId: true, stageName: true, fulfillsFeedType: true, bagSizeKg: true, bagsPurchased: true, totalCostZmw: true } },
+        feedPurchases: { select: { id: true, feedStageId: true, stageName: true, fulfillsFeedType: true, bagSizeKg: true, bagsPurchased: true, totalCostZmw: true } },
         feedRecords: { select: { feedType: true, quantityKg: true, costZmw: true } },
       },
     });
@@ -920,8 +938,21 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         currentCount: flock.currentCount,
         supplierName: flock.supplier?.name ?? null,
         stages: [],
-        totals: { bagsRequired: 0, bagsPurchased: 0, bagsRemaining: 0, projectedCostZmw: 0, purchasedCostZmw: 0 },
+        totals: { bagsRequired: 0, bagsPurchased: 0, bagsRemaining: 0, requiredKg: 0, purchasedKg: 0, consumedKg: 0, remainingKg: 0, projectedCostZmw: 0, purchasedCostZmw: 0 },
       };
+    }
+
+    // Physical bag truth: count finished FeedBags per purchase. In-stock =
+    // purchased bags not yet marked finished (sealed + open still count).
+    const flockFeedBags = await prisma.feedBag.findMany({
+      where: { flockId: id },
+      select: { purchaseId: true, status: true },
+    });
+    const finishedByPurchase = new Map<string, number>();
+    for (const b of flockFeedBags) {
+      if (b.status === 'finished' && b.purchaseId) {
+        finishedByPurchase.set(b.purchaseId, (finishedByPurchase.get(b.purchaseId) ?? 0) + 1);
+      }
     }
 
     const startDate = flock.startDate ? new Date(flock.startDate) : null;
@@ -941,7 +972,10 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       stages: any[];
       purchasedKg: number;
       purchasedCost: number;
+      consumedKg: number; // feed actually fed (FeedRecord consumption log)
+      stockKg: number; // kg in unfinished physical bags (FeedBag status != finished)
       bagsByStage: Map<string, number>; // physical bags per stage row (purchase attribution)
+      stockByStage: Map<string, number>; // in-stock bags per stage row
     }
     const typeBuckets = new Map<string, TypeBucket>();
     const stageById = new Map<string, any>();
@@ -969,7 +1003,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
       // Alternative bag-size variants of the same type share one requirement.
       if (!typeBuckets.has(key)) {
-        typeBuckets.set(key, { requiredKg, birdsAlive, stages: [fs], purchasedKg: 0, purchasedCost: 0, bagsByStage: new Map() });
+        typeBuckets.set(key, { requiredKg, birdsAlive, stages: [fs], purchasedKg: 0, purchasedCost: 0, consumedKg: 0, stockKg: 0, bagsByStage: new Map(), stockByStage: new Map() });
       } else {
         typeBuckets.get(key)!.stages.push(fs);
       }
@@ -1000,13 +1034,21 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         row = bucket.stages.reduce((a: any, b: any) => (Number(b.unitSizeKg) > Number(a.unitSizeKg) ? b : a));
       }
       bucket.bagsByStage.set(row.id, (bucket.bagsByStage.get(row.id) ?? 0) + p.bagsPurchased);
+
+      // In-stock = purchased bags not yet marked finished (sealed + open
+      // still count). Purchases predating FeedBag materialization have no
+      // bag rows → nothing finished → all bags count as in stock.
+      const inStockBags = Math.max(0, p.bagsPurchased - (finishedByPurchase.get(p.id) ?? 0));
+      bucket.stockKg += inStockBags * bagKg;
+      bucket.stockByStage.set(row.id, (bucket.stockByStage.get(row.id) ?? 0) + inStockBags);
     }
 
-    // Legacy FeedRecord kg counts as feed secured (reduces remaining) but is
-    // not procurement — it does not inflate the purchased-bag count.
+    // FeedRecord entries are the CONSUMPTION log (feed actually fed — manual
+    // entries plus auto-records created when a bag is finished). Reported as
+    // consumedKg for display; in-stock counts come from FeedBag statuses.
     for (const fr of flock.feedRecords) {
       const bucket = typeBuckets.get(typeKey(fr.feedType));
-      if (bucket) bucket.purchasedKg += Number(fr.quantityKg || 0);
+      if (bucket) bucket.consumedKg += Number(fr.quantityKg || 0);
     }
 
     const stages: any[] = [];
@@ -1018,11 +1060,20 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
     let totalPurchasedCost = 0;
     let totalRequiredKg = 0;
     let totalPurchasedKg = 0;
+    let totalConsumedKg = 0;
+    let totalRemainingKg = 0;
 
-    for (const [key, bucket] of typeBuckets) {
-      const remainingKg = bucket.requiredKg - bucket.purchasedKg;
+    for (const bucket of typeBuckets.values()) {
+      // Two different "remaining" notions:
+      //   deficitKg   = requiredKg - purchasedKg → how much MORE must be
+      //                 bought (drives status, coverage, to-purchase bags and
+      //                 remainingCostZmw).
+      //   stockKg     = kg in physical bags not yet finished (FeedBag status
+      //                 != finished) → feed stock on hand, counted per size.
+      const deficitKg = bucket.requiredKg - bucket.purchasedKg;
+      const remainingKg = bucket.stockKg;
       const status: 'complete' | 'partial' | 'not_started' =
-        remainingKg <= 0 && bucket.requiredKg > 0 ? 'complete'
+        deficitKg <= 0 && bucket.requiredKg > 0 ? 'complete'
         : bucket.purchasedKg > 0 ? 'partial'
         : 'not_started';
 
@@ -1030,7 +1081,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         const unitKg = Number(fs.unitSizeKg);
         const bagsRequired = unitKg > 0 ? Math.ceil(bucket.requiredKg / unitKg) : 0;
         const bagsPurchased = bucket.bagsByStage.get(fs.id) ?? 0;
-        const bagsRemaining = unitKg > 0 ? Math.max(0, Math.ceil(remainingKg / unitKg)) : 0;
+        const bagsRemaining = bucket.stockByStage.get(fs.id) ?? 0;
+        const bagsToPurchase = unitKg > 0 ? Math.max(0, Math.ceil(Math.max(0, deficitKg) / unitKg)) : 0;
         const projectedCostZmw = bagsRequired > 0
           ? new Decimal(bagsRequired).mul(fs.unitPriceZmw).toNumber()
           : 0;
@@ -1047,6 +1099,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
           bagsRaw: unitKg > 0 ? bucket.requiredKg / unitKg : 0,
           bagsPurchased,
           bagsRemaining,
+          bagsToPurchase,
+          consumedKg: bucket.consumedKg,
           unitPriceZmw: Number(fs.unitPriceZmw),
           projectedCostZmw,
           purchasedCostZmw: 0, // cost reported at type level below
@@ -1059,6 +1113,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       const primary = bucket.stages.reduce((a: any, b: any) => (Number(b.unitSizeKg) > Number(a.unitSizeKg) ? b : a));
       const primaryKg = Number(primary.unitSizeKg) || 1;
       const typePurchasedBags = [...bucket.bagsByStage.values()].reduce((a, b) => a + b, 0);
+      const typeStockBags = [...bucket.stockByStage.values()].reduce((a, b) => a + b, 0);
 
       // Grouped per-type view (one row per feed type; per-size sub-columns)
       const typeRow = {
@@ -1067,11 +1122,12 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         dayRangeEnd: primary.dayRangeEnd,
         requiredKg: bucket.requiredKg,
         purchasedKg: bucket.purchasedKg,
+        consumedKg: bucket.consumedKg,
         remainingKg,
         spentZmw: bucket.purchasedCost,
-        remainingCostZmw: Math.ceil(Math.max(0, remainingKg) / primaryKg) * Number(primary.unitPriceZmw),
+        remainingCostZmw: Math.ceil(Math.max(0, deficitKg) / primaryKg) * Number(primary.unitPriceZmw),
         coveragePct: bucket.requiredKg > 0 ? Math.min(100, (bucket.purchasedKg / bucket.requiredKg) * 100) : 0,
-        overPurchasedKg: Math.max(0, -remainingKg),
+        overPurchasedKg: Math.max(0, -deficitKg),
         status,
         sizes: bucket.stages
           .slice()
@@ -1083,7 +1139,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
               unitKg: u,
               requiredBags: u > 0 ? Math.ceil(bucket.requiredKg / u) : 0,
               purchasedBags: bucket.bagsByStage.get(s.id) ?? 0,
-              remainingBags: u > 0 ? Math.max(0, Math.ceil(remainingKg / u)) : 0,
+              remainingBags: bucket.stockByStage.get(s.id) ?? 0,
+              bagsToPurchase: u > 0 ? Math.max(0, Math.ceil(Math.max(0, deficitKg) / u)) : 0,
               projectedCostZmw: u > 0 ? new Decimal(Math.ceil(bucket.requiredKg / u)).mul(s.unitPriceZmw).toNumber() : 0,
               unitPriceZmw: Number(s.unitPriceZmw),
             };
@@ -1093,11 +1150,13 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
 
       totalBagsRequired += Math.ceil(bucket.requiredKg / primaryKg);
       totalBagsPurchased += typePurchasedBags;
-      totalBagsRemaining += Math.max(0, Math.ceil(remainingKg / primaryKg));
+      totalBagsRemaining += typeStockBags;
       totalProjectedCost += Math.ceil(bucket.requiredKg / primaryKg) * Number(primary.unitPriceZmw);
       totalPurchasedCost += bucket.purchasedCost;
       totalRequiredKg += bucket.requiredKg;
       totalPurchasedKg += bucket.purchasedKg;
+      totalConsumedKg += bucket.consumedKg;
+      totalRemainingKg += remainingKg;
     }
 
     return {
@@ -1114,7 +1173,8 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
         bagsRemaining: totalBagsRemaining,
         requiredKg: totalRequiredKg,
         purchasedKg: totalPurchasedKg,
-        remainingKg: Math.max(0, totalRequiredKg - totalPurchasedKg),
+        consumedKg: totalConsumedKg,
+        remainingKg: totalRemainingKg,
         projectedCostZmw: totalProjectedCost,
         purchasedCostZmw: totalPurchasedCost,
       },

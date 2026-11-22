@@ -74,14 +74,16 @@ describe('Feed Projection & Purchases API', () => {
       expect(data.totals).toBeDefined();
       expect(data.totals.bagsRequired).toBeGreaterThan(0);
       expect(data.totals.bagsPurchased).toBe(0); // no purchases yet
-      expect(data.totals.bagsRemaining).toBe(data.totals.bagsRequired);
+      // bagsRemaining is physical stock on hand (purchased bags not yet
+      // finished) — with nothing purchased, nothing is left.
+      expect(data.totals.bagsRemaining).toBe(0);
 
       // Each stage should have the required fields
       const stage = data.stages[0];
       expect(stage.stageName).toBeDefined();
       expect(stage.bagsRequired).toBeGreaterThan(0);
       expect(stage.bagsPurchased).toBe(0);
-      expect(stage.bagsRemaining).toBe(stage.bagsRequired);
+      expect(stage.bagsRemaining).toBe(0); // no physical stock on hand
       expect(stage.status).toBe('not_started');
       expect(stage.bagSizeKg).toBeGreaterThan(0);
       expect(stage.unitPriceZmw).toBeGreaterThanOrEqual(0);
@@ -314,14 +316,20 @@ describe('Feed Projection & Purchases API', () => {
       const s25 = t.sizes.find((s: any) => s.unitKg === 25);
       expect(t.purchasedKg).toBeCloseTo(100);
       expect(s50.purchasedBags).toBe(2);
-      expect(s50.remainingBags).toBe(18); // 900kg left ÷ 50
+      // In stock = physical unfinished bags of THAT size — a 50kg purchase
+      // does not create 25kg bags on the shelf.
+      expect(s50.remainingBags).toBe(2);
       expect(s25.purchasedBags).toBe(0);
-      expect(s25.remainingBags).toBe(36); // 900kg left ÷ 25 — cross-size credit
+      expect(s25.remainingBags).toBe(0);
+      // To buy = procurement deficit (1000kg required − 100kg purchased =
+      // 900kg) expressed per bag size.
+      expect(s50.bagsToPurchase).toBe(18); // 900kg ÷ 50
+      expect(s25.bagsToPurchase).toBe(36); // 900kg ÷ 25
       expect(t.coveragePct).toBeCloseTo(10);
       expect(t.status).toBe('partial');
     });
 
-    it('over-purchasing clamps remaining to 0 and flags the surplus', async () => {
+    it('over-purchasing leaves the surplus as physical stock on hand', async () => {
       const res = await api('/api/v1/feed-purchases', token, {
         method: 'POST',
         body: JSON.stringify({
@@ -339,11 +347,149 @@ describe('Feed Projection & Purchases API', () => {
       const { t } = await getType();
       const s50 = t.sizes.find((s: any) => s.unitKg === 50);
       const s25 = t.sizes.find((s: any) => s.unitKg === 25);
-      expect(s50.remainingBags).toBe(0);
+      // 1350kg purchased across 27 physical 50kg bags, none finished →
+      // 27 bags of 50kg stock, 0 physical 25kg bags.
+      expect(s50.remainingBags).toBe(27);
       expect(s25.remainingBags).toBe(0);
+      expect(s50.bagsToPurchase).toBe(0); // requirement already exceeded
+      expect(s25.bagsToPurchase).toBe(0);
       expect(t.overPurchasedKg).toBeCloseTo(350); // 1350kg bought vs 1000kg needed
       expect(t.coveragePct).toBe(100);
       expect(t.status).toBe('complete');
+    });
+  });
+
+  describe('Physical stock remaining (purchased bags not finished)', () => {
+    let stockFlockId: string;
+    let growerStageId: string;
+
+    beforeAll(async () => {
+      // Dedicated supplier with a single "Grower" feed stage (50kg bags)
+      const supRes = await api('/api/v1/suppliers', token, {
+        method: 'POST',
+        body: JSON.stringify({ name: `Stock Test Feeds ${Date.now()}`, chickenType: 'broiler' }),
+      });
+      const sup = await supRes.json();
+      expect(sup.id).toBeDefined();
+
+      const stageRes = await api('/api/v1/feed-stages', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          supplierId: sup.id,
+          stageName: 'Grower',
+          stageType: 'feed',
+          dayRangeStart: 0,
+          dayRangeEnd: 35,
+          unitSizeKg: 50,
+          unitPriceZmw: 700,
+          intakePerBirdKg: 1.0,
+          sortOrder: 0,
+        }),
+      });
+      const stage = await stageRes.json();
+      expect(stage.id).toBeDefined();
+      growerStageId = stage.id;
+
+      const breedsRes = await api('/api/v1/breeds', token);
+      const breeds = await breedsRes.json();
+      const breedId = breeds.find((b: any) => b.name === 'Ross 308').id;
+
+      const flockRes = await api('/api/v1/broiler-flocks', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Stock Remaining Test Flock',
+          breedId,
+          supplierId: sup.id,
+          orderDate: '2026-10-01',
+          initialCount: 1000,
+          targetWeight: 2.5,
+          targetAge: 42,
+          feedTransitionDay: 11,
+          chicksCollected: true,
+          collectionDate: '2026-10-05',
+        }),
+      });
+      const flock = await flockRes.json();
+      expect(flock.id).toBeDefined();
+      stockFlockId = flock.id;
+
+      // Buy exactly 4 Grower bags — no consumption recorded.
+      const buyRes = await api('/api/v1/feed-purchases', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          flockId: stockFlockId,
+          feedStageId: growerStageId,
+          stageName: 'Grower',
+          bagSizeKg: 50,
+          bagsPurchased: 4,
+          unitPriceZmw: 700,
+          purchaseDate: '2026-10-06',
+        }),
+      });
+      expect(buyRes.status).toBe(200);
+    });
+
+    it('reports 4 bags remaining on the detailed projection', async () => {
+      const res = await api(`/api/v1/broiler-flocks/${stockFlockId}/feed-projection`, token);
+      expect(res.status).toBe(200);
+      const data = await res.json();
+
+      const stage = data.stages.find((s: any) => s.feedStageId === growerStageId);
+      expect(stage).toBeDefined();
+      expect(stage.bagsPurchased).toBe(4);
+      expect(stage.bagsRemaining).toBe(4); // 4 purchased bags, none finished
+      expect(stage.bagsToPurchase).toBe(16); // 1000kg required − 200kg bought = 800kg ÷ 50
+      expect(stage.consumedKg).toBe(0);
+
+      expect(data.totals.bagsPurchased).toBe(4);
+      expect(data.totals.bagsRemaining).toBe(4);
+      expect(data.totals.purchasedKg).toBeCloseTo(200);
+      expect(data.totals.consumedKg).toBe(0);
+      expect(data.totals.remainingKg).toBeCloseTo(200);
+      // Required is still the full projection (1000 birds × 1.0 kg = 1000kg → 20 bags)
+      expect(data.totals.bagsRequired).toBe(20);
+      expect(data.totals.requiredKg).toBeCloseTo(1000);
+    });
+
+    it('drops in-stock count when a bag is marked finished', async () => {
+      // Find one of the flock's Grower bags and finish it.
+      const bagsRes = await api(`/api/v1/feed-bags?flockId=${stockFlockId}`, token);
+      expect(bagsRes.status).toBe(200);
+      const bags = await bagsRes.json();
+      const bag = bags.find((b: any) => b.status !== 'finished');
+      expect(bag).toBeDefined();
+
+      const finishRes = await api(`/api/v1/feed-bags/${bag.id}/finish`, token, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      expect(finishRes.status).toBe(200);
+
+      const res = await api(`/api/v1/broiler-flocks/${stockFlockId}/feed-projection`, token);
+      const data = await res.json();
+      const stage = data.stages.find((s: any) => s.feedStageId === growerStageId);
+      expect(stage.bagsRemaining).toBe(3); // one bag finished → 3 left
+      expect(data.totals.bagsRemaining).toBe(3);
+      // Purchased/required unchanged — finishing is consumption, not a
+      // change to what was bought.
+      expect(stage.bagsPurchased).toBe(4);
+      expect(data.totals.bagsPurchased).toBe(4);
+    });
+
+    it('reports in-stock count on the flock list mini-projection', async () => {
+      // Runs after the finish test above — one of the 4 bags is finished,
+      // so 3 remain in stock and 50kg shows as consumed.
+      const res = await api('/api/v1/broiler-flocks', token);
+      expect(res.status).toBe(200);
+      const flocks = await res.json();
+      const flock = flocks.find((f: any) => f.id === stockFlockId);
+      expect(flock).toBeDefined();
+      const fp = flock.feedProjection.find((s: any) => s.feedStageId === growerStageId);
+      expect(fp).toBeDefined();
+      expect(fp.bagsPurchased).toBe(4);
+      expect(fp.bagsRemaining).toBe(3);
+      expect(fp.bagsToPurchase).toBe(16); // 20 required − 4 purchased
+      expect(fp.consumedKg).toBe(50);
     });
   });
 });

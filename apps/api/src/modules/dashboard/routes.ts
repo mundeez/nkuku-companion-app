@@ -89,8 +89,9 @@ export async function buildDashboardModule(app: FastifyInstance) {
     const profitPerBird = totalBirds > 0 ? Number((netProfit / totalBirds).toFixed(2)) : 0;
 
     const totalCollected = saleRecords.reduce((s: number, r: any) => s + Number(r.amountPaidZmw ?? 0), 0);
+    // Outstanding is derived from amounts, not the persisted paymentStatus
+    // column (which can go stale relative to amountPaidZmw).
     const totalOutstanding = saleRecords
-      .filter((r: any) => r.paymentStatus !== 'paid')
       .reduce((s: number, r: any) => s + Math.max(0, Number(r.totalAmountZmw) - Number(r.amountPaidZmw ?? 0)), 0);
 
     // ── Monthly Trend (last 12 months) ───────

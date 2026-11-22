@@ -191,6 +191,7 @@ class FeedProjectionTypeSize {
   final int requiredBags;
   final int purchasedBags;
   final int remainingBags;
+  final int bagsToPurchase;
   final double projectedCostZmw;
   final double unitPriceZmw;
 
@@ -200,6 +201,7 @@ class FeedProjectionTypeSize {
     required this.requiredBags,
     required this.purchasedBags,
     required this.remainingBags,
+    required this.bagsToPurchase,
     required this.projectedCostZmw,
     required this.unitPriceZmw,
   });
@@ -211,6 +213,7 @@ class FeedProjectionTypeSize {
       requiredBags: json['requiredBags'] ?? 0,
       purchasedBags: json['purchasedBags'] ?? 0,
       remainingBags: json['remainingBags'] ?? 0,
+      bagsToPurchase: json['bagsToPurchase'] ?? 0,
       projectedCostZmw: FeedPurchase._toDouble(json['projectedCostZmw']) ?? 0,
       unitPriceZmw: FeedPurchase._toDouble(json['unitPriceZmw']) ?? 0,
     );
@@ -227,6 +230,7 @@ class FeedProjectionStage {
   final int bagsRequired;
   final int bagsPurchased;
   final int bagsRemaining;
+  final int bagsToPurchase;
   final double projectedCostZmw;
   final String status;
 
@@ -240,6 +244,7 @@ class FeedProjectionStage {
     required this.bagsRequired,
     required this.bagsPurchased,
     required this.bagsRemaining,
+    required this.bagsToPurchase,
     required this.projectedCostZmw,
     required this.status,
   });
@@ -255,6 +260,7 @@ class FeedProjectionStage {
       bagsRequired: json['bagsRequired'] ?? json['bags_required'] ?? 0,
       bagsPurchased: json['bagsPurchased'] ?? json['bags_purchased'] ?? 0,
       bagsRemaining: json['bagsRemaining'] ?? json['bags_remaining'] ?? 0,
+      bagsToPurchase: json['bagsToPurchase'] ?? json['bags_to_purchase'] ?? 0,
       projectedCostZmw: FeedPurchase._toDouble(json['projectedCostZmw'] ?? json['projected_cost_zmw']) ?? 0,
       status: json['status'] ?? 'not_started',
     );
