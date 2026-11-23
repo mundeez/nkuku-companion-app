@@ -2880,49 +2880,69 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
         : _saleRecords.fold(0.0, (sum, r) => sum + r.totalAmountZmw);
     final totalPaid = sumKey('totalPaid');
     final outstanding = sumKey('outstanding');
+    final totalCosts = sumKey('totalCosts');
+    final totalProfit = sumKey('totalProfit');
+    final profitLessOutstanding = sumKey('profitLessOutstanding');
+    final cashProfit = sumKey('cashProfit');
+    final avgProfitPerBird = sumKey('avgProfitPerBird');
+    final avgCostsPerBird = sumKey('avgCostsPerBird');
+    Color profitColor(double v) => v >= 0 ? Colors.green : Colors.red;
 
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: StatCard(
-                    label: 'Birds sold',
-                    value: '$totalBirdsSold',
-                    color: Colors.green),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: StatCard(
-                  label: 'Revenue',
-                  value: 'ZMW ${totalRevenue.toStringAsFixed(2)}',
-                  color: Colors.teal,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: StatCard(
-                    label: 'Paid',
-                    value: 'ZMW ${totalPaid.toStringAsFixed(2)}',
-                    color: Colors.blue),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: StatCard(
-                  label: 'Outstanding',
-                  value: 'ZMW ${outstanding.toStringAsFixed(2)}',
-                  color: Colors.orange,
-                ),
-              ),
-            ],
-          ),
+          StatCardPager(cards: [
+            StatCard(
+                label: 'Birds sold',
+                value: '$totalBirdsSold',
+                color: Colors.green),
+            StatCard(
+              label: 'Revenue',
+              value: 'ZMW ${totalRevenue.toStringAsFixed(2)}',
+              color: Colors.teal,
+            ),
+            StatCard(
+                label: 'Paid',
+                value: 'ZMW ${totalPaid.toStringAsFixed(2)}',
+                color: Colors.blue),
+            StatCard(
+              label: 'Outstanding',
+              value: 'ZMW ${outstanding.toStringAsFixed(2)}',
+              color: Colors.orange,
+            ),
+            StatCard(
+              label: 'Total Costs',
+              value: 'ZMW ${totalCosts.toStringAsFixed(2)}',
+              color: Colors.grey[700],
+            ),
+            StatCard(
+              label: 'Total Profit',
+              value: 'ZMW ${totalProfit.toStringAsFixed(2)}',
+              color: profitColor(totalProfit),
+            ),
+            StatCard(
+              label: 'Profit less Outstanding',
+              value: 'ZMW ${profitLessOutstanding.toStringAsFixed(2)}',
+              color: profitColor(profitLessOutstanding),
+            ),
+            StatCard(
+              label: 'Cash Profit',
+              value: 'ZMW ${cashProfit.toStringAsFixed(2)}',
+              color: profitColor(cashProfit),
+            ),
+            StatCard(
+              label: 'Avg Costs/Bird',
+              value: 'ZMW ${avgCostsPerBird.toStringAsFixed(2)}',
+              color: Colors.grey[700],
+            ),
+            StatCard(
+              label: 'Avg Profit/Bird',
+              value: 'ZMW ${avgProfitPerBird.toStringAsFixed(2)}',
+              color: profitColor(avgProfitPerBird),
+            ),
+          ]),
           const SizedBox(height: 12),
           _buildSalesFilterRow(),
           const SizedBox(height: 8),

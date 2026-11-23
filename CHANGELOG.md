@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.58.0] — 2026-11-23
+
+### Mobile — paged stat-card grids & grouped projection breakdown
+
+- **New `StatCardPager` widget** (`lib/widgets/stat_card.dart`) —
+  horizontally-paged 2×2 grid of `StatCard`s with a fixed card height and
+  dot indicators, so dashboards keep a stable layout while card content
+  scrolls page-by-page.
+- **Sales dashboard** — the KPI card area is now a `StatCardPager`:
+  12 cards across 3 pages including Total Costs, Total Profit, Profit
+  less Outstanding, Cash Profit, Avg Costs/Bird, and Avg Profit/Bird.
+  Tap-to-filter behaviour is preserved; the Margin card was removed to
+  keep an even 2×2 page layout.
+- **Per-flock Sales tab** (`flock_detail_screen.dart`) — same pager with
+  10 cards (core KPIs plus all six profit metrics) across 3 pages.
+- **Projection Calculator** — feed breakdown now groups feed stages by
+  bag size ("50 kg bags", "25 kg bags", …), each with its own subtotal,
+  and non-feed costs under "Other costs". `ProjectionBreakdown` parses
+  `unitSizeKg`/`itemsRaw` from the API and exposes a `groupLabel`.
+- **Version** — `pubspec.yaml` bumped to `1.58.0+161`.
+
 ## [1.57.1] — 2026-11-22
 
 ### Additions — avg costs per bird on sales profit fields

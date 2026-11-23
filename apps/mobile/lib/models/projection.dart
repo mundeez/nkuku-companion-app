@@ -41,6 +41,9 @@ class ProjectionBreakdown {
   final int? itemsRoundedUp;
   final String unitPriceZmw;
   final String subtotalZmw;
+  // Feed bag size in kg (e.g. 50 or 25); 0/null for non-feed stages.
+  final double? unitSizeKg;
+  final String? itemsRaw;
 
   ProjectionBreakdown({
     required this.stageName,
@@ -48,7 +51,19 @@ class ProjectionBreakdown {
     this.itemsRoundedUp,
     required this.unitPriceZmw,
     required this.subtotalZmw,
+    this.unitSizeKg,
+    this.itemsRaw,
   });
+
+  /// Bag-size group label for feed stages ("50 kg bags"), or 'Other costs'
+  /// for non-feed stages (chicks, medication, …).
+  String get groupLabel {
+    if (stageType != 'feed' || unitSizeKg == null) return 'Other costs';
+    final kg = unitSizeKg == unitSizeKg!.roundToDouble()
+        ? unitSizeKg!.toInt().toString()
+        : unitSizeKg!.toString();
+    return '$kg kg bags';
+  }
 
   factory ProjectionBreakdown.fromJson(Map<String, dynamic> json) {
     return ProjectionBreakdown(
@@ -57,7 +72,8 @@ class ProjectionBreakdown {
       itemsRoundedUp: json['itemsRoundedUp'],
       unitPriceZmw: json['unitPriceZmw']?.toString() ?? '0',
       subtotalZmw: json['subtotalZmw']?.toString() ?? '0',
+      unitSizeKg: double.tryParse('${json['unitSizeKg']}'),
+      itemsRaw: json['itemsRaw']?.toString(),
     );
   }
 }
-

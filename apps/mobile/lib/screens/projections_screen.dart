@@ -205,24 +205,66 @@ class _ProjectionsScreenState extends State<ProjectionsScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              ..._projection!.breakdown.map((b) => ListTile(
-                    dense: true,
-                    title: Text(b.stageName,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(
-                        '${b.itemsRoundedUp} items @ ZMW ${b.unitPriceZmw}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                    trailing: Text('ZMW ${b.subtotalZmw}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                  )),
+              ..._buildGroupedBreakdown(_projection!.breakdown),
             ],
           ],
         ),
       ),
     );
+  }
+
+  /// Groups the breakdown by feed bag size (50 kg bags, 25 kg bags, …) so
+  /// each size's projected totals are shown separately, with non-feed costs
+  /// (chicks, medication, …) under 'Other costs' last.
+  List<Widget> _buildGroupedBreakdown(List<ProjectionBreakdown> items) {
+    final groups = <String, List<ProjectionBreakdown>>{};
+    for (final b in items) {
+      groups.putIfAbsent(b.groupLabel, () => []).add(b);
+    }
+    final labels = groups.keys.toList()
+      ..sort((a, b) {
+        if (a == 'Other costs') return 1;
+        if (b == 'Other costs') return -1;
+        final aKg = double.tryParse(a.split(' ').first) ?? 0;
+        final bKg = double.tryParse(b.split(' ').first) ?? 0;
+        return bKg.compareTo(aKg); // larger bags first
+      });
+
+    return [
+      for (final label in labels) ...[
+        Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.bold)),
+              Text(
+                'ZMW ${groups[label]!.fold<double>(0, (s, b) => s + (double.tryParse(b.subtotalZmw) ?? 0)).toStringAsFixed(2)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+        ...groups[label]!.map((b) => ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(b.stageName,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(
+                  b.stageType == 'feed'
+                      ? '${b.itemsRoundedUp ?? 0} bags @ ZMW ${b.unitPriceZmw}/bag'
+                      : '${b.itemsRoundedUp ?? 0} units @ ZMW ${b.unitPriceZmw}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+              trailing: Text('ZMW ${b.subtotalZmw}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+            )),
+      ],
+    ];
   }
 }
 
