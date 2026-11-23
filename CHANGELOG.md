@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.58.1] — 2026-11-23
+
+### Fix — mobile Projection Calculator double-counted feed variants
+
+- **Bug** — `projections_screen.dart` issued a single unfiltered
+  `POST /api/v1/projections/calculate` for the selected supplier. Feed
+  stages exist in 25 kg and 50 kg variants, so the response summed BOTH
+  bag-size variants of every feed stage — roughly doubling Total Expenses
+  and corrupting Gross/Net Profit.
+- **Fix** — the calculator now detects which feed-stage bag sizes the
+  selected supplier actually uses (`unitSizeKg` 25 / 50) and fires one
+  calculation per size with the `bagSize` parameter, matching web
+  behaviour. Each size renders as its own scenario section with
+  Total Expenses / Projected Revenue / Gross Profit / Net Profit KPI
+  cards, bar chart, and grouped breakdown. Suppliers without a size
+  split still receive a single unfiltered projection.
+- **Version** — `pubspec.yaml` bumped to `1.58.1+162`.
+
 ## [1.58.0] — 2026-11-23
 
 ### Mobile — paged stat-card grids & grouped projection breakdown
