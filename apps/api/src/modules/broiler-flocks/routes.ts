@@ -956,6 +956,7 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       },
       select: { id: true, cause: true, diseaseId: true },
       orderBy: { eventDate: 'desc' },
+      take: 200,
     });
 
     const diseaseById = new Map(diseases.map((d: any) => [d.id, d]));

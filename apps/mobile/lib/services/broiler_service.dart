@@ -1731,17 +1731,41 @@ class DiseaseWatchItem {
   }
 }
 
+/// One row of the mortality-by-disease breakdown returned by
+/// GET /api/v1/mortality-events/summary (sorted by count desc).
+class DiseaseBreakdownItem {
+  final String diseaseId;
+  final String diseaseName;
+  final int count;
+
+  DiseaseBreakdownItem({
+    required this.diseaseId,
+    required this.diseaseName,
+    required this.count,
+  });
+
+  factory DiseaseBreakdownItem.fromJson(Map<String, dynamic> json) {
+    return DiseaseBreakdownItem(
+      diseaseId: json['diseaseId']?.toString() ?? '',
+      diseaseName: json['diseaseName']?.toString() ?? '',
+      count: json['count'] ?? 0,
+    );
+  }
+}
+
 class MortalitySummary {
   final int totalDeaths;
   final String mortalityRate;
   final int initialCount;
   final int currentCount;
+  final List<DiseaseBreakdownItem> diseaseBreakdown;
 
   MortalitySummary({
     required this.totalDeaths,
     required this.mortalityRate,
     required this.initialCount,
     required this.currentCount,
+    this.diseaseBreakdown = const [],
   });
 
   factory MortalitySummary.fromJson(Map<String, dynamic> json) {
@@ -1750,6 +1774,9 @@ class MortalitySummary {
       mortalityRate: json['mortalityRate']?.toString() ?? '0.00',
       initialCount: json['initialCount'] ?? 0,
       currentCount: json['currentCount'] ?? 0,
+      diseaseBreakdown: (json['diseaseBreakdown'] as List? ?? [])
+          .map((e) => DiseaseBreakdownItem.fromJson(e))
+          .toList(),
     );
   }
 }

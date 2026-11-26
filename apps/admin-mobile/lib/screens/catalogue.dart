@@ -579,7 +579,7 @@ class _EntityEditorState extends State<_EntityEditor> {
   List<Widget> _fields() {
     Widget tf(String key, String label,
             {bool required = false, int maxLines = 1, TextInputType? kb,
-            String? hint}) =>
+            String? hint, String? Function(String?)? validate}) =>
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: TextFormField(
@@ -590,9 +590,24 @@ class _EntityEditorState extends State<_EntityEditor> {
                 labelText: label,
                 hintText: hint,
                 border: const OutlineInputBorder()),
-            validator: required ? _req : null,
+            validator: (v) {
+              if (required) {
+                final err = _req(v);
+                if (err != null) return err;
+              }
+              return validate?.call(v);
+            },
           ),
         );
+
+    String? ageDaysValidator(String? v) {
+      final t = v?.trim() ?? '';
+      if (t.isEmpty) return null;
+      final n = int.tryParse(t);
+      if (n == null) return 'Enter a whole number of days (or leave empty)';
+      if (n < 0 || n > 400) return 'Must be between 0 and 400 days';
+      return null;
+    }
 
     Widget sw(String label, bool value, ValueChanged<bool> set) =>
         SwitchListTile(
@@ -650,12 +665,12 @@ class _EntityEditorState extends State<_EntityEditor> {
           Row(children: [
             Expanded(
               child: tf('susceptibleAgeMinDays', 'Susceptible from (day of age)',
-                  kb: TextInputType.number),
+                  kb: TextInputType.number, validate: ageDaysValidator),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: tf('susceptibleAgeMaxDays', 'Susceptible until (day of age)',
-                  kb: TextInputType.number),
+                  kb: TextInputType.number, validate: ageDaysValidator),
             ),
           ]),
         ];

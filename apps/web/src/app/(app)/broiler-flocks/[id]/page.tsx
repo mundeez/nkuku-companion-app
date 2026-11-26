@@ -1113,7 +1113,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const { data: diseases = [] } = useApiQuery<Disease[]>("/api/v1/diseases", {
-    enabled: type === "mortality",
+    enabled: type === "mortality" || type === "vaccination",
   });
 
   const titles: any = {
@@ -1147,6 +1147,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       { key: "vaccineName", label: "Vaccine Name", type: "text" },
       { key: "adminDate", label: "Date", type: "date" },
       { key: "adminMethod", label: "Method", type: "select", options: ["Drinking Water", "Spray", "Eye Drop", "Injection", "Wing Web"] },
+      { key: "diseaseId", label: "Disease Prevented", type: "disease-select" },
       { key: "ageDays", label: "Age (days)", type: "number" },
       { key: "costZmw", label: "Cost (ZMW)", type: "number" },
     ]},
@@ -1509,7 +1510,20 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
         {r.costZmw && `| ZMW ${r.costZmw}`}
       </span>
     );
-    if (type === "vaccination") return <span className="text-green-700">{r.vaccineName} | {r.adminMethod} {r.costZmw && `| ZMW ${r.costZmw}`}</span>;
+    if (type === "vaccination") return (
+      <span className="text-green-700">
+        {r.vaccineName} | {r.adminMethod}
+        {r.disease && (
+          <>
+            {" | "}
+            <Link href="/diseases" className="inline-flex">
+              <Badge variant="secondary" className="text-xs">{r.disease.name}</Badge>
+            </Link>
+          </>
+        )}
+        {r.costZmw && ` | ZMW ${r.costZmw}`}
+      </span>
+    );
     if (type === "financial") return <span className={r.isIncome ? "text-green-700" : ""}>{r.category}: {r.description} | ZMW {r.amountZmw} {r.isIncome && "(Income)"}</span>;
     return null;
   }

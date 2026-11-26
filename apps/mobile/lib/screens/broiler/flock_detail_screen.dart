@@ -2161,6 +2161,18 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               SummaryRow('Mortality rate', '${summary.mortalityRate}%'),
               SummaryRow('Current count', '${summary.currentCount}'),
             ]),
+          if (summary != null && summary.diseaseBreakdown.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SummaryCard(children: [
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text('Mortality by disease',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              ...summary.diseaseBreakdown.map((d) =>
+                  SummaryRow(d.diseaseName, '${d.count}')),
+            ]),
+          ],
           const SizedBox(height: 12),
           DiseaseInsightsCard(flockId: widget.flockId),
           const SizedBox(height: 12),

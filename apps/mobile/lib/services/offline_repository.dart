@@ -285,6 +285,8 @@ class OfflineRepository {
       ageDays: Value(_toIntOrNull(r['ageDays'])),
       costZmw: Value(_toDouble(r['costZmw'])),
       notes: Value(r['notes']?.toString()),
+      diseaseId: Value(r['diseaseId']?.toString()),
+      diseaseName: Value((r['disease'] is Map ? r['disease']['name'] : null)?.toString()),
     )).toList();
     await db.upsertMortalityEvents(companions);
     await db.enforceStorageCap(flockId, 100);

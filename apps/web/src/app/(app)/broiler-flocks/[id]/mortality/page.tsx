@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Skull } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { MortalitySummary } from "@/lib/types";
 
 export default function MortalityAnalysisPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const flockId = params.id as string;
-  const [summary, setSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<MortalitySummary | null>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [error, setError] = useState("");
 
@@ -74,7 +75,7 @@ export default function MortalityAnalysisPage() {
             </CardContent></Card>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 mb-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
             <Card>
               <CardHeader><CardTitle>Cause Breakdown</CardTitle></CardHeader>
               <CardContent>
@@ -116,6 +117,29 @@ export default function MortalityAnalysisPage() {
                 ) : <p className="text-muted-foreground">No age data recorded.</p>}
               </CardContent>
             </Card>
+
+            {summary.diseaseBreakdown?.length > 0 && (
+              <Card>
+                <CardHeader><CardTitle>By Disease</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {summary.diseaseBreakdown.map((d) => (
+                      <div key={d.diseaseId || "unknown"}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <Link href="/diseases">
+                            <Badge variant="secondary" className="text-xs hover:bg-secondary/80">{d.diseaseName || "Unknown"}</Badge>
+                          </Link>
+                          <span className="font-medium">{d.count} birds</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-purple-500 rounded-full" style={{ width: `${summary.totalDeaths > 0 ? (d.count / summary.totalDeaths * 100) : 0}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <Card>

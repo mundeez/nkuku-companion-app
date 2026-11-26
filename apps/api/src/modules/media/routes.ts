@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getS3Client, getS3Bucket } from '../../core/storage/s3-client.js';
+import { publicRateLimit } from '../../core/security/rate-limiter.js';
 
 // Public read-only proxy for catalogue media (disease images etc.).
 // Objects live in the private documents bucket under catalogue/ — this
@@ -21,7 +22,7 @@ const MIME: Record<string, string> = {
 };
 
 export async function buildMediaModule(app: FastifyInstance) {
-  app.get('/catalogue/diseases/:file', async (request, reply) => {
+  app.get('/catalogue/diseases/:file', { preHandler: [publicRateLimit] }, async (request, reply) => {
     const { file } = request.params as { file: string };
     if (!FILE_RE.test(file)) {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: 'Invalid media key' });

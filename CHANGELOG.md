@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.60.1] — 2026-11-26
+
+### Follow-up patch — v1.60.0 limitation items
+
+- **API hardening** — per-IP rate limit (`PUBLIC_MEDIA_RATE_LIMIT`, default
+  300/min) on the public catalogue media proxy; `disease-insights` mortality
+  query capped at 200 events; `/mortality-events/summary` gains
+  `diseaseBreakdown` (per-disease tagged-mortality counts).
+- **Web** — vaccination record form gains a "Disease Prevented" picker;
+  mortality analysis page shows a "By Disease" breakdown card.
+- **Mobile** — vaccination event form disease dropdown; "Mortality by
+  disease" card on the flock mortality tab; Drift offline cache
+  (`CachedMortalityEvents`) gains `diseaseId`/`diseaseName` columns
+  (schema v5); vaccination `toJson` emits explicit `diseaseId: null` so
+  PATCH clears a previously-set disease link.
+- **Admin-mobile** — susceptible-age fields get client-side numeric/range
+  validation instead of silently coercing bad input.
+- **Tests** — diseaseBreakdown coverage added; 555+ suite green.
+
 ## [1.60.0] — 2026-11-26
 
 ### Next-queue phases A–F — disease↔flock integration, media self-hosting, regional content

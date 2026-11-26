@@ -87,6 +87,8 @@ class CachedMortalityEvents extends Table {
   IntColumn get ageDays => integer().nullable()();
   RealColumn get costZmw => real().nullable()();
   TextColumn get notes => text().nullable()();
+  TextColumn get diseaseId => text().nullable()();
+  TextColumn get diseaseName => text().nullable()();
   DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override

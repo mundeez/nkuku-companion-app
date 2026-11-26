@@ -367,6 +367,21 @@ export interface MortalityEvent {
   disease?: { id: string; name: string; category: string } | null;
 }
 
+export interface MortalityDiseaseBreakdownItem {
+  diseaseId: string | null;
+  diseaseName: string | null;
+  count: number;
+}
+
+export interface MortalitySummary {
+  totalDeaths: number;
+  mortalityRate: number;
+  initialCount: number;
+  currentCount: number;
+  causeBreakdown: { cause: string | null; _sum: { count: number } }[];
+  diseaseBreakdown: MortalityDiseaseBreakdownItem[];
+}
+
 export interface VaccinationEvent {
   id: string;
   flockId: string;

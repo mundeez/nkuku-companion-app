@@ -153,7 +153,7 @@ class ApiService {
   /// App semver sent as X-App-Version on every request. Keep in sync with
   /// pubspec.yaml `version:` — the API uses it for deprecation tracking
   /// (e.g. the organicTreatments alias sunset).
-  static const String appVersion = '1.60.0';
+  static const String appVersion = '1.60.1';
 
   static void setupInterceptors() {
     dio.interceptors.add(InterceptorsWrapper(

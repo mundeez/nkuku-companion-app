@@ -2310,6 +2310,18 @@ class $CachedMortalityEventsTable extends CachedMortalityEvents
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
       'notes', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _diseaseIdMeta =
+      const VerificationMeta('diseaseId');
+  @override
+  late final GeneratedColumn<String> diseaseId = GeneratedColumn<String>(
+      'disease_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _diseaseNameMeta =
+      const VerificationMeta('diseaseName');
+  @override
+  late final GeneratedColumn<String> diseaseName = GeneratedColumn<String>(
+      'disease_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _cachedAtMeta =
       const VerificationMeta('cachedAt');
   @override
@@ -2319,8 +2331,19 @@ class $CachedMortalityEventsTable extends CachedMortalityEvents
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, flockId, eventDate, count, cause, ageDays, costZmw, notes, cachedAt];
+  List<GeneratedColumn> get $columns => [
+        id,
+        flockId,
+        eventDate,
+        count,
+        cause,
+        ageDays,
+        costZmw,
+        notes,
+        diseaseId,
+        diseaseName,
+        cachedAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2369,6 +2392,16 @@ class $CachedMortalityEventsTable extends CachedMortalityEvents
       context.handle(
           _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
     }
+    if (data.containsKey('disease_id')) {
+      context.handle(_diseaseIdMeta,
+          diseaseId.isAcceptableOrUnknown(data['disease_id']!, _diseaseIdMeta));
+    }
+    if (data.containsKey('disease_name')) {
+      context.handle(
+          _diseaseNameMeta,
+          diseaseName.isAcceptableOrUnknown(
+              data['disease_name']!, _diseaseNameMeta));
+    }
     if (data.containsKey('cached_at')) {
       context.handle(_cachedAtMeta,
           cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta));
@@ -2398,6 +2431,10 @@ class $CachedMortalityEventsTable extends CachedMortalityEvents
           .read(DriftSqlType.double, data['${effectivePrefix}cost_zmw']),
       notes: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      diseaseId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}disease_id']),
+      diseaseName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}disease_name']),
       cachedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}cached_at'])!,
     );
@@ -2419,6 +2456,8 @@ class CachedMortalityEvent extends DataClass
   final int? ageDays;
   final double? costZmw;
   final String? notes;
+  final String? diseaseId;
+  final String? diseaseName;
   final DateTime cachedAt;
   const CachedMortalityEvent(
       {required this.id,
@@ -2429,6 +2468,8 @@ class CachedMortalityEvent extends DataClass
       this.ageDays,
       this.costZmw,
       this.notes,
+      this.diseaseId,
+      this.diseaseName,
       required this.cachedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2448,6 +2489,12 @@ class CachedMortalityEvent extends DataClass
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || diseaseId != null) {
+      map['disease_id'] = Variable<String>(diseaseId);
+    }
+    if (!nullToAbsent || diseaseName != null) {
+      map['disease_name'] = Variable<String>(diseaseName);
     }
     map['cached_at'] = Variable<DateTime>(cachedAt);
     return map;
@@ -2469,6 +2516,12 @@ class CachedMortalityEvent extends DataClass
           : Value(costZmw),
       notes:
           notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      diseaseId: diseaseId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(diseaseId),
+      diseaseName: diseaseName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(diseaseName),
       cachedAt: Value(cachedAt),
     );
   }
@@ -2485,6 +2538,8 @@ class CachedMortalityEvent extends DataClass
       ageDays: serializer.fromJson<int?>(json['ageDays']),
       costZmw: serializer.fromJson<double?>(json['costZmw']),
       notes: serializer.fromJson<String?>(json['notes']),
+      diseaseId: serializer.fromJson<String?>(json['diseaseId']),
+      diseaseName: serializer.fromJson<String?>(json['diseaseName']),
       cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
     );
   }
@@ -2500,6 +2555,8 @@ class CachedMortalityEvent extends DataClass
       'ageDays': serializer.toJson<int?>(ageDays),
       'costZmw': serializer.toJson<double?>(costZmw),
       'notes': serializer.toJson<String?>(notes),
+      'diseaseId': serializer.toJson<String?>(diseaseId),
+      'diseaseName': serializer.toJson<String?>(diseaseName),
       'cachedAt': serializer.toJson<DateTime>(cachedAt),
     };
   }
@@ -2513,6 +2570,8 @@ class CachedMortalityEvent extends DataClass
           Value<int?> ageDays = const Value.absent(),
           Value<double?> costZmw = const Value.absent(),
           Value<String?> notes = const Value.absent(),
+          Value<String?> diseaseId = const Value.absent(),
+          Value<String?> diseaseName = const Value.absent(),
           DateTime? cachedAt}) =>
       CachedMortalityEvent(
         id: id ?? this.id,
@@ -2523,6 +2582,8 @@ class CachedMortalityEvent extends DataClass
         ageDays: ageDays.present ? ageDays.value : this.ageDays,
         costZmw: costZmw.present ? costZmw.value : this.costZmw,
         notes: notes.present ? notes.value : this.notes,
+        diseaseId: diseaseId.present ? diseaseId.value : this.diseaseId,
+        diseaseName: diseaseName.present ? diseaseName.value : this.diseaseName,
         cachedAt: cachedAt ?? this.cachedAt,
       );
   CachedMortalityEvent copyWithCompanion(CachedMortalityEventsCompanion data) {
@@ -2535,6 +2596,9 @@ class CachedMortalityEvent extends DataClass
       ageDays: data.ageDays.present ? data.ageDays.value : this.ageDays,
       costZmw: data.costZmw.present ? data.costZmw.value : this.costZmw,
       notes: data.notes.present ? data.notes.value : this.notes,
+      diseaseId: data.diseaseId.present ? data.diseaseId.value : this.diseaseId,
+      diseaseName:
+          data.diseaseName.present ? data.diseaseName.value : this.diseaseName,
       cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
     );
   }
@@ -2550,14 +2614,16 @@ class CachedMortalityEvent extends DataClass
           ..write('ageDays: $ageDays, ')
           ..write('costZmw: $costZmw, ')
           ..write('notes: $notes, ')
+          ..write('diseaseId: $diseaseId, ')
+          ..write('diseaseName: $diseaseName, ')
           ..write('cachedAt: $cachedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, flockId, eventDate, count, cause, ageDays, costZmw, notes, cachedAt);
+  int get hashCode => Object.hash(id, flockId, eventDate, count, cause, ageDays,
+      costZmw, notes, diseaseId, diseaseName, cachedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2570,6 +2636,8 @@ class CachedMortalityEvent extends DataClass
           other.ageDays == this.ageDays &&
           other.costZmw == this.costZmw &&
           other.notes == this.notes &&
+          other.diseaseId == this.diseaseId &&
+          other.diseaseName == this.diseaseName &&
           other.cachedAt == this.cachedAt);
 }
 
@@ -2583,6 +2651,8 @@ class CachedMortalityEventsCompanion
   final Value<int?> ageDays;
   final Value<double?> costZmw;
   final Value<String?> notes;
+  final Value<String?> diseaseId;
+  final Value<String?> diseaseName;
   final Value<DateTime> cachedAt;
   final Value<int> rowid;
   const CachedMortalityEventsCompanion({
@@ -2594,6 +2664,8 @@ class CachedMortalityEventsCompanion
     this.ageDays = const Value.absent(),
     this.costZmw = const Value.absent(),
     this.notes = const Value.absent(),
+    this.diseaseId = const Value.absent(),
+    this.diseaseName = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2606,6 +2678,8 @@ class CachedMortalityEventsCompanion
     this.ageDays = const Value.absent(),
     this.costZmw = const Value.absent(),
     this.notes = const Value.absent(),
+    this.diseaseId = const Value.absent(),
+    this.diseaseName = const Value.absent(),
     this.cachedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -2620,6 +2694,8 @@ class CachedMortalityEventsCompanion
     Expression<int>? ageDays,
     Expression<double>? costZmw,
     Expression<String>? notes,
+    Expression<String>? diseaseId,
+    Expression<String>? diseaseName,
     Expression<DateTime>? cachedAt,
     Expression<int>? rowid,
   }) {
@@ -2632,6 +2708,8 @@ class CachedMortalityEventsCompanion
       if (ageDays != null) 'age_days': ageDays,
       if (costZmw != null) 'cost_zmw': costZmw,
       if (notes != null) 'notes': notes,
+      if (diseaseId != null) 'disease_id': diseaseId,
+      if (diseaseName != null) 'disease_name': diseaseName,
       if (cachedAt != null) 'cached_at': cachedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2646,6 +2724,8 @@ class CachedMortalityEventsCompanion
       Value<int?>? ageDays,
       Value<double?>? costZmw,
       Value<String?>? notes,
+      Value<String?>? diseaseId,
+      Value<String?>? diseaseName,
       Value<DateTime>? cachedAt,
       Value<int>? rowid}) {
     return CachedMortalityEventsCompanion(
@@ -2657,6 +2737,8 @@ class CachedMortalityEventsCompanion
       ageDays: ageDays ?? this.ageDays,
       costZmw: costZmw ?? this.costZmw,
       notes: notes ?? this.notes,
+      diseaseId: diseaseId ?? this.diseaseId,
+      diseaseName: diseaseName ?? this.diseaseName,
       cachedAt: cachedAt ?? this.cachedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -2689,6 +2771,12 @@ class CachedMortalityEventsCompanion
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (diseaseId.present) {
+      map['disease_id'] = Variable<String>(diseaseId.value);
+    }
+    if (diseaseName.present) {
+      map['disease_name'] = Variable<String>(diseaseName.value);
+    }
     if (cachedAt.present) {
       map['cached_at'] = Variable<DateTime>(cachedAt.value);
     }
@@ -2709,6 +2797,8 @@ class CachedMortalityEventsCompanion
           ..write('ageDays: $ageDays, ')
           ..write('costZmw: $costZmw, ')
           ..write('notes: $notes, ')
+          ..write('diseaseId: $diseaseId, ')
+          ..write('diseaseName: $diseaseName, ')
           ..write('cachedAt: $cachedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7842,6 +7932,8 @@ typedef $$CachedMortalityEventsTableCreateCompanionBuilder
   Value<int?> ageDays,
   Value<double?> costZmw,
   Value<String?> notes,
+  Value<String?> diseaseId,
+  Value<String?> diseaseName,
   Value<DateTime> cachedAt,
   Value<int> rowid,
 });
@@ -7855,6 +7947,8 @@ typedef $$CachedMortalityEventsTableUpdateCompanionBuilder
   Value<int?> ageDays,
   Value<double?> costZmw,
   Value<String?> notes,
+  Value<String?> diseaseId,
+  Value<String?> diseaseName,
   Value<DateTime> cachedAt,
   Value<int> rowid,
 });
@@ -7891,6 +7985,12 @@ class $$CachedMortalityEventsTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get diseaseId => $composableBuilder(
+      column: $table.diseaseId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get diseaseName => $composableBuilder(
+      column: $table.diseaseName, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get cachedAt => $composableBuilder(
       column: $table.cachedAt, builder: (column) => ColumnFilters(column));
@@ -7929,6 +8029,12 @@ class $$CachedMortalityEventsTableOrderingComposer
   ColumnOrderings<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get diseaseId => $composableBuilder(
+      column: $table.diseaseId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get diseaseName => $composableBuilder(
+      column: $table.diseaseName, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
       column: $table.cachedAt, builder: (column) => ColumnOrderings(column));
 }
@@ -7965,6 +8071,12 @@ class $$CachedMortalityEventsTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get diseaseId =>
+      $composableBuilder(column: $table.diseaseId, builder: (column) => column);
+
+  GeneratedColumn<String> get diseaseName => $composableBuilder(
+      column: $table.diseaseName, builder: (column) => column);
 
   GeneratedColumn<DateTime> get cachedAt =>
       $composableBuilder(column: $table.cachedAt, builder: (column) => column);
@@ -8009,6 +8121,8 @@ class $$CachedMortalityEventsTableTableManager extends RootTableManager<
             Value<int?> ageDays = const Value.absent(),
             Value<double?> costZmw = const Value.absent(),
             Value<String?> notes = const Value.absent(),
+            Value<String?> diseaseId = const Value.absent(),
+            Value<String?> diseaseName = const Value.absent(),
             Value<DateTime> cachedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -8021,6 +8135,8 @@ class $$CachedMortalityEventsTableTableManager extends RootTableManager<
             ageDays: ageDays,
             costZmw: costZmw,
             notes: notes,
+            diseaseId: diseaseId,
+            diseaseName: diseaseName,
             cachedAt: cachedAt,
             rowid: rowid,
           ),
@@ -8033,6 +8149,8 @@ class $$CachedMortalityEventsTableTableManager extends RootTableManager<
             Value<int?> ageDays = const Value.absent(),
             Value<double?> costZmw = const Value.absent(),
             Value<String?> notes = const Value.absent(),
+            Value<String?> diseaseId = const Value.absent(),
+            Value<String?> diseaseName = const Value.absent(),
             Value<DateTime> cachedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -8045,6 +8163,8 @@ class $$CachedMortalityEventsTableTableManager extends RootTableManager<
             ageDays: ageDays,
             costZmw: costZmw,
             notes: notes,
+            diseaseId: diseaseId,
+            diseaseName: diseaseName,
             cachedAt: cachedAt,
             rowid: rowid,
           ),

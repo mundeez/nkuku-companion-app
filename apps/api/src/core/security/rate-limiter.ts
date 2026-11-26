@@ -9,6 +9,9 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 const WINDOW_SECONDS = 60; // 1-minute sliding window
 const BULK_LIMIT = Number.parseInt(process.env.BULK_RATE_LIMIT || '10', 10);
 const AUTH_LIMIT = Number.parseInt(process.env.AUTH_RATE_LIMIT || '10', 10);
+// Public media proxy — catalogue pages load ~32 images at once, so be
+// generous but bounded per-IP per minute.
+const PUBLIC_MEDIA_LIMIT = Number.parseInt(process.env.PUBLIC_MEDIA_RATE_LIMIT || '300', 10);
 
 async function checkLimit(
   redis: any,
@@ -61,4 +64,17 @@ export async function authRateLimit(request: FastifyRequest, reply: FastifyReply
   if (!ip) return;
 
   await checkLimit(redis, `auth_rl:${ip}`, AUTH_LIMIT, reply, 'authentication');
+}
+
+/** Per-IP rate limit for public endpoints (e.g. the media proxy). */
+export async function publicRateLimit(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  if (Number.isNaN(PUBLIC_MEDIA_LIMIT) || PUBLIC_MEDIA_LIMIT <= 0) return;
+
+  const redis = (request.server as any).redis;
+  if (!redis) return;
+
+  const ip = request.ip;
+  if (!ip) return;
+
+  await checkLimit(redis, `public_rl:${ip}`, PUBLIC_MEDIA_LIMIT, reply, 'request');
 }

@@ -82,12 +82,33 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
       _sum: { count: true },
     });
 
+    // Disease-tagged mortality breakdown: group by diseaseId, then resolve
+    // names from the global diseases catalogue.
+    const diseaseGroups = await prisma.mortalityEvent.groupBy({
+      by: ['diseaseId'],
+      where: { flockId, diseaseId: { not: null } },
+      _sum: { count: true },
+    });
+    const diseaseIds = diseaseGroups.map((g: any) => g.diseaseId).filter(Boolean) as string[];
+    const diseaseRows = diseaseIds.length
+      ? await prisma.disease.findMany({ where: { id: { in: diseaseIds } }, select: { id: true, name: true } })
+      : [];
+    const diseaseNameById = new Map(diseaseRows.map((d: any) => [d.id, d.name]));
+    const diseaseBreakdown = diseaseGroups
+      .map((g: any) => ({
+        diseaseId: g.diseaseId,
+        diseaseName: diseaseNameById.get(g.diseaseId) ?? null,
+        count: g._sum.count ?? 0,
+      }))
+      .sort((a: any, b: any) => b.count - a.count);
+
     return {
       totalDeaths: totalDeaths._sum.count ?? 0,
       mortalityRate: mortalityRate.toFixed(2),
       initialCount: flock.initialCount,
       currentCount: flock.currentCount,
       causeBreakdown,
+      diseaseBreakdown,
     };
   });
 

@@ -159,6 +159,30 @@ describe('Phase F — disease↔flock links', () => {
     });
   });
 
+  describe('GET /mortality-events/summary — diseaseBreakdown', () => {
+    it('groups disease-tagged events by disease with names and counts', async () => {
+      // At this point the flock has gumboro-tagged events: the re-linked
+      // mortalityEventId (count 3) + the /bulk record (count 1) = 4.
+      const res = await get(`/api/v1/mortality-events/summary?flockId=${flockId}`, token);
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.data.diseaseBreakdown)).toBe(true);
+      const entry = res.data.diseaseBreakdown.find((d: any) => d.diseaseId === gumboroId);
+      expect(entry).toBeDefined();
+      expect(entry.diseaseName).toBe(gumboroName);
+      expect(entry.count).toBe(4);
+      // Sorted by count desc
+      for (let i = 1; i < res.data.diseaseBreakdown.length; i++) {
+        expect(res.data.diseaseBreakdown[i - 1].count).toBeGreaterThanOrEqual(res.data.diseaseBreakdown[i].count);
+      }
+    });
+
+    it('flock with no disease-tagged events returns empty breakdown', async () => {
+      const res = await get(`/api/v1/mortality-events/summary?flockId=${youngFlockId}`, token);
+      expect(res.status).toBe(200);
+      expect(res.data.diseaseBreakdown).toEqual([]);
+    });
+  });
+
   describe('vaccination events — diseaseId', () => {
     it('POST with diseaseId returns disease summary; PATCH null clears', async () => {
       const res = await post('/api/v1/vaccination-events', {

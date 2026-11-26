@@ -1,3 +1,5 @@
+import 'disease_ref.dart';
+
 class VaccinationEvent {
   final String id;
   final String flockId;
@@ -12,6 +14,8 @@ class VaccinationEvent {
   final DateTime? expiryDate;
   final String? vaccineInventoryId;
   final String? notes;
+  final String? diseaseId;
+  final DiseaseRef? disease;
 
   VaccinationEvent({
     required this.id,
@@ -27,6 +31,8 @@ class VaccinationEvent {
     this.expiryDate,
     this.vaccineInventoryId,
     this.notes,
+    this.diseaseId,
+    this.disease,
   });
 
   factory VaccinationEvent.fromJson(Map<String, dynamic> json) {
@@ -48,6 +54,8 @@ class VaccinationEvent {
           : null,
       vaccineInventoryId: json['vaccineInventoryId'] ?? json['vaccine_inventory_id'],
       notes: json['notes'],
+      diseaseId: json['diseaseId'] ?? json['disease_id'],
+      disease: DiseaseRef.maybeFromJson(json['disease']),
     );
   }
 
@@ -67,6 +75,7 @@ class VaccinationEvent {
         'expiryDate': expiryDate!.toIso8601String().split('T').first,
       if (vaccineInventoryId != null) 'vaccineInventoryId': vaccineInventoryId,
       if (notes != null && notes!.isNotEmpty) 'notes': notes,
+      'diseaseId': diseaseId,
     };
   }
 
@@ -84,6 +93,8 @@ class VaccinationEvent {
     DateTime? expiryDate,
     String? vaccineInventoryId,
     String? notes,
+    String? diseaseId,
+    DiseaseRef? disease,
   }) {
     return VaccinationEvent(
       id: id ?? this.id,
@@ -99,6 +110,8 @@ class VaccinationEvent {
       expiryDate: expiryDate ?? this.expiryDate,
       vaccineInventoryId: vaccineInventoryId ?? this.vaccineInventoryId,
       notes: notes ?? this.notes,
+      diseaseId: diseaseId ?? this.diseaseId,
+      disease: disease ?? this.disease,
     );
   }
 
