@@ -398,6 +398,29 @@ class VaccinationScheduleItem {
   }
 }
 
+class DiseaseSource {
+  final String title;
+  final String url;
+  final String publisher;
+  final String type;
+
+  DiseaseSource({
+    required this.title,
+    required this.url,
+    required this.publisher,
+    required this.type,
+  });
+
+  factory DiseaseSource.fromJson(Map<String, dynamic> json) {
+    return DiseaseSource(
+      title: json['title'] ?? '',
+      url: json['url'] ?? '',
+      publisher: json['publisher'] ?? '',
+      type: json['type'] ?? '',
+    );
+  }
+}
+
 class Disease {
   final String id;
   final String name;
@@ -407,7 +430,13 @@ class Disease {
   final String symptoms;
   final String prevention;
   final String treatment;
-  final String organicTreatments;
+  final String supportiveTreatments;
+  final String imageUrl;
+  final String videoUrl;
+  final String videoProvider;
+  final List<DiseaseSource> sources;
+  final Map<String, String> regionalNotes;
+  final Map<String, String> evidence;
 
   Disease({
     required this.id,
@@ -418,10 +447,21 @@ class Disease {
     required this.symptoms,
     required this.prevention,
     required this.treatment,
-    required this.organicTreatments,
+    required this.supportiveTreatments,
+    required this.imageUrl,
+    required this.videoUrl,
+    required this.videoProvider,
+    required this.sources,
+    required this.regionalNotes,
+    required this.evidence,
   });
 
   factory Disease.fromJson(Map<String, dynamic> json) {
+    Map<String, String> stringMap(dynamic v) =>
+        v is Map
+            ? v.map((k, val) => MapEntry('$k', '$val'))
+            : <String, String>{};
+
     return Disease(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
@@ -431,10 +471,37 @@ class Disease {
       symptoms: json['symptoms'] ?? '',
       prevention: json['prevention'] ?? '',
       treatment: json['treatment'] ?? '',
-      organicTreatments:
-          json['organicTreatments'] ?? json['organic_treatments'] ?? '',
+      supportiveTreatments: json['supportiveTreatments'] ??
+          json['supportive_treatments'] ??
+          // Deprecated API alias for pre-rename clients — remove once
+          // the mobile min-version ships.
+          json['organicTreatments'] ??
+          json['organic_treatments'] ??
+          '',
+      imageUrl: json['imageUrl'] ?? json['image_url'] ?? '',
+      videoUrl: json['videoUrl'] ?? json['video_url'] ?? '',
+      videoProvider: json['videoProvider'] ?? json['video_provider'] ?? '',
+      sources: json['sources'] is List
+          ? (json['sources'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(DiseaseSource.fromJson)
+              .toList()
+          : <DiseaseSource>[],
+      regionalNotes: stringMap(json['regionalNotes'] ?? json['regional_notes']),
+      evidence: stringMap(json['evidence']),
     );
   }
+
+  /// Best available regional note: explicit override → org country → general.
+  String getRegionalNote(String? orgCountry, [String? override]) {
+    final key = override ?? orgCountry?.toUpperCase();
+    if (key != null && regionalNotes.containsKey(key)) return regionalNotes[key]!;
+    if (regionalNotes.containsKey('general')) return regionalNotes['general']!;
+    if (regionalNotes.isNotEmpty) return regionalNotes.values.first;
+    return '';
+  }
+
+  String? evidenceBadge(String section) => evidence[section];
 }
 
 class LightingTemperatureSchedule {

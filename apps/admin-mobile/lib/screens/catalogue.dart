@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../reauth.dart';
@@ -308,10 +309,12 @@ class _EntityEditorState extends State<_EntityEditor> {
       for (final k in [
         'name', 'category', 'supplier', 'description', 'incubation',
         'mortalityRate', 'symptoms', 'prevention', 'treatment',
-        'organicTreatments', 'ageDays', 'targetWeight', 'targetFeed',
+        'supportiveTreatments', 'imageUrl', 'videoUrl', 'videoProvider',
+        'sourcesJson', 'regionalNotesJson', 'evidenceJson',
+        'ageDays', 'targetWeight', 'targetFeed',
         'targetFcr', 'targetWater', 'sortOrder',
       ])
-        k: TextEditingController(text: _str(it[k])),
+        k: TextEditingController(text: _initialText(k, it)),
     };
     _isPrimary = it['isPrimary'] == true;
     _isDefault = it['isDefault'] == true;
@@ -338,6 +341,19 @@ class _EntityEditorState extends State<_EntityEditor> {
   }
 
   static String _str(dynamic v) => v == null ? '' : '$v';
+
+  static String _initialText(String key, Map<String, dynamic> it) {
+    switch (key) {
+      case 'sourcesJson':
+        return it['sources'] == null ? '' : jsonEncode(it['sources']);
+      case 'regionalNotesJson':
+        return it['regionalNotes'] == null ? '' : jsonEncode(it['regionalNotes']);
+      case 'evidenceJson':
+        return it['evidence'] == null ? '' : jsonEncode(it['evidence']);
+      default:
+        return _str(it[key]);
+    }
+  }
 
   @override
   void dispose() {
@@ -387,6 +403,16 @@ class _EntityEditorState extends State<_EntityEditor> {
 
     switch (widget.entity) {
       case 'diseases':
+        dynamic optJson(String key) {
+          final v = _c[key]!.text.trim();
+          if (v.isEmpty) return null;
+          final decoded = jsonDecode(v);
+          if (decoded is! Map && decoded is! List) {
+            throw FormatException('$key must be a JSON object or array');
+          }
+          return decoded;
+        }
+
         return {
           'name': _c['name']!.text.trim(),
           'category': _c['category']!.text.trim(),
@@ -395,8 +421,16 @@ class _EntityEditorState extends State<_EntityEditor> {
           if (opt('symptoms') != null) 'symptoms': opt('symptoms'),
           if (opt('prevention') != null) 'prevention': opt('prevention'),
           if (opt('treatment') != null) 'treatment': opt('treatment'),
-          if (opt('organicTreatments') != null)
-            'organicTreatments': opt('organicTreatments'),
+          if (opt('supportiveTreatments') != null)
+            'supportiveTreatments': opt('supportiveTreatments'),
+          // Explicit null clears media fields.
+          'imageUrl': opt('imageUrl'),
+          'videoUrl': opt('videoUrl'),
+          'videoProvider': opt('videoProvider'),
+          if (optJson('sourcesJson') != null) 'sources': optJson('sourcesJson'),
+          if (optJson('regionalNotesJson') != null)
+            'regionalNotes': optJson('regionalNotesJson'),
+          if (optJson('evidenceJson') != null) 'evidence': optJson('evidenceJson'),
         };
       case 'breeds':
         return {
@@ -566,7 +600,18 @@ class _EntityEditorState extends State<_EntityEditor> {
           tf('symptoms', 'Symptoms', maxLines: 2),
           tf('prevention', 'Prevention', maxLines: 2),
           tf('treatment', 'Treatment', maxLines: 2),
-          tf('organicTreatments', 'Organic treatments', maxLines: 2),
+          tf('supportiveTreatments', 'Supportive & traditional care',
+              maxLines: 2),
+          tf('imageUrl', 'Image URL (https)'),
+          tf('videoUrl', 'Video URL (https)'),
+          tf('videoProvider', 'Video provider',
+              hint: 'youtube | vimeo | external'),
+          tf('sourcesJson', 'Sources (JSON array)', maxLines: 3,
+              hint: '[{"title":"…","url":"https://…","publisher":"…","type":"government"}]'),
+          tf('regionalNotesJson', 'Regional notes (JSON object)', maxLines: 3,
+              hint: '{"general":"…","ZM":"…","KE":"…"}'),
+          tf('evidenceJson', 'Evidence levels (JSON object)', maxLines: 2,
+              hint: '{"prevention":"veterinary-recommended"}'),
         ];
       case 'breeds':
         return [

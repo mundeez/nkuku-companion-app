@@ -1,143 +1,38 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+import type { DiseaseRecord } from './data/diseases.types.js';
+import { diseasesPart1 } from './data/diseases-1.js';
+import { diseasesPart2 } from './data/diseases-2.js';
+import { diseasesPart3 } from './data/diseases-3.js';
+
+const diseases: DiseaseRecord[] = [...diseasesPart1, ...diseasesPart2, ...diseasesPart3];
 
 export async function seedDiseases(prisma: PrismaClient) {
   console.log('[SEED] Diseases...');
-
-  const diseases = [
-    {
-      name: 'Newcastle Disease',
-      category: 'Viral',
-      incubation: '2-14 days',
-      mortalityRate: 'Up to 100% unvaccinated; variable if vaccinated',
-      symptoms: 'Sudden death, green diarrhea, respiratory distress, neurological signs (tremors, torticollis), swollen head, reduced feed intake',
-      prevention: 'Biosecurity + vaccination with live or inactivated ND vaccines. In Zambia, NDV genotype VII.2 circulates in Lusaka Province alongside vaccine genotype II strains; vaccine strain selection and administration quality are critical. Day-old hatchery spray + day 21 booster (day 28 if kept >42 days).',
-      treatment: 'No specific treatment; supportive care with vitamins, electrolytes, and antibiotics only for confirmed secondary bacterial infections under veterinary supervision',
-      organicTreatments: 'Basil leaf and ginger concoction, clove extract, aloe vera gel in drinking water; provide electrolytes and vitamins during recovery',
-    },
-    {
-      name: 'Marek\'s Disease',
-      category: 'Viral',
-      incubation: '3-6 weeks',
-      mortalityRate: 'Up to 50% in unvaccinated flocks',
-      symptoms: 'Paralysis (one wing, leg, neck), weight loss, lymphomatous tumors in organs, immunosuppression',
-      prevention: 'Hatchery vaccination is standard and highly effective — in ovo at 18 days of incubation or subcutaneous injection at hatch. Source chicks only from hatchery-vaccinated parent flocks.',
-      treatment: 'No treatment available; cull affected birds',
-      organicTreatments: 'Ginger and turmeric combination in feed, bitter leaf extract (supportive only)',
-    },
-    {
-      name: 'Infectious Bursal Disease (Gumboro)',
-      category: 'Viral',
-      incubation: '2-3 weeks',
-      mortalityRate: '5-20%; up to 60%+ with vvIBDV',
-      symptoms: 'Depression, watery diarrhea, vent picking, bursal swelling then atrophy, immunosuppression, sudden mortality spikes',
-      prevention: 'Hatchery immune-complex vaccines (single dose, e.g., CEVAC Transmune) are preferred and overcome maternal antibody interference. On-farm live intermediate/intermediate-plus vaccines (e.g., Nobilis Gumboro D78) must be timed to maternal antibody decline using the Deventer formula: high day-old titers → vaccinate around day 16-18; low titers → day 10-14. Do not use intermediate-plus before 10 days or in birds without MDA.',
-      treatment: 'No specific treatment; supportive care, maintain gut health, avoid additional stressors',
-      organicTreatments: 'Neem leaves extract, turmeric in water; probiotics and acidifiers to support gut recovery',
-    },
-    {
-      name: 'Infectious Bronchitis (IB)',
-      category: 'Viral',
-      incubation: '2-6 days',
-      mortalityRate: 'Low; high with secondary E. coli',
-      symptoms: 'Respiratory signs (snicking, rales, gasping), reduced weight gain, poor feed conversion, kidney damage, reduced uniformity',
-      prevention: 'Day-old hatchery coarse spray with Massachusetts-type strains (H120, Ma5) and/or variant strains where locally relevant. Day 10 booster in high-challenge areas such as Lusaka.',
-      treatment: 'No specific treatment; control secondary E. coli with antibiotics only under veterinary diagnosis',
-      organicTreatments: 'Honey and garlic mixture, eucalyptus oil vapor, oregano oil in water',
-    },
-    {
-      name: 'Coccidiosis',
-      category: 'Parasitic',
-      incubation: '4-7 days',
-      mortalityRate: 'Variable; subclinical losses often highest',
-      symptoms: 'Diarrhea (may be bloody), depression, huddling, poor feed conversion, weight loss, mortality in severe cases',
-      prevention: 'Anticoccidial drugs (ionophores or chemicals) in feed, live coccidiosis vaccines, or bio-shuttle programs. In Zambia, rotate or shuttle product classes every 2-3 grow-outs to slow resistance. Include withdrawal period before slaughter as per label.',
-      treatment: 'Amprolium, coccidiostats, sulfa drugs; follow label and veterinary advice',
-      organicTreatments: 'Turmeric and black pepper (weekly), neem leaves, ginger in water; maintain dry, well-ventilated litter',
-    },
-    {
-      name: 'Necrotic Enteritis',
-      category: 'Bacterial',
-      incubation: 'Variable, often after coccidiosis or gut damage',
-      mortalityRate: 'Variable; subclinical FCR loss is major',
-      symptoms: 'Sudden death, diarrhea, ruffled feathers, lethargy, poor feed conversion, gut lesions',
-      prevention: 'Coccidiosis control, gut health management, avoid high-non-starch polysaccharide diets, use probiotics/competitive exclusion, minimize stress. Do not use antibiotics routinely for prophylaxis.',
-      treatment: 'Acute clinical cases with confirmed C. perfringens involvement may require water medication under veterinary supervision; record withdrawal period',
-      organicTreatments: 'Probiotics, organic acids, phytogenics (oregano, thyme essential oils), turmeric',
-    },
-    {
-      name: 'Infectious Laryngotracheitis (ILT)',
-      category: 'Viral',
-      incubation: '4-12 days',
-      mortalityRate: 'Variable',
-      symptoms: 'Bloody mucus expectoration, gasping, ruffled feathers, nasal discharge',
-      prevention: 'Live conventional or recombinant vaccines; usually area-dependent',
-      treatment: 'Emergency vaccination in early stages, antibiotics for secondary infections',
-      organicTreatments: 'Honey and garlic mixture, eucalyptus oil vapor',
-    },
-    {
-      name: 'Avian Influenza',
-      category: 'Viral',
-      incubation: '1-3 days (HPAI)',
-      mortalityRate: '50-90% HPAI; 5-30% LPAI',
-      symptoms: 'Sudden death, swelling of head and comb, purple discoloration, respiratory distress, diarrhea',
-      prevention: 'Vaccination (inactivated, LPAI areas only), strict biosecurity, controlled access, wild-bird proofing',
-      treatment: 'No specific treatment; culling in HPAI cases; report to veterinary authorities',
-      organicTreatments: 'None effective; strict biosecurity only',
-    },
-    {
-      name: 'Salmonellosis',
-      category: 'Bacterial',
-      incubation: 'Variable',
-      mortalityRate: 'Variable; higher in young chicks',
-      symptoms: 'Diarrhea, weakness, huddling, poor growth, pasty vent',
-      prevention: 'Vaccination of breeders, biosecurity, feed hygiene, rodent control, clean water',
-      treatment: 'Broad-spectrum antibiotics as per veterinary recommendation and sensitivity testing. Withdrawal periods: Amoxicillin 5 days, Trimethoprim-sulfa 5-7 days, Enrofloxacin 8-10 days. Always complete full course and observe withdrawal before slaughter.',
-      organicTreatments: 'Turmeric in water, basil leaf extract, probiotic supplements',
-    },
-    {
-      name: 'E. coli Infection (Colibacillosis)',
-      category: 'Bacterial',
-      incubation: 'Variable',
-      mortalityRate: 'Variable',
-      symptoms: 'Respiratory signs, airsacculitis, septicemia, swollen joints, diarrhea',
-      prevention: 'Good management, biosecurity, clean environment, proper ventilation, water sanitation, avoid stress',
-      treatment: 'Broad-spectrum antibiotics based on sensitivity testing. Withdrawal periods: Amoxicillin 5 days, Doxycycline 7 days, Enrofloxacin 8-10 days. Use only when bacterial disease is confirmed or strongly suspected under veterinary supervision. Observe withdrawal before slaughter.',
-      organicTreatments: 'Lime water, clove extract, sage infusion; acidifiers and probiotics in water',
-    },
-    {
-      name: 'Chronic Respiratory Disease (CRD) / Mycoplasma',
-      category: 'Bacterial',
-      incubation: 'Variable',
-      mortalityRate: 'Low to moderate',
-      symptoms: 'Nasal discharge, coughing, sneezing, swollen sinuses, reduced growth',
-      prevention: 'Biosecurity, sourcing Mycoplasma-free chicks, avoid stress, good ventilation',
-      treatment: 'Tylosin (withdrawal 10 days), Doxycycline/Oxytetracycline (withdrawal 7-12 days), Enrofloxacin (withdrawal 8-10 days). Vet prescription only. Prophylactic use in day-old chicks (Days 1-3) for vertical bacterial transmission cleanup is acceptable; therapeutic use post-Day 14 requires full withdrawal period before slaughter. Never use antibiotics continuously as growth promoters.',
-      organicTreatments: 'Garlic in water, oregano oil, echinacea',
-    },
-    {
-      name: 'Fowl Pox',
-      category: 'Viral',
-      incubation: '4-14 days',
-      mortalityRate: 'Low to moderate; wet pox higher',
-      symptoms: 'Warty growths on comb, wattles, eyelids; reduced vision; respiratory distress (wet form)',
-      prevention: 'Wing web vaccination, mosquito control, biosecurity; more common in backyard/scavenging systems',
-      treatment: 'Supportive care, iodine on lesions, antibiotics for secondary infections',
-      organicTreatments: 'Aloe vera gel on lesions, neem oil spray',
-    },
-  ];
 
   for (const disease of diseases) {
     await prisma.disease.upsert({
       where: { name: disease.name },
       update: {
+        category: disease.category,
         incubation: disease.incubation,
         mortalityRate: disease.mortalityRate,
         symptoms: disease.symptoms,
         prevention: disease.prevention,
         treatment: disease.treatment,
-        organicTreatments: disease.organicTreatments,
+        supportiveTreatments: disease.supportiveTreatments,
+        imageUrl: disease.imageUrl,
+        videoUrl: disease.videoUrl,
+        videoProvider: disease.videoProvider,
+        sources: disease.sources as Prisma.InputJsonValue | undefined,
+        regionalNotes: disease.regionalNotes as Prisma.InputJsonValue | undefined,
+        evidence: disease.evidence as Prisma.InputJsonValue | undefined,
       },
-      create: disease,
+      create: {
+        ...disease,
+        sources: disease.sources as Prisma.InputJsonValue | undefined,
+        regionalNotes: disease.regionalNotes as Prisma.InputJsonValue | undefined,
+        evidence: disease.evidence as Prisma.InputJsonValue | undefined,
+      },
     });
   }
 

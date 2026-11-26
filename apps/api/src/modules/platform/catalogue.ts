@@ -20,21 +20,11 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireStaff, getClientIp } from '../../core/staff-auth/staff-auth.service.js';
 import { writePlatformAudit } from '../../core/staff-auth/audit.service.js';
+import { DiseaseCreateSchema as DiseaseSchema, DiseasePatchSchema as DiseasePatch, videoFieldsIssues, withLegacyAlias } from '../diseases/schemas.js';
 
 // ── Per-entity config ────────────────────────────────────
 // Each entity declares its zod create/update schemas and the prisma
 // delegate names so the generic handlers can stay thin.
-
-const DiseaseSchema = z.object({
-  name: z.string().min(1).max(100),
-  category: z.string().min(1).max(50),
-  incubation: z.string().optional(),
-  mortalityRate: z.string().optional(),
-  symptoms: z.string().optional(),
-  prevention: z.string().optional(),
-  treatment: z.string().optional(),
-  organicTreatments: z.string().optional(),
-});
 
 const BreedSchema = z.object({
   name: z.string().min(1).max(100),
@@ -97,14 +87,25 @@ interface EntityDef {
   patchSchema: z.ZodTypeAny;
   listInclude?: any;
   auditType: string;
+  // Optional response serializer (e.g. deprecated field aliases).
+  serialize?: (row: any) => any;
+  // Optional post-merge validation for PATCH fragments — receives the
+  // parsed patch body and the stored row; return error strings or [].
+  patchValidate?: (body: any, existing: any) => string[];
 }
 
 const ENTITIES: Record<string, EntityDef> = {
   diseases: {
     delegate: 'disease',
     createSchema: DiseaseSchema,
-    patchSchema: DiseaseSchema.partial(),
+    patchSchema: DiseasePatch,
     auditType: 'disease',
+    serialize: withLegacyAlias,
+    patchValidate: (body, existing) =>
+      videoFieldsIssues({
+        videoUrl: body.videoUrl !== undefined ? body.videoUrl : existing.videoUrl,
+        videoProvider: body.videoProvider !== undefined ? body.videoProvider : existing.videoProvider,
+      }),
   },
   breeds: {
     delegate: 'breed',
@@ -221,7 +222,8 @@ export async function buildPlatformCatalogueModule(app: FastifyInstance) {
       include: def.listInclude,
       orderBy: entity === 'performance-targets' ? [{ breedId: 'asc' }, { ageDays: 'asc' }] : { name: 'asc' },
     });
-    return { items: rows, count: rows.length };
+    const items = def.serialize ? rows.map(def.serialize) : rows;
+    return { items, count: items.length };
   });
 
   // ── POST /catalogue/:entity ──
@@ -257,7 +259,7 @@ export async function buildPlatformCatalogueModule(app: FastifyInstance) {
       after: row,
       ...auditCtx(request),
     });
-    return reply.status(201).send({ item: row });
+    return reply.status(201).send({ item: def.serialize ? def.serialize(row) : row });
   });
 
   // ── PATCH /catalogue/:entity/:id ──
@@ -276,6 +278,11 @@ export async function buildPlatformCatalogueModule(app: FastifyInstance) {
 
     const existing = await (prisma as any)[def.delegate].findUnique({ where: { id } });
     if (!existing) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    const patchIssues = def.patchValidate?.(body, existing) ?? [];
+    if (patchIssues.length) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: patchIssues[0] });
+    }
 
     let row;
     try {
@@ -297,7 +304,7 @@ export async function buildPlatformCatalogueModule(app: FastifyInstance) {
       after: row,
       ...auditCtx(request),
     });
-    return { item: row };
+    return { item: def.serialize ? def.serialize(row) : row };
   });
 
   // ── DELETE /catalogue/:entity/:id ──

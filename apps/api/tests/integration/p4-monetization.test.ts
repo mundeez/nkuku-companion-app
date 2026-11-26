@@ -496,6 +496,103 @@ describe('P4 — plans, trial, lock, flags, announcements, catalogue', () => {
       expect([200, 201]).toContain(res.status);
     });
 
+    it('rejects malformed disease JSON fields and bad media URLs', async () => {
+      const base = { name: `P4 Invalid ${Date.now()}`, category: 'viral' };
+
+      const badSources = await post(
+        '/api/v1/diseases',
+        { ...base, sources: [{ title: 'x', url: 'http://insecure.example.com', publisher: 'p', type: 'government' }] },
+        editorToken,
+      );
+      expect(badSources.status).toBe(400);
+
+      const badRegionKey = await post(
+        '/api/v1/diseases',
+        { ...base, regionalNotes: { zambia: 'not an ISO code' } },
+        editorToken,
+      );
+      expect(badRegionKey.status).toBe(400);
+
+      const badProvider = await post(
+        '/api/v1/diseases',
+        { ...base, videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', videoProvider: 'tiktok' },
+        editorToken,
+      );
+      expect(badProvider.status).toBe(400);
+
+      const orphanVideo = await post(
+        '/api/v1/diseases',
+        { ...base, videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
+        editorToken,
+      );
+      expect(orphanVideo.status).toBe(400);
+
+      const nonCanonicalVideo = await post(
+        '/api/v1/diseases',
+        { ...base, videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', videoProvider: 'youtube' },
+        editorToken,
+      );
+      expect(nonCanonicalVideo.status).toBe(400);
+
+      const noGeneralNote = await post(
+        '/api/v1/diseases',
+        { ...base, regionalNotes: { ZM: 'Zambia note only' } },
+        editorToken,
+      );
+      expect(noGeneralNote.status).toBe(400);
+
+      const badEvidenceKey = await post(
+        '/api/v1/diseases',
+        { ...base, evidence: { bogusSection: 'standard-practice' } },
+        editorToken,
+      );
+      expect(badEvidenceKey.status).toBe(400);
+    });
+
+    it('accepts a fully-populated enriched disease payload', async () => {
+      const res = await post(
+        '/api/v1/diseases',
+        {
+          name: `P4 Enriched ${Date.now()}`,
+          category: 'Viral',
+          supportiveTreatments: 'electrolytes and rest',
+          imageUrl: 'https://upload.wikimedia.org/example.jpg',
+          videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+          videoProvider: 'youtube',
+          sources: [
+            { title: 'Merck page', url: 'https://www.merckvetmanual.com/example', publisher: 'Merck', type: 'industry' },
+          ],
+          regionalNotes: { general: 'General note', ZM: 'Zambia note', KE: 'Kenya note' },
+          evidence: { prevention: 'veterinary-recommended', treatment: 'standard-practice', supportiveTreatments: 'traditional-limited-evidence' },
+        },
+        editorToken,
+      );
+      expect([200, 201]).toContain(res.status);
+      if (res.status === 201 || res.status === 200) {
+        const id = res.data.item?.id ?? res.data.id;
+        // PATCH fragments merge with stored state: changing only videoUrl
+        // is valid because videoProvider is already set.
+        const patched = await patch(
+          `/api/v1/diseases/${id}`,
+          { videoUrl: 'https://www.youtube.com/embed/9bZkp7q19f0' },
+          editorToken,
+        );
+        expect(patched.status).toBe(200);
+        // Clearing videoUrl alone is rejected — provider would be orphaned.
+        const clearUrl = await patch(`/api/v1/diseases/${id}`, { videoUrl: null }, editorToken);
+        expect(clearUrl.status).toBe(400);
+        // Clearing both is allowed.
+        const clearBoth = await patch(
+          `/api/v1/diseases/${id}`,
+          { videoUrl: null, videoProvider: null },
+          editorToken,
+        );
+        expect(clearBoth.status).toBe(200);
+        const delRes = await del(`/api/v1/diseases/${id}`, editorToken);
+        expect(delRes.status).toBe(200);
+      }
+    });
+
     it('tenant reads of the catalogue still work', async () => {
       expect((await get('/api/v1/diseases', ownerToken)).status).toBe(200);
       expect((await get('/api/v1/breeds', ownerToken)).status).toBe(200);

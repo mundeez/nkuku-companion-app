@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.59.0] — 2026-11-26
+
+### Disease reference catalogue — source-cited, region-aware, media-ready
+
+- **Data** — disease reference grew from 12 plain-text seed entries to
+  **32 diseases** seeded across `diseases-{1,2,3}.ts`, each with curated
+  authoritative sources (Merck Veterinary Manual, WOAH, FAO, university
+  extension) and SADC / East-Africa regional notes.
+- **Schema** — `Disease` model extended with `imageUrl`, `videoUrl`,
+  `videoProvider`, and `sources` / `regionalNotes` / `evidence` JSONB
+  columns. `organicTreatments` renamed to `supportiveTreatments` (TEXT);
+  `incubation` and `mortalityRate` widened to TEXT.
+  **Migrations:** `20261126000001` (RENAME COLUMN, data-preserving) and
+  `20261126000002` (new columns / widened types). Deploy runs
+  `migrate deploy` automatically on API boot.
+- **API** — shared zod contracts in
+  `src/modules/diseases/schemas.ts`: https-only media URLs (max 500),
+  canonical YouTube-embed / Vimeo-player video URLs, `regionalNotes`
+  keyed by ISO alpha-2 country code with mandatory `general` fallback,
+  evidence enum validation. PATCH merge-validation applied on both
+  tenant routes and the platform catalogue; all disease responses keep
+  the deprecated `organicTreatments` alias for backwards compatibility.
+  Platform catalogue gained `serialize` / `patchValidate` hooks.
+- **Web** (`/diseases`) — disease cards now show image, embedded
+  YouTube/Vimeo video, evidence badges, region-specific note with
+  org-country auto-select plus manual override, source list, and a
+  medical disclaimer.
+- **Admin** — `admin-web` diseases tab and `admin-mobile` catalogue
+  screen cover all new fields including JSON editors and explicit-null
+  media clearing.
+- **Mobile** — `Disease` model + `diseases_screen.dart` rewritten with
+  `cached_network_image`, `youtube_player_flutter` embeds
+  (`^9.1.1`), region override dropdown, evidence chips, and source
+  list; generated macOS/Windows plugin registrants updated.
+- **Docs** — `docs/MEDIA-STORAGE-OPTIONS.md` records the MinIO vs
+  Garage vs SeaweedFS evaluation for future media hosting.
+- **Tests** — full suite **541/541 green**; typechecks and security
+  audit clean.
+- **Version** — `pubspec.yaml` bumped to `1.59.0+163`.
+
 ## [1.58.1] — 2026-11-23
 
 ### Fix — mobile Projection Calculator double-counted feed variants

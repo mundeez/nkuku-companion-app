@@ -318,8 +318,30 @@ describe('Broiler Management API', () => {
       });
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data.length).toBeGreaterThanOrEqual(10);
+      expect(data.length).toBeGreaterThanOrEqual(30);
       expect(data.some((d: any) => d.name === 'Newcastle Disease')).toBe(true);
+    });
+
+    it('returns enriched disease fields with contract-conformant shapes', async () => {
+      const res = await fetch(`${API_URL}/api/v1/diseases`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      const nd = data.find((d: any) => d.name === 'Newcastle Disease');
+      expect(nd).toBeDefined();
+      // Enriched fields exist
+      expect(nd.supportiveTreatments).toBeTruthy();
+      expect(Array.isArray(nd.sources)).toBe(true);
+      expect(nd.sources.length).toBeGreaterThanOrEqual(3);
+      for (const s of nd.sources) {
+        expect(s.url).toMatch(/^https:\/\//);
+        expect(['peer-reviewed', 'government', 'university-extension', 'industry', 'ngo']).toContain(s.type);
+      }
+      expect(nd.regionalNotes && nd.regionalNotes.general).toBeTruthy();
+      expect(nd.evidence && nd.evidence.prevention).toBeTruthy();
+      // Deprecated alias mirrors supportiveTreatments for old mobile clients
+      expect(nd.organicTreatments).toBe(nd.supportiveTreatments);
     });
 
     it('returns disease categories', async () => {

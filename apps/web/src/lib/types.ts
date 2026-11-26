@@ -445,6 +445,29 @@ export type AlertType =
   | "environmental_threshold"
   | "task_due";
 
+export type DiseaseSourceType =
+  | "peer-reviewed"
+  | "government"
+  | "university-extension"
+  | "industry"
+  | "ngo";
+
+export interface DiseaseSource {
+  title: string;
+  url: string;
+  publisher: string;
+  type: DiseaseSourceType;
+}
+
+export type DiseaseEvidenceLevel =
+  | "veterinary-recommended"
+  | "standard-practice"
+  | "traditional-limited-evidence";
+
+export type DiseaseEvidence = Partial<
+  Record<"prevention" | "treatment" | "supportiveTreatments", DiseaseEvidenceLevel>
+>;
+
 export interface Disease {
   id: string;
   name: string;
@@ -454,7 +477,15 @@ export interface Disease {
   symptoms?: string;
   prevention?: string;
   treatment?: string;
-  organicTreatments?: string;
+  supportiveTreatments?: string;
+  /** @deprecated legacy alias for supportiveTreatments — remove after mobile min-version ships */
+  organicTreatments?: string | null;
+  imageUrl?: string;
+  videoUrl?: string;
+  videoProvider?: "youtube" | "vimeo" | "external";
+  sources?: DiseaseSource[];
+  regionalNotes?: Record<string, string>;
+  evidence?: DiseaseEvidence;
 }
 
 export interface MedicationRecord {

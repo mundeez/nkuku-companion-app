@@ -440,6 +440,25 @@ export interface AnnouncementPayload {
 
 // ── P4: catalogue (global reference data) ───────────────
 
+export type CatalogueDiseaseSourceType =
+  | "peer-reviewed"
+  | "government"
+  | "university-extension"
+  | "industry"
+  | "ngo";
+
+export interface CatalogueDiseaseSource {
+  title: string;
+  url: string;
+  publisher: string;
+  type: CatalogueDiseaseSourceType;
+}
+
+export type CatalogueDiseaseEvidenceLevel =
+  | "veterinary-recommended"
+  | "standard-practice"
+  | "traditional-limited-evidence";
+
 export interface CatalogueDisease {
   id: string;
   name: string;
@@ -449,7 +468,13 @@ export interface CatalogueDisease {
   symptoms: string | null;
   prevention: string | null;
   treatment: string | null;
-  organicTreatments: string | null;
+  supportiveTreatments: string | null;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  videoProvider: "youtube" | "vimeo" | "external" | null;
+  sources: CatalogueDiseaseSource[] | null;
+  regionalNotes: Record<string, string> | null;
+  evidence: Partial<Record<"prevention" | "treatment" | "supportiveTreatments", CatalogueDiseaseEvidenceLevel>> | null;
 }
 
 export interface CatalogueBreed {
