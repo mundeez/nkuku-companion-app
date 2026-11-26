@@ -153,8 +153,8 @@ User directive: execute all queued follow-ups via EGM-Lite, starting with APK �
 
 ## Phase F — Disease ↔ flock integration (largest; may need its own spec review)
 
-- [ ] Design pass: link `diseases` to mortality events / vaccination schedules / alerts — e.g., "possible causes" suggestions when logging mortality, disease-aware vaccination reminders, alert enrichment.
-- [ ] Scope decision needed: read-only suggestions vs. writable links (FK on mortality_events?). Present design before exec — this phase likely warrants a fresh goldfish spec review.
+- [x] Design pass: link `diseases` to mortality events / vaccination schedules / alerts — e.g., "possible causes" suggestions when logging mortality, disease-aware vaccination reminders, alert enrichment.
+- [x] Scope decision needed: read-only suggestions vs. writable links (FK on mortality_events?). Present design before exec — this phase likely warrants a fresh goldfish spec review.
 
 **Phase F design draft (pending scope decision + goldfish):**
 - Touchpoints: `mortality_events.cause` (free text varchar200), `vaccination_schedule_items` (free-text vaccine names), `alerts` (fixed AlertType enum), global `diseases` catalogue (32 enriched entries).
@@ -205,7 +205,9 @@ Tests (integration, test stack):
 
 Deferred: disease-grouped mortality analytics, alert filtering UI, retroactive matching (computed on the fly), combo-vaccine join table.
 
+**Phase F implementation notes:** spec v2 implemented by 4 parallel subagents (api/web/mobile/admin) + goldfish design+readiness reviews + post-impl codebase audit. Audit fixes applied: vaccination /bulk diseaseId passthrough + existence check, mobile mortality toJson always emits diseaseId (null clears), mortality single-record FinancialRecord sourceTable/isSystemGenerated (bulk-delete consistency), disease-matcher generic-token stopwords, platform catalogue schedule-item diseaseId existence guard (400 DISEASE_NOT_FOUND), disease-insights unions explicit diseaseId links (score 100) + country uppercase + window-aware reason, FK indexes migration 20261201000003, mobile/web score shown raw (not %), admin-mobile age-field garbage no longer silently clears. Test-isolation fixes: sale-payments reversalOf paginates journal (same-date ordering), disease-links alert test filters flockId + 30s timeout (/generate scans all org flocks). Deferred per spec: vaccination-event disease picker in tenant clients (API accepts diseaseId; schedule-item links cover templates), disease-grouped mortality analytics, alert-type filter UI, combo-vaccine join table, offline Drift cache disease columns. Validation: 555/555 tests, all typechecks/builds green, security audit clean (P2s only). Released as v1.60.0 (commit 2bb4115); prod api/web/admin-web rebuilt & healthy (env=production). Mobile v1.60.0+164 needs APK build to reach users; admin-mobile needs internal rebuild.
+
 ## Cross-cutting
 
-- [ ] After each phase: typecheck/analyze + relevant tests green before moving on.
-- [ ] Phase-closeout per phase or batched at end per user preference — default: single closeout after Phase D, separate for C and F if they land as releases.
+- [x] After each phase: typecheck/analyze + relevant tests green before moving on.
+- [x] Phase-closeout per phase or batched at end per user preference — default: single closeout after Phase D, separate for C and F if they land as releases.
