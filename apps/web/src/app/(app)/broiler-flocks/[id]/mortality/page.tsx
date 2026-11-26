@@ -7,6 +7,8 @@ import { apiFetch } from "@/lib/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Skull } from "lucide-react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
 export default function MortalityAnalysisPage() {
   const params = useParams();
@@ -121,17 +123,24 @@ export default function MortalityAnalysisPage() {
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b"><th className="text-left py-2">Date</th><th className="text-left py-2">Count</th><th className="text-left py-2">Cause</th><th className="text-left py-2">Age</th></tr></thead>
+                  <thead><tr className="border-b"><th className="text-left py-2">Date</th><th className="text-left py-2">Count</th><th className="text-left py-2">Cause</th><th className="text-left py-2">Disease</th><th className="text-left py-2">Age</th></tr></thead>
                   <tbody>
                     {events.map((e: any) => (
                       <tr key={e.id} className="border-b">
                         <td className="py-2">{new Date(e.eventDate).toLocaleDateString()}</td>
                         <td className="py-2 font-medium text-red-600">{e.count}</td>
                         <td className="py-2">{e.cause || "-"}</td>
+                        <td className="py-2">
+                          {e.disease ? (
+                            <Link href="/diseases">
+                              <Badge variant="secondary" className="text-xs">{e.disease.name}</Badge>
+                            </Link>
+                          ) : "-"}
+                        </td>
                         <td className="py-2">{e.ageDays ? `Day ${e.ageDays}` : "-"}</td>
                       </tr>
                     ))}
-                    {events.length === 0 && <tr><td colSpan={4} className="py-4 text-muted-foreground text-center">No mortality events recorded.</td></tr>}
+                    {events.length === 0 && <tr><td colSpan={5} className="py-4 text-muted-foreground text-center">No mortality events recorded.</td></tr>}
                   </tbody>
                 </table>
               </div>

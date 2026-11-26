@@ -363,6 +363,8 @@ export interface MortalityEvent {
   cause?: string;
   ageDays?: number;
   notes?: string;
+  diseaseId?: string | null;
+  disease?: { id: string; name: string; category: string } | null;
 }
 
 export interface VaccinationEvent {
@@ -378,6 +380,8 @@ export interface VaccinationEvent {
   expiryDate?: string;
   vaccineInventoryId?: string;
   notes?: string;
+  diseaseId?: string | null;
+  disease?: { id: string; name: string; category: string } | null;
 }
 
 export interface FinancialRecord {
@@ -428,6 +432,7 @@ export interface Alert {
   dueDate: string;
   isRead: boolean;
   isResolved: boolean;
+  disease?: { id: string; name: string } | null;
   createdAt: string;
 }
 
@@ -443,7 +448,8 @@ export type AlertType =
   | "withdrawal_due"
   | "vaccine_expiry"
   | "environmental_threshold"
-  | "task_due";
+  | "task_due"
+  | "disease_risk";
 
 export type DiseaseSourceType =
   | "peer-reviewed"
@@ -486,6 +492,9 @@ export interface Disease {
   sources?: DiseaseSource[];
   regionalNotes?: Record<string, string>;
   evidence?: DiseaseEvidence;
+  keywords?: string[];
+  susceptibleAgeMinDays?: number;
+  susceptibleAgeMaxDays?: number;
 }
 
 export interface MedicationRecord {
@@ -567,6 +576,31 @@ export type FlockTaskCategory =
   | "biosecurity"
   | "management";
 
+// ── DISEASE INSIGHTS (Phase F) ──────────────────
+
+export interface DiseaseInsightSuggestion {
+  disease: { id: string; name: string; category: string };
+  score: number;
+  regionalNote?: string;
+}
+
+export interface DiseaseInsightMatch {
+  mortalityEventId: string;
+  cause?: string | null;
+  suggestions: DiseaseInsightSuggestion[];
+}
+
+export interface DiseaseInsightWatchlistItem {
+  disease: { id: string; name: string; category: string };
+  reason: string;
+  regionalNote?: string;
+}
+
+export interface DiseaseInsights {
+  matches: DiseaseInsightMatch[];
+  watchlist: DiseaseInsightWatchlistItem[];
+}
+
 export interface FlockTimelineEvent {
   ageDays: number;
   date: string;
@@ -643,6 +677,8 @@ export interface VaccinationScheduleItem {
   sortOrder: number;
   notes?: string;
   completed?: boolean;
+  diseaseId?: string | null;
+  disease?: { id: string; name: string; category?: string } | null;
 }
 
 export interface VaccinationSchedule {

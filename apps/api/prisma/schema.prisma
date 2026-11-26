@@ -1027,12 +1027,15 @@ model MortalityEvent {
   ageDays   Int?     @map("age_days")
   costZmw   Decimal? @map("cost_zmw") @db.Decimal(14, 2)
   notes     String?  @db.Text
+  diseaseId String?  @map("disease_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  flock BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  flock   BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  disease Disease?     @relation(fields: [diseaseId], references: [id], onDelete: SetNull)
 
   @@index([flockId, eventDate])
+  @@index([diseaseId])
   @@map("mortality_events")
 }
 
@@ -1050,13 +1053,16 @@ model VaccinationEvent {
   expiryDate         DateTime? @map("expiry_date") @db.Date
   vaccineInventoryId String?   @map("vaccine_inventory_id") @db.Uuid
   notes              String?   @db.Text
+  diseaseId          String?   @map("disease_id") @db.Uuid
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   flock            BroilerFlock      @relation(fields: [flockId], references: [id], onDelete: Cascade)
   vaccineInventory VaccineInventory? @relation(fields: [vaccineInventoryId], references: [id], onDelete: SetNull)
+  disease          Disease?          @relation(fields: [diseaseId], references: [id], onDelete: SetNull)
 
   @@index([flockId, adminDate])
+  @@index([diseaseId])
   @@map("vaccination_events")
 }
 
@@ -1107,12 +1113,15 @@ model Alert {
   dueDate    DateTime      @map("due_date") @db.Date
   isRead     Boolean       @default(false) @map("is_read")
   isResolved Boolean       @default(false) @map("is_resolved")
+  diseaseId  String?       @map("disease_id") @db.Uuid
   createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  flock BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  flock   BroilerFlock @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  disease Disease?     @relation(fields: [diseaseId], references: [id], onDelete: SetNull)
 
   @@index([flockId, isResolved, dueDate])
+  @@index([diseaseId])
   @@map("alerts")
 }
 
@@ -1129,6 +1138,7 @@ enum AlertType {
   vaccine_expiry
   environmental_threshold
   task_due
+  disease_risk
 }
 
 enum AlertSeverity {
@@ -1153,8 +1163,16 @@ model Disease {
   sources              Json?
   regionalNotes        Json?    @map("regional_notes")
   evidence             Json?
+  keywords             String[] @default([])
+  susceptibleAgeMinDays Int?    @map("susceptible_age_min_days")
+  susceptibleAgeMaxDays Int?    @map("susceptible_age_max_days")
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  mortalityEvents         MortalityEvent[]
+  vaccinationEvents       VaccinationEvent[]
+  vaccinationScheduleItems VaccinationScheduleItem[]
+  alerts                  Alert[]
 
   @@map("diseases")
 }
@@ -1185,12 +1203,15 @@ model VaccinationScheduleItem {
   adminMethod String   @map("admin_method") @db.VarChar(50)
   sortOrder   Int      @map("sort_order")
   notes       String?  @db.Text
+  diseaseId   String?  @map("disease_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   schedule VaccinationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  disease  Disease?            @relation(fields: [diseaseId], references: [id], onDelete: SetNull)
 
   @@index([scheduleId, sortOrder])
+  @@index([diseaseId])
   @@map("vaccination_schedule_items")
 }
 

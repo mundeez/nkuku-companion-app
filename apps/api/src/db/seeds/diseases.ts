@@ -26,6 +26,9 @@ export async function seedDiseases(prisma: PrismaClient) {
         sources: disease.sources as Prisma.InputJsonValue | undefined,
         regionalNotes: disease.regionalNotes as Prisma.InputJsonValue | undefined,
         evidence: disease.evidence as Prisma.InputJsonValue | undefined,
+        keywords: disease.keywords ?? [],
+        susceptibleAgeMinDays: disease.susceptibleAgeMinDays ?? null,
+        susceptibleAgeMaxDays: disease.susceptibleAgeMaxDays ?? null,
       },
       create: {
         ...disease,

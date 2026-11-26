@@ -4,7 +4,7 @@ import { z } from 'zod';
 // /api/v1/diseases routes and the staff /api/v1/platform/catalogue routes so
 // validation can never drift between the two write surfaces.
 
-export const SOURCE_TYPES = ['peer-reviewed', 'government', 'university-extension', 'industry', 'ngo'] as const;
+export const SOURCE_TYPES = ['peer-reviewed', 'government', 'university-extension', 'industry', 'ngo', 'media'] as const;
 export const EVIDENCE_LEVELS = ['veterinary-recommended', 'standard-practice', 'traditional-limited-evidence'] as const;
 export const EVIDENCE_SECTIONS = ['prevention', 'treatment', 'supportiveTreatments'] as const;
 export const VIDEO_PROVIDERS = ['youtube', 'vimeo', 'external'] as const;
@@ -95,6 +95,11 @@ export const DiseaseObjectSchema = z.object({
   sources: z.array(DiseaseSourceSchema).max(50).optional(),
   regionalNotes: RegionalNotesSchema.optional(),
   evidence: EvidenceSchema.optional(),
+  // Phase F: cause-matching keywords (synonyms/abbreviations) and the
+  // peak-risk age window used by disease↔flock insights.
+  keywords: z.array(z.string().min(1).max(100)).max(100).optional(),
+  susceptibleAgeMinDays: z.number().int().min(0).max(400).nullable().optional(),
+  susceptibleAgeMaxDays: z.number().int().min(0).max(400).nullable().optional(),
 });
 
 export const DiseaseCreateSchema = DiseaseObjectSchema.superRefine((d, ctx) => {

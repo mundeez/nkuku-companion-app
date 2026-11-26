@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'package:dio/dio.dart';
 import '../models/breed.dart';
 import '../models/chick_addition.dart';
+import '../models/disease_ref.dart';
 import '../models/document.dart';
 import '../models/environmental_record.dart';
 import '../models/financial_record.dart';
@@ -704,6 +705,16 @@ class BroilerService {
     );
     _assertOk(res);
     return MortalitySummary.fromJson(res.data);
+  }
+
+  /// Disease↔flock insights (Phase F): per-mortality-event disease
+  /// suggestions plus a watchlist of diseases relevant to this flock.
+  static Future<DiseaseInsights> getDiseaseInsights(String flockId) async {
+    final res = await ApiService.dio.get(
+      '/api/v1/broiler-flocks/$flockId/disease-insights',
+    );
+    _assertOk(res);
+    return DiseaseInsights.fromJson(res.data);
   }
 
   static Future<MortalityEvent> createMortalityEvent(
@@ -1624,6 +1635,98 @@ class WaterRatio {
       totalWaterLiters: (json['totalWaterLiters'] ?? 0).toDouble(),
       totalFeedKg: (json['totalFeedKg'] ?? 0).toDouble(),
       waterToFeedRatio: json['waterToFeedRatio'],
+    );
+  }
+}
+
+/// Response of GET /api/v1/broiler-flocks/:id/disease-insights.
+class DiseaseInsights {
+  final List<DiseaseInsightMatch> matches;
+  final List<DiseaseWatchItem> watchlist;
+
+  DiseaseInsights({required this.matches, required this.watchlist});
+
+  bool get isEmpty => matches.isEmpty && watchlist.isEmpty;
+
+  factory DiseaseInsights.fromJson(Map<String, dynamic> json) {
+    return DiseaseInsights(
+      matches: (json['matches'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => DiseaseInsightMatch.fromJson(
+              Map<String, dynamic>.from(e)))
+          .toList(),
+      watchlist: (json['watchlist'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) =>
+              DiseaseWatchItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
+}
+
+/// Suggested diseases for a single mortality event.
+class DiseaseInsightMatch {
+  final String mortalityEventId;
+  final String? cause;
+  final List<DiseaseSuggestion> suggestions;
+
+  DiseaseInsightMatch({
+    required this.mortalityEventId,
+    this.cause,
+    required this.suggestions,
+  });
+
+  factory DiseaseInsightMatch.fromJson(Map<String, dynamic> json) {
+    return DiseaseInsightMatch(
+      mortalityEventId: json['mortalityEventId']?.toString() ?? '',
+      cause: json['cause']?.toString(),
+      suggestions: (json['suggestions'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => DiseaseSuggestion.fromJson(
+              Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
+}
+
+class DiseaseSuggestion {
+  final DiseaseRef disease;
+  final double score;
+  final String? regionalNote;
+
+  DiseaseSuggestion({
+    required this.disease,
+    required this.score,
+    this.regionalNote,
+  });
+
+  factory DiseaseSuggestion.fromJson(Map<String, dynamic> json) {
+    return DiseaseSuggestion(
+      disease: DiseaseRef.maybeFromJson(json['disease']) ??
+          DiseaseRef(id: '', name: ''),
+      score: double.tryParse(json['score']?.toString() ?? '') ?? 0,
+      regionalNote: json['regionalNote']?.toString(),
+    );
+  }
+}
+
+class DiseaseWatchItem {
+  final DiseaseRef disease;
+  final String reason;
+  final String? regionalNote;
+
+  DiseaseWatchItem({
+    required this.disease,
+    required this.reason,
+    this.regionalNote,
+  });
+
+  factory DiseaseWatchItem.fromJson(Map<String, dynamic> json) {
+    return DiseaseWatchItem(
+      disease: DiseaseRef.maybeFromJson(json['disease']) ??
+          DiseaseRef(id: '', name: ''),
+      reason: json['reason']?.toString() ?? '',
+      regionalNote: json['regionalNote']?.toString(),
     );
   }
 }

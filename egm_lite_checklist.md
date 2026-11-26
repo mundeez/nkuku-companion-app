@@ -107,3 +107,105 @@
 
 - `[⚠️ UNVERIFIED]`: Siloed external contract. Requires indisputable evidence to verify.
 - `[⏳ ACK]`: Acknowledged assumption. Factual evidence unavailable; risk accepted and opaque-box empirical test strictly scheduled.
+
+---
+
+# EGM-Lite Queue — Post-v1.59.0 Follow-ups
+
+User directive: execute all queued follow-ups via EGM-Lite, starting with APK → prod deploy → media.
+
+## Phase A — Mobile release APK (v1.59.0+163)
+
+- [x] `cd apps/mobile && flutter build apk --release --dart-define=APP_API_BASE_URL=https://nkuku.deeztechnology.solutions` — verify build succeeds.
+- [x] Archive APK to `~/DevWorkz/nkuku-releases/nkuku-companion-v1.59.0.apk` (match naming convention).
+- [x] Sanity: `flutter analyze` clean on touched files (already verified); confirm version string `1.59.0+163` in pubspec.
+- [x] Report APK path + size; note distribution is manual/internal per AGENTS.md.
+
+## Phase B — Production deploy
+
+- [x] **GATE: requires explicit user confirmation immediately before executing** — real-world side effect on live prod.
+- [x] Determine access path: prod lives at `/var/www/nkuku` on the VPS (`nkuku.deeztechnology.solutions`). Check for SSH config/alias; if unreachable, produce exact deploy commands for the user instead of improvising.
+- [x] Deploy: `git pull` (to v1.59.0) → `docker compose -f docker-compose.prod.yml up --build -d` → `npx prisma migrate deploy` runs at api boot (verify both disease migrations apply cleanly — RENAME preserves data).
+- [x] Post-deploy verify: `curl https://nkuku.deeztechnology.solutions/api/v1/health` (or :30001 health), spot-check `GET /api/v1/diseases` returns enriched shape + `organicTreatments` alias, check api logs for migration errors.
+- [x] Rollback note: previous tag `v1.58.1` per AGENTS.md rollback procedure.
+
+## Phase C — Media self-hosting + catalogue backfill
+
+- [x] Provision object storage per `docs/MEDIA-STORAGE-OPTIONS.md` recommendation (MinIO near-term): bucket for catalogue media, credentials via env (never committed), Docker Compose service if self-hosted.
+- [x] Upload/curate assets: disease images (Wikimedia Commons / CC-licensed) + the verified ILT video; keep license/attribution metadata (record in `sources` or a `licenseNote` field if schema needs it — decide during exec).
+- [x] Backfill `imageUrl`/`videoUrl` across the 32 seed diseases via staff API or seed update + re-seed script; keep external URLs as fallback where self-hosted asset unavailable.
+- [x] Verify web + mobile render self-hosted media (CORS/bucket public-read policy or signed URLs — decide per MinIO setup).
+
+## Phase D — Housekeeping
+
+- [x] `organicTreatments` alias sunset prep: add min-app-version tracking mechanism (e.g., `X-App-Version` header logging or platform flag) so alias removal is schedulable; document sunset criteria in checklist/AGENTS.md.
+- [x] Admin JSON-field clearing UX: admin-web + admin-mobile — send explicit `[]`/`{}` (or support `null`→`Prisma.DbNull`) when JSON textareas emptied; add UI hint text.
+- [x] Test-stack footgun: fix `docker-compose.test.yml` dead `./apps/api/src` bind mount (remove or replace with a comment/warning) and document "rebuild api image after src changes" in AGENTS.md Testing Guidelines.
+
+**Phase C implementation notes:** reused existing `nkuku-documents` bucket (shared pom-minio) under `catalogue/diseases/` prefix — NO new bucket/policy needed. New public route `GET /api/v1/media/catalogue/diseases/:file` (apps/api/src/modules/media/routes.ts) streams objects with strict key whitelist + immutable cache headers; stored `imageUrl`s are absolute `https://nkuku.deeztechnology.solutions/api/v1/media/...` URLs (pass https contract). Upload script: apps/api/src/scripts/upload-catalogue-media.ts (dry-run default, --apply uploads+updates DB; 429-backoff for Wikimedia). Result: 28/32 diseases have self-hosted CC-licensed images (4 skipped: FLHS, Omphalitis, Avian Leukosis, Heat Stress — no suitable free imagery). Each image's license/attribution recorded as a `type:"media"` entry appended to `sources` (new SOURCE_TYPES enum value + web label). Videos remain external embeds (YouTube can't be self-hosted; ILT embed retained).
+
+## Phase E — Content depth
+
+- [x] Regional prevalence emphasis pass: review all 32 `regionalNotes` for ZM/BW/KE (and other SADC/East-Africa keys present); strengthen Zambia/Botswana/Kenya-specific disease emphasis where literature supports it; every claim must cite a source already in `sources` or add one.
+- [x] Coverage gap check: are high-priority regional diseases missing (e.g., other mycotoxicosis, heat stress, coccidiosis variants)? Propose additions only if sources verify — do not pad the count.
+
+**Phase E implementation notes:** two parallel audit subagents reviewed all 32 records for ZM/BW/KE coverage; 27 diseases received verified regional notes (evidence: Botswana DVS/WOAH outbreak reports, Kenya NDV genotype V/V.3/Vd surveillance, H9N2 LBM detections, Botswana/ Kenya poultry-sector reports, peer-reviewed mycotoxin/feed surveys, Merck/extension etiology). Merged into `regional_notes` jsonb on shared DB — existing keys preserved, `general` fallback intact (verified). Data-quality fix: removed 3 legacy stub duplicates ("Salmonella", "E. coli Infection", "Chronic Respiratory Disease (CRD)" — no sources/notes/image, superseded by enriched entries); catalogue now exactly 32 unique diseases. Coverage assessment: viral/bacterial/parasites/nutritional/management categories all covered for SSA broiler production; only marginal candidate is Chicken Infectious Anemia (gyrovirus) — deferred, would need its own sourced entry rather than padding.
+
+## Phase F — Disease ↔ flock integration (largest; may need its own spec review)
+
+- [ ] Design pass: link `diseases` to mortality events / vaccination schedules / alerts — e.g., "possible causes" suggestions when logging mortality, disease-aware vaccination reminders, alert enrichment.
+- [ ] Scope decision needed: read-only suggestions vs. writable links (FK on mortality_events?). Present design before exec — this phase likely warrants a fresh goldfish spec review.
+
+**Phase F design draft (pending scope decision + goldfish):**
+- Touchpoints: `mortality_events.cause` (free text varchar200), `vaccination_schedule_items` (free-text vaccine names), `alerts` (fixed AlertType enum), global `diseases` catalogue (32 enriched entries).
+- Option A (read-only): new `GET /broiler-flocks/:id/disease-insights` — token/synonym matching of mortality causes against disease names+symptoms, flock-age watchlist, links into catalogue detail. No schema change.
+- Option B (recommended): A + nullable `mortality_events.disease_id` FK + catalogue dropdown in mortality form (web+mobile) — enables mortality-by-disease analytics; small migration.
+- Option C (full): B + `vaccination_schedule_items.disease_id` link ("protects against") + new `disease_risk` AlertType + generation logic in alerts /generate.
+- **Scope decision (user): Option C — full integration.**
+
+**Phase F spec (v2 — post-goldfish revisions):**
+
+Goldfish findings resolved: schedule items have no tenant CRUD (writes via platform catalogue only); matcher redesigned to curated keywords; alert dedupe gets partial unique index + cooldown; PATCH clear semantics explicit; bulk endpoint pass-through added.
+
+Schema (one migration `disease_flock_links`):
+- `diseases.keywords` `String[]` — curated match terms incl. synonyms ("gumboro","IBD","cocci","CRD","mycoplasma"…) populated in seeds; staff-editable via platform catalogue.
+- `diseases.susceptible_age_min_days` / `susceptible_age_max_days` Int NULL — curated peak-risk window; NULL = not watchlist-eligible.
+- `mortality_events.disease_id` UUID NULL → diseases.id ON DELETE SET NULL + index.
+- `vaccination_events.disease_id` UUID NULL → diseases.id ON DELETE SET NULL (per-flock record — the actually-administered link).
+- `vaccination_schedule_items.disease_id` UUID NULL → diseases.id ON DELETE SET NULL (template-level "protects against"; 1:N limitation documented — combo vaccines pick primary).
+- `alerts.disease_id` UUID NULL → diseases.id ON DELETE SET NULL.
+- `AlertType` += `disease_risk`; partial unique index `alerts(flock_id, disease_id) WHERE alert_type='disease_risk' AND is_resolved=false AND disease_id IS NOT NULL`.
+
+API:
+- mortality-events POST/PATCH/bulk: `diseaseId: z.string().uuid().nullable().optional()` — `null` clears; invalid uuid/existing-check → 400 `{error:'DISEASE_NOT_FOUND'}`; bulk validates existence once via findMany-in + passes field through (it currently rebuilds rows field-by-field).
+- All mortality-event responses (GET list/detail/PATCH/POST/bulk) `include: { disease: {select:{id,name,category}} }`; `/summary` unchanged (future: disease-grouped breakdown).
+- vaccination-events POST/PATCH: same diseaseId contract; responses include disease summary.
+- platform catalogue `ScheduleItemSchema` + diseases entity schema: accept `diseaseId`/`keywords`/susceptible-age fields; `writeWithItems` createMany passes diseaseId.
+- `GET /vaccination-events/schedules` + `/schedule`: include `items.disease {id,name}` so tenant UI can show "protects against".
+- New `GET /broiler-flocks/:id/disease-insights` (auth = flock read, org-scoped 404):
+  - Response: `{ matches: [{mortalityEventId, cause, suggestions: [{disease:{id,name,category}, score, regionalNote?}]}], watchlist: [{disease:{id,name,category}, reason, regionalNote?}] }`
+  - Matching (`apps/api/src/core/disease-matching.ts`): normalize cause (lowercase, strip punct, stopword list); score = 3×name-token hits + 1×keyword hits; synonyms live IN `keywords` (no separate map); top 5, score ≥3; null cause → skipped. In-memory compiled index, not per-request retokenization of prose.
+  - Watchlist: flock `ageDays` from `startDate` (same convention as vaccination-events/routes.ts); diseases where ageDays ∈ [min,max]; null startDate → empty watchlist. `regionalNote` = regionalNotes[org.country] ?? regionalNotes.general.
+- alerts: zod enum += `disease_risk`; `/generate` — for active flocks, mortality events with non-null `diseaseId` in last 7d → disease_risk alert (severity warning, dueDate +3d, message = disease name + first prevention sentence, diseaseId set) IF no disease_risk alert for (flock,disease) created in last 14d (cooldown covers resolved+unresolved; partial unique index guards unresolved dupes). GET /alerts includes `disease:{id,name}`.
+
+Clients:
+- web `types.ts`: `AlertType` += `disease_risk`; `MortalityEvent`/`VaccinationEvent` += disease fields; alert badge fallback for unknown types verified.
+- web flock mortality: new `disease-select` field type in `SimpleRecordTab` (fetch `/api/v1/diseases`, optional, sends null to clear); disease chip on mortality record cards + `/mortality` analysis table.
+- web flock detail mortality tab: "Disease insights" card (matches grouped by event + watchlist, regional note, link to /diseases).
+- web `FlockVaccinationSchedule` (read-only): show linked disease name per item when present.
+- mobile: `mortality_event.dart` model + form dropdown (via ApiService disease list); mortality `RecordCard` subtitle chip; new insights card on mortality section of `flock_detail_screen.dart`; `vaccination_schedules_screen.dart`/`flock.dart` VaccinationScheduleItem disease name display; alert icon default-branch already safe — optionally add disease_risk icon.
+- admin-web `schedules-tab.tsx` + admin-mobile `catalogue.dart`: disease dropdown per schedule item + disease picker data from catalogue diseases endpoint; diseases-tab editors get keywords/age-window fields if trivially addable (JSON/text arrays) — else defer.
+- Seeds: `diseases-{1,2,3}.ts` add `keywords` + susceptible-age windows for all 32; `vaccination-schedules.ts` link default schedule items to diseases by name where unambiguous (ND→Newcastle, Gumboro→IBD, etc.).
+
+Tests (integration, test stack):
+- mortality diseaseId: POST valid/invalid, PATCH set/clear(null), bulk passthrough.
+- disease-insights: seeded cause strings rank expected disease top-3; null-cause flock → empty matches; watchlist respects age window + null startDate.
+- alerts/generate: tagged mortality → one disease_risk alert; second run → no dupe (unique index + cooldown); resolve + rerun within 14d → still no dupe.
+- schedule item diseaseId round-trip via platform catalogue; `/schedule` response includes disease name.
+
+Deferred: disease-grouped mortality analytics, alert filtering UI, retroactive matching (computed on the fly), combo-vaccine join table.
+
+## Cross-cutting
+
+- [ ] After each phase: typecheck/analyze + relevant tests green before moving on.
+- [ ] Phase-closeout per phase or batched at end per user preference — default: single closeout after Phase D, separate for C and F if they land as releases.

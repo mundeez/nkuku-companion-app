@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../models/flock.dart';
 import '../../../models/mortality_event.dart';
+import '../../../services/api_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/broiler_service.dart';
 
@@ -30,6 +32,8 @@ class _MortalityEventFormState extends State<MortalityEventForm> {
   DateTime _eventDate = DateTime.now();
   bool _saving = false;
   String? _error;
+  List<Disease> _diseases = [];
+  String? _selectedDiseaseId;
 
   @override
   void initState() {
@@ -41,6 +45,19 @@ class _MortalityEventFormState extends State<MortalityEventForm> {
       _costController.text = widget.record!.costZmw?.toString() ?? '';
       _notesController.text = widget.record!.notes ?? '';
       _eventDate = widget.record!.eventDate;
+      _selectedDiseaseId = widget.record!.diseaseId;
+    }
+    _loadDiseases();
+  }
+
+  Future<void> _loadDiseases() async {
+    try {
+      final res = await ApiService.dio.get('/api/v1/diseases');
+      final diseases =
+          (res.data as List).map((e) => Disease.fromJson(e)).toList();
+      if (mounted) setState(() => _diseases = diseases);
+    } catch (_) {
+      // Disease list is optional — the dropdown just stays empty.
     }
   }
 
@@ -80,6 +97,7 @@ class _MortalityEventFormState extends State<MortalityEventForm> {
         ageDays: int.tryParse(_ageController.text),
         costZmw: double.tryParse(_costController.text),
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        diseaseId: _selectedDiseaseId,
       );
 
       if (widget.record == null) {
@@ -134,6 +152,42 @@ class _MortalityEventFormState extends State<MortalityEventForm> {
                 controller: _causeController,
                 decoration: const InputDecoration(labelText: 'Cause (optional)'),
               ),
+              const SizedBox(height: 12),
+              Builder(builder: (context) {
+                final items = <DropdownMenuItem<String>>[
+                  const DropdownMenuItem(
+                    value: '',
+                    child: Text('None'),
+                  ),
+                  ..._diseases.map((d) => DropdownMenuItem(
+                        value: d.id,
+                        child: Text(d.name,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      )),
+                ];
+                // Keep the current selection visible even if the disease
+                // list hasn't loaded yet or the entry was removed.
+                if (_selectedDiseaseId != null &&
+                    !_diseases.any((d) => d.id == _selectedDiseaseId)) {
+                  items.add(DropdownMenuItem(
+                    value: _selectedDiseaseId,
+                    child: Text(
+                        widget.record?.disease?.name ?? 'Selected disease',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ));
+                }
+                return DropdownButtonFormField<String>(
+                  initialValue: _selectedDiseaseId,
+                  decoration: const InputDecoration(
+                    labelText: 'Disease (optional)',
+                  ),
+                  items: items,
+                  onChanged: (v) => setState(() {
+                    _selectedDiseaseId = (v == null || v.isEmpty) ? null : v;
+                  }),
+                );
+              }),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _ageController,

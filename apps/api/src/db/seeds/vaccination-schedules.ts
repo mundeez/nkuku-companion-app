@@ -1,7 +1,31 @@
 import { PrismaClient } from '@prisma/client';
 
+// Phase F: link schedule items to catalogue diseases where the mapping is
+// unambiguous (exactly one disease pattern matches the vaccine name).
+// Combined vaccines (e.g. "Newcastle + Infectious Bronchitis") match >1
+// disease and are left unlinked. Missing diseases are skipped silently.
+const DISEASE_NAME_BY_PATTERN: Array<{ re: RegExp; diseaseName: string }> = [
+  { re: /gumboro|bursal/i, diseaseName: 'Infectious Bursal Disease (Gumboro)' },
+  { re: /marek/i, diseaseName: "Marek's Disease" },
+  { re: /coccidiosis/i, diseaseName: 'Coccidiosis' },
+  { re: /newcastle/i, diseaseName: 'Newcastle Disease' },
+  { re: /bronchitis|\bib\b/i, diseaseName: 'Infectious Bronchitis (IB)' },
+];
+
 export async function seedVaccinationSchedules(prisma: PrismaClient) {
   console.log('[SEED] Vaccination schedules...');
+
+  const diseaseRows = await prisma.disease.findMany({ select: { id: true, name: true } });
+  const diseaseIdByName = new Map(diseaseRows.map((d) => [d.name.toLowerCase(), d.id]));
+
+  const resolveItemDiseaseId = (vaccineName: string): string | null => {
+    const matched = DISEASE_NAME_BY_PATTERN
+      .filter((p) => p.re.test(vaccineName))
+      .map((p) => diseaseIdByName.get(p.diseaseName.toLowerCase()))
+      .filter((id): id is string => !!id);
+    const unique = [...new Set(matched)];
+    return unique.length === 1 ? unique[0] : null;
+  };
 
   // ── Standard Zambia Broiler Schedule ───────────────
   const standardSchedule = await prisma.vaccinationSchedule.upsert({
@@ -30,7 +54,7 @@ export async function seedVaccinationSchedules(prisma: PrismaClient) {
 
   for (const item of standardItems) {
     await prisma.vaccinationScheduleItem.create({
-      data: { scheduleId: standardSchedule.id, ...item },
+      data: { scheduleId: standardSchedule.id, ...item, diseaseId: resolveItemDiseaseId(item.vaccineName) },
     });
   }
 
@@ -62,7 +86,7 @@ export async function seedVaccinationSchedules(prisma: PrismaClient) {
 
   for (const item of rossItems) {
     await prisma.vaccinationScheduleItem.create({
-      data: { scheduleId: rossSchedule.id, ...item },
+      data: { scheduleId: rossSchedule.id, ...item, diseaseId: resolveItemDiseaseId(item.vaccineName) },
     });
   }
 
@@ -96,7 +120,7 @@ export async function seedVaccinationSchedules(prisma: PrismaClient) {
 
   for (const item of zambiaItems) {
     await prisma.vaccinationScheduleItem.create({
-      data: { scheduleId: zambiaSchedule.id, ...item },
+      data: { scheduleId: zambiaSchedule.id, ...item, diseaseId: resolveItemDiseaseId(item.vaccineName) },
     });
   }
 

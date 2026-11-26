@@ -60,6 +60,7 @@ class _EntityTabState extends State<_EntityTab> {
   final _search = TextEditingController();
   List<dynamic> _items = [];
   List<dynamic> _breeds = [];
+  List<dynamic> _diseases = [];
   bool _loading = true;
   bool _canWrite = false;
   String? _error;
@@ -73,11 +74,16 @@ class _EntityTabState extends State<_EntityTab> {
       if (mounted) setState(() => _canWrite = v);
     });
     _load();
-    // Breeds are needed as a foreign key by targets/schedules — fetch once.
+    // Breeds/diseases are needed as foreign keys by targets/schedules — fetch once.
     if (_entity == 'performance-targets' ||
         _entity == 'vaccination-schedules') {
       Api.catalogue('breeds').then((b) {
         if (mounted) setState(() => _breeds = b);
+      }).catchError((_) {});
+    }
+    if (_entity == 'vaccination-schedules') {
+      Api.catalogue('diseases').then((d) {
+        if (mounted) setState(() => _diseases = d);
       }).catchError((_) {});
     }
   }
@@ -148,6 +154,7 @@ class _EntityTabState extends State<_EntityTab> {
           entity: _entity,
           item: item,
           breeds: _breeds,
+          diseases: _diseases,
         ),
       ),
     );
@@ -276,10 +283,12 @@ class _EntityEditor extends StatefulWidget {
   final String entity;
   final Map<String, dynamic>? item;
   final List<dynamic> breeds;
+  final List<dynamic> diseases;
   const _EntityEditor({
     required this.entity,
     required this.item,
     required this.breeds,
+    required this.diseases,
   });
 
   @override
@@ -311,6 +320,7 @@ class _EntityEditorState extends State<_EntityEditor> {
         'mortalityRate', 'symptoms', 'prevention', 'treatment',
         'supportiveTreatments', 'imageUrl', 'videoUrl', 'videoProvider',
         'sourcesJson', 'regionalNotesJson', 'evidenceJson',
+        'keywordsCsv', 'susceptibleAgeMinDays', 'susceptibleAgeMaxDays',
         'ageDays', 'targetWeight', 'targetFeed',
         'targetFcr', 'targetWater', 'sortOrder',
       ])
@@ -328,6 +338,7 @@ class _EntityEditorState extends State<_EntityEditor> {
           'ageDays': TextEditingController(text: _str(i['ageDays'])),
           'adminMethod': TextEditingController(text: _str(i['adminMethod'])),
           'notes': TextEditingController(text: _str(i['notes'])),
+          'diseaseId': i['diseaseId'] as String?,
         },
     ];
     _templateItems = [
@@ -350,6 +361,9 @@ class _EntityEditorState extends State<_EntityEditor> {
         return it['regionalNotes'] == null ? '' : jsonEncode(it['regionalNotes']);
       case 'evidenceJson':
         return it['evidence'] == null ? '' : jsonEncode(it['evidence']);
+      case 'keywordsCsv':
+        final kw = it['keywords'];
+        return kw is List ? kw.join(', ') : _str(kw);
       default:
         return _str(it[key]);
     }
@@ -427,10 +441,28 @@ class _EntityEditorState extends State<_EntityEditor> {
           'imageUrl': opt('imageUrl'),
           'videoUrl': opt('videoUrl'),
           'videoProvider': opt('videoProvider'),
-          if (optJson('sourcesJson') != null) 'sources': optJson('sourcesJson'),
-          if (optJson('regionalNotesJson') != null)
-            'regionalNotes': optJson('regionalNotesJson'),
-          if (optJson('evidenceJson') != null) 'evidence': optJson('evidenceJson'),
+          // Empty JSON textareas clear the field ([] / {} are valid clears).
+          'sources': optJson('sourcesJson') ?? <dynamic>[],
+          'regionalNotes': optJson('regionalNotesJson') ?? <String, dynamic>{},
+          'evidence': optJson('evidenceJson') ?? <String, dynamic>{},
+          // Empty keywords clears the list; empty age fields send null (clear).
+          'keywords': _c['keywordsCsv']!.text
+              .split(',')
+              .map((k) => k.trim())
+              .where((k) => k.isNotEmpty)
+              .toList(),
+          'susceptibleAgeMinDays': _c['susceptibleAgeMinDays']!.text
+                  .trim()
+                  .isEmpty
+              ? null
+              : int.tryParse(_c['susceptibleAgeMinDays']!.text.trim()) ??
+                  _c['susceptibleAgeMinDays']!.text.trim(),
+          'susceptibleAgeMaxDays': _c['susceptibleAgeMaxDays']!.text
+                  .trim()
+                  .isEmpty
+              ? null
+              : int.tryParse(_c['susceptibleAgeMaxDays']!.text.trim()) ??
+                  _c['susceptibleAgeMaxDays']!.text.trim(),
         };
       case 'breeds':
         return {
@@ -476,6 +508,7 @@ class _EntityEditorState extends State<_EntityEditor> {
                   'notes': _scheduleItems[idx]['notes']!.text.trim().isEmpty
                       ? null
                       : _scheduleItems[idx]['notes']!.text.trim(),
+                  'diseaseId': _scheduleItems[idx]['diseaseId'] as String?,
                 },
           ],
         };
@@ -612,6 +645,19 @@ class _EntityEditorState extends State<_EntityEditor> {
               hint: '{"general":"…","ZM":"…","KE":"…"}'),
           tf('evidenceJson', 'Evidence levels (JSON object)', maxLines: 2,
               hint: '{"prevention":"veterinary-recommended"}'),
+          tf('keywordsCsv', 'Keywords (comma-separated)',
+              hint: 'e.g. coccidiosis, chicken'),
+          Row(children: [
+            Expanded(
+              child: tf('susceptibleAgeMinDays', 'Susceptible from (day of age)',
+                  kb: TextInputType.number),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: tf('susceptibleAgeMaxDays', 'Susceptible until (day of age)',
+                  kb: TextInputType.number),
+            ),
+          ]),
         ];
       case 'breeds':
         return [
@@ -653,6 +699,7 @@ class _EntityEditorState extends State<_EntityEditor> {
                   'ageDays': TextEditingController(text: '1'),
                   'adminMethod': TextEditingController(),
                   'notes': TextEditingController(),
+                  'diseaseId': null,
                 }));
           }),
           for (var idx = 0; idx < _scheduleItems.length; idx++)
@@ -746,7 +793,33 @@ class _EntityEditorState extends State<_EntityEditor> {
           f('ageDays', 'Day of age', kb: TextInputType.number),
           f('adminMethod', 'Method (e.g. eye drop)'),
           f('notes', 'Notes (optional)'),
+          _diseasePicker(item),
         ]),
+      ),
+    );
+  }
+
+  Widget _diseasePicker(Map<String, dynamic> item) {
+    const none = '__none__';
+    final current = item['diseaseId'] as String?;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: DropdownButtonFormField<String>(
+        initialValue: current ?? none,
+        isExpanded: true,
+        decoration: const InputDecoration(
+            labelText: 'Linked disease (optional)',
+            isDense: true,
+            border: OutlineInputBorder()),
+        items: [
+          const DropdownMenuItem(value: none, child: Text('— no disease link —')),
+          for (final d in widget.diseases)
+            DropdownMenuItem(
+                value: d['id'] as String, child: Text('${d['name']}')),
+        ],
+        onChanged: (v) => setState(() {
+          item['diseaseId'] = v == none ? null : v;
+        }),
       ),
     );
   }

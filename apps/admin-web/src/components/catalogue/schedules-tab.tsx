@@ -1,6 +1,6 @@
 "use client";
 
-import { EntityCrud, useCatalogueBreeds } from "./entity-crud";
+import { EntityCrud, useCatalogueBreeds, useCatalogueDiseases } from "./entity-crud";
 import type { CatalogueScheduleItem, CatalogueVaccinationSchedule } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ interface ScheduleDraft {
 }
 
 const NO_BREED = "__none__";
+const NO_DISEASE = "__none__";
 
 const EMPTY: ScheduleDraft = {
   name: "",
@@ -42,10 +43,12 @@ const EMPTY_ITEM: CatalogueScheduleItem = {
   adminMethod: "",
   sortOrder: 0,
   notes: "",
+  diseaseId: null,
 };
 
 export function SchedulesTab() {
   const breeds = useCatalogueBreeds(true);
+  const diseases = useCatalogueDiseases(true);
 
   return (
     <EntityCrud<CatalogueVaccinationSchedule, ScheduleDraft>
@@ -115,6 +118,7 @@ export function SchedulesTab() {
             adminMethod: i.adminMethod,
             sortOrder: i.sortOrder,
             notes: i.notes ?? "",
+            diseaseId: i.diseaseId ?? null,
           })),
       })}
       toPayload={(d) => ({
@@ -131,6 +135,7 @@ export function SchedulesTab() {
             adminMethod: i.adminMethod.trim() || "other",
             sortOrder: idx,
             notes: i.notes?.trim() || null,
+            diseaseId: i.diseaseId ?? null,
           })),
       })}
       canSubmit={(d) => !!d.name.trim()}
@@ -209,7 +214,7 @@ export function SchedulesTab() {
                 {draft.items.map((item, idx) => (
                   <div
                     key={idx}
-                    className="grid grid-cols-[1fr_1fr_72px_1fr_1fr_32px] items-center gap-2 rounded-md border p-2"
+                    className="grid grid-cols-[1fr_1fr_72px_1fr_1fr_1fr_32px] items-center gap-2 rounded-md border p-2"
                   >
                     <Input
                       className="h-8"
@@ -279,6 +284,31 @@ export function SchedulesTab() {
                         })
                       }
                     />
+                    <Select
+                      value={item.diseaseId ?? NO_DISEASE}
+                      onValueChange={(v) =>
+                        setDraft({
+                          ...draft,
+                          items: draft.items.map((x, j) =>
+                            j === idx
+                              ? { ...x, diseaseId: v === NO_DISEASE ? null : v }
+                              : x
+                          ),
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Disease (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_DISEASE}>— no disease link —</SelectItem>
+                        {diseases.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <button
                       type="button"
                       title="Remove item"
@@ -291,12 +321,13 @@ export function SchedulesTab() {
                     </button>
                   </div>
                 ))}
-                <div className="grid grid-cols-[1fr_1fr_72px_1fr_1fr_32px] gap-2 px-2 text-[11px] text-muted-foreground">
+                <div className="grid grid-cols-[1fr_1fr_72px_1fr_1fr_1fr_32px] gap-2 px-2 text-[11px] text-muted-foreground">
                   <span>Vaccine</span>
                   <span>Type</span>
                   <span>Day</span>
                   <span>Method</span>
                   <span>Notes</span>
+                  <span>Disease</span>
                   <span></span>
                 </div>
               </div>

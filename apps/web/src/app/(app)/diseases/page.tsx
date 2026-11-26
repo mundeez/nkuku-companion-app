@@ -32,6 +32,7 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   "university-extension": "University extension",
   "industry": "Industry reference",
   "ngo": "NGO / International org",
+  "media": "Media / Image credit",
 };
 
 function videoEmbedUrl(disease: Disease): string | null {

@@ -22,6 +22,9 @@ interface DiseaseDraft {
   sourcesJson: string;
   regionalNotesJson: string;
   evidenceJson: string;
+  keywordsCsv: string;
+  susceptibleAgeMinDays: string;
+  susceptibleAgeMaxDays: string;
 }
 
 const EMPTY: DiseaseDraft = {
@@ -39,6 +42,9 @@ const EMPTY: DiseaseDraft = {
   sourcesJson: "",
   regionalNotesJson: "",
   evidenceJson: "",
+  keywordsCsv: "",
+  susceptibleAgeMinDays: "",
+  susceptibleAgeMaxDays: "",
 };
 
 const TEXT_FIELDS: { key: keyof DiseaseDraft; label: string; textarea?: boolean }[] = [
@@ -62,6 +68,20 @@ function parseJsonField<T>(raw: string, field: string): T | undefined {
 
 function jsonOrEmpty(value: unknown): string {
   return value == null ? "" : JSON.stringify(value, null, 2);
+}
+
+function parseKeywordsCsv(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
+function parseNullableInt(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
 export function DiseasesTab() {
@@ -111,6 +131,9 @@ export function DiseasesTab() {
         sourcesJson: jsonOrEmpty(d.sources),
         regionalNotesJson: jsonOrEmpty(d.regionalNotes),
         evidenceJson: jsonOrEmpty(d.evidence),
+        keywordsCsv: (d.keywords ?? []).join(", "),
+        susceptibleAgeMinDays: d.susceptibleAgeMinDays?.toString() ?? "",
+        susceptibleAgeMaxDays: d.susceptibleAgeMaxDays?.toString() ?? "",
       })}
       toPayload={(d) => ({
         name: d.name.trim(),
@@ -125,9 +148,14 @@ export function DiseasesTab() {
         imageUrl: d.imageUrl.trim() || null,
         videoUrl: d.videoUrl.trim() || null,
         videoProvider: d.videoProvider || null,
-        sources: parseJsonField(d.sourcesJson, "Sources"),
-        regionalNotes: parseJsonField(d.regionalNotesJson, "Regional notes"),
-        evidence: parseJsonField(d.evidenceJson, "Evidence"),
+        // Empty JSON textareas clear the field ([] / {} are valid clears).
+        sources: parseJsonField(d.sourcesJson, "Sources") ?? [],
+        regionalNotes: parseJsonField(d.regionalNotesJson, "Regional notes") ?? {},
+        evidence: parseJsonField(d.evidenceJson, "Evidence") ?? {},
+        // Empty keywords clears the list; empty age fields send null (clear).
+        keywords: parseKeywordsCsv(d.keywordsCsv),
+        susceptibleAgeMinDays: parseNullableInt(d.susceptibleAgeMinDays),
+        susceptibleAgeMaxDays: parseNullableInt(d.susceptibleAgeMaxDays),
       })}
       canSubmit={(d) => !!d.name.trim() && !!d.category.trim()}
       dialogTitle={(d) => (d ? `Edit disease — ${d.name}` : "New disease")}
@@ -177,6 +205,43 @@ export function DiseasesTab() {
               />
             </div>
           ))}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1 sm:col-span-1">
+              <Label htmlFor="d-keywordsCsv">Keywords (comma-separated)</Label>
+              <Input
+                id="d-keywordsCsv"
+                placeholder="e.g. coccidiosis, chicken"
+                value={draft.keywordsCsv}
+                onChange={(e) => setDraft({ ...draft, keywordsCsv: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="d-susceptibleAgeMinDays">Susceptible from (day of age)</Label>
+              <Input
+                id="d-susceptibleAgeMinDays"
+                type="number"
+                min={0}
+                placeholder="e.g. 7"
+                value={draft.susceptibleAgeMinDays}
+                onChange={(e) =>
+                  setDraft({ ...draft, susceptibleAgeMinDays: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="d-susceptibleAgeMaxDays">Susceptible until (day of age)</Label>
+              <Input
+                id="d-susceptibleAgeMaxDays"
+                type="number"
+                min={0}
+                placeholder="e.g. 56"
+                value={draft.susceptibleAgeMaxDays}
+                onChange={(e) =>
+                  setDraft({ ...draft, susceptibleAgeMaxDays: e.target.value })
+                }
+              />
+            </div>
+          </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1">
               <Label htmlFor="d-imageUrl">Image URL (https)</Label>

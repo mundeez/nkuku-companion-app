@@ -475,6 +475,9 @@ export interface CatalogueDisease {
   sources: CatalogueDiseaseSource[] | null;
   regionalNotes: Record<string, string> | null;
   evidence: Partial<Record<"prevention" | "treatment" | "supportiveTreatments", CatalogueDiseaseEvidenceLevel>> | null;
+  keywords?: string[] | null;
+  susceptibleAgeMinDays?: number | null;
+  susceptibleAgeMaxDays?: number | null;
 }
 
 export interface CatalogueBreed {
@@ -504,6 +507,7 @@ export interface CatalogueScheduleItem {
   adminMethod: string;
   sortOrder: number;
   notes?: string | null;
+  diseaseId?: string | null;
 }
 
 export interface CatalogueVaccinationSchedule {

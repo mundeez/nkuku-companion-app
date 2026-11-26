@@ -53,7 +53,17 @@ export function FlockVaccinationSchedule({ flockId }: { flockId: string }) {
               {schedule.items.map((item) => (
                 <tr key={item.id} className="border-b last:border-0">
                   <td className="p-2 font-medium">{item.displayDay ?? item.ageDays + 1}</td>
-                  <td className="p-2">{item.vaccineName}</td>
+                  <td className="p-2">
+                    {item.vaccineName}
+                    {item.disease && (
+                      <div className="text-xs text-muted-foreground">
+                        Protects against:{" "}
+                        <Link href="/diseases" className="text-primary hover:underline">
+                          {item.disease.name}
+                        </Link>
+                      </div>
+                    )}
+                  </td>
                   <td className="p-2 text-muted-foreground">{item.vaccineType}</td>
                   <td className="p-2 text-muted-foreground">{item.adminMethod}</td>
                   <td className="p-2 text-muted-foreground max-w-xs truncate">{item.notes || "—"}</td>

@@ -21,6 +21,7 @@ import '../../models/water_record.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/broiler_service.dart';
+import '../../widgets/disease_insights_card.dart';
 import '../../widgets/flock_charts.dart';
 import '../../widgets/record_card.dart';
 import '../../widgets/sale_detail_sheet.dart';
@@ -2139,6 +2140,14 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
     );
   }
 
+  String? _mortalitySubtitle(MortalityEvent r) {
+    final parts = <String>[
+      if (r.ageDays != null) 'Age day ${r.ageDays}',
+      if (r.disease != null) 'Disease: ${r.disease!.name}',
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
   Widget _buildMortalityTab() {
     final summary = _mortalitySummary;
     return RefreshIndicator(
@@ -2152,6 +2161,8 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               SummaryRow('Mortality rate', '${summary.mortalityRate}%'),
               SummaryRow('Current count', '${summary.currentCount}'),
             ]),
+          const SizedBox(height: 12),
+          DiseaseInsightsCard(flockId: widget.flockId),
           const SizedBox(height: 12),
           if (_mortalityEvents.isNotEmpty)
             MortalityChart(records: _mortalityEvents),
@@ -2172,7 +2183,7 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
               ),
             ..._mortalityEvents.reversed.map((r) => RecordCard(
                   title: '${r.count} birds · ${r.cause ?? 'Unknown cause'}',
-                  subtitle: r.ageDays != null ? 'Age day ${r.ageDays}' : null,
+                  subtitle: _mortalitySubtitle(r),
                   trailing:
                       Text(r.eventDate.toIso8601String().split('T').first),
                   onEdit: AuthService.canEdit
@@ -2273,6 +2284,12 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                                     style: TextStyle(
                                         fontSize: 11, color: Colors.grey[600]),
                                   ),
+                                  if (item.diseaseName != null &&
+                                      item.diseaseName!.isNotEmpty)
+                                    Text('Protects against: ${item.diseaseName}',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.green[700])),
                                 ],
                               ),
                             ),
@@ -2401,6 +2418,9 @@ class _FlockDetailScreenState extends State<FlockDetailScreen>
                   '${item.vaccineType.isNotEmpty ? ' · ${item.vaccineType}' : ''}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
+                if (item.diseaseName != null && item.diseaseName!.isNotEmpty)
+                  Text('Protects against: ${item.diseaseName}',
+                      style: TextStyle(fontSize: 11, color: Colors.green[700])),
                 if (item.notes != null && item.notes!.isNotEmpty)
                   Text(item.notes!,
                       style: TextStyle(fontSize: 11, color: Colors.grey[500])),

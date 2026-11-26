@@ -118,6 +118,14 @@ class _VaccinationSchedulesScreenState extends State<VaccinationSchedulesScreen>
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(fontSize: 12)),
+                                      if (item.diseaseName != null &&
+                                          item.diseaseName!.isNotEmpty)
+                                        Text('Protects against: ${item.diseaseName}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.green[700])),
                                       if (item.notes != null && item.notes!.isNotEmpty)
                                         Padding(
                                           padding: const EdgeInsets.only(top: 4),

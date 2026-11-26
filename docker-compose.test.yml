@@ -114,15 +114,18 @@ services:
       # No ntfy service in the test stack; alert delivery is best-effort and
       # failures are logged, not fatal.
       NTFY_BASE_URL: http://127.0.0.1:9
-    # Same mounts as the dev compose service — currently vestigial (the app
-    # runs from /workspace/apps/api), kept for parity so future WorkDir fixes
-    # behave identically in both stacks.
+    # Mounts target /workspace/apps/api — the actual WORKDIR of the test
+    # image. (Previously mounted under /app where nothing reads them.)
+    # NOTE: src/tests changes still require `up -d --build api` only when
+    # package.json/prisma schema change; TS source edits are picked up
+    # live because vitest reads from the mounted src.
     volumes:
-      - ./apps/api/src:/app/src:ro
-      - ./apps/api/prisma:/app/prisma:ro
-      - ./apps/api/tests:/app/tests:ro
-      - ./apps/api/vitest.config.ts:/app/vitest.config.ts:ro
-      - api_test_node_modules:/app/node_modules
+      - ./apps/api/src:/workspace/apps/api/src:ro
+      - ./apps/api/prisma:/workspace/apps/api/prisma:ro
+      - ./apps/api/tests:/workspace/apps/api/tests:ro
+      - ./apps/api/vitest.config.ts:/workspace/apps/api/vitest.config.ts:ro
+      # node_modules stays baked into the image (pnpm workspace layout) —
+      # do NOT volume-mount it or the install is shadowed.
     ports:
       - "127.0.0.1:3002:3001"
     depends_on:

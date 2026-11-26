@@ -653,6 +653,8 @@ class _AlertDetailSheet extends StatelessWidget {
               _detailRow(
                   'Flock', alert.flockName.isNotEmpty ? alert.flockName : '—'),
               _detailRow('Type', alert.alertType.replaceAll('_', ' ')),
+              if (alert.diseaseName != null && alert.diseaseName!.isNotEmpty)
+                _detailRow('Disease', alert.diseaseName!),
               _detailRow('Severity', alert.severity.toUpperCase()),
               _detailRow(
                   'Due Date', alert.dueDate.toIso8601String().split('T').first),

@@ -37,4 +37,9 @@ export interface DiseaseRecord {
   sources?: DiseaseSource[];
   regionalNotes?: Record<string, string>;
   evidence?: Record<string, EvidenceLevel>;
+  // Phase F: free-text cause-matching terms (synonyms, abbreviations,
+  // common misspellings) and the typical peak-risk age window in days.
+  keywords?: string[];
+  susceptibleAgeMinDays?: number | null;
+  susceptibleAgeMaxDays?: number | null;
 }

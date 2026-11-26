@@ -74,6 +74,7 @@ const alertTypeLabels: Record<string, string> = {
   withdrawal_due: "Withdrawal Due",
   vaccine_expiry: "Vaccine Expiry",
   task_due: "Task Due",
+  disease_risk: "Disease Risk",
 };
 
 export default function DashboardPage() {

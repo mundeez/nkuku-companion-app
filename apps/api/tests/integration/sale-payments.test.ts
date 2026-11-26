@@ -33,8 +33,16 @@ async function journalFor(sourceId: string, token: string) {
 }
 
 async function reversalOf(journalId: string, token: string) {
-  const { data } = await api('/api/v1/journal?limit=100', {}, token);
-  return ((data.data ?? data) as any[]).find((e: any) => e.reversesId === journalId);
+  // entryDate is a DATE — thousands of same-day rows make page-1 lookups
+  // nondeterministic, so paginate until the reversal is found.
+  for (let offset = 0; offset < 5000; offset += 100) {
+    const { data } = await api(`/api/v1/journal?limit=100&offset=${offset}`, {}, token);
+    const entries = (data.data ?? data) as any[];
+    const hit = entries.find((e: any) => e.reversesId === journalId);
+    if (hit) return hit;
+    if (entries.length < 100) return undefined;
+  }
+  return undefined;
 }
 
 describe('Sale Payments + AR posting', () => {

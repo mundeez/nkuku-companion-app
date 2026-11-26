@@ -367,6 +367,7 @@ class VaccinationScheduleItem {
   final bool isWaterRoute;
   final VaccineMixVolume? vaccineWater;
   final String? notes;
+  final String? diseaseName;
 
   VaccinationScheduleItem({
     required this.id,
@@ -378,6 +379,7 @@ class VaccinationScheduleItem {
     this.isWaterRoute = false,
     this.vaccineWater,
     this.notes,
+    this.diseaseName,
   }) : displayDay = displayDay ?? display_utils.displayDay(ageDays);
 
   factory VaccinationScheduleItem.fromJson(Map<String, dynamic> json) {
@@ -394,7 +396,18 @@ class VaccinationScheduleItem {
           ? VaccineMixVolume.fromJson(json['vaccineWater'])
           : null,
       notes: json['notes'],
+      diseaseName: _diseaseName(json),
     );
+  }
+
+  /// Phase F: schedule items may link to a disease via `diseaseId` +
+  /// embedded `disease: {id, name}`.
+  static String? _diseaseName(Map<String, dynamic> json) {
+    final disease = json['disease'];
+    if (disease is Map && disease['name'] != null) {
+      return disease['name'].toString();
+    }
+    return (json['diseaseName'] ?? json['disease_name'])?.toString();
   }
 }
 

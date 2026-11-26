@@ -9,6 +9,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Avian Tuberculosis (Mycobacterium avium)',
     category: 'Bacterial',
+    keywords: ['TB', 'tuberculosis', 'avian TB', 'mycobacterium'],
+    susceptibleAgeMinDays: null,
+    susceptibleAgeMaxDays: null,
     incubation: 'Weeks to months — a slow, chronic disease',
     mortalityRate: 'Variable; affected birds usually die eventually, losses are gradual',
     symptoms:
@@ -60,6 +63,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Aspergillosis (Brooder Pneumonia)',
     category: 'Fungal',
+    keywords: ['aspergillosis', 'aspergillus', 'brooder pneumonia', 'fungal pneumonia'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 21,
     incubation: 'Hours to days after heavy inhalation of fungal spores',
     mortalityRate: 'Can be high in young flocks; often 30–90% in severe outbreaks',
     symptoms:
@@ -105,6 +111,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Botulism (Clostridium botulinum Toxemia)',
     category: 'Bacterial',
+    keywords: ['botulism', 'botulinum', 'limberneck', 'paralysis'],
+    susceptibleAgeMinDays: null,
+    susceptibleAgeMaxDays: null,
     incubation: 'Hours to ~2 weeks after eating contaminated feed or carcasses',
     mortalityRate: 'Very high if untreated; most affected birds die within days',
     symptoms:
@@ -150,6 +159,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Fatty Liver Hemorrhagic Syndrome (FLHS)',
     category: 'Nutritional',
+    keywords: ['FLHS', 'fatty liver', 'liver hemorrhage', 'sudden death layer'],
+    susceptibleAgeMinDays: 120,
+    susceptibleAgeMaxDays: null,
     incubation: 'Develops over weeks to months of over-conditioning in high-producing birds',
     mortalityRate: 'Low flock-wide; sudden death of individual birds when the liver ruptures',
     symptoms:
@@ -200,6 +212,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Ascites / Pulmonary Hypertension Syndrome (PHS)',
     category: 'Management',
+    keywords: ['ascites', 'PHS', 'pulmonary hypertension', 'right heart failure', 'dropsy'],
+    susceptibleAgeMinDays: 21,
+    susceptibleAgeMaxDays: 42,
     incubation: 'Develops over the grow-out period, usually after 4–5 weeks of age',
     mortalityRate: 'Usually 1–5% of the flock; can exceed 10% in severe outbreaks',
     symptoms:
@@ -252,6 +267,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Tibial Dyschondroplasia (Leg Abnormality)',
     category: 'Nutritional',
+    keywords: ['TD', 'tibial dyschondroplasia', 'leg abnormality', 'angular leg', 'slipped tendon', 'perosis'],
+    susceptibleAgeMinDays: 14,
+    susceptibleAgeMaxDays: 35,
     incubation: 'Develops during rapid growth, typically visible at 14–25 days of age',
     mortalityRate: 'Low directly; causes lameness, poor welfare and some culling',
     symptoms:
@@ -296,6 +314,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Omphalitis / Yolk Sac Infection (Mushy Chick Disease)',
     category: 'Bacterial',
+    keywords: ['omphalitis', 'yolk sac', 'mushy chick', 'navel infection', 'unabsorbed yolk'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 10,
     incubation: 'Within the first few days of life, usually before the navel heals',
     mortalityRate: 'High in affected chicks; most die within the first week',
     symptoms:
@@ -346,6 +367,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Footpad Dermatitis / Pododermatitis (Bumblefoot Lesions)',
     category: 'Management',
+    keywords: ['footpad', 'pododermatitis', 'bumblefoot', 'foot lesion', 'hock burn'],
+    susceptibleAgeMinDays: 21,
+    susceptibleAgeMaxDays: null,
     incubation: 'Develops over days to weeks of exposure to wet, irritating litter',
     mortalityRate: 'Low directly; secondary infection can cause lameness and some deaths',
     symptoms:
@@ -397,6 +421,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Ammonia Toxicity / Poor Air Quality',
     category: 'Management',
+    keywords: ['ammonia', 'air quality', 'respiratory irritation', 'poor ventilation'],
+    susceptibleAgeMinDays: null,
+    susceptibleAgeMaxDays: null,
     incubation: 'Develops over days of exposure to accumulated ammonia in poorly ventilated houses',
     mortalityRate: 'Indirect — increases disease susceptibility and mortality, especially near market age',
     symptoms:
@@ -448,6 +475,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Avian Leukosis (Avian Leukosis Virus / ALV)',
     category: 'Viral',
+    keywords: ['ALV', 'leukosis', 'av leukosis', 'lymphoid leukosis'],
+    susceptibleAgeMinDays: null,
+    susceptibleAgeMaxDays: null,
     incubation: 'Months — disease typically appears in birds over 16 weeks old',
     mortalityRate: 'Typically 1–2% of birds; can exceed 20% in severe outbreaks',
     symptoms:
@@ -498,6 +528,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Reovirus Infection / Malabsorption Syndrome',
     category: 'Viral',
+    keywords: ['reovirus', 'malabsorption', 'runting', 'stunting'],
+    susceptibleAgeMinDays: 7,
+    susceptibleAgeMaxDays: 28,
     incubation: 'Variable — malabsorption typically seen at 3–6 weeks of age',
     mortalityRate: 'Low for malabsorption syndrome; moderate in severe tenosynovitis outbreaks',
     symptoms:
@@ -548,6 +581,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Staphylococcosis (Staphylococcus aureus Infection)',
     category: 'Bacterial',
+    keywords: ['staph', 'staphylococcus', 'bumblefoot', 'septicemia', 'S.aureus'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 42,
     incubation: 'Variable — depends on entry point and immune status of the bird',
     mortalityRate: 'Variable; high in systemic disease or bacterial chondronecrosis outbreaks',
     symptoms:
@@ -592,6 +628,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Inclusion Body Hepatitis (IBH — Fowl Adenovirus)',
     category: 'Viral',
+    keywords: ['IBH', 'inclusion body hepatitis', 'adenovirus', 'fowl adenovirus'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 28,
     incubation: 'Usually 3–5 weeks of age in broilers',
     mortalityRate: 'Can cause sudden mortality of 10–30% in affected flocks',
     symptoms:
@@ -636,6 +675,9 @@ export const diseasesPart3: DiseaseRecord[] = [
   {
     name: 'Infectious Synovitis (Mycoplasma synoviae)',
     category: 'Bacterial',
+    keywords: ['synovitis', 'mycoplasma synoviae', 'MS', 'swollen joints', 'hock synovitis'],
+    susceptibleAgeMinDays: 21,
+    susceptibleAgeMaxDays: null,
     incubation: 'Variable — often 4–16 weeks, but can be earlier',
     mortalityRate: 'Low–moderate; mainly causes lameness and reduced performance',
     symptoms:

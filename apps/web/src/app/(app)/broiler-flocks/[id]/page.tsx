@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast-provider";
 import { apiFetch } from "@/lib/api/client";
 import { useFlock, useUpdateFlock, useApiQuery, useApiMutation } from "@/lib/api/hooks";
-import { BroilerFlock, GrowthRecord, FeedRecord, FeedPurchase, FeedProjectionResult, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier, ChickAddition, ChickAdditionReason } from "@/lib/types";
+import { BroilerFlock, GrowthRecord, FeedRecord, FeedPurchase, FeedProjectionResult, WaterRecord, MortalityEvent, VaccinationEvent, FinancialRecord, Supplier, ChickAddition, ChickAdditionReason, Disease, DiseaseInsights } from "@/lib/types";
 import { FeedProjectionTable } from "@/components/feed-projection-table";
 import { FlockVaccinationSchedule } from "@/components/flock-vaccination-schedule";
 import { useHatchDayConvention, displayDay } from "@/lib/day-convention";
@@ -887,7 +887,12 @@ export default function FlockDetailPage() {
           </div>
         </TabsContent>
         <TabsContent value="water"><SimpleRecordTab flockId={flockId} records={waterRecords} type="water" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
-        <TabsContent value="mortality"><SimpleRecordTab flockId={flockId} records={mortalityEvents} type="mortality" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
+        <TabsContent value="mortality">
+          <div className="space-y-6">
+            <DiseaseInsightsCard flockId={flockId} />
+            <SimpleRecordTab flockId={flockId} records={mortalityEvents} type="mortality" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} />
+          </div>
+        </TabsContent>
         <TabsContent value="vaccination"><SimpleRecordTab flockId={flockId} records={vaccinationEvents} type="vaccination" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
         <TabsContent value="financial"><SimpleRecordTab flockId={flockId} records={financialRecords} type="financial" onRefresh={refetchAll} canEdit={canCreateEdit} userRole={user?.role} /></TabsContent>
       </Tabs>
@@ -1011,6 +1016,90 @@ export default function FlockDetailPage() {
   );
 }
 
+function DiseaseInsightsCard({ flockId }: { flockId: string }) {
+  const { data, isLoading, error } = useApiQuery<DiseaseInsights>(
+    `/api/v1/broiler-flocks/${flockId}/disease-insights`,
+    { enabled: !!flockId }
+  );
+
+  // Endpoint may not be deployed yet — degrade silently
+  if (error) return null;
+
+  const hasContent = data && (data.watchlist.length > 0 || data.matches.length > 0);
+  if (!isLoading && !hasContent) return null;
+
+  return (
+    <Card>
+      <CardHeader className="py-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Activity className="h-4 w-4 text-red-600" />
+          Disease Insights
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Analysing mortality causes…</p>
+        ) : (
+          <div className="space-y-4">
+            {data!.watchlist.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">Watchlist — diseases to monitor</h4>
+                <div className="space-y-2">
+                  {data!.watchlist.map((w) => (
+                    <div key={w.disease.id} className="rounded-md border p-3 text-sm">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link href="/diseases" className="font-medium text-primary hover:underline">
+                          {w.disease.name}
+                        </Link>
+                        <Badge variant="secondary" className="text-xs">{w.disease.category}</Badge>
+                      </div>
+                      <p className="text-muted-foreground mt-1">{w.reason}</p>
+                      {w.regionalNote && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">Regional note: {w.regionalNote}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {data!.matches.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">Possible causes for recorded mortality</h4>
+                <div className="space-y-3">
+                  {data!.matches.map((m) => (
+                    <div key={m.mortalityEventId} className="rounded-md border p-3 text-sm">
+                      <p className="font-medium mb-2">
+                        Cause: <span className="text-muted-foreground">{m.cause || "Unknown"}</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {m.suggestions.map((s) => (
+                          <Link key={s.disease.id} href="/diseases">
+                            <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent">
+                              {s.disease.name}
+                              <span className="ml-1 text-muted-foreground">
+                                {s.score}
+                              </span>
+                            </Badge>
+                          </Link>
+                        ))}
+                      </div>
+                      {m.suggestions[0]?.regionalNote && (
+                        <p className="text-xs text-muted-foreground mt-2 italic">
+                          Regional note ({m.suggestions[0].disease.name}): {m.suggestions[0].regionalNote}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole, suppliers, breedId, startDate }: any) {
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -1023,6 +1112,9 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const { data: diseases = [] } = useApiQuery<Disease[]>("/api/v1/diseases", {
+    enabled: type === "mortality",
+  });
 
   const titles: any = {
     growth: { title: "Growth Records", icon: TrendingUp, endpoint: "/api/v1/growth-records", fields: [
@@ -1047,6 +1139,7 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       { key: "eventDate", label: "Date", type: "date" },
       { key: "count", label: "Number of Birds", type: "number" },
       { key: "cause", label: "Cause", type: "text" },
+      { key: "diseaseId", label: "Suspected Disease", type: "disease-select" },
       { key: "ageDays", label: "Age (days)", type: "number" },
       { key: "costZmw", label: "Disposal Cost (ZMW)", type: "number" },
     ]},
@@ -1079,6 +1172,8 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       delete body._bagPriceZmw;
       delete body.bagCount;
       if (body.supplierId === "custom") delete body.supplierId;
+      // disease-select stores "" for "None" — send explicit null so the API clears the link
+      if (body.diseaseId !== undefined) body.diseaseId = body.diseaseId || null;
 
       if (isEditing) {
         await apiFetch(`${config.endpoint}/${editingRecord.id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -1317,6 +1412,17 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       );
     }
 
+    if (f.type === "disease-select") {
+      return (
+        <select key={f.key} className="w-full border rounded-md p-2 bg-background text-foreground" value={val || ""} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}>
+          <option value="">None</option>
+          {diseases.map((d: Disease) => (
+            <option key={d.id} value={d.id}>{d.name}</option>
+          ))}
+        </select>
+      );
+    }
+
     if (f.type === "select") {
       return (
         <select key={f.key} className="w-full border rounded-md p-2 bg-background text-foreground" value={val} onChange={async (e) => {
@@ -1392,7 +1498,17 @@ function SimpleRecordTab({ flockId, records, type, onRefresh, canEdit, userRole,
       );
     }
     if (type === "water") return <span>{r.quantityLiters} liters {r.ph && `| pH ${r.ph}`} {r.costZmw && `| ZMW ${r.costZmw}`}</span>;
-    if (type === "mortality") return <span className="text-red-700">{r.count} deaths - {r.cause || "Unknown"} {r.costZmw && `| ZMW ${r.costZmw}`}</span>;
+    if (type === "mortality") return (
+      <span className="text-red-700 flex items-center gap-2 flex-wrap">
+        {r.count} deaths - {r.cause || "Unknown"}
+        {r.disease && (
+          <Link href="/diseases" className="inline-flex">
+            <Badge variant="secondary" className="text-xs">{r.disease.name}</Badge>
+          </Link>
+        )}
+        {r.costZmw && `| ZMW ${r.costZmw}`}
+      </span>
+    );
     if (type === "vaccination") return <span className="text-green-700">{r.vaccineName} | {r.adminMethod} {r.costZmw && `| ZMW ${r.costZmw}`}</span>;
     if (type === "financial") return <span className={r.isIncome ? "text-green-700" : ""}>{r.category}: {r.description} | ZMW {r.amountZmw} {r.isIncome && "(Income)"}</span>;
     return null;

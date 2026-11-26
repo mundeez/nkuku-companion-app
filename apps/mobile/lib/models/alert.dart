@@ -12,6 +12,7 @@ class Alert {
   final bool isRead;
   final bool isResolved;
   final DateTime? createdAt;
+  final Map<String, dynamic>? disease;
 
   Alert({
     required this.id,
@@ -25,6 +26,7 @@ class Alert {
     required this.isRead,
     required this.isResolved,
     this.createdAt,
+    this.disease,
   });
 
   factory Alert.fromJson(Map<String, dynamic> json) {
@@ -40,6 +42,9 @@ class Alert {
       isRead: json['isRead'] ?? json['is_read'] ?? false,
       isResolved: json['isResolved'] ?? json['is_resolved'] ?? false,
       createdAt: _toDateTime(json['createdAt'] ?? json['created_at']),
+      disease: json['disease'] is Map
+          ? Map<String, dynamic>.from(json['disease'])
+          : null,
     );
   }
 
@@ -60,6 +65,7 @@ class Alert {
     bool? isRead,
     bool? isResolved,
     DateTime? createdAt,
+    Map<String, dynamic>? disease,
   }) {
     return Alert(
       id: id ?? this.id,
@@ -73,6 +79,7 @@ class Alert {
       isRead: isRead ?? this.isRead,
       isResolved: isResolved ?? this.isResolved,
       createdAt: createdAt ?? this.createdAt,
+      disease: disease ?? this.disease,
     );
   }
 
@@ -101,6 +108,8 @@ class Alert {
         return Icons.monitor_weight;
       case 'mortality_threshold':
         return Icons.warning;
+      case 'disease_risk':
+        return Icons.coronavirus;
       case 'financial':
         return Icons.attach_money;
       case 'medication_due':
@@ -114,6 +123,9 @@ class Alert {
   }
 
   String get flockName => flock?['name'] as String? ?? '';
+
+  /// Name of the disease linked to a `disease_risk` alert, if any.
+  String? get diseaseName => disease?['name'] as String?;
 
   static DateTime? _toDateTime(dynamic value) {
     if (value == null) return null;

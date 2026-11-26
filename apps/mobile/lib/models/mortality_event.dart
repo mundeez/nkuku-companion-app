@@ -1,3 +1,5 @@
+import 'disease_ref.dart';
+
 class MortalityEvent {
   final String id;
   final String flockId;
@@ -7,6 +9,8 @@ class MortalityEvent {
   final int? ageDays;
   final double? costZmw;
   final String? notes;
+  final String? diseaseId;
+  final DiseaseRef? disease;
 
   MortalityEvent({
     required this.id,
@@ -17,6 +21,8 @@ class MortalityEvent {
     this.ageDays,
     this.costZmw,
     this.notes,
+    this.diseaseId,
+    this.disease,
   });
 
   factory MortalityEvent.fromJson(Map<String, dynamic> json) {
@@ -29,6 +35,8 @@ class MortalityEvent {
       ageDays: json['ageDays'] ?? json['age_days'],
       costZmw: _toDouble(json['costZmw'] ?? json['cost_zmw']),
       notes: json['notes'],
+      diseaseId: json['diseaseId'] ?? json['disease_id'],
+      disease: DiseaseRef.maybeFromJson(json['disease']),
     );
   }
 
@@ -41,6 +49,7 @@ class MortalityEvent {
       if (ageDays != null) 'ageDays': ageDays,
       if (costZmw != null) 'costZmw': costZmw,
       if (notes != null && notes!.isNotEmpty) 'notes': notes,
+      'diseaseId': diseaseId,
     };
   }
 
@@ -53,6 +62,8 @@ class MortalityEvent {
     int? ageDays,
     double? costZmw,
     String? notes,
+    String? diseaseId,
+    DiseaseRef? disease,
   }) {
     return MortalityEvent(
       id: id ?? this.id,
@@ -63,6 +74,8 @@ class MortalityEvent {
       ageDays: ageDays ?? this.ageDays,
       costZmw: costZmw ?? this.costZmw,
       notes: notes ?? this.notes,
+      diseaseId: diseaseId ?? this.diseaseId,
+      disease: disease ?? this.disease,
     );
   }
 

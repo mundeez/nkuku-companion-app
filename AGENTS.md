@@ -29,6 +29,9 @@ pnpm run test:stack:down         # down -v — destroys the test DB volume
 # Or inside an already-running test stack:
 docker compose -f docker-compose.test.yml exec api pnpm run test          # unit + integration
 docker compose -f docker-compose.test.yml exec api pnpm run test:unit     # no API needed
+# NOTE: src/tests/prisma are bind-mounted into the test container — TS
+# source edits are picked up live. Rebuild (`up -d --build api`) only when
+# package.json deps or the prisma schema change.
 # Or from the host (postgres-test is on 127.0.0.1:35432):
 API_URL=http://localhost:3002 \
   TEST_DATABASE_URL=postgresql://nkuku_user:test_password@127.0.0.1:35432/nkuku_test \

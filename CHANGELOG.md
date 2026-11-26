@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.60.0] — 2026-11-26
+
+### Next-queue phases A–F — disease↔flock integration, media self-hosting, regional content
+
+- **Phase A/B** — mobile release APK built and archived; `egm_lite_checklist.md`
+  protocol artifact recorded the queue execution.
+- **Phase C — media self-hosting** — new `apps/api/src/modules/media/` module:
+  public catalogue-media proxy serving self-hosted images/videos, `SOURCE_TYPES`
+  extended with `'media'` (web `SOURCE_TYPE_LABELS` updated), plus
+  `src/scripts/upload-catalogue-media.ts` upload script and DB `imageUrl`
+  backfill (data-only, no schema change).
+- **Phase D — housekeeping** — `docker-compose.test.yml` bind mounts fixed to
+  target the real WORKDIR `/workspace/apps/api` (previously `/app`, vestigial);
+  admin JSON-clear UX in `admin-web` diseases tab and `admin-mobile` catalogue
+  screen; alias-sunset prep: mobile now sends `X-App-Version` header (synced
+  with pubspec version) for API-side deprecation tracking.
+- **Phase E — regional content** — DB-only: `regional_notes` merged, 3 stub
+  diseases deleted (no code change).
+- **Phase F — disease↔flock integration** — three migrations
+  (`20261201000001` disease_flock_links, `20261201000002`
+  disease_risk_alert_unique_idx, `20261201000003` disease_fk_indexes);
+  `disease_id` FKs added to mortality_events, vaccination_events,
+  vaccination_schedule_items, alerts; `diseases.keywords` +
+  `susceptible_age` fields; new disease-insights endpoint; `disease_risk`
+  alert type with generation; `core/disease-matching.ts` matching service;
+  web/mobile/admin UI surfaces (disease insights card, disease refs on
+  mortality/vaccination forms, alerts); new `disease-links.test.ts`
+  integration suite.
+- **Tests** — `sale-payments.test.ts` reversalOf pagination fix and
+  `disease-links.test.ts` flockId filter + timeout fixes included.
+- **Version** — `pubspec.yaml` bumped to `1.60.0+164`.
+
 ## [1.59.0] — 2026-11-26
 
 ### Disease reference catalogue — source-cited, region-aware, media-ready

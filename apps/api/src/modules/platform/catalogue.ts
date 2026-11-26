@@ -49,6 +49,7 @@ const ScheduleItemSchema = z.object({
   adminMethod: z.string().min(1).max(50),
   sortOrder: z.number().int().default(0),
   notes: z.string().nullable().optional(),
+  diseaseId: z.string().uuid().nullable().optional(),
 });
 
 const VaccinationScheduleSchema = z.object({
@@ -168,6 +169,15 @@ export async function buildPlatformCatalogueModule(app: FastifyInstance) {
     const { items, ...fields } = data;
 
     if (entity === 'vaccination-schedules') {
+      if (items !== undefined) {
+        const diseaseIds = [...new Set(items.map((it: any) => it.diseaseId).filter(Boolean))];
+        if (diseaseIds.length) {
+          const found = await prisma.disease.count({ where: { id: { in: diseaseIds } } });
+          if (found !== diseaseIds.length) {
+            throw Object.assign(new Error('DISEASE_NOT_FOUND'), { code: 'DISEASE_NOT_FOUND' });
+          }
+        }
+      }
       return prisma.$transaction(async (tx: any) => {
         const row = id
           ? await tx.vaccinationSchedule.update({ where: { id }, data: fields })
@@ -246,6 +256,7 @@ export async function buildPlatformCatalogueModule(app: FastifyInstance) {
       // Unique violations (duplicate disease name, breed name, (breedId,
       // ageDays) pair, schedule name, template category) → 409.
       if (err?.code === 'P2002') return reply.status(409).send({ error: 'ALREADY_EXISTS' });
+      if (err?.code === 'DISEASE_NOT_FOUND') return reply.status(400).send({ error: 'DISEASE_NOT_FOUND' });
       throw err;
     }
 
@@ -289,6 +300,7 @@ export async function buildPlatformCatalogueModule(app: FastifyInstance) {
       row = await writeWithItems(entity, body, id);
     } catch (err: any) {
       if (err?.code === 'P2002') return reply.status(409).send({ error: 'ALREADY_EXISTS' });
+      if (err?.code === 'DISEASE_NOT_FOUND') return reply.status(400).send({ error: 'DISEASE_NOT_FOUND' });
       if (err?.code === 'P2025') return reply.status(404).send({ error: 'NOT_FOUND' });
       throw err;
     }

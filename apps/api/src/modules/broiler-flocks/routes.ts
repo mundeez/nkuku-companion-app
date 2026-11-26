@@ -15,6 +15,7 @@ import { resolveVaccinationSchedule } from '../../core/vaccination-schedule.reso
 import { computeDailyWater, computeVaccineMixVolume, isWaterRoute } from '../../core/water-requirement.service.js';
 import { buildVaccinationDayNotes } from '../../core/vaccination-notes.js';
 import { displayDayOf } from '../../core/day-convention.js';
+import { scoreCauseAgainstDiseases } from '../../core/disease-matching.js';
 
 const dateOrIso = z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
@@ -909,6 +910,98 @@ export async function buildBroilerFlockModule(app: FastifyInstance) {
       targetFcr: target?.targetFcr ?? null,
       mortalityRate,
     };
+  });
+
+  // GET /api/v1/broiler-flocks/:id/disease-insights — Phase F disease↔flock
+  // integration: mortality-cause → disease suggestions (last 30d) plus an
+  // age-window watchlist of diseases the flock is currently susceptible to.
+  app.get('/:id/disease-insights', { preHandler: [authenticate] }, async (request, reply) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const organizationId = getOrganizationId(request);
+
+    const flock = await prisma.broilerFlock.findFirst({
+      where: { id, organizationId },
+      select: { id: true, startDate: true },
+    });
+    if (!flock) return reply.status(404).send({ error: 'NOT_FOUND' });
+
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { country: true },
+    });
+    const country = org?.country ? org.country.toUpperCase() : null;
+
+    // Compile the disease index once per request (the table is small).
+    const diseases = await prisma.disease.findMany({
+      select: {
+        id: true, name: true, category: true, keywords: true,
+        susceptibleAgeMinDays: true, susceptibleAgeMaxDays: true,
+        regionalNotes: true,
+      },
+    });
+
+    const regionalNoteFor = (d: any): string | undefined => {
+      const notes = d?.regionalNotes as Record<string, string> | null;
+      if (!notes) return undefined;
+      return notes[country ?? ''] ?? notes.general;
+    };
+
+    // ── Matches: mortality events (last 30d) with a recorded cause ──
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const mortalityEvents = await prisma.mortalityEvent.findMany({
+      where: {
+        flockId: id,
+        eventDate: { gte: since },
+        OR: [{ cause: { not: null } }, { diseaseId: { not: null } }],
+      },
+      select: { id: true, cause: true, diseaseId: true },
+      orderBy: { eventDate: 'desc' },
+    });
+
+    const diseaseById = new Map(diseases.map((d: any) => [d.id, d]));
+    const toSuggestion = (d: any, score: number) => ({
+      disease: { id: d.id, name: d.name, category: d.category },
+      score,
+      regionalNote: regionalNoteFor(d),
+    });
+    const matches = mortalityEvents
+      .map((e: any) => {
+        const suggestions = scoreCauseAgainstDiseases(e.cause, diseases).map((m: any) =>
+          toSuggestion(diseaseById.get(m.disease.id) as any, m.score),
+        );
+        // An explicit diseaseId link is stronger evidence than text matching —
+        // surface it first even when the cause is blank or unmatched.
+        if (e.diseaseId) {
+          const linked = diseaseById.get(e.diseaseId) as any;
+          if (linked && !suggestions.some((s: any) => s.disease.id === linked.id)) {
+            suggestions.unshift(toSuggestion(linked, 100));
+          }
+        }
+        return { mortalityEventId: e.id, cause: e.cause, suggestions };
+      })
+      .filter((m: any) => m.suggestions.length > 0);
+
+    // ── Watchlist: diseases whose susceptible age window brackets flock age ──
+    const watchlist: any[] = [];
+    if (flock.startDate) {
+      const ageDays = Math.floor((Date.now() - new Date(flock.startDate).getTime()) / (1000 * 60 * 60 * 24));
+      for (const d of diseases as any[]) {
+        const min = d.susceptibleAgeMinDays;
+        const max = d.susceptibleAgeMaxDays;
+        if (min == null && max == null) continue; // both null → age-independent, ineligible
+        const aboveMin = min == null || ageDays >= min;
+        const belowMax = max == null || ageDays <= max;
+        if (aboveMin && belowMax) {
+          watchlist.push({
+            disease: { id: d.id, name: d.name, category: d.category },
+            reason: `Susceptible age window ${min ?? 'any'}–${max ?? 'any'}d; flock is ${ageDays}d old`,
+            regionalNote: regionalNoteFor(d),
+          });
+        }
+      }
+    }
+
+    return { matches, watchlist };
   });
 
   // GET /api/v1/broiler-flocks/:id/feed-projection

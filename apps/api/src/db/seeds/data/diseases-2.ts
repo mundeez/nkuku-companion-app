@@ -9,6 +9,9 @@ export const diseasesPart2: DiseaseRecord[] = [
   {
     name: 'Fowl Typhoid',
     category: 'Bacterial',
+    keywords: ['fowl typhoid', 'salmonella gallinarum', 'typhoid'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 42,
     incubation: 'About 5–14 days after infection; clinical signs may not appear for the first 5–10 days in chicks.',
     mortalityRate: 'Variable; often high (mortality reported up to ~40–80% in affected young birds) and can be higher in older birds than in pullorum disease.',
     symptoms:
@@ -61,6 +64,9 @@ export const diseasesPart2: DiseaseRecord[] = [
   {
     name: 'Infectious Coryza',
     category: 'Bacterial',
+    keywords: ['coryza', 'haemophilus', 'infectious coryza', 'IC'],
+    susceptibleAgeMinDays: 28,
+    susceptibleAgeMaxDays: null,
     incubation: 'Usually 24–48 hours after exposure; signs can appear within a day or two of birds contacting infected birds or contaminated material.',
     mortalityRate: 'Variable; mortality up to ~50% has been reported but ~20% is more typical, and much of the loss comes from secondary infections.',
     symptoms:
@@ -107,6 +113,9 @@ export const diseasesPart2: DiseaseRecord[] = [
   {
     name: 'Heat Stress / Thermal Stress in Broilers',
     category: 'Management',
+    keywords: ['heat stress', 'thermal stress', 'heat stroke', 'overheating', 'hot weather'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 21,
     mortalityRate: 'Acute heat-stress episodes can kill birds within hours, especially heavier birds; mortality rises sharply when high temperature combines with high humidity.',
     symptoms:
       'Panting (open-mouth breathing), wings held away from the body, increased water intake, reduced feed intake, lethargy and crowding near cool spots. Birds may huddle, lose weight, develop pale or bruised breast muscle (woody breast/spaghetti meat defects), and in severe cases die suddenly of heat exhaustion. Young and fast-growing broilers are most vulnerable because they generate the most body heat.',
@@ -160,6 +169,9 @@ export const diseasesPart2: DiseaseRecord[] = [
   {
     name: 'Mycotoxicosis (Mycotoxin Poisoning in Feed)',
     category: 'Nutritional',
+    keywords: ['mycotoxin', 'mycotoxicosis', 'aflatoxin', 'fusarium', 'mold', 'mould', 'feed poisoning'],
+    susceptibleAgeMinDays: null,
+    susceptibleAgeMaxDays: null,
     incubation: 'Chronic mycotoxicosis develops over days to weeks of continuous low-level intake; acute poisoning can appear within days of feeding highly contaminated feed.',
     mortalityRate: 'Variable and dose-dependent; high levels cause significant morbidity and mortality, while low chronic levels cause poor growth and reduced disease resistance without obvious deaths.',
     symptoms:
@@ -220,6 +232,9 @@ export const diseasesPart2: DiseaseRecord[] = [
   {
     name: 'Avian Encephalomyelitis (Epidemic Tremor)',
     category: 'Viral',
+    keywords: ['AE', 'epidemic tremor', 'tremor', 'encephalomyelitis', 'ataxia'],
+    susceptibleAgeMinDays: 7,
+    susceptibleAgeMaxDays: 28,
     incubation: 'Typically signs appear at about 7–10 days of age in vertically infected chicks; horizontal spread after contact usually takes at least ~11 days.',
     mortalityRate: 'Variable; mortality in affected young flocks can reach ~75% in severe outbreaks, though many chicks show milder signs and recover.',
     symptoms:
@@ -272,6 +287,9 @@ export const diseasesPart2: DiseaseRecord[] = [
   {
     name: 'Fowl Cholera',
     category: 'Bacterial',
+    keywords: ['fowl cholera', 'pasteurella', 'cholera', 'avibacterium'],
+    susceptibleAgeMinDays: null,
+    susceptibleAgeMaxDays: null,
     incubation: 'Signs usually appear 3–7 days after exposure in acute cases; chronic forms may develop over weeks.',
     mortalityRate: 'Acute outbreaks can cause very high sudden mortality (often 50% or more of the flock) in susceptible birds; chronic and carrier forms cause lower losses.',
     symptoms:

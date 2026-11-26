@@ -27,7 +27,7 @@ function publishNtfy(topic: string, title: string, message: string, priority: 'd
 
 const AlertCreateSchema = z.object({
   flockId: z.string().uuid(),
-  alertType: z.enum(['temperature_adjustment', 'vaccination_due', 'feed_transition', 'weight_check', 'mortality_threshold', 'environmental', 'financial', 'medication_due', 'withdrawal_due', 'vaccine_expiry', 'environmental_threshold', 'task_due']),
+  alertType: z.enum(['temperature_adjustment', 'vaccination_due', 'feed_transition', 'weight_check', 'mortality_threshold', 'environmental', 'financial', 'medication_due', 'withdrawal_due', 'vaccine_expiry', 'environmental_threshold', 'task_due', 'disease_risk']),
   title: z.string().min(1).max(200),
   message: z.string().min(1),
   severity: z.enum(['info', 'warning', 'critical']).optional(),
@@ -58,7 +58,7 @@ export async function buildAlertModule(app: FastifyInstance) {
 
     return prisma.alert.findMany({
       where,
-      include: { flock: { select: { name: true } } },
+      include: { flock: { select: { name: true } }, disease: { select: { id: true, name: true } } },
       orderBy: orderBy(query.sortBy, query.sortDir, ['dueDate', 'severity', 'createdAt', 'title'], [
         { isResolved: 'asc' },
         { dueDate: 'asc' },
@@ -74,7 +74,7 @@ export async function buildAlertModule(app: FastifyInstance) {
 
     const alert = await prisma.alert.findFirst({
       where: { id, flock: { organizationId } },
-      include: { flock: { select: { name: true } } },
+      include: { flock: { select: { name: true } }, disease: { select: { id: true, name: true } } },
     });
     if (!alert) return reply.status(404).send({ error: 'NOT_FOUND' });
     return alert;
@@ -398,6 +398,68 @@ export async function buildAlertModule(app: FastifyInstance) {
             },
           })
         );
+      }
+
+      // Disease-risk alerts (Phase F): mortality events linked to a disease
+      // in the last 7 days raise a warning, with a 14-day cooldown per
+      // (flock, disease) measured on createdAt regardless of resolution.
+      // The partial unique index alerts_disease_risk_unique_idx backstops
+      // unresolved duplicates (P2002 → skip).
+      const recentDiseaseMortality = await prisma.mortalityEvent.findMany({
+        where: {
+          flockId: flock.id,
+          diseaseId: { not: null },
+          eventDate: { gte: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) },
+        },
+        select: { diseaseId: true },
+        distinct: ['diseaseId'],
+      });
+      const riskDiseaseIds = recentDiseaseMortality.map((m: any) => m.diseaseId).filter(Boolean);
+      if (riskDiseaseIds.length > 0) {
+        const riskDiseases = await prisma.disease.findMany({
+          where: { id: { in: riskDiseaseIds } },
+          select: { id: true, name: true, prevention: true },
+        });
+        const diseaseById = new Map(riskDiseases.map((d: any) => [d.id, d]));
+        const cooldownSince = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
+        const recentAlerts = await prisma.alert.findMany({
+          where: {
+            flockId: flock.id,
+            alertType: 'disease_risk',
+            diseaseId: { in: riskDiseaseIds },
+            createdAt: { gte: cooldownSince },
+          },
+          select: { diseaseId: true },
+        });
+        const cooledDown = new Set(recentAlerts.map((a: any) => a.diseaseId));
+        const dueDate = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+        for (const diseaseId of riskDiseaseIds) {
+          if (cooledDown.has(diseaseId)) continue;
+          const disease = diseaseById.get(diseaseId) as any;
+          if (!disease) continue;
+          const firstSentence = (disease.prevention || '').split(/(?<=[.!?])\s/)[0] || '';
+          try {
+            generatedAlerts.push(
+              await prisma.alert.create({
+                data: {
+                  flockId: flock.id,
+                  alertType: 'disease_risk',
+                  title: `Disease risk: ${disease.name}`,
+                  message: `Mortality events linked to ${disease.name} were recorded in the last 7 days. ${firstSentence} Review flock health and biosecurity (see disease details for prevention guidance).`,
+                  severity: 'warning',
+                  dueDate,
+                  diseaseId,
+                  isRead: false,
+                },
+              })
+            );
+          } catch (err: any) {
+            // P2002 = unresolved disease_risk alert already exists for this
+            // (flock, disease) — the partial unique index did its job.
+            if (err?.code !== 'P2002') throw err;
+          }
+        }
       }
       } catch (err) {
         // Skip flocks that fail (e.g. deleted mid-request); continue with others

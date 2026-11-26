@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { useApiQuery, useApiMutation } from "@/lib/api/hooks";
 import { Alert } from "@/lib/types";
@@ -266,6 +267,11 @@ export default function AlertsPage() {
                       Due: {new Date(alert.dueDate).toLocaleDateString()}
                     </span>
                     {alert.flock?.name && <span>Flock: {alert.flock.name}</span>}
+                    {alert.disease?.name && (
+                      <Link href="/diseases" className="text-primary hover:underline">
+                        Disease: {alert.disease.name}
+                      </Link>
+                    )}
                   </div>
                 </div>
                 {!alert.isResolved && (

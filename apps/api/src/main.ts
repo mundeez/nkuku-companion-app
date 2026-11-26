@@ -46,6 +46,7 @@ import { buildAccountModule } from './modules/accounts/routes.js';
 import { buildJournalModule } from './modules/journal/routes.js';
 import { buildLedgerModule } from './modules/ledger/routes.js';
 import { buildDocumentModule } from './modules/documents/routes.js';
+import { buildMediaModule } from './modules/media/routes.js';
 import { buildAdModule } from './modules/ads/routes.js';
 import { buildAdCampaignModule } from './modules/ad-campaigns/routes.js';
 import { buildAdminOpsModule } from './modules/admin-ops/routes.js';
@@ -183,6 +184,16 @@ try {
   app.log.error(`[Storage] Bucket setup failed: ${err.message}`);
 }
 
+// App-version telemetry: mobile clients send X-App-Version; logged at
+// debug level so deprecation decisions (e.g. organicTreatments alias
+// sunset) have adoption data without new infrastructure.
+app.addHook('onRequest', async (request) => {
+  const v = request.headers['x-app-version'];
+  if (typeof v === 'string' && v.length <= 32) {
+    request.log.debug({ appVersion: v, path: request.url }, 'client app version');
+  }
+});
+
 // ── Global error handler — convert Zod errors to 400 ──
 // Must be set BEFORE registering modules so it applies to all routes.
 app.setErrorHandler((err: any, request: any, reply: any) => {
@@ -240,6 +251,7 @@ await app.register(buildAccountModule, { prefix: '/api/v1/accounts' });
 await app.register(buildJournalModule, { prefix: '/api/v1/journal' });
 await app.register(buildLedgerModule, { prefix: '/api/v1/ledger' });
 await app.register(buildDocumentModule, { prefix: '/api/v1/documents' });
+await app.register(buildMediaModule, { prefix: '/api/v1/media' });
 await app.register(buildAdModule, { prefix: '/api/v1/ads' });
 await app.register(buildAdCampaignModule, { prefix: '/api/v1/ad-campaigns' });
 await app.register(buildAdminOpsModule, { prefix: '/api/v1/admin' });

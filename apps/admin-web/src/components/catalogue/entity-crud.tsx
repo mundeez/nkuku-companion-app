@@ -9,7 +9,7 @@ import {
   updateCatalogueItem,
   type CatalogueEntity,
 } from "@/lib/api/platform";
-import type { CatalogueBreed } from "@/lib/types";
+import type { CatalogueBreed, CatalogueDisease } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -300,6 +300,18 @@ export function useCatalogueBreeds(enabled: boolean) {
       .catch(() => setBreeds([]));
   }, [enabled]);
   return breeds;
+}
+
+/** Diseases are needed as a foreign key by the schedules editor — share one fetch. */
+export function useCatalogueDiseases(enabled: boolean) {
+  const [diseases, setDiseases] = useState<CatalogueDisease[]>([]);
+  useEffect(() => {
+    if (!enabled) return;
+    listCatalogue<CatalogueDisease>("diseases")
+      .then(setDiseases)
+      .catch(() => setDiseases([]));
+  }, [enabled]);
+  return diseases;
 }
 
 export function ActiveBadge({ active }: { active: boolean }) {

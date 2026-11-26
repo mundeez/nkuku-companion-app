@@ -16,7 +16,7 @@ export async function resolveVaccinationSchedule(
   if (flock.vaccinationScheduleId) {
     const schedule = await prisma.vaccinationSchedule.findUnique({
       where: { id: flock.vaccinationScheduleId },
-      include: { items: { orderBy: { sortOrder: 'asc' } } },
+      include: { items: { orderBy: { sortOrder: 'asc' }, include: { disease: { select: { id: true, name: true } } } } },
     });
     if (schedule) return schedule;
   }
@@ -28,7 +28,7 @@ export async function resolveVaccinationSchedule(
   if (org?.defaultVaccinationScheduleId) {
     const schedule = await prisma.vaccinationSchedule.findUnique({
       where: { id: org.defaultVaccinationScheduleId },
-      include: { items: { orderBy: { sortOrder: 'asc' } } },
+      include: { items: { orderBy: { sortOrder: 'asc' }, include: { disease: { select: { id: true, name: true } } } } },
     });
     if (schedule) return schedule;
   }
@@ -38,6 +38,6 @@ export async function resolveVaccinationSchedule(
     : 'Standard Broiler Schedule';
   return prisma.vaccinationSchedule.findFirst({
     where: { name: scheduleName },
-    include: { items: { orderBy: { sortOrder: 'asc' } } },
+    include: { items: { orderBy: { sortOrder: 'asc' }, include: { disease: { select: { id: true, name: true } } } } },
   });
 }

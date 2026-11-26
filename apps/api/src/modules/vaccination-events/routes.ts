@@ -9,6 +9,16 @@ import { displayDayOf, getHatchDayConvention } from '../../core/day-convention.j
 
 const withDisplayDay = (item: any, convention: string) => ({ ...item, displayDay: displayDayOf(item.ageDays, convention) });
 
+const diseaseInclude = { disease: { select: { id: true, name: true, category: true } } } as const;
+const scheduleItemInclude = { disease: { select: { id: true, name: true } } } as const;
+
+async function assertDiseasesExist(prisma: any, diseaseIds: (string | null | undefined)[]) {
+  const ids = [...new Set(diseaseIds.filter((d): d is string => !!d))];
+  if (!ids.length) return true;
+  const found = await prisma.disease.findMany({ where: { id: { in: ids } }, select: { id: true } });
+  return found.length === ids.length;
+}
+
 const VaccinationEventCreateSchema = z.object({
   flockId: z.string().uuid(),
   vaccineName: z.string().min(1).max(100),
@@ -22,6 +32,7 @@ const VaccinationEventCreateSchema = z.object({
   expiryDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional().nullable(),
   vaccineInventoryId: z.string().uuid().optional().nullable(),
   notes: z.string().optional(),
+  diseaseId: z.string().uuid().nullable().optional(),
 });
 
 export async function buildVaccinationEventModule(app: FastifyInstance) {
@@ -36,7 +47,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     reply.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
     const convention = await getHatchDayConvention(prisma, getOrganizationId(request));
     const schedules = await prisma.vaccinationSchedule.findMany({
-      include: { items: { orderBy: { sortOrder: 'asc' } } },
+      include: { items: { orderBy: { sortOrder: 'asc' }, include: scheduleItemInclude } },
       orderBy: { isDefault: 'desc' },
     });
     return schedules.map((s: any) => ({
@@ -58,6 +69,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
       return prisma.vaccinationEvent.findMany({
         where: { flockId },
+        include: diseaseInclude,
         orderBy: { adminDate: 'asc' },
       });
     }
@@ -65,6 +77,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     // No flockId provided — return all vaccination events for the user's flocks
     return prisma.vaccinationEvent.findMany({
       where: { flock: { organizationId } },
+      include: diseaseInclude,
       orderBy: { adminDate: 'asc' },
     });
   });
@@ -113,7 +126,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
     };
   });
 
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request, reply) => {
     const { flockId, ...data } = VaccinationEventCreateSchema.parse(request.body);
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
@@ -122,6 +135,10 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
       where: { id: flockId, organizationId },
     });
     if (!flock) return { error: 'NOT_FOUND' };
+
+    if (!(await assertDiseasesExist(prisma, [data.diseaseId]))) {
+      return reply.status(400).send({ error: 'DISEASE_NOT_FOUND' });
+    }
 
     const record = await prisma.vaccinationEvent.create({
       data: {
@@ -132,6 +149,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         flockId,
       },
+      include: diseaseInclude,
     });
 
     // Auto-create financial record for vaccine cost
@@ -171,6 +189,10 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
     if (assertFlockNotCompleted(reply, event.flock.status, (request as any).authUser?.role)) return;
 
+    if (!(await assertDiseasesExist(prisma, [data.diseaseId]))) {
+      return reply.status(400).send({ error: 'DISEASE_NOT_FOUND' });
+    }
+
     const updated = await prisma.vaccinationEvent.update({
       where: { id },
       data: {
@@ -180,6 +202,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
         nextDueDate: data.nextDueDate ? new Date(data.nextDueDate) : undefined,
         expiryDate: data.expiryDate !== undefined ? (data.expiryDate ? new Date(data.expiryDate) : null) : undefined,
       },
+      include: diseaseInclude,
     });
 
     // Sync financial record
@@ -279,6 +302,10 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
 
       const validRecords = body.records.filter((r) => validFlockIds.has(r.flockId));
 
+      if (!(await assertDiseasesExist(prisma, validRecords.map((r) => r.diseaseId)))) {
+        return reply.status(400).send({ error: 'DISEASE_NOT_FOUND' });
+      }
+
       const created = await prisma.$transaction(async (tx: any) => {
         const results: any[] = [];
         for (const r of validRecords) {
@@ -287,6 +314,7 @@ export async function buildVaccinationEventModule(app: FastifyInstance) {
               flockId: r.flockId,
               vaccineName: r.vaccineName,
               vaccineType: r.vaccineType || r.vaccineName,
+              diseaseId: r.diseaseId ?? null,
               adminDate: new Date(r.adminDate),
               adminMethod: r.adminMethod,
               ageDays: r.ageDays,

@@ -5,6 +5,8 @@ import { getOrganizationId } from '../../core/tenancy/scope.js';
 import { bulkRateLimit } from '../../core/security/rate-limiter.js';
 import { checkFlockNotLocked, assertFlockNotCompleted } from '../broiler-flocks/check-flock-locked.js';
 
+const diseaseInclude = { disease: { select: { id: true, name: true, category: true } } } as const;
+
 const MortalityEventCreateSchema = z.object({
   flockId: z.string().uuid(),
   eventDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
@@ -13,7 +15,17 @@ const MortalityEventCreateSchema = z.object({
   ageDays: z.number().int().optional(),
   costZmw: z.number().nonnegative().optional(),
   notes: z.string().optional(),
+  diseaseId: z.string().uuid().nullable().optional(),
 });
+
+// diseaseId references the GLOBAL diseases table (no org scope) — validate
+// existence once and 400 DISEASE_NOT_FOUND on any miss.
+async function assertDiseasesExist(prisma: any, diseaseIds: (string | null | undefined)[]) {
+  const ids = [...new Set(diseaseIds.filter((d): d is string => !!d))];
+  if (!ids.length) return true;
+  const found = await prisma.disease.findMany({ where: { id: { in: ids } }, select: { id: true } });
+  return found.length === ids.length;
+}
 
 export async function buildMortalityEventModule(app: FastifyInstance) {
   const prisma = (app as any).prisma;
@@ -32,6 +44,7 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
 
       return prisma.mortalityEvent.findMany({
         where: { flockId },
+        include: diseaseInclude,
         orderBy: { eventDate: 'asc' },
       });
     }
@@ -39,6 +52,7 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
     // No flockId provided — return all mortality events for the user's flocks
     return prisma.mortalityEvent.findMany({
       where: { flock: { organizationId } },
+      include: diseaseInclude,
       orderBy: { eventDate: 'asc' },
     });
   });
@@ -77,7 +91,7 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
     };
   });
 
-  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request) => {
+  app.post('/', { preHandler: [authenticate, requireRole('owner', 'manager'), flockLock] }, async (request, reply) => {
     const { flockId, ...data } = MortalityEventCreateSchema.parse(request.body);
     const _authUser = (request as any).authUser;
     const organizationId = getOrganizationId(request);
@@ -86,6 +100,10 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
       where: { id: flockId, organizationId },
     });
     if (!flock) return { error: 'NOT_FOUND' };
+
+    if (!(await assertDiseasesExist(prisma, [data.diseaseId]))) {
+      return reply.status(400).send({ error: 'DISEASE_NOT_FOUND' });
+    }
 
     // Update current count
     await prisma.broilerFlock.update({
@@ -99,6 +117,7 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
         eventDate: new Date(data.eventDate),
         flockId,
       },
+      include: diseaseInclude,
     });
 
     // Auto-create financial record for mortality/disposal cost
@@ -107,11 +126,13 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
         data: {
           flockId,
           sourceRecordId: record.id,
+          sourceTable: 'mortality_events',
           recordDate: new Date(data.eventDate),
           category: 'other',
           description: `Mortality/Disposal - ${data.count} birds (${data.cause || 'Unknown cause'})`,
           amountZmw: data.costZmw,
           isIncome: false,
+          isSystemGenerated: true,
           notes: 'Auto-generated from mortality record',
         },
       });
@@ -138,6 +159,10 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
 
     if (assertFlockNotCompleted(reply, record.flock.status, (request as any).authUser?.role)) return;
 
+    if (!(await assertDiseasesExist(prisma, [data.diseaseId]))) {
+      return reply.status(400).send({ error: 'DISEASE_NOT_FOUND' });
+    }
+
     // Adjust flock count if count changed
     if (data.count !== undefined && record.flock) {
       const delta = record.count - data.count;
@@ -153,6 +178,7 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
         ...data,
         eventDate: data.eventDate ? new Date(data.eventDate) : undefined,
       },
+      include: diseaseInclude,
     });
 
     // Sync financial record
@@ -174,11 +200,13 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
             data: {
               flockId: record.flockId,
               sourceRecordId: id,
+              sourceTable: 'mortality_events',
               recordDate: new Date(data.eventDate || record.eventDate),
               category: 'other',
               description: desc,
               amountZmw: data.costZmw,
               isIncome: false,
+              isSystemGenerated: true,
               notes: 'Auto-generated from mortality record',
             },
           });
@@ -254,6 +282,11 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
 
       const validRecords = body.records.filter((r) => flockMap.has(r.flockId));
 
+      // Batch-validate all referenced diseases once (global table, no org scope)
+      if (!(await assertDiseasesExist(prisma, validRecords.map((r) => r.diseaseId)))) {
+        return reply.status(400).send({ error: 'DISEASE_NOT_FOUND' });
+      }
+
       const created = await prisma.$transaction(async (tx: any) => {
         const results: any[] = [];
         // Track per-flock count adjustments
@@ -278,7 +311,9 @@ export async function buildMortalityEventModule(app: FastifyInstance) {
               ageDays: r.ageDays,
               costZmw: r.costZmw,
               notes: r.notes,
+              diseaseId: r.diseaseId ?? null,
             },
+            include: diseaseInclude,
           });
           if (r.costZmw && r.costZmw > 0) {
             await tx.financialRecord.create({

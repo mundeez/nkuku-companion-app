@@ -9,6 +9,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Newcastle Disease',
     category: 'Viral',
+    keywords: ['ND', 'NCD', 'pseudo fowl pest', 'fowl pest', 'paramyxovirus', 'new castle'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 42,
     incubation: 'Usually 3–6 days after exposure (strain- and host-dependent; roughly 2–15 days range).',
     mortalityRate: 'Highly variable. Velogenic (virulent) strains can kill up to ~100% of unvaccinated or poorly vaccinated flocks; mild strains and well-vaccinated flocks show much lower losses.',
     symptoms:
@@ -61,6 +64,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: "Marek's Disease",
     category: 'Viral',
+    keywords: ['mareks', 'marek', 'herpesvirus avium', 'mdv'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 180,
     incubation:
       'Clinical disease typically appears weeks to months after infection — often 2–7 months of age; nerve paralysis and tumors can appear later in life.',
     mortalityRate:
@@ -113,6 +119,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Infectious Bursal Disease (Gumboro)',
     category: 'Viral',
+    keywords: ['IBD', 'Gumboro', 'infectious bursal', 'bursal disease', 'gumboro disease'],
+    susceptibleAgeMinDays: 14,
+    susceptibleAgeMaxDays: 28,
     incubation: 'Clinical signs typically appear 2–5 days after infection; outbreaks in a flock usually develop over 3–4 days.',
     mortalityRate:
       'Usually low (<10%) with classic strains, but very virulent strains can cause mortality of 60% or more. High morbidity is typical even when deaths are few.',
@@ -165,6 +174,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Infectious Bronchitis (IB)',
     category: 'Viral',
+    keywords: ['IB', 'infectious bronchitis', 'bronchitis', 'coronavirus avian', 'IBV'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 56,
     incubation: 'Generally 24–48 hours; viral excretion peaks 3–5 days after infection.',
     mortalityRate:
       'Usually low in broilers (most birds recover with care), but nephropathogenic strains can cause significant mortality, and layers suffer production losses rather than mass death.',
@@ -217,6 +229,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Coccidiosis',
     category: 'Parasitic',
+    keywords: ['cocci', 'coccidiosis', 'eimeria', 'emeria', 'coccidia'],
+    susceptibleAgeMinDays: 14,
+    susceptibleAgeMaxDays: 42,
     incubation:
       'Prepatent period (time from infection to oocyst shedding) is about 4–7 days; clinical disease typically follows within days of heavy exposure.',
     mortalityRate:
@@ -270,6 +285,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Necrotic Enteritis',
     category: 'Bacterial',
+    keywords: ['NE', 'necrotic enteritis', 'clostridium perfringens', 'enteritis', 'necrotic'],
+    susceptibleAgeMinDays: 10,
+    susceptibleAgeMaxDays: 35,
     incubation: 'Peracute course of 3–4 days per bird; flock-level incidence can rise and fall over two or more weeks.',
     mortalityRate: 'Rapidly fatal — mortality can reach ~50% of affected birds, often with few preceding signs.',
     symptoms:
@@ -320,6 +338,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Infectious Laryngotracheitis (ILT)',
     category: 'Viral',
+    keywords: ['ILT', 'laryngotracheitis', 'tracheitis'],
+    susceptibleAgeMinDays: 42,
+    susceptibleAgeMaxDays: null,
     incubation: 'About 4–12 days from exposure to clinical signs (typically 1–2 weeks in field cases).',
     mortalityRate:
       'Variable — mild strains cause little loss, while severe outbreaks can kill a substantial fraction of the flock; recovered birds often remain lifelong carriers.',
@@ -373,6 +394,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Avian Influenza',
     category: 'Viral',
+    keywords: ['AI', 'avian influenza', 'bird flu', 'H5N1', 'H7N9'],
+    susceptibleAgeMinDays: null,
+    susceptibleAgeMaxDays: null,
     incubation:
       'Flock-level incubation is about 14 days per WOAH guidance; individual birds may show signs within roughly 2–17 days of exposure.',
     mortalityRate:
@@ -421,6 +445,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Salmonellosis',
     category: 'Bacterial',
+    keywords: ['salmonella', 'pullorum', 'typhoid', 'paratyphoid', 'SE', 'ST'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 42,
     incubation:
       'Variable — typically a few days to 1–2 weeks after exposure, depending on serotype and bird age.',
     mortalityRate:
@@ -474,6 +501,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'E. coli Infection (Colibacillosis)',
     category: 'Bacterial',
+    keywords: ['E.coli', 'E coli', 'ecoli', 'colibacillosis', 'coliform', 'air sac infection', 'coli'],
+    susceptibleAgeMinDays: 0,
+    susceptibleAgeMaxDays: 42,
     incubation:
       'Variable — signs can appear within days of exposure or develop gradually as a secondary infection.',
     mortalityRate:
@@ -526,6 +556,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Chronic Respiratory Disease (CRD) / Mycoplasma',
     category: 'Bacterial',
+    keywords: ['CRD', 'mycoplasma', 'MG', 'mycoplasma gallisepticum', 'chronic respiratory'],
+    susceptibleAgeMinDays: 14,
+    susceptibleAgeMaxDays: 56,
     incubation:
       'Slow and insidious — clinical signs often develop over weeks after introduction of infected stock; incubation can be several weeks.',
     mortalityRate:
@@ -579,6 +612,9 @@ export const diseasesPart1: DiseaseRecord[] = [
   {
     name: 'Fowl Pox',
     category: 'Viral',
+    keywords: ['fowl pox', 'pox', 'avipoxvirus', 'diphtheritic form'],
+    susceptibleAgeMinDays: 56,
+    susceptibleAgeMaxDays: null,
     incubation:
       'About 4–10 days from exposure to appearance of scabs/lesions, depending on route of infection.',
     mortalityRate:
